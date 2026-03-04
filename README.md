@@ -81,7 +81,7 @@ Addition is built for the modern cloud:
 
 <div align="center">
   <h3>Project Showcase</h3>
-  <video src="web/portal/assets/promo.mp4" width="800" controls muted autoplay loop>
+  <video src="docs/assets/promo.mp4" width="800" controls muted autoplay loop>
     Your browser does not support the video tag.
   </video>
 </div>
