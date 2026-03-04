@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/ADDAddition/ADDITION/main/docs/assets/logo-transparent.png" alt="Addition Logo" width="250">
+  <img src="docs/assets/logo-transparent.png" alt="Addition Logo" width="250">
 </p>
 
 <h1 align="center">/ADD PROTOCOL (ADDITION)</h1>
@@ -17,14 +17,15 @@
 ## The Evolutionary Shift
 Addition (/ADD) is a next-generation Layer 1 blockchain engineered to eliminate the vulnerabilities of legacy networks. While Ethereum and Solana face the imminent threat of quantum computing, Addition provides a **mathematically secure, hyper-scarce, and fully decentralised** financial foundation.
 
-### Technical Superiority: /ADD vs. The Giants
+### Technical Superiority Matrix
 
-| Feature | Addition (/ADD) | Solana (SOL) | Ethereum (ETH) |
-| :--- | :--- | :--- | :--- |
-| **Quantum Security** | **ML-DSA-87 (NIST Lvl 5)** | Vulnerable | Vulnerable |
-| **TX Experience** | **INSTANT (via Mempool-Sync)** | Variable | Slow / Expensive |
-| **Max Supply** | **50,000,000 (Fixed)** | ~580M | Infinite |
-| **Privacy** | **Native Privacy Pools** | Public Only | L2 Required |
+| Feature | Addition (/ADD) | Solana (SOL) | Ethereum (ETH) | Bitcoin (BTC) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Quantum Security** | **YES (NIST Lvl 5)** | NO (Vulnerable) | NO (Vulnerable) | NO (Vulnerable) |
+| **TX Experience** | **INSTANT (Sync)** | Fast | Slow | Very Slow |
+| **Max Supply** | **50,000,000** | ~580M (Inflation) | Infinite | 21,000,000 |
+| **Privacy** | **Native Pools** | Public Only | Public Only | Public Only |
+| **MetaMask / EVM** | **YES (Native Bridge)** | NO (Isolated) | YES | NO |
 
 ---
 
@@ -36,7 +37,7 @@ Despite a robust 60-second block confirmation time for deep security, Addition u
 - **Efficiency**: Merchants don't wait for block mining to verify transaction legitimacy.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/ADDAddition/ADDITION/main/docs/assets/privacy_new.png" alt="Addition Privacy" width="450">
+  <img src="docs/assets/privacy_new.png" alt="Addition Privacy" width="450">
 </p>
 
 ### Universal Interoperability (EVM Bridge)
@@ -69,14 +70,6 @@ Addition is backed by a **legally registered Canadian Federal Entity**. We combi
 [View Official Federal Registry Details](https://ised-isde.canada.ca/cc/lgcy/fdrlCrpDtls.html?p=0&corpId=17632274&crpNm=addison&crpNmbr=&bsNmbr=&cProv=&cStatus=&cAct=)
 
 ---
-
-<div align="center">
-  <h3>Network Showcase</h3>
-  <video src="https://github.com/ADDAddition/ADDITION/raw/main/docs/assets/promo.mp4" width="100%"></video>
-  <br>
-  <h3>Chain Visual Demo</h3>
-  <video src="https://github.com/ADDAddition/ADDITION/raw/main/docs/assets/masterpiece_chain.mp4" width="100%"></video>
-</div>
 
 <p align="center">
   <br>
