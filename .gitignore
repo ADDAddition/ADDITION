@@ -62,3 +62,5 @@ yarn-error.log
 *.obj
 *.gch
 *.pch
+
+web/
