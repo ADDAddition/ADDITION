@@ -1,8 +1,30 @@
-# Addition (ADD) / ADD Privacy
+﻿<p align="center">
+  <img src="web/portal/assets/logo-transparent.png" alt="Addition Logo" width="250">
+</p>
 
-Professional quantum-resistant blockchain stack with mining, staking, privacy runtime,
-smart contracts, token/NFT support, and hardened decentralized P2P.
+<h1 align="center">Addition (ADD) / ADD Privacy</h1>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Status-Mainnet--Ready-brightgreen?style=for-the-badge" alt="Status">
+  <img src="https://img.shields.io/badge/Security-Quantum--Resistant-blue?style=for-the-badge" alt="Security">
+  <img src="https://img.shields.io/badge/Privacy-Enabled-blueviolet?style=for-the-badge" alt="Privacy">
+  <img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge" alt="License">
+</p>
+
+---
+
+<p align="center">
+  <b>Professional quantum-resistant blockchain stack with mining, staking, privacy runtime, smart contracts, and hardened P2P.</b>
+</p>
+
+<div align="center">
+  <h3>Project Showcase</h3>
+  <video src="web/portal/assets/promo.mp4" width="800" controls muted autoplay loop>
+    Your browser does not support the video tag.
+  </video>
+</div>
+
+---
 ## Core Highlights
 - Quantum-resistant signatures (ML-DSA-87, strict mode)
 - Hard monetary cap: 50,000,000 ADD
@@ -164,3 +186,4 @@ Notes:
 - App entry is `client/addition_app/lib/main.dart`.
 - API base defaults to `http://127.0.0.1:8080` and can be changed in UI.
 Then open `web/portal/index.html` in a browser.
+
