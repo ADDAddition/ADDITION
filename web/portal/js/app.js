@@ -1,4 +1,27 @@
-const LOCAL_API = 'http://127.0.0.1:8080';
+const LOCAL_API = (() => {
+    const queryApi = new URLSearchParams(window.location.search).get('api');
+    if (queryApi) {
+        const normalized = queryApi.trim().replace(/\/$/, '');
+        localStorage.setItem('PORTAL_API_BASE', normalized);
+        return normalized;
+    }
+
+    const stored = (localStorage.getItem('PORTAL_API_BASE') || '').trim();
+    if (stored) {
+        return stored.replace(/\/$/, '');
+    }
+
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+        return 'http://127.0.0.1:8080';
+    }
+
+    if (host === 'dogecointoday.com' || host === 'www.dogecointoday.com') {
+        return 'https://api.dogecointoday.com';
+    }
+
+    return 'https://api.xa1.ai';
+})();
 const TPS_HISTORY = [];
 const TPS_HISTORY_MAX = 60;
 

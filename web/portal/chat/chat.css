@@ -1,5 +1,7 @@
 body{font-family:Arial,sans-serif;background:#020202;color:#fff;max-width:900px;margin:0 auto;padding:16px}
 header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.chat-brand{display:inline-flex;align-items:center;text-decoration:none}
+.chat-brand img{width:72px;height:72px;object-fit:contain;border-radius:0}
 .card{background:#0a0a0c;border:1px solid #222;border-radius:12px;padding:16px;margin-bottom:12px}
 .row{display:flex;flex-direction:column;margin-bottom:10px}
 input,textarea,button,pre{background:#111;color:#fff;border:1px solid #333;border-radius:8px;padding:10px}

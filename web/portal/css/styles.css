@@ -87,6 +87,18 @@ body {
 .brand strong { display: block; font-size: .95rem; }
 .brand span { display: block; font-size: .72rem; color: var(--muted); }
 
+.brand--logo-only img {
+    width: 68px;
+    height: 68px;
+    object-fit: contain;
+    border-radius: 0;
+    background: transparent;
+}
+
+.brand--logo-only .brand-copy {
+    display: none;
+}
+
 .nav-links { display: flex; flex-wrap: wrap; gap: .4rem; }
 .nav-links a {
     text-decoration: none;

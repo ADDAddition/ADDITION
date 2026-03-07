@@ -1,0 +1,12 @@
+# Example Cloudflared config for exposing ADDITION portal backend securely
+# Copy to: %USERPROFILE%\.cloudflared\config.yml
+
+tunnel: <YOUR_TUNNEL_ID>
+credentials-file: C:\Users\<YOUR_USER>\.cloudflared\<YOUR_TUNNEL_ID>.json
+
+ingress:
+  - hostname: api.xa1.ai
+    service: http://127.0.0.1:8080
+  - hostname: api.dogecointoday.com
+    service: http://127.0.0.1:8080
+  - service: http_status:404
