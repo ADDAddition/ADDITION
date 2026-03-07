@@ -14,8 +14,11 @@ Each TCP request is one command line and returns one response line.
 - `createwallet`
 - `getbalance <address>`
 - `getbalance_instant <address>`
-- `sendtx <from_addr> <pubkey_hex> <privkey_hex> <to_addr> <amount> <fee> <nonce>`
-- `sendtx_hash <from_addr> <pubkey_hex> <privkey_hex> <to_addr> <amount> <fee> <nonce>`
+- `tx_build <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce>`
+- `sendtx_signed <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce> <sig_hex_without_pq_prefix>`
+- `sendtx_signed_hash <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce> <sig_hex_without_pq_prefix>`
+- `sendtx <from_addr> <pubkey_hex> <privkey_hex> <to_addr> <amount> <fee> <nonce>` (legacy, disabled unless `ADDITION_ALLOW_INSECURE_TX_COMMANDS=1`)
+- `sendtx_hash <from_addr> <pubkey_hex> <privkey_hex> <to_addr> <amount> <fee> <nonce>` (legacy, disabled unless `ADDITION_ALLOW_INSECURE_TX_COMMANDS=1`)
 - `tx_status <tx_hash>`
 - `mine`
 
@@ -91,28 +94,23 @@ Each TCP request is one command line and returns one response line.
 	- Any mismatch fails signing/verification immediately.
 
 ## Privacy pool
-- `privacy_set_verifier <command_path_or_wrapper>`
-- `privacy_mint <owner> <amount>`
-- `privacy_spend <owner> <note_id> <recipient> <amount>`
+- `privacy_native_verifier <pq_mldsa87>`
 - `privacy_mint_zk <owner> <amount> <commitment_hex> <nullifier_hex> <proof_hex> <vk_hex>`
 - `privacy_spend_zk <owner> <note_id> <recipient> <amount> <nullifier_hex> <proof_hex> <vk_hex>`
-- `privacy_balance <owner>`
 
 Strict privacy mode notes:
-- `privacy_mint_zk` / `privacy_spend_zk` require external verifier command configured via `privacy_set_verifier`.
+- `privacy_mint_zk` / `privacy_spend_zk` are verified only in-process via native mode `pq_mldsa87`.
+- Non-ZK privacy commands are removed; privacy flow is ZK-only.
+- Strict ZK privacy policy is always ON (runtime toggle removed).
+- External verifier wrappers are disabled in mainnet native-only mode.
 - Proof and verification key are mandatory; no internal simulation verifier is used.
-
-Example verifier setup:
-- `privacy_set_verifier python tools/zk_verify_wrapper.py`
+- Note storage hardening: `owner` and `amount` are not persisted in plaintext.
+- Required for private note operations: set `ADDITION_PRIVACY_MASTER_KEY` (minimum 32 chars) before node startup.
+- `owner_tag` derivation is also keyed with `ADDITION_PRIVACY_MASTER_KEY` to avoid cross-dataset linkage from state files.
+- Private balance query commands are removed from command surface to reduce metadata leakage.
 
 Verifier tooling:
-- Wrapper: `tools/zk_verify_wrapper.py`
-- Smoke test: `tools/zk_verify_smoketest.py`
-- Backend contract: `tools/zk_backend_contract.md`
-
-Real backend note:
-- `tools/zk_verify_wrapper.py` requires env var `ADDITION_ZK_VERIFY_CMD`.
-- The backend command must follow the JSON request/result contract documented in `tools/zk_backend_contract.md`.
+- Native verifier is integrated in C++ (`privacy.cpp`) and uses ML-DSA-87 verification primitives.
 
 ## Staking
 - `stake <address> <amount>`
@@ -123,7 +121,25 @@ Real backend note:
 
 ## Smart-contract runtime
 - `contract_deploy <owner> <code>`
-- `contract_call <id> <set|add|get> <key> <value>`
+- `contract_call <id> <set|add|get|token_balance|swap_quote|zk_mint|zk_spend|zk_privacy_status> <key> <value>`
+
+### ZK privacy methods via `contract_call`
+- `zk_mint`
+	- key format: `<OWNER>:<COMMITMENT_HEX>:<NULLIFIER_HEX>:<PROOF_HEX>:<VK_HEX>`
+	- value: amount to mint privately (`> 0`)
+	- return: created `note_id`
+- `zk_spend`
+	- key format: `<OWNER>:<NOTE_ID>:<RECIPIENT>:<NULLIFIER_HEX>:<PROOF_HEX>:<VK_HEX>`
+	- value: private amount to send (`> 0`)
+	- return: recipient new private `note_id`
+- `zk_privacy_status`
+	- key format: any non-empty token (for example `status`)
+	- value: ignored (set `0`)
+	- return: `verifier_configured`, `strict_zk_mode`, notes and nullifier stats
+
+Notes:
+- For strongest privacy, keep `strict_zk_mode` ON.
+- `zk_mint` and `zk_spend` require valid proof/vk hex and native in-process ML-DSA-87 verification.
 
 ## Token & NFT runtime
 - `token_create <symbol> <owner> <max_supply> <initial_mint>`
@@ -150,6 +166,9 @@ Real backend note:
 - Runtime strict gates enabled:
 	- PQ signatures required for spend transactions (`signature` must be `pq=` format)
 	- Minimum transaction fee enforced (`min_fee=1`)
+	- RPC LAN commands are filtered by untrusted allowlist
+	- Admin-sensitive commands require trusted interface when strict admin mode is enabled
+	- Local/LAN RPC token auth supported via `ADDITION_RPC_TOKEN` / `ADDITION_LAN_RPC_TOKEN`
 	- Daemon refuses startup if liboqs is not linked
 	- Staking requires sufficient on-chain balance
 	- `sendtx` is routed through decentralized gossip path (`ok:gossiped` on success)
@@ -171,7 +190,7 @@ Real backend note:
 - Supports:
 	- Wallet creation (`createwallet`)
 	- Balance refresh (`getbalance`)
-	- Send tx with explicit keys (`sendtx ...`)
+	- Secure send flow (`tx_build` + `sign_message` + `sendtx_signed_hash`)
 	- Mining to selected address (`mine <address>`)
 	- Stake / unstake / claim
 
@@ -222,8 +241,6 @@ Supported bootstrap methods:
 
 Limitations (current bridge stage):
 - Not a full EVM execution node.
-- Bridge `eth_sendRawTransaction` expects strict bridge payload encoding:
-	- `0x` + UTF-8 hex for: `from|pub|priv|to|amount|fee|nonce`
-- `eth_sendRawTransaction` maps to native `sendtx_hash`.
+- `eth_sendRawTransaction` is disabled in secure mode.
 - `eth_getTransactionReceipt` / `eth_getTransactionByHash` map to native `tx_status`.
 - No smart-contract bytecode execution in EVM context yet.

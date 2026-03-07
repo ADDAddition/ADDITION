@@ -1,7 +1,7 @@
-name = "addition-portal"
+name = "add-core-portal"
+account_id = "6590fd0642af0b3ecaf9ad5046f22ae4"
 main = "worker.js"
 compatibility_date = "2026-03-03"
-route = "xa1.ai/*"
 
 [assets]
 directory = "../../web/portal"
@@ -9,3 +9,55 @@ binding = "ASSETS"
 
 [vars]
 PORTAL_API_BASE = "https://api.xa1.ai"
+
+[[routes]]
+pattern = "bitcoins.express/*"
+zone_name = "bitcoins.express"
+
+[[routes]]
+pattern = "bitcoins.icu/*"
+zone_name = "bitcoins.icu"
+
+[[routes]]
+pattern = "bnkchain.com/*"
+zone_name = "bnkchain.com"
+
+[[routes]]
+pattern = "chainbnk.com/*"
+zone_name = "chainbnk.com"
+
+[[routes]]
+pattern = "dogecointoday.com/*"
+zone_name = "dogecointoday.com"
+
+[[routes]]
+pattern = "dogecointoday.net/*"
+zone_name = "dogecointoday.net"
+
+[[routes]]
+pattern = "dogecointoday.org/*"
+zone_name = "dogecointoday.org"
+
+[[routes]]
+pattern = "gcli.ai/*"
+zone_name = "gcli.ai"
+
+[[routes]]
+pattern = "pw1.ai/*"
+zone_name = "pw1.ai"
+
+[[routes]]
+pattern = "tradexai.ai/*"
+zone_name = "tradexai.ai"
+
+[[routes]]
+pattern = "vanitygen.cc/*"
+zone_name = "vanitygen.cc"
+
+[[routes]]
+pattern = "xcryptocurrencies.com/*"
+zone_name = "xcryptocurrencies.com"
+
+[[routes]]
+pattern = "xpaiements.com/*"
+zone_name = "xpaiements.com"

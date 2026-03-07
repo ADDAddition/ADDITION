@@ -6,10 +6,17 @@
 #include <chrono>
 #include <limits>
 #include <optional>
+#include <atomic>
+#include <thread>
+#include <mutex>
 #include <vector>
 
 namespace addition {
 namespace {
+
+std::string derive_address_from_pubkey(const std::string& pubkey_hex) {
+    return to_hex(sha3_512_bytes("addr|" + pubkey_hex)).substr(0, 40);
+}
 
 std::uint64_t now_seconds() {
     const auto now = std::chrono::system_clock::now();
@@ -72,6 +79,7 @@ void Chain::reset() {
     blocks_.clear();
     utxo_set_.clear();
     address_index_.clear();
+    signer_last_nonce_.clear();
     seen_transactions_.clear();
     difficulty_target_ = cfg_.initial_difficulty_target;
     total_emitted_ = 0;
@@ -145,9 +153,13 @@ bool Chain::hash_meets_target(const std::string& hex_hash, std::uint64_t target)
 std::uint64_t Chain::compute_block_reward(std::uint64_t h) const {
     const auto halvings = h / cfg_.halving_interval;
     if (halvings >= 63) {
-        return 0;
+        return cfg_.tail_emission_reward;
     }
-    return cfg_.block_reward >> halvings;
+    const auto shifted = cfg_.block_reward >> halvings;
+    if (shifted == 0) {
+        return cfg_.tail_emission_reward;
+    }
+    return shifted;
 }
 
 std::uint64_t Chain::compute_next_difficulty_target() const {
@@ -164,10 +176,28 @@ std::uint64_t Chain::compute_next_difficulty_target() const {
     const auto expected = static_cast<std::uint64_t>(window) * cfg_.target_block_time_sec;
 
     std::uint64_t next = difficulty_target_;
+
     if (observed < expected) {
         next = std::max(cfg_.min_difficulty_target, static_cast<std::uint64_t>(difficulty_target_ * 9 / 10));
     } else if (observed > expected) {
-        next = std::min(cfg_.max_difficulty_target, static_cast<std::uint64_t>(difficulty_target_ * 11 / 10));
+        const std::uint64_t observed_capped = std::min<std::uint64_t>(observed, expected * 32ULL);
+        std::uint64_t scaled = difficulty_target_;
+        if (expected > 0 && scaled <= (std::numeric_limits<std::uint64_t>::max() / observed_capped)) {
+            scaled = (scaled * observed_capped) / expected;
+        } else {
+            scaled = cfg_.max_difficulty_target;
+        }
+        if (scaled < difficulty_target_) {
+            scaled = difficulty_target_;
+        }
+        next = std::min(cfg_.max_difficulty_target, scaled);
+    }
+
+    if (next < cfg_.min_difficulty_target) {
+        next = cfg_.min_difficulty_target;
+    }
+    if (next > cfg_.max_difficulty_target) {
+        next = cfg_.max_difficulty_target;
     }
     return next;
 }
@@ -175,6 +205,46 @@ std::uint64_t Chain::compute_next_difficulty_target() const {
 std::uint64_t Chain::balance_of(const std::string& address) const {
     const auto it = address_index_.find(address);
     return it == address_index_.end() ? 0ULL : it->second;
+}
+
+bool Chain::credit_balance(const std::string& address,
+                          std::uint64_t amount,
+                          const std::string& reason,
+                          std::string& error) {
+    if (address.empty()) {
+        error = "address empty";
+        return false;
+    }
+    if (amount == 0) {
+        error = "amount must be > 0";
+        return false;
+    }
+    if (reason.empty()) {
+        error = "reason empty";
+        return false;
+    }
+
+    const auto txid = to_hex(sha3_512_bytes("credit|" + reason + "|" + address + "|" + std::to_string(amount) + "|" + std::to_string(height() + 1)));
+    if (seen_transactions_.count(txid) > 0) {
+        error = "duplicate credit tx";
+        return false;
+    }
+
+    const auto key = outpoint_key(txid, 0);
+    if (utxo_set_.count(key) > 0) {
+        error = "duplicate credit outpoint";
+        return false;
+    }
+
+    utxo_set_[key] = UTXO{address, amount, false};
+    if (address_index_[address] > (std::numeric_limits<std::uint64_t>::max() - amount)) {
+        utxo_set_.erase(key);
+        error = "balance overflow";
+        return false;
+    }
+    address_index_[address] += amount;
+    seen_transactions_.insert(txid);
+    return true;
 }
 
 bool Chain::build_transaction(const std::string& from,
@@ -190,6 +260,10 @@ bool Chain::build_transaction(const std::string& from,
     }
     if (amount == 0) {
         error = "amount must be > 0";
+        return false;
+    }
+    if (fee > (std::numeric_limits<std::uint64_t>::max() - amount)) {
+        error = "amount+fee overflow";
         return false;
     }
 
@@ -251,6 +325,10 @@ bool Chain::validate_transaction(const Transaction& tx, std::string& error) cons
             error = "output amount zero";
             return false;
         }
+        if (outputs_total > (std::numeric_limits<std::uint64_t>::max() - out.amount)) {
+            error = "outputs overflow";
+            return false;
+        }
         outputs_total += out.amount;
     }
 
@@ -275,6 +353,14 @@ bool Chain::validate_transaction(const Transaction& tx, std::string& error) cons
         return false;
     }
 
+    {
+        const auto it = signer_last_nonce_.find(tx.signer);
+        if (it != signer_last_nonce_.end() && tx.nonce <= it->second) {
+            error = "nonce replay or out-of-order";
+            return false;
+        }
+    }
+
     std::uint64_t inputs_total = 0;
     std::unordered_set<std::string> seen_inputs;
     for (const auto& in : tx.inputs) {
@@ -288,7 +374,16 @@ bool Chain::validate_transaction(const Transaction& tx, std::string& error) cons
             error = "input utxo not found or spent";
             return false;
         }
+        if (inputs_total > (std::numeric_limits<std::uint64_t>::max() - it->second.amount)) {
+            error = "inputs overflow";
+            return false;
+        }
         inputs_total += it->second.amount;
+    }
+
+    if (outputs_total > (std::numeric_limits<std::uint64_t>::max() - tx.fee)) {
+        error = "outputs+fee overflow";
+        return false;
     }
 
     if (inputs_total < outputs_total + tx.fee) {
@@ -322,22 +417,63 @@ Block Chain::make_block_template(const std::string& reward_address,
 
 bool Chain::mine_and_add_block(const std::string& reward_address,
                                std::vector<Transaction> txs,
+                               std::size_t threads,
                                std::string& mined_hash,
                                std::string& error) {
     const auto emission_left = (cfg_.max_supply > total_emitted_) ? (cfg_.max_supply - total_emitted_) : 0ULL;
     const auto reward = std::min<std::uint64_t>(current_block_reward(), emission_left);
     auto b = make_block_template(reward_address, std::move(txs), reward);
 
-    for (std::uint64_t nonce = 0; nonce < std::numeric_limits<std::uint64_t>::max(); ++nonce) {
-        b.header.nonce = nonce;
-        const auto h = hash_block_header(b.header);
-        if (hash_meets_target(h, b.header.difficulty_target)) {
-            if (!add_block(b, error)) {
-                return false;
+    if (threads == 0) {
+        threads = 1;
+    }
+    const auto hw = std::thread::hardware_concurrency();
+    if (hw > 0 && threads > hw) {
+        threads = hw;
+    }
+
+    std::atomic<bool> found{false};
+    std::atomic<std::uint64_t> winning_nonce{0};
+    std::string winning_hash;
+    std::mutex win_mu;
+    std::vector<std::thread> workers;
+    workers.reserve(threads);
+
+    for (std::size_t tid = 0; tid < threads; ++tid) {
+        workers.emplace_back([&, tid]() {
+            Block local = b;
+            const std::uint64_t step = static_cast<std::uint64_t>(threads);
+            for (std::uint64_t nonce = static_cast<std::uint64_t>(tid);
+                 nonce < std::numeric_limits<std::uint64_t>::max() && !found.load(std::memory_order_relaxed);
+                 nonce += step) {
+                local.header.nonce = nonce;
+                const auto h = hash_block_header(local.header);
+                if (hash_meets_target(h, local.header.difficulty_target)) {
+                    bool expected = false;
+                    if (found.compare_exchange_strong(expected, true)) {
+                        winning_nonce.store(nonce, std::memory_order_relaxed);
+                        std::lock_guard<std::mutex> lk(win_mu);
+                        winning_hash = h;
+                    }
+                    return;
+                }
             }
-            mined_hash = h;
-            return true;
+        });
+    }
+
+    for (auto& th : workers) {
+        if (th.joinable()) {
+            th.join();
         }
+    }
+
+    if (found.load(std::memory_order_relaxed)) {
+        b.header.nonce = winning_nonce.load(std::memory_order_relaxed);
+        if (!add_block(b, error)) {
+            return false;
+        }
+        mined_hash = winning_hash;
+        return true;
     }
 
     error = "mining search exhausted";
@@ -360,6 +496,11 @@ bool Chain::validate_transaction_signature(const Transaction& tx, std::string& e
     }
     if (tx.signature.empty()) {
         error = "missing signature";
+        return false;
+    }
+
+    if (derive_address_from_pubkey(tx.signer_pubkey) != tx.signer) {
+        error = "signer/pubkey mismatch";
         return false;
     }
 
@@ -412,7 +553,15 @@ bool Chain::apply_transaction(const Transaction& tx, const std::string& txid, st
         const auto key = outpoint_key(txid, i);
         UTXO out{tx.outputs[i].recipient, tx.outputs[i].amount, false};
         utxo_set_[key] = out;
+        if (address_index_[out.owner] > (std::numeric_limits<std::uint64_t>::max() - out.amount)) {
+            error = "balance index overflow";
+            return false;
+        }
         address_index_[out.owner] += out.amount;
+    }
+
+    if (!tx.inputs.empty()) {
+        signer_last_nonce_[tx.signer] = tx.nonce;
     }
 
     seen_transactions_.insert(txid);
@@ -469,25 +618,44 @@ bool Chain::validate_block_transactions(const Block& candidate, std::string& err
         return false;
     }
     if (coinbase.outputs.empty()) {
-        error = "coinbase must have output";
-        return false;
+        if (!cfg_.allow_zero_reward_blocks) {
+            error = "coinbase must have output";
+            return false;
+        }
     }
     std::uint64_t coinbase_total = 0;
     for (const auto& out : coinbase.outputs) {
+        if (out.recipient.empty() || out.amount == 0) {
+            error = "invalid coinbase output";
+            return false;
+        }
+        if (coinbase_total > (std::numeric_limits<std::uint64_t>::max() - out.amount)) {
+            error = "coinbase overflow";
+            return false;
+        }
         coinbase_total += out.amount;
     }
     std::uint64_t fees = 0;
     for (std::size_t i = 1; i < candidate.transactions.size(); ++i) {
+        if (fees > (std::numeric_limits<std::uint64_t>::max() - candidate.transactions[i].fee)) {
+            error = "fees overflow";
+            return false;
+        }
         fees += candidate.transactions[i].fee;
     }
-    const auto allowed_reward = compute_block_reward(candidate.header.height) + fees;
+    const auto base_reward = compute_block_reward(candidate.header.height);
+    if (base_reward > (std::numeric_limits<std::uint64_t>::max() - fees)) {
+        error = "allowed reward overflow";
+        return false;
+    }
+    const auto allowed_reward = base_reward + fees;
     if (coinbase_total > allowed_reward) {
         error = "coinbase exceeds allowed reward+fees";
         return false;
     }
 
     const auto minted = (coinbase_total > fees) ? (coinbase_total - fees) : 0ULL;
-    if (total_emitted_ + minted > cfg_.max_supply) {
+    if (minted > (cfg_.max_supply - total_emitted_)) {
         error = "max supply exceeded";
         return false;
     }
@@ -506,6 +674,10 @@ bool Chain::validate_block_transactions(const Block& candidate, std::string& err
                 error = "invalid tx output";
                 return false;
             }
+            if (outputs_total > (std::numeric_limits<std::uint64_t>::max() - out.amount)) {
+                error = "block tx outputs overflow";
+                return false;
+            }
             outputs_total += out.amount;
         }
 
@@ -517,6 +689,10 @@ bool Chain::validate_block_transactions(const Block& candidate, std::string& err
                 error = "invalid or spent input in block";
                 return false;
             }
+            if (inputs_total > (std::numeric_limits<std::uint64_t>::max() - it->second.amount)) {
+                error = "inputs overflow";
+                return false;
+            }
             inputs_total += it->second.amount;
             it->second.spent = true;
             if (snapshot_index[it->second.owner] >= it->second.amount) {
@@ -526,6 +702,10 @@ bool Chain::validate_block_transactions(const Block& candidate, std::string& err
             }
         }
 
+        if (!tx.inputs.empty() && outputs_total > (std::numeric_limits<std::uint64_t>::max() - tx.fee)) {
+            error = "block tx outputs+fee overflow";
+            return false;
+        }
         if (!tx.inputs.empty() && inputs_total < outputs_total + tx.fee) {
             error = "block tx value mismatch";
             return false;
@@ -535,6 +715,11 @@ bool Chain::validate_block_transactions(const Block& candidate, std::string& err
         for (std::uint32_t i = 0; i < tx.outputs.size(); ++i) {
             const auto key = outpoint_key(txid, i);
             snapshot_utxo[key] = UTXO{tx.outputs[i].recipient, tx.outputs[i].amount, false};
+            if (snapshot_index[tx.outputs[i].recipient] >
+                (std::numeric_limits<std::uint64_t>::max() - tx.outputs[i].amount)) {
+                error = "balance index overflow";
+                return false;
+            }
             snapshot_index[tx.outputs[i].recipient] += tx.outputs[i].amount;
         }
     }
@@ -550,15 +735,40 @@ bool Chain::add_block(const Block& block, std::string& error) {
         return false;
     }
 
+    auto utxo_snapshot = utxo_set_;
+    auto index_snapshot = address_index_;
+    auto seen_snapshot = seen_transactions_;
+    auto nonce_snapshot = signer_last_nonce_;
+    const auto emitted_snapshot = total_emitted_;
+    const auto fees_snapshot = total_fees_last_block_;
+    const auto blocks_snapshot_size = blocks_.size();
+    const auto work_snapshot = cumulative_work_;
+    const auto diff_snapshot = difficulty_target_;
+
     for (const auto& tx : block.transactions) {
         const auto txid = hash_transaction(tx);
         if (!apply_transaction(tx, txid, error)) {
+            utxo_set_ = std::move(utxo_snapshot);
+            address_index_ = std::move(index_snapshot);
+            seen_transactions_ = std::move(seen_snapshot);
+            signer_last_nonce_ = std::move(nonce_snapshot);
+            total_emitted_ = emitted_snapshot;
+            total_fees_last_block_ = fees_snapshot;
+            if (blocks_.size() > blocks_snapshot_size) {
+                blocks_.resize(blocks_snapshot_size);
+            }
+            cumulative_work_ = work_snapshot;
+            difficulty_target_ = diff_snapshot;
             return false;
         }
     }
 
     std::uint64_t fees = 0;
     for (std::size_t i = 1; i < block.transactions.size(); ++i) {
+        if (fees > (std::numeric_limits<std::uint64_t>::max() - block.transactions[i].fee)) {
+            error = "fees overflow";
+            return false;
+        }
         fees += block.transactions[i].fee;
     }
     total_fees_last_block_ = fees;
@@ -566,9 +776,17 @@ bool Chain::add_block(const Block& block, std::string& error) {
     if (!block.transactions.empty()) {
         std::uint64_t coinbase_total = 0;
         for (const auto& out : block.transactions.front().outputs) {
+            if (coinbase_total > (std::numeric_limits<std::uint64_t>::max() - out.amount)) {
+                error = "coinbase overflow";
+                return false;
+            }
             coinbase_total += out.amount;
         }
         const auto minted = (coinbase_total > fees) ? (coinbase_total - fees) : 0ULL;
+        if (minted > (cfg_.max_supply - total_emitted_)) {
+            error = "max supply exceeded";
+            return false;
+        }
         total_emitted_ += minted;
     }
 
@@ -596,6 +814,7 @@ bool Chain::replace_with_chain(const std::vector<Block>& candidate,
     auto old_utxo = utxo_set_;
     auto old_index = address_index_;
     auto old_seen = seen_transactions_;
+    auto old_nonce = signer_last_nonce_;
     auto old_difficulty = difficulty_target_;
     auto old_emitted = total_emitted_;
     auto old_fees = total_fees_last_block_;
@@ -611,6 +830,7 @@ bool Chain::replace_with_chain(const std::vector<Block>& candidate,
             utxo_set_ = std::move(old_utxo);
             address_index_ = std::move(old_index);
             seen_transactions_ = std::move(old_seen);
+            signer_last_nonce_ = std::move(old_nonce);
             difficulty_target_ = old_difficulty;
             total_emitted_ = old_emitted;
             total_fees_last_block_ = old_fees;
@@ -626,6 +846,7 @@ bool Chain::replace_with_chain(const std::vector<Block>& candidate,
         utxo_set_ = std::move(old_utxo);
         address_index_ = std::move(old_index);
         seen_transactions_ = std::move(old_seen);
+        signer_last_nonce_ = std::move(old_nonce);
         difficulty_target_ = old_difficulty;
         total_emitted_ = old_emitted;
         total_fees_last_block_ = old_fees;

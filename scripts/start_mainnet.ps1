@@ -45,5 +45,20 @@ if (-not (Test-Path $exe)) {
     throw "additiond.exe not found"
 }
 
+if (-not $env:ADDITION_RPC_TOKEN) {
+    Write-Host "[mainnet][WARN] ADDITION_RPC_TOKEN not set (local RPC auth disabled)."
+}
+if ($env:ADDITION_ENABLE_LAN_RPC -eq "1" -and -not $env:ADDITION_LAN_RPC_TOKEN) {
+    Write-Host "[mainnet][WARN] LAN RPC enabled but ADDITION_LAN_RPC_TOKEN is empty."
+}
+if (-not $env:ADDITION_STRICT_ADMIN_MODE) {
+    $env:ADDITION_STRICT_ADMIN_MODE = "1"
+    Write-Host "[mainnet] ADDITION_STRICT_ADMIN_MODE defaulted to 1"
+}
+if (-not $env:ADDITION_ALLOW_INSECURE_TX_COMMANDS) {
+    $env:ADDITION_ALLOW_INSECURE_TX_COMMANDS = "0"
+    Write-Host "[mainnet] ADDITION_ALLOW_INSECURE_TX_COMMANDS defaulted to 0"
+}
+
 Write-Host "[mainnet] starting daemon..."
 & $exe

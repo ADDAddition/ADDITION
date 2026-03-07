@@ -37,13 +37,16 @@ add_library(addition_core
     src/p2p.cpp
     src/consensus_engine.cpp
     src/privacy.cpp
+    src/pouw_storage.cpp
+    src/pouw_compute.cpp
+    src/private_messaging.cpp
+    src/ai_optimizer.cpp
     src/wallet.cpp
 )
 
 target_include_directories(addition_core PUBLIC include)
 target_include_directories(addition_core PUBLIC ${OQS_INCLUDE_DIR})
 target_link_libraries(addition_core PUBLIC ${OQS_LIBRARY} OpenSSL::SSL OpenSSL::Crypto)
-target_compile_definitions(addition_core PUBLIC ADDITION_HAS_OQS=1)
 
 if(WIN32)
     target_link_libraries(addition_core PUBLIC ws2_32)

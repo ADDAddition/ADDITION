@@ -12,11 +12,17 @@
 - Data backup path ready (`./data` snapshot)
 
 ## 2) Security baseline
-- Keep `node_identity.dat` private and backed up.
-- Configure privacy verifier command before ZK operations:
-  - `privacy_set_verifier python tools/zk_verify_wrapper.py`
-- Set environment var for real verifier backend:
-  - `ADDITION_ZK_VERIFY_CMD=<your_real_verifier_cmd>`
+- `node_identity.dat` now stores only `PUB|...` (no private key persisted).
+- Set secure runtime vars before launch:
+  - `ADDITION_MAINNET_MODE=1`
+  - `ADDITION_RPC_TOKEN=<strong_token>`
+  - `ADDITION_STRICT_ADMIN_MODE=1`
+  - `ADDITION_PRIVACY_MASTER_KEY=<strong_secret_min_32_chars>`
+- If enabling LAN RPC, also set:
+  - `ADDITION_ENABLE_LAN_RPC=1`
+  - `ADDITION_LAN_RPC_TOKEN=<strong_token>`
+- Keep `ADDITION_ALLOW_INSECURE_TX_COMMANDS` unset (or `0`) in production.
+- Privacy verifier is native in-process (ML-DSA-87); external wrappers are disabled.
 
 ## 3) First startup
 - Launch daemon:
@@ -51,19 +57,25 @@ Expected:
   - `createwallet`
 - Mine one block to bootstrap address:
   - `mine <address>`
-- Send a tx:
-  - `sendtx_hash <from> <pub> <priv> <to> <amount> <fee> <nonce>`
+- Build/sign/send tx (secure flow):
+  - `tx_build <from> <pub> <to> <amount> <fee> <nonce>`
+  - `sign_message <priv> <sign_hash_hex_utf8>`
+  - `sendtx_signed_hash <from> <pub> <to> <amount> <fee> <nonce> <sig_hex_without_pq_prefix>`
 - Track status:
   - `tx_status <tx_hash>`
 - Instant receive check:
   - `getbalance_instant <to_address>`
 
 ## 7) Privacy strict sanity
-- Configure verifier:
-  - `privacy_set_verifier <wrapper_cmd>`
+- Confirm native verifier mode:
+  - `privacy_native_verifier pq_mldsa87`
 - Submit ZK mint/spend only (avoid non-ZK in strict operations):
   - `privacy_mint_zk ...`
   - `privacy_spend_zk ...`
+
+Important:
+- In mainnet mode (`ADDITION_MAINNET_MODE=1`), daemon startup is blocked if `ADDITION_PRIVACY_MASTER_KEY` is missing or shorter than 32 chars.
+- Keep `ADDITION_PRIVACY_MASTER_KEY` stable across restarts, otherwise previously sealed private notes cannot be unsealed.
 
 ## 8) Portal + metrics
 - Start portal backend:

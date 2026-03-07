@@ -26,6 +26,7 @@ public:
     bool add_block(const Block& block, std::string& error);
     bool mine_and_add_block(const std::string& reward_address,
                             std::vector<Transaction> txs,
+                            std::size_t threads,
                             std::string& mined_hash,
                             std::string& error);
     bool replace_with_chain(const std::vector<Block>& candidate,
@@ -40,6 +41,10 @@ public:
                            std::string& error) const;
 
     std::uint64_t balance_of(const std::string& address) const;
+    bool credit_balance(const std::string& address,
+                        std::uint64_t amount,
+                        const std::string& reason,
+                        std::string& error);
     bool apply_transaction(const Transaction& tx,
                            const std::string& txid,
                            std::string& error);
@@ -70,6 +75,7 @@ private:
     std::vector<Block> blocks_;
     std::unordered_map<std::string, UTXO> utxo_set_;
     std::unordered_map<std::string, std::uint64_t> address_index_;
+    std::unordered_map<std::string, std::uint64_t> signer_last_nonce_;
     std::unordered_set<std::string> seen_transactions_;
     std::uint64_t difficulty_target_{0};
     std::uint64_t total_emitted_{0};

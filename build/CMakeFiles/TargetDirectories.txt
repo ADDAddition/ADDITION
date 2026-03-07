@@ -1,0 +1,4 @@
+C:/Users/admin/Desktop/ADDITION_FINAL/build/CMakeFiles/addition_core.dir
+C:/Users/admin/Desktop/ADDITION_FINAL/build/CMakeFiles/additiond.dir
+C:/Users/admin/Desktop/ADDITION_FINAL/build/CMakeFiles/edit_cache.dir
+C:/Users/admin/Desktop/ADDITION_FINAL/build/CMakeFiles/rebuild_cache.dir

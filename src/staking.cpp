@@ -1,6 +1,7 @@
 #include "addition/staking.hpp"
 
 #include <algorithm>
+#include <limits>
 
 namespace addition {
 
@@ -15,6 +16,14 @@ bool StakingEngine::stake(const std::string& address, std::uint64_t amount, std:
     }
 
     stakes_[address] += amount;
+    if (total_staked_ > (std::numeric_limits<std::uint64_t>::max() - amount)) {
+        error = "staking overflow";
+        stakes_[address] -= amount;
+        if (stakes_[address] == 0) {
+            stakes_.erase(address);
+        }
+        return false;
+    }
     total_staked_ += amount;
     return true;
 }
@@ -58,9 +67,27 @@ void StakingEngine::distribute_epoch_rewards(std::uint64_t reward_pool) {
         return;
     }
 
+    std::uint64_t distributed = 0;
     for (const auto& [addr, staked] : stakes_) {
         const auto reward = (bounded_pool * staked) / total_staked_;
+        if (reward == 0) {
+            continue;
+        }
         claimable_[addr] += reward;
+        distributed += reward;
+    }
+
+    const std::uint64_t remainder = bounded_pool - distributed;
+    if (remainder > 0) {
+        auto best = stakes_.begin();
+        for (auto it = stakes_.begin(); it != stakes_.end(); ++it) {
+            if (it->second > best->second) {
+                best = it;
+            }
+        }
+        if (best != stakes_.end()) {
+            claimable_[best->first] += remainder;
+        }
     }
 }
 
@@ -95,6 +122,31 @@ std::uint64_t StakingEngine::claim(const std::string& address) {
     return value;
 }
 
+bool StakingEngine::consume_staked_credit(const std::string& address, std::uint64_t amount, std::string& error) {
+    if (address.empty()) {
+        error = "address empty";
+        return false;
+    }
+    if (amount == 0) {
+        return true;
+    }
+    auto it = stakes_.find(address);
+    if (it == stakes_.end() || it->second < amount) {
+        error = "insufficient staked credit";
+        return false;
+    }
+    it->second -= amount;
+    if (it->second == 0) {
+        stakes_.erase(it);
+    }
+    if (total_staked_ < amount) {
+        error = "staking accounting underflow";
+        return false;
+    }
+    total_staked_ -= amount;
+    return true;
+}
+
 const std::unordered_map<std::string, std::uint64_t>& StakingEngine::stakes_map() const {
     return stakes_;
 }
@@ -108,7 +160,15 @@ void StakingEngine::replace_state(const std::unordered_map<std::string, std::uin
                                   std::uint64_t total_staked) {
     stakes_ = stakes;
     claimable_ = claimable;
-    total_staked_ = total_staked;
+    std::uint64_t recomputed_total = 0;
+    for (const auto& [_, amount] : stakes_) {
+        if (recomputed_total > (std::numeric_limits<std::uint64_t>::max() - amount)) {
+            total_staked_ = total_staked;
+            return;
+        }
+        recomputed_total += amount;
+    }
+    total_staked_ = recomputed_total;
 }
 
 } // namespace addition

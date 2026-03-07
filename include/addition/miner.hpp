@@ -11,6 +11,7 @@ public:
     Miner(Chain& chain, Mempool& mempool);
     bool mine_next_block(const std::string& reward_address,
                          std::size_t max_txs,
+                         std::size_t threads,
                          std::string& mined_hash,
                          std::string& error);
     double last_tps() const;

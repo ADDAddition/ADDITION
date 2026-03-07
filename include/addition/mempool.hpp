@@ -4,6 +4,7 @@
 
 #include <mutex>
 #include <optional>
+#include <unordered_set>
 #include <vector>
 
 namespace addition {
@@ -17,8 +18,12 @@ public:
     std::size_t size() const;
 
 private:
+    std::string signer_nonce_key(const Transaction& tx) const;
+
     mutable std::mutex mu_;
     std::vector<Transaction> pending_;
+    std::unordered_set<std::string> txids_;
+    std::unordered_set<std::string> signer_nonces_;
 };
 
 } // namespace addition

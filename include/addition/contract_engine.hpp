@@ -8,10 +8,13 @@
 
 namespace addition {
 
+class PrivacyPool;
+
 class ContractEngine {
 public:
-    explicit ContractEngine(TokenEngine* tokens = nullptr);
+    explicit ContractEngine(TokenEngine* tokens = nullptr, PrivacyPool* privacy = nullptr);
     void bind_token_engine(TokenEngine* tokens);
+    void bind_privacy_pool(PrivacyPool* privacy);
 
     std::string deploy(const std::string& owner, const std::string& code);
     bool call(const std::string& contract_id,
@@ -33,6 +36,7 @@ private:
 
     std::unordered_map<std::string, Contract> contracts_;
     TokenEngine* tokens_{nullptr};
+    PrivacyPool* privacy_{nullptr};
 };
 
 } // namespace addition

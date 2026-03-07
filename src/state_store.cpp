@@ -107,6 +107,9 @@ std::string StateStore::peers_path() const { return data_dir_ + "/peers.dat"; }
 std::string StateStore::node_identity_path() const { return data_dir_ + "/node_identity.dat"; }
 std::string StateStore::peer_pins_path() const { return data_dir_ + "/peer_pins.dat"; }
 std::string StateStore::privacy_path() const { return data_dir_ + "/privacy.dat"; }
+std::string StateStore::pouw_storage_path() const { return data_dir_ + "/pouw_storage.dat"; }
+std::string StateStore::pouw_compute_path() const { return data_dir_ + "/pouw_compute.dat"; }
+std::string StateStore::private_messages_path() const { return data_dir_ + "/private_messages.dat"; }
 
 bool StateStore::save_all(const Chain& chain,
                           const Mempool& mempool,
@@ -116,6 +119,9 @@ bool StateStore::save_all(const Chain& chain,
                           const BridgeEngine& bridge,
                           const PeerNetwork& peers,
                           const DecentralizedNode& node,
+                          const PoUWStorageEngine& pouw_storage,
+                          const PoUWComputeEngine& pouw_compute,
+                          const PrivateMessagingEngine& private_messaging,
                           const PrivacyPool& privacy,
                           std::string& error) const {
     std::filesystem::create_directories(data_dir_);
@@ -195,7 +201,6 @@ bool StateStore::save_all(const Chain& chain,
     {
         std::ostringstream id;
         id << "PUB|" << node.node_public_key() << '\n';
-        id << "PRIV|" << node.node_private_key() << '\n';
         if (!write_text(node_identity_path(), id.str(), error)) {
             return false;
         }
@@ -217,6 +222,24 @@ bool StateStore::save_all(const Chain& chain,
         }
     }
 
+    {
+        if (!write_text(pouw_storage_path(), pouw_storage.dump_state(), error)) {
+            return false;
+        }
+    }
+
+    {
+        if (!write_text(pouw_compute_path(), pouw_compute.dump_state(), error)) {
+            return false;
+        }
+    }
+
+    {
+        if (!write_text(private_messages_path(), private_messaging.dump_state(), error)) {
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -228,6 +251,9 @@ bool StateStore::load_all(Chain& chain,
                           BridgeEngine& bridge,
                           PeerNetwork& peers,
                           DecentralizedNode& node,
+                          PoUWStorageEngine& pouw_storage,
+                          PoUWComputeEngine& pouw_compute,
+                          PrivateMessagingEngine& private_messaging,
                           PrivacyPool& privacy,
                           std::string& error) const {
     try {
@@ -400,20 +426,13 @@ bool StateStore::load_all(Chain& chain,
         if (std::filesystem::exists(node_identity_path()) && read_text(node_identity_path(), content, error)) {
             std::istringstream iss(content);
             std::string pub;
-            std::string priv;
             for (std::string line; std::getline(iss, line);) {
                 if (line.rfind("PUB|", 0) == 0) {
                     pub = line.substr(4);
-                } else if (line.rfind("PRIV|", 0) == 0) {
-                    priv = line.substr(5);
                 }
             }
             if (!pub.empty() && pub != node.node_public_key()) {
                 error = "node public key mismatch with persisted identity";
-                return false;
-            }
-            if (!priv.empty() && priv != node.node_private_key()) {
-                error = "node private key mismatch with persisted identity";
                 return false;
             }
         }
@@ -442,6 +461,33 @@ bool StateStore::load_all(Chain& chain,
         std::string content;
         if (std::filesystem::exists(privacy_path()) && read_text(privacy_path(), content, error)) {
             if (!privacy.load_state(content, error)) {
+                return false;
+            }
+        }
+    }
+
+    {
+        std::string content;
+        if (std::filesystem::exists(pouw_storage_path()) && read_text(pouw_storage_path(), content, error)) {
+            if (!pouw_storage.load_state(content, error)) {
+                return false;
+            }
+        }
+    }
+
+    {
+        std::string content;
+        if (std::filesystem::exists(pouw_compute_path()) && read_text(pouw_compute_path(), content, error)) {
+            if (!pouw_compute.load_state(content, error)) {
+                return false;
+            }
+        }
+    }
+
+    {
+        std::string content;
+        if (std::filesystem::exists(private_messages_path()) && read_text(private_messages_path(), content, error)) {
+            if (!private_messaging.load_state(content, error)) {
                 return false;
             }
         }

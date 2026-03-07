@@ -8,12 +8,17 @@ Miner::Miner(Chain& chain, Mempool& mempool) : chain_(chain), mempool_(mempool) 
 
 bool Miner::mine_next_block(const std::string& reward_address,
                             std::size_t max_txs,
+                            std::size_t threads,
                             std::string& mined_hash,
                             std::string& error) {
     const auto t0 = std::chrono::steady_clock::now();
     auto txs = mempool_.fetch_for_block(max_txs);
+    auto txs_for_restore = txs;
     const auto tx_count = txs.size();
-    if (!chain_.mine_and_add_block(reward_address, std::move(txs), mined_hash, error)) {
+    if (!chain_.mine_and_add_block(reward_address, std::move(txs), threads, mined_hash, error)) {
+        for (const auto& tx : txs_for_restore) {
+            mempool_.submit(tx);
+        }
         return false;
     }
     const auto t1 = std::chrono::steady_clock::now();

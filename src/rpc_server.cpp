@@ -10,6 +10,8 @@
 #include <vector>
 #include <chrono>
 #include <iomanip>
+#include <limits>
+#include <thread>
 
 namespace addition {
 
@@ -56,6 +58,40 @@ std::vector<std::string> split_route(const std::string& route) {
     return out;
 }
 
+bool is_remote_allowed_command(const std::string& cmd) {
+    return cmd == "getinfo" ||
+           cmd == "protocol_status" ||
+           cmd == "fee_info" ||
+           cmd == "monetary_info" ||
+           cmd == "crypto_selftest" ||
+           cmd == "node_pubkey" ||
+           cmd == "peers" ||
+           cmd == "tx_status" ||
+           cmd == "getbalance" ||
+           cmd == "getbalance_instant" ||
+           cmd == "staked" ||
+           cmd == "stake_claimable" ||
+           cmd == "token_balance" ||
+           cmd == "token_info" ||
+           cmd == "swap_quote" ||
+           cmd == "swap_pool_info" ||
+           cmd == "swap_quote_route" ||
+           cmd == "swap_best_route" ||
+           cmd == "nft_owner" ||
+           cmd == "privacy_status" ||
+           cmd == "bridge_balance" ||
+           cmd == "bridge_attestor" ||
+           cmd == "pouw_storage_deal_status" ||
+           cmd == "pouw_storage_worker_status" ||
+           cmd == "pouw_compute_job_status" ||
+           cmd == "pouw_compute_worker_status" ||
+           cmd == "pm_inbox" ||
+           cmd == "pm_status" ||
+           cmd == "pm_fetch" ||
+           cmd == "verify_message" ||
+           cmd == "ai_status";
+}
+
 std::string derive_address_from_pubkey(const std::string& pubkey_hex) {
     return to_hex(sha3_512_bytes("addr|" + pubkey_hex)).substr(0, 40);
 }
@@ -73,6 +109,11 @@ bool verify_admin_signature(const std::string& admin_addr,
     return verify_message_signature_hybrid(admin_pubkey, payload, std::string("pq=") + admin_sig_hex);
 }
 
+bool requires_admin_signature_command(const std::string& cmd) {
+    return cmd == "stake_policy" ||
+           cmd == "bridge_set_attestor";
+}
+
 } // namespace
 
 RpcServer::RpcServer(Chain& chain,
@@ -85,7 +126,13 @@ RpcServer::RpcServer(Chain& chain,
                                          PeerNetwork& peers,
                                          ConsensusEngine& consensus,
                                          PrivacyPool& privacy,
-                                         DecentralizedNode& node)
+                                         PoUWStorageEngine& pouw_storage,
+                                         PoUWComputeEngine& pouw_compute,
+                                         PrivateMessagingEngine& private_messaging,
+                                         AIRoutingOptimizer& ai_optimizer,
+                                         DecentralizedNode& node,
+                                         bool allow_insecure_tx_commands,
+                                         bool strict_admin_mode)
         : chain_(chain),
             mempool_(mempool),
             miner_(miner),
@@ -96,12 +143,32 @@ RpcServer::RpcServer(Chain& chain,
             peers_(peers),
             consensus_(consensus),
             privacy_(privacy),
-            node_(node) {}
+            pouw_storage_(pouw_storage),
+            pouw_compute_(pouw_compute),
+            private_messaging_(private_messaging),
+            ai_optimizer_(ai_optimizer),
+            node_(node),
+            allow_insecure_tx_commands_(allow_insecure_tx_commands),
+            strict_admin_mode_(strict_admin_mode) {}
 
-std::string RpcServer::handle_command(const std::string& line) {
+std::string RpcServer::handle_command(const std::string& line, bool trusted) {
     std::istringstream iss(line);
     std::string cmd;
     iss >> cmd;
+
+    if (cmd.empty()) {
+        return "error: empty command";
+    }
+
+    if (!trusted && !is_remote_allowed_command(cmd)) {
+        return "error: command disabled on remote RPC";
+    }
+
+    if (strict_admin_mode_ && requires_admin_signature_command(cmd) && !trusted) {
+        return "error: admin command allowed only on trusted interface";
+    }
+
+    ai_optimizer_.observe(mempool_.size(), chain_.total_fees_last_block(), chain_.height());
 
     if (cmd == "getinfo") {
         const auto dyn_fee = recommended_min_fee(mempool_.size(), chain_.total_fees_last_block());
@@ -145,11 +212,14 @@ std::string RpcServer::handle_command(const std::string& line) {
         const auto msz = mempool_.size();
         const auto last = chain_.total_fees_last_block();
         const auto dyn = recommended_min_fee(msz, last);
+        const auto ai_floor = ai_optimizer_.recommended_fee_floor();
         std::ostringstream out;
         out << "base_min_fee=1"
             << " mempool_size=" << msz
             << " fees_last_block=" << last
-            << " recommended_min_fee=" << dyn;
+            << " recommended_min_fee=" << std::max(dyn, ai_floor)
+            << " ai_fee_floor=" << ai_floor
+            << " ai_difficulty_bias_bps=" << ai_optimizer_.suggested_difficulty_bias_bps();
         return out.str();
     }
 
@@ -191,6 +261,29 @@ std::string RpcServer::handle_command(const std::string& line) {
         } catch (const std::exception& e) {
             return std::string("error: signing failed: ") + e.what();
         }
+    }
+
+    if (cmd == "verify_message") {
+        std::string pubkey;
+        std::string message_hex;
+        std::string sig_hex;
+        iss >> pubkey >> message_hex >> sig_hex;
+        if (pubkey.empty() || message_hex.empty() || sig_hex.empty()) {
+            return "error: usage verify_message <pubkey_hex> <message_hex_utf8> <sig_hex_without_pq_prefix>";
+        }
+
+        std::vector<std::uint8_t> msg_bytes;
+        std::string error;
+        if (!hex_to_bytes(message_hex, msg_bytes, error)) {
+            return "error: invalid message_hex: " + error;
+        }
+        if (msg_bytes.empty() || msg_bytes.size() > 8192) {
+            return "error: message size invalid";
+        }
+
+        const std::string msg(reinterpret_cast<const char*>(msg_bytes.data()), msg_bytes.size());
+        const bool ok = verify_message_signature_hybrid(pubkey, msg, std::string("pq=") + sig_hex);
+        return ok ? "true" : "false";
     }
 
     if (cmd == "addpeer") {
@@ -347,19 +440,25 @@ std::string RpcServer::handle_command(const std::string& line) {
 
     if (cmd == "mine") {
         std::string reward_address;
+        std::size_t threads = 0;
         iss >> reward_address;
+        iss >> threads;
         if (reward_address.empty()) {
             reward_address = "miner1";
+        }
+        if (threads == 0) {
+            const auto hw = std::thread::hardware_concurrency();
+            threads = hw > 0 ? static_cast<std::size_t>(hw) : 1;
         }
 
         std::string mined_hash;
         std::string error;
-        if (!miner_.mine_next_block(reward_address, 500, mined_hash, error)) {
+        if (!miner_.mine_next_block(reward_address, 500, threads, mined_hash, error)) {
             return "error: " + error;
         }
 
         std::ostringstream out;
-        out << "mined block " << chain_.height() << " reward=" << reward_address << " hash=" << mined_hash;
+        out << "mined block " << chain_.height() << " reward=" << reward_address << " threads=" << threads << " hash=" << mined_hash;
         return out.str();
     }
 
@@ -391,7 +490,9 @@ std::string RpcServer::handle_command(const std::string& line) {
 
             std::string mined_hash;
             std::string error;
-            if (!miner_.mine_next_block("bench_miner", tx_per_block + 50, mined_hash, error)) {
+            const auto hw = std::thread::hardware_concurrency();
+            const std::size_t threads = hw > 0 ? static_cast<std::size_t>(hw) : 1;
+            if (!miner_.mine_next_block("bench_miner", tx_per_block + 50, threads, mined_hash, error)) {
                 return "error: benchmark mine failed: " + error;
             }
             mined_total += miner_.last_mined_txs();
@@ -452,6 +553,9 @@ std::string RpcServer::handle_command(const std::string& line) {
     }
 
     if (cmd == "sendtx") {
+        if (!allow_insecure_tx_commands_) {
+            return "error: insecure command disabled; use tx_build + sign_message + sendtx_signed";
+        }
         std::string from;
         std::string pubkey;
         std::string privkey;
@@ -464,7 +568,8 @@ std::string RpcServer::handle_command(const std::string& line) {
             return "error: usage sendtx <from_addr> <pubkey_hex> <privkey_hex> <to_addr> <amount> <fee> <nonce>";
         }
 
-        const auto required_fee = recommended_min_fee(mempool_.size(), chain_.total_fees_last_block());
+        const auto required_fee = std::max(recommended_min_fee(mempool_.size(), chain_.total_fees_last_block()),
+                                           ai_optimizer_.recommended_fee_floor());
         if (fee < required_fee) {
             return "error: fee too low, required>=" + std::to_string(required_fee);
         }
@@ -495,6 +600,9 @@ std::string RpcServer::handle_command(const std::string& line) {
     }
 
     if (cmd == "sendtx_hash") {
+        if (!allow_insecure_tx_commands_) {
+            return "error: insecure command disabled; use tx_build + sign_message + sendtx_signed_hash";
+        }
         std::string from;
         std::string pubkey;
         std::string privkey;
@@ -506,7 +614,8 @@ std::string RpcServer::handle_command(const std::string& line) {
         if (from.empty() || pubkey.empty() || privkey.empty() || to.empty()) {
             return "error: usage sendtx_hash <from_addr> <pubkey_hex> <privkey_hex> <to_addr> <amount> <fee> <nonce>";
         }
-        const auto required_fee = recommended_min_fee(mempool_.size(), chain_.total_fees_last_block());
+        const auto required_fee = std::max(recommended_min_fee(mempool_.size(), chain_.total_fees_last_block()),
+                                           ai_optimizer_.recommended_fee_floor());
         if (fee < required_fee) {
             return "error: fee too low, required>=" + std::to_string(required_fee);
         }
@@ -534,6 +643,119 @@ std::string RpcServer::handle_command(const std::string& line) {
             return "error: " + error;
         }
 
+        return hash_transaction(tx);
+    }
+
+    if (cmd == "tx_build") {
+        std::string from;
+        std::string pubkey;
+        std::string to;
+        std::uint64_t amount = 0;
+        std::uint64_t fee = 0;
+        std::uint64_t nonce = 0;
+        iss >> from >> pubkey >> to >> amount >> fee >> nonce;
+        if (from.empty() || pubkey.empty() || to.empty()) {
+            return "error: usage tx_build <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce>";
+        }
+
+        if (derive_address_from_pubkey(pubkey) != from) {
+            return "error: from/pubkey mismatch";
+        }
+
+        const auto required_fee = std::max(recommended_min_fee(mempool_.size(), chain_.total_fees_last_block()),
+                                           ai_optimizer_.recommended_fee_floor());
+        if (fee < required_fee) {
+            return "error: fee too low, required>=" + std::to_string(required_fee);
+        }
+
+        Transaction tx{};
+        std::string error;
+        if (!chain_.build_transaction(from, to, amount, fee, nonce, tx, error)) {
+            return "error: " + error;
+        }
+
+        tx.signer = from;
+        tx.signer_pubkey = pubkey;
+        tx.signature.clear();
+        const auto sign_hash = hash_transaction(tx);
+        return "sign_hash=" + sign_hash;
+    }
+
+    if (cmd == "sendtx_signed") {
+        std::string from;
+        std::string pubkey;
+        std::string to;
+        std::uint64_t amount = 0;
+        std::uint64_t fee = 0;
+        std::uint64_t nonce = 0;
+        std::string sig_hex;
+        iss >> from >> pubkey >> to >> amount >> fee >> nonce >> sig_hex;
+        if (from.empty() || pubkey.empty() || to.empty() || sig_hex.empty()) {
+            return "error: usage sendtx_signed <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce> <sig_hex_without_pq_prefix>";
+        }
+
+        const auto required_fee = std::max(recommended_min_fee(mempool_.size(), chain_.total_fees_last_block()),
+                                           ai_optimizer_.recommended_fee_floor());
+        if (fee < required_fee) {
+            return "error: fee too low, required>=" + std::to_string(required_fee);
+        }
+
+        Transaction tx{};
+        std::string error;
+        if (!chain_.build_transaction(from, to, amount, fee, nonce, tx, error)) {
+            return "error: " + error;
+        }
+
+        tx.signer = from;
+        tx.signer_pubkey = pubkey;
+        tx.signature = std::string("pq=") + sig_hex;
+
+        if (!chain_.validate_transaction(tx, error)) {
+            return "error: " + error;
+        }
+
+        if (!node_.submit_transaction(tx, error)) {
+            return "error: " + error;
+        }
+        return "ok:gossiped";
+    }
+
+    if (cmd == "sendtx_signed_hash") {
+        std::string from;
+        std::string pubkey;
+        std::string to;
+        std::uint64_t amount = 0;
+        std::uint64_t fee = 0;
+        std::uint64_t nonce = 0;
+        std::string sig_hex;
+        iss >> from >> pubkey >> to >> amount >> fee >> nonce >> sig_hex;
+        if (from.empty() || pubkey.empty() || to.empty() || sig_hex.empty()) {
+            return "error: usage sendtx_signed_hash <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce> <sig_hex_without_pq_prefix>";
+        }
+
+        const auto required_fee = std::max(recommended_min_fee(mempool_.size(), chain_.total_fees_last_block()),
+                                           ai_optimizer_.recommended_fee_floor());
+        if (fee < required_fee) {
+            return "error: fee too low, required>=" + std::to_string(required_fee);
+        }
+
+        Transaction tx{};
+        std::string error;
+        if (!chain_.build_transaction(from, to, amount, fee, nonce, tx, error)) {
+            return "error: " + error;
+        }
+
+        tx.signer = from;
+        tx.signer_pubkey = pubkey;
+        tx.signature = std::string("pq=") + sig_hex;
+
+        if (!chain_.validate_transaction(tx, error)) {
+            return "error: " + error;
+        }
+
+        if (!node_.submit_transaction(tx, error)) {
+            return "error: " + error;
+        }
         return hash_transaction(tx);
     }
 
@@ -574,14 +796,16 @@ std::string RpcServer::handle_command(const std::string& line) {
         if (chain_.balance_of(addr) < amount) {
             return "error: insufficient on-chain balance to stake";
         }
+        if (staking_.staked_of(addr) > (std::numeric_limits<std::uint64_t>::max() - amount)) {
+            return "error: stake overflow";
+        }
+        const auto effective_balance = chain_.balance_of(addr) - staking_.staked_of(addr);
+        if (effective_balance < amount) {
+            return "error: insufficient unlocked balance to stake";
+        }
         std::string error;
         if (!staking_.stake(addr, amount, error)) {
             return "error: " + error;
-        }
-        if (chain_.balance_of(addr) < amount) {
-            std::string rollback_error;
-            staking_.unstake(addr, amount, rollback_error);
-            return "error: insufficient on-chain balance to lock";
         }
         return "ok";
     }
@@ -650,7 +874,30 @@ std::string RpcServer::handle_command(const std::string& line) {
         if (addr.empty()) {
             return "error: usage stake_claim <address>";
         }
-        return std::to_string(staking_.claim(addr));
+        const auto reward = staking_.claim(addr);
+        if (reward == 0) {
+            return "0";
+        }
+
+        std::string error;
+        if (!chain_.credit_balance(addr, reward, "staking_claim", error)) {
+            return "error: failed to credit claim reward: " + error;
+        }
+        return std::to_string(reward);
+    }
+
+    if (cmd == "consume_stake_credit") {
+        std::string addr;
+        std::uint64_t amount = 0;
+        iss >> addr >> amount;
+        if (addr.empty() || amount == 0) {
+            return "error: usage consume_stake_credit <address> <amount>";
+        }
+        std::string error;
+        if (!staking_.consume_staked_credit(addr, amount, error)) {
+            return "error: " + error;
+        }
+        return "ok";
     }
 
     if (cmd == "contract_deploy") {
@@ -677,7 +924,7 @@ std::string RpcServer::handle_command(const std::string& line) {
         std::int64_t value = 0;
         iss >> cid >> method >> key >> value;
         if (cid.empty() || method.empty()) {
-            return "error: usage contract_call <id> <set|add|get> <key> <value>";
+            return "error: usage contract_call <id> <set|add|get|token_balance|swap_quote|zk_mint|zk_spend|zk_privacy_status> <key> <value>";
         }
         std::string out;
         std::string error;
@@ -1357,44 +1604,16 @@ std::string RpcServer::handle_command(const std::string& line) {
         return owner.empty() ? std::string("error: nft not found") : owner;
     }
 
-    if (cmd == "privacy_mint") {
-        std::string owner;
-        std::uint64_t amount = 0;
-        iss >> owner >> amount;
-        if (owner.empty() || amount == 0) {
-            return "error: usage privacy_mint <owner> <amount>";
-        }
-        std::string error;
-        const auto note_id = privacy_.mint(owner, amount, error);
-        if (!error.empty()) {
-            return "error: " + error;
-        }
-        return note_id;
-    }
-
-    if (cmd == "privacy_set_verifier") {
-        std::string command;
-        std::getline(iss, command);
-        if (!command.empty() && command.front() == ' ') {
-            command.erase(command.begin());
-        }
-        if (command.empty()) {
-            return "error: usage privacy_set_verifier <command_path_or_wrapper>";
-        }
-        std::string error;
-        if (!privacy_.set_verifier_command(command, error)) {
-            return "error: " + error;
-        }
-        return "ok";
-    }
-
-    if (cmd == "privacy_strict_mode") {
+    if (cmd == "privacy_native_verifier") {
         std::string mode;
         iss >> mode;
-        if (mode != "on" && mode != "off") {
-            return "error: usage privacy_strict_mode <on|off>";
+        if (mode.empty()) {
+            return "error: usage privacy_native_verifier <pq_mldsa87>";
         }
-        privacy_.set_strict_zk_mode(mode == "on");
+        std::string error;
+        if (!privacy_.set_native_verifier_mode(mode, error)) {
+            return "error: " + error;
+        }
         return "ok";
     }
 
@@ -1417,20 +1636,6 @@ std::string RpcServer::handle_command(const std::string& line) {
         return note_id;
     }
 
-    if (cmd == "privacy_spend") {
-        std::string owner;
-        std::string note_id;
-        std::string recipient;
-        std::uint64_t amount = 0;
-        iss >> owner >> note_id >> recipient >> amount;
-        std::string new_note;
-        std::string error;
-        if (!privacy_.spend(owner, note_id, recipient, amount, new_note, error)) {
-            return "error: " + error;
-        }
-        return new_note;
-    }
-
     if (cmd == "privacy_spend_zk") {
         std::string owner;
         std::string note_id;
@@ -1451,22 +1656,320 @@ std::string RpcServer::handle_command(const std::string& line) {
         return new_note;
     }
 
-    if (cmd == "privacy_balance") {
-        std::string owner;
-        iss >> owner;
-        if (owner.empty()) {
-            return "error: usage privacy_balance <owner>";
-        }
-        return std::to_string(privacy_.private_balance(owner));
-    }
-
     if (cmd == "privacy_status") {
         std::ostringstream out;
         out << "verifier_configured=" << (privacy_.verifier_configured() ? "true" : "false")
+            << " native_verifier_mode=" << privacy_.native_verifier_mode()
             << " strict_zk_mode=" << (privacy_.strict_zk_mode() ? "true" : "false")
             << " notes=" << privacy_.note_count()
             << " used_nullifiers=" << privacy_.used_nullifier_count();
         return out.str();
+    }
+
+    if (cmd == "pouw_storage_create_deal") {
+        std::string client_addr;
+        std::string content_root;
+        std::uint64_t chunk_count = 0;
+        std::uint64_t replication_factor = 0;
+        std::uint64_t start_height = 0;
+        std::uint64_t end_height = 0;
+        std::uint64_t price_per_epoch = 0;
+        iss >> client_addr >> content_root >> chunk_count >> replication_factor >> start_height >> end_height >> price_per_epoch;
+        if (client_addr.empty() || content_root.empty() || chunk_count == 0 || replication_factor == 0 || end_height == 0) {
+            return "error: usage pouw_storage_create_deal <client_addr> <content_root> <chunk_count> <replication_factor> <start_height> <end_height> <price_per_epoch>";
+        }
+        std::string deal_id;
+        std::string error;
+        if (!pouw_storage_.create_deal(client_addr,
+                                       content_root,
+                                       chunk_count,
+                                       replication_factor,
+                                       start_height,
+                                       end_height,
+                                       price_per_epoch,
+                                       deal_id,
+                                       error)) {
+            return "error: " + error;
+        }
+        return "ok:deal_id=" + deal_id;
+    }
+
+    if (cmd == "pouw_storage_commit") {
+        std::string deal_id;
+        std::string worker_addr;
+        std::string sealed_commitment;
+        std::uint64_t collateral = 0;
+        iss >> deal_id >> worker_addr >> sealed_commitment >> collateral;
+        if (deal_id.empty() || worker_addr.empty() || sealed_commitment.empty() || collateral == 0) {
+            return "error: usage pouw_storage_commit <deal_id> <worker_addr> <sealed_commitment> <collateral>";
+        }
+        std::string error;
+        if (!pouw_storage_.register_commitment(deal_id, worker_addr, sealed_commitment, collateral, error)) {
+            return "error: " + error;
+        }
+        return "ok";
+    }
+
+    if (cmd == "pouw_storage_challenge") {
+        std::string deal_id;
+        std::string worker_addr;
+        std::uint64_t height = 0;
+        iss >> deal_id >> worker_addr >> height;
+        if (deal_id.empty() || worker_addr.empty() || height == 0) {
+            return "error: usage pouw_storage_challenge <deal_id> <worker_addr> <height>";
+        }
+        std::string challenge_id;
+        std::string error;
+        if (!pouw_storage_.issue_challenge(deal_id, worker_addr, height, challenge_id, error)) {
+            return "error: " + error;
+        }
+        return "ok:challenge_id=" + challenge_id;
+    }
+
+    if (cmd == "pouw_storage_submit_proof") {
+        std::string challenge_id;
+        std::string worker_addr;
+        std::string proof_blob_hash;
+        iss >> challenge_id >> worker_addr >> proof_blob_hash;
+        if (challenge_id.empty() || worker_addr.empty() || proof_blob_hash.empty()) {
+            return "error: usage pouw_storage_submit_proof <challenge_id> <worker_addr> <proof_blob_hash>";
+        }
+        std::string verdict;
+        std::string error;
+        if (!pouw_storage_.submit_proof(challenge_id, worker_addr, proof_blob_hash, verdict, error)) {
+            return "error: " + error;
+        }
+        return "ok:verdict=" + verdict;
+    }
+
+    if (cmd == "pouw_storage_deal_status") {
+        std::string deal_id;
+        iss >> deal_id;
+        if (deal_id.empty()) {
+            return "error: usage pouw_storage_deal_status <deal_id>";
+        }
+        std::string out;
+        std::string error;
+        if (!pouw_storage_.deal_status(deal_id, out, error)) {
+            return "error: " + error;
+        }
+        return out;
+    }
+
+    if (cmd == "pouw_storage_worker_status") {
+        std::string worker_addr;
+        iss >> worker_addr;
+        if (worker_addr.empty()) {
+            return "error: usage pouw_storage_worker_status <worker_addr>";
+        }
+        std::string out;
+        std::string error;
+        if (!pouw_storage_.worker_status(worker_addr, out, error)) {
+            return "error: " + error;
+        }
+        return out;
+    }
+
+    if (cmd == "pouw_compute_submit_job") {
+        std::string requester_addr;
+        std::string job_type;
+        std::string input_ref;
+        std::string determinism_profile;
+        std::uint64_t max_latency_sec = 0;
+        std::uint64_t reward_budget = 0;
+        std::uint64_t min_reputation = 0;
+        iss >> requester_addr >> job_type >> input_ref >> determinism_profile >> max_latency_sec >> reward_budget >> min_reputation;
+        if (requester_addr.empty() || job_type.empty() || input_ref.empty() || max_latency_sec == 0 || reward_budget == 0) {
+            return "error: usage pouw_compute_submit_job <requester_addr> <job_type> <input_ref> <determinism_profile> <max_latency_sec> <reward_budget> <min_reputation>";
+        }
+        std::string job_id;
+        std::string error;
+        if (!pouw_compute_.submit_job(requester_addr,
+                                      job_type,
+                                      input_ref,
+                                      determinism_profile,
+                                      max_latency_sec,
+                                      reward_budget,
+                                      min_reputation,
+                                      job_id,
+                                      error)) {
+            return "error: " + error;
+        }
+        return "ok:job_id=" + job_id;
+    }
+
+    if (cmd == "pouw_compute_assign_job") {
+        std::string job_id;
+        std::string worker_addr;
+        std::uint64_t collateral_locked = 0;
+        iss >> job_id >> worker_addr >> collateral_locked;
+        if (job_id.empty() || worker_addr.empty() || collateral_locked == 0) {
+            return "error: usage pouw_compute_assign_job <job_id> <worker_addr> <collateral_locked>";
+        }
+        std::string error;
+        if (!pouw_compute_.assign_job(job_id, worker_addr, collateral_locked, error)) {
+            return "error: " + error;
+        }
+        return "ok";
+    }
+
+    if (cmd == "pouw_compute_submit_result") {
+        std::string job_id;
+        std::string worker_addr;
+        std::string output_ref;
+        std::string result_hash;
+        std::string proof_ref;
+        iss >> job_id >> worker_addr >> output_ref >> result_hash >> proof_ref;
+        if (job_id.empty() || worker_addr.empty() || output_ref.empty() || result_hash.empty()) {
+            return "error: usage pouw_compute_submit_result <job_id> <worker_addr> <output_ref> <result_hash> <proof_ref>";
+        }
+        std::string error;
+        if (!pouw_compute_.submit_result(job_id, worker_addr, output_ref, result_hash, proof_ref, error)) {
+            return "error: " + error;
+        }
+        return "ok";
+    }
+
+    if (cmd == "pouw_compute_validate") {
+        std::string job_id;
+        std::string validator_addr;
+        std::string verdict;
+        std::uint64_t score = 0;
+        iss >> job_id >> validator_addr >> verdict >> score;
+        if (job_id.empty() || validator_addr.empty() || verdict.empty()) {
+            return "error: usage pouw_compute_validate <job_id> <validator_addr> <pass|fail> <score>";
+        }
+        std::string error;
+        if (!pouw_compute_.submit_validation(job_id, validator_addr, verdict, score, error)) {
+            return "error: " + error;
+        }
+        return "ok";
+    }
+
+    if (cmd == "pouw_compute_job_status") {
+        std::string job_id;
+        iss >> job_id;
+        if (job_id.empty()) {
+            return "error: usage pouw_compute_job_status <job_id>";
+        }
+        std::string out;
+        std::string error;
+        if (!pouw_compute_.job_status(job_id, out, error)) {
+            return "error: " + error;
+        }
+        return out;
+    }
+
+    if (cmd == "pouw_compute_worker_status") {
+        std::string worker_addr;
+        iss >> worker_addr;
+        if (worker_addr.empty()) {
+            return "error: usage pouw_compute_worker_status <worker_addr>";
+        }
+        std::string out;
+        std::string error;
+        if (!pouw_compute_.worker_status(worker_addr, out, error)) {
+            return "error: " + error;
+        }
+        return out;
+    }
+
+    if (cmd == "pm_send_ttl") {
+        std::string sender;
+        std::string recipient;
+        std::string ciphertext_ref;
+        std::uint64_t ttl_sec = 0;
+        std::string policy;
+        iss >> sender >> recipient >> ciphertext_ref >> ttl_sec >> policy;
+        if (sender.empty() || recipient.empty() || ciphertext_ref.empty() || ttl_sec == 0) {
+            return "error: usage pm_send_ttl <sender> <recipient> <ciphertext_ref> <ttl_sec> [policy]";
+        }
+
+        auto tip_block = chain_.tip();
+        const auto anchor_height = tip_block.header.height;
+        const auto anchor_block_hash = hash_block_header(tip_block.header);
+
+        std::string msg_id;
+        std::string error;
+        if (!private_messaging_.send_ttl(sender,
+                                        recipient,
+                                        ciphertext_ref,
+                                        ttl_sec,
+                                        anchor_height,
+                                        anchor_block_hash,
+                                        policy,
+                                        msg_id,
+                                        error)) {
+            return "error: " + error;
+        }
+        return "ok:msg_id=" + msg_id +
+               " anchor_height=" + std::to_string(anchor_height) +
+               " anchor_block_hash=" + anchor_block_hash;
+    }
+
+    if (cmd == "pm_inbox") {
+        std::string recipient;
+        iss >> recipient;
+        if (recipient.empty()) {
+            return "error: usage pm_inbox <recipient>";
+        }
+        std::string out;
+        std::string error;
+        if (!private_messaging_.inbox(recipient, out, error)) {
+            return "error: " + error;
+        }
+        return out;
+    }
+
+    if (cmd == "pm_status") {
+        std::string msg_id;
+        iss >> msg_id;
+        if (msg_id.empty()) {
+            return "error: usage pm_status <msg_id>";
+        }
+        std::string out;
+        std::string error;
+        if (!private_messaging_.status(msg_id, out, error)) {
+            return "error: " + error;
+        }
+        return out;
+    }
+
+    if (cmd == "pm_fetch") {
+        std::string msg_id;
+        std::string requester;
+        iss >> msg_id >> requester;
+        if (msg_id.empty() || requester.empty()) {
+            return "error: usage pm_fetch <msg_id> <requester>";
+        }
+        std::string out;
+        std::string error;
+        if (!private_messaging_.fetch(msg_id, requester, out, error)) {
+            return "error: " + error;
+        }
+        return out;
+    }
+
+    if (cmd == "pm_destroy") {
+        std::string msg_id;
+        std::string requester;
+        iss >> msg_id >> requester;
+        if (msg_id.empty() || requester.empty()) {
+            return "error: usage pm_destroy <msg_id> <requester>";
+        }
+        std::string error;
+        if (!private_messaging_.destroy(msg_id, requester, error)) {
+            return "error: " + error;
+        }
+        return "ok";
+    }
+
+    if (cmd == "pm_purge") {
+        return "ok:purged=" + std::to_string(private_messaging_.purge_expired());
+    }
+
+    if (cmd == "ai_status") {
+        return ai_optimizer_.status();
     }
 
     if (cmd == "stake_claimable") {

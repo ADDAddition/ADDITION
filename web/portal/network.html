@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Metrics | Wallstreet Exchange</title>
+    <link rel="stylesheet" href="./css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body data-page="network">
+    <header class="topbar">
+        <a class="brand" href="./index.html">
+            <img src="./assets/logo-transparent.png" alt="ADDITION Logo">
+            <div><strong>ADDITION</strong><span>The Wallstreet Exchange</span></div>
+        </a>
+        <nav class="nav-links">
+            <a href="./index.html">Home</a>
+            <a href="./exchange.html">Exchange</a>
+            <a href="./network.html" class="active">Network</a>
+            <a href="./node.html">Node</a>
+            <a href="./tokenomics.html">Tokenomics</a>
+            <a href="./about.html">About</a>
+            <a href="./chat/">Private Chat</a>
+        </nav>
+    </header>
+
+    <main>
+        <section class="panel fade-up">
+            <h2>Real Node Telemetry</h2>
+            <p class="sub">Metrics are fetched live from your portal backend and daemon RPC.</p>
+            <div class="metrics-grid">
+                <article class="metric"><label>Chain Height</label><strong id="m-height">—</strong></article>
+                <article class="metric"><label>Peers</label><strong id="m-peers">—</strong></article>
+                <article class="metric"><label>TPS</label><strong id="kpi-tps">—</strong></article>
+                <article class="metric"><label>Difficulty</label><strong id="m-diff">—</strong></article>
+                <article class="metric"><label>Supply Emitted</label><strong id="m-emitted">—</strong></article>
+                <article class="metric"><label>Hashrate Estimate</label><strong id="m-hash">—</strong></article>
+                <article class="metric"><label>Health</label><strong id="health-status" class="status-warn">SYNCING</strong></article>
+            </div>
+            <div class="panel" style="margin-top:.8rem;">
+                <h3 style="margin:.2rem 0 1rem;">Live TPS Trend</h3>
+                <canvas id="tps-chart" width="1000" height="220"></canvas>
+            </div>
+            <div class="raw-box" id="network-raw">No data</div>
+        </section>
+    </main>
+
+    <footer class="footer"><p>© 2026 ADDITION NETWORK — The Wallstreet Exchange</p></footer>
+    <script src="./js/app.js"></script>
+</body>
+</html>

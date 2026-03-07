@@ -113,6 +113,10 @@ Mining is available from:
 - local RPC command submission
 - wallet/automation wrappers
 
+Current implementation note:
+- Mining uses a memory-hard PoW path in consensus (`memory_hard_head64`).
+- A dedicated Proof of Useful Work (PoUW) consensus mode is not yet implemented in the current runtime.
+
 ### 4.2 Staking
 
 Staking commands:
@@ -144,7 +148,7 @@ This enables deterministic supply monitoring for operators and exchange integrat
 
 1. Wallet keys created (`createwallet`)
 2. Sender balance checked (`getbalance`)
-3. Transaction built and signed (`sendtx` / `sendtx_hash`)
+3. Transaction built + signed via secure flow (`tx_build` + `sign_message` + `sendtx_signed[_hash]`)
 4. Mempool admission and gossip relay
 5. Block inclusion via mining
 6. Status tracking (`tx_status`)
@@ -189,11 +193,11 @@ This provides deterministic on-chain trading primitives for ecosystem assets.
 ### 8.1 Privacy
 
 Privacy commands include:
-- `privacy_mint`, `privacy_spend`
 - `privacy_mint_zk`, `privacy_spend_zk`
-- external verifier configuration (`privacy_set_verifier`)
 
-Strict operations can require external proof verification command wrappers.
+Verification is native in-process (ML-DSA-87), without external wrapper dependency.
+
+Strict operations use native proof verification.
 
 ### 8.2 Bridge
 
@@ -320,7 +324,8 @@ Addition is positioned as a security-oriented, operator-practical blockchain run
 - `createwallet`
 - `mine <address>`
 - `getbalance <address>`
-- `sendtx_hash <...>`
+- `tx_build <...>`
+- `sendtx_signed_hash <...>`
 - `tx_status <hash>`
 - `peers`
 - `sync`

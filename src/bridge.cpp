@@ -2,6 +2,7 @@
 
 #include "addition/crypto.hpp"
 
+#include <limits>
 #include <sstream>
 
 namespace addition {
@@ -54,6 +55,10 @@ bool BridgeEngine::lock(const std::string& chain,
         return false;
     }
 
+    if (it->second.locked_pool > (std::numeric_limits<std::uint64_t>::max() - amount)) {
+        error = "locked pool overflow";
+        return false;
+    }
     it->second.locked_pool += amount;
     receipt = to_hex(sha3_512_bytes(chain + "|" + user + "|" + std::to_string(amount)));
     it->second.receipts.push_back(receipt);
@@ -79,7 +84,12 @@ bool BridgeEngine::mint_wrapped(const std::string& chain,
         return false;
     }
 
-    it->second.wrapped_balances[user] += amount;
+    auto& w = it->second.wrapped_balances[user];
+    if (w > (std::numeric_limits<std::uint64_t>::max() - amount)) {
+        error = "wrapped balance overflow";
+        return false;
+    }
+    w += amount;
     return true;
 }
 
@@ -103,8 +113,16 @@ bool BridgeEngine::mint_wrapped_attested(const std::string& chain,
         error = "invalid attestation signature";
         return false;
     }
-
-    return mint_wrapped(chain, user, amount, error);
+    const auto attestation_id = to_hex(sha3_512_bytes("mint_att|" + chain + "|" + user + "|" + std::to_string(amount) + "|" + attestation));
+    if (!it->second.used_attestations.insert(attestation_id).second) {
+        error = "attestation replay";
+        return false;
+    }
+    if (!mint_wrapped(chain, user, amount, error)) {
+        it->second.used_attestations.erase(attestation_id);
+        return false;
+    }
+    return true;
 }
 
 bool BridgeEngine::burn_wrapped(const std::string& chain,
@@ -170,8 +188,16 @@ bool BridgeEngine::release_attested(const std::string& chain,
         error = "invalid attestation signature";
         return false;
     }
-
-    return release(chain, user, amount, error);
+    const auto attestation_id = to_hex(sha3_512_bytes("release_att|" + chain + "|" + user + "|" + std::to_string(amount) + "|" + attestation));
+    if (!it->second.used_attestations.insert(attestation_id).second) {
+        error = "attestation replay";
+        return false;
+    }
+    if (!release(chain, user, amount, error)) {
+        it->second.used_attestations.erase(attestation_id);
+        return false;
+    }
+    return true;
 }
 
 std::uint64_t BridgeEngine::wrapped_balance(const std::string& chain, const std::string& user) const {
@@ -189,6 +215,9 @@ std::string BridgeEngine::dump_state() const {
         oss << "C|" << chain << '|' << st.locked_pool << '\n';
         if (!st.attestor_pubkey.empty()) {
             oss << "A|" << chain << '|' << st.attestor_pubkey << '\n';
+        }
+        for (const auto& a : st.used_attestations) {
+            oss << "Y|" << chain << '|' << a << '\n';
         }
         for (const auto& [user, amount] : st.wrapped_balances) {
             oss << "W|" << chain << '|' << user << '|' << amount << '\n';
@@ -245,6 +274,16 @@ bool BridgeEngine::load_state(const std::string& state, std::string& error) {
                 return false;
             }
             chains_[chain].wrapped_balances[user] = static_cast<std::uint64_t>(std::stoull(amount));
+        } else if (tag == "Y") {
+            std::string chain;
+            std::string aid;
+            std::getline(ls, chain, '|');
+            std::getline(ls, aid);
+            if (chain.empty() || aid.empty()) {
+                error = "invalid bridge attestation line";
+                return false;
+            }
+            chains_[chain].used_attestations.insert(aid);
         } else if (tag == "R") {
             std::string chain;
             std::string receipt;

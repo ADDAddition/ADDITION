@@ -18,6 +18,7 @@ public:
     std::uint64_t reward_cap_bps() const;
     std::uint64_t claimable_of(const std::string& address) const;
     std::uint64_t claim(const std::string& address);
+    bool consume_staked_credit(const std::string& address, std::uint64_t amount, std::string& error);
 
     const std::unordered_map<std::string, std::uint64_t>& stakes_map() const;
     const std::unordered_map<std::string, std::uint64_t>& claimable_map() const;

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <unordered_map>
 #include <string>
+#include <mutex>
 #include <unordered_set>
 #include <vector>
 
@@ -20,6 +21,7 @@ public:
     std::size_t peer_count() const;
 
 private:
+    mutable std::mutex mu_;
     std::unordered_set<std::string> peers_;
     std::unordered_map<std::string, int> score_;
     std::unordered_set<std::string> banned_;

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace addition {
@@ -54,6 +55,7 @@ private:
         std::string attestor_pubkey;
         std::unordered_map<std::string, std::uint64_t> wrapped_balances;
         std::vector<std::string> receipts;
+        std::unordered_set<std::string> used_attestations;
     };
 
     std::unordered_map<std::string, ChainState> chains_;

@@ -1,6 +1,7 @@
 param(
     [string]$RpcHost = "127.0.0.1",
     [int]$Port = 8545,
+    [string]$RpcToken = "",
     [int]$BenchBlocks = 2,
     [int]$BenchTxPerBlock = 2000
 )
@@ -17,7 +18,8 @@ function Invoke-RpcLine {
     $writer.AutoFlush = $true
     $reader = New-Object System.IO.StreamReader($stream)
 
-    $writer.WriteLine($Command)
+    $wire = if ([string]::IsNullOrEmpty($RpcToken)) { $Command } else { "$RpcToken $Command" }
+    $writer.WriteLine($wire)
     $resp = $reader.ReadLine()
 
     $reader.Dispose()

@@ -537,7 +537,11 @@ bool DecentralizedNode::submit_transaction(const Transaction& tx, std::string& e
 
     const auto txid = hash_transaction(tx);
     if (seen_txids_.insert(txid).second) {
-        mempool_.submit(tx);
+        if (!mempool_.submit(tx)) {
+            seen_txids_.erase(txid);
+            error = "duplicate mempool tx";
+            return false;
+        }
         outbound_.push_back(encode_tx_gossip(tx));
     }
     return true;

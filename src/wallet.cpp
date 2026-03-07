@@ -36,7 +36,10 @@ bool Wallet::send(Mempool& mempool,
         return false;
     }
 
-    mempool.submit(tx);
+    if (!mempool.submit(tx)) {
+        error = "transaction rejected by mempool";
+        return false;
+    }
     ++next_nonce_;
     return true;
 }

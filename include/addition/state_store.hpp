@@ -7,6 +7,9 @@
 #include "addition/decentralized_node.hpp"
 #include "addition/mempool.hpp"
 #include "addition/p2p.hpp"
+#include "addition/pouw_compute.hpp"
+#include "addition/pouw_storage.hpp"
+#include "addition/private_messaging.hpp"
 #include "addition/privacy.hpp"
 #include "addition/staking.hpp"
 #include "addition/token_engine.hpp"
@@ -27,6 +30,9 @@ public:
                   const BridgeEngine& bridge,
                   const PeerNetwork& peers,
                   const DecentralizedNode& node,
+                  const PoUWStorageEngine& pouw_storage,
+                  const PoUWComputeEngine& pouw_compute,
+                  const PrivateMessagingEngine& private_messaging,
                   const PrivacyPool& privacy,
                   std::string& error) const;
 
@@ -38,6 +44,9 @@ public:
                   BridgeEngine& bridge,
                   PeerNetwork& peers,
                   DecentralizedNode& node,
+                  PoUWStorageEngine& pouw_storage,
+                  PoUWComputeEngine& pouw_compute,
+                  PrivateMessagingEngine& private_messaging,
                   PrivacyPool& privacy,
                   std::string& error) const;
 
@@ -54,6 +63,9 @@ private:
     std::string node_identity_path() const;
     std::string peer_pins_path() const;
     std::string privacy_path() const;
+    std::string pouw_storage_path() const;
+    std::string pouw_compute_path() const;
+    std::string private_messages_path() const;
 };
 
 } // namespace addition

@@ -106,6 +106,10 @@ bool TokenEngine::create_token_ex(const std::string& symbol,
         error = "dev wallet required when dev allocation > 0";
         return false;
     }
+    if (initial_mint > (std::numeric_limits<std::uint64_t>::max() - dev_allocation)) {
+        error = "initial + dev allocation overflow";
+        return false;
+    }
     if (initial_mint + dev_allocation > max_supply) {
         error = "initial + dev allocation exceeds max supply";
         return false;
@@ -157,8 +161,16 @@ bool TokenEngine::mint(const std::string& symbol,
         error = "invalid mint params";
         return false;
     }
+    if (it->second.total_supply > (std::numeric_limits<std::uint64_t>::max() - amount)) {
+        error = "token supply overflow";
+        return false;
+    }
     if (it->second.total_supply + amount > it->second.max_supply) {
         error = "token max supply exceeded";
+        return false;
+    }
+    if (it->second.balances[to] > (std::numeric_limits<std::uint64_t>::max() - amount)) {
+        error = "recipient balance overflow";
         return false;
     }
 
@@ -213,6 +225,11 @@ bool TokenEngine::transfer(const std::string& symbol,
     }
 
     from_bal -= amount;
+    if (it->second.balances[to] > (std::numeric_limits<std::uint64_t>::max() - receive_amount)) {
+        from_bal += amount;
+        error = "recipient balance overflow";
+        return false;
+    }
     it->second.balances[to] += receive_amount;
 
     if (it->second.max_wallet_amount > 0 && it->second.balances[to] > it->second.max_wallet_amount) {
@@ -223,6 +240,12 @@ bool TokenEngine::transfer(const std::string& symbol,
     }
 
     if (transfer_fee > 0 && !it->second.treasury_wallet.empty()) {
+        if (it->second.balances[it->second.treasury_wallet] > (std::numeric_limits<std::uint64_t>::max() - transfer_fee)) {
+            from_bal += amount;
+            it->second.balances[to] -= receive_amount;
+            error = "treasury balance overflow";
+            return false;
+        }
         it->second.balances[it->second.treasury_wallet] += transfer_fee;
     }
     if (burn_fee > 0) {
@@ -534,6 +557,19 @@ bool TokenEngine::add_liquidity(const std::string& token_a,
             return false;
         }
     } else {
+        if (p.reserve0 == 0 || p.reserve1 == 0) {
+            error = "invalid pool reserves";
+            return false;
+        }
+        if (add0 > (std::numeric_limits<std::uint64_t>::max() / p.reserve1) ||
+            p.reserve0 > (std::numeric_limits<std::uint64_t>::max() / add1)) {
+            error = "liquidity ratio overflow";
+            return false;
+        }
+        if (add0 * p.reserve1 != add1 * p.reserve0) {
+            error = "liquidity amounts must match pool ratio";
+            return false;
+        }
         const auto lp0 = (add0 * p.lp_total_supply) / p.reserve0;
         const auto lp1 = (add1 * p.lp_total_supply) / p.reserve1;
         minted_lp = std::min(lp0, lp1);
@@ -545,6 +581,15 @@ bool TokenEngine::add_liquidity(const std::string& token_a,
 
     b0 -= add0;
     b1 -= add1;
+    if (p.reserve0 > (std::numeric_limits<std::uint64_t>::max() - add0) ||
+        p.reserve1 > (std::numeric_limits<std::uint64_t>::max() - add1) ||
+        p.lp_total_supply > (std::numeric_limits<std::uint64_t>::max() - minted_lp) ||
+        p.lp_balances[provider] > (std::numeric_limits<std::uint64_t>::max() - minted_lp)) {
+        b0 += add0;
+        b1 += add1;
+        error = "pool state overflow";
+        return false;
+    }
     p.reserve0 += add0;
     p.reserve1 += add1;
     p.lp_total_supply += minted_lp;
@@ -592,6 +637,15 @@ bool TokenEngine::remove_liquidity(const std::string& token_a,
     p.reserve0 -= take0;
     p.reserve1 -= take1;
 
+    if (tokens_[p.token0].balances[provider] > (std::numeric_limits<std::uint64_t>::max() - take0) ||
+        tokens_[p.token1].balances[provider] > (std::numeric_limits<std::uint64_t>::max() - take1)) {
+        lp_bal += lp_amount;
+        p.lp_total_supply += lp_amount;
+        p.reserve0 += take0;
+        p.reserve1 += take1;
+        error = "provider balance overflow";
+        return false;
+    }
     tokens_[p.token0].balances[provider] += take0;
     tokens_[p.token1].balances[provider] += take1;
 
@@ -632,14 +686,32 @@ bool TokenEngine::quote_exact_in(const std::string& token_in,
     }
 
     const std::uint64_t fee_denom = 10000;
-    const std::uint64_t amount_in_with_fee = amount_in * (fee_denom - p.fee_bps);
+    const std::uint64_t fee_multiplier = (fee_denom - p.fee_bps);
+    if (amount_in > (std::numeric_limits<std::uint64_t>::max() / fee_multiplier)) {
+        error = "quote overflow";
+        return false;
+    }
+    const std::uint64_t amount_in_with_fee = amount_in * fee_multiplier;
     if (amount_in_with_fee == 0) {
         error = "amount too small after fee";
         return false;
     }
 
+    if (amount_in_with_fee > (std::numeric_limits<std::uint64_t>::max() / reserve_out)) {
+        error = "quote overflow";
+        return false;
+    }
     const std::uint64_t num = amount_in_with_fee * reserve_out;
-    const std::uint64_t den = reserve_in * fee_denom + amount_in_with_fee;
+    if (reserve_in > (std::numeric_limits<std::uint64_t>::max() / fee_denom)) {
+        error = "quote overflow";
+        return false;
+    }
+    const std::uint64_t base_den = reserve_in * fee_denom;
+    if (base_den > (std::numeric_limits<std::uint64_t>::max() - amount_in_with_fee)) {
+        error = "quote overflow";
+        return false;
+    }
+    const std::uint64_t den = base_den + amount_in_with_fee;
     if (den == 0) {
         error = "quote denominator zero";
         return false;
@@ -690,6 +762,12 @@ bool TokenEngine::swap_exact_in(const std::string& token_in,
             return false;
         }
         in_bal -= amount_in;
+        if (tokens_[token_out].balances[trader] > (std::numeric_limits<std::uint64_t>::max() - amount_out) ||
+            p.reserve0 > (std::numeric_limits<std::uint64_t>::max() - amount_in)) {
+            in_bal += amount_in;
+            error = "swap state overflow";
+            return false;
+        }
         tokens_[token_out].balances[trader] += amount_out;
         p.reserve0 += amount_in;
         p.reserve1 -= amount_out;
@@ -699,6 +777,12 @@ bool TokenEngine::swap_exact_in(const std::string& token_in,
             return false;
         }
         in_bal -= amount_in;
+        if (tokens_[token_out].balances[trader] > (std::numeric_limits<std::uint64_t>::max() - amount_out) ||
+            p.reserve1 > (std::numeric_limits<std::uint64_t>::max() - amount_in)) {
+            in_bal += amount_in;
+            error = "swap state overflow";
+            return false;
+        }
         tokens_[token_out].balances[trader] += amount_out;
         p.reserve1 += amount_in;
         p.reserve0 -= amount_out;

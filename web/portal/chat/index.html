@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#020202" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="stylesheet" href="/chat/chat.css" />
+  <title>ADDITION Secure Chat</title>
+</head>
+<body>
+  <header>
+    <h1>ADDITION Secure Chat</h1>
+    <button id="installBtn" hidden>Install</button>
+  </header>
+
+  <section class="card">
+    <h2>Identity</h2>
+    <div class="row"><label>Address</label><input id="addr" placeholder="your address" /></div>
+    <div class="row"><label>Peer</label><input id="peer" placeholder="recipient address" /></div>
+    <div class="row"><label>Identity pubkey (daemon PQ pub)</label><input id="idPub" placeholder="identity pubkey hex" /></div>
+    <div class="row"><label>Identity privkey (daemon PQ priv)</label><input id="idPriv" placeholder="identity privkey hex" type="password" /></div>
+    <div class="row"><label>Public key</label><input id="pub" placeholder="your pubkey hex" /></div>
+    <div class="row"><label>Private key</label><input id="priv" placeholder="your privkey hex (local)" type="password" /></div>
+    <div class="row"><label>Session token</label><input id="session" placeholder="issued by challenge verify" /></div>
+    <div class="row"><label>Min staked required</label><input id="stakeHint" value="1 ADD" readonly /></div>
+    <div class="row actions"><button id="authBtn">Authenticate</button></div>
+    <div class="row actions"><button id="saveIdentity">Save</button></div>
+  </section>
+
+  <section class="card">
+    <h2>Encrypted message</h2>
+    <div class="row actions"><button id="prekeyBtn">Publish X3DH Bundle</button><button id="syncPeerBtn">Sync Peer Bundle</button></div>
+    <div class="row"><label>TTL (sec)</label><input id="ttl" type="number" min="30" max="86400" value="300" /></div>
+    <div class="row"><label>Plaintext (local only)</label><textarea id="plain" rows="5"></textarea></div>
+    <div class="row actions"><button id="sendBtn">Encrypt + Send</button></div>
+    <p class="hint">End-to-end encryption done in browser. Server receives ciphertext only.</p>
+  </section>
+
+  <section class="card">
+    <h2>Inbox</h2>
+    <div class="row actions"><button id="refreshBtn">Refresh Inbox</button></div>
+    <ul id="inbox"></ul>
+  </section>
+
+  <section class="card">
+    <h2>Platform quick actions</h2>
+    <div class="row"><label>Swap in</label><input id="swapIn" value="SOL" /></div>
+    <div class="row"><label>Swap out</label><input id="swapOut" value="ADD" /></div>
+    <div class="row"><label>Amount</label><input id="swapAmount" type="number" value="10" /></div>
+    <div class="row actions"><button id="quoteBtn">Quote Swap</button></div>
+    <pre id="quoteOut"></pre>
+  </section>
+
+  <script src="/chat/chat.js"></script>
+</body>
+</html>

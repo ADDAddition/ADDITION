@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exchange Desk | Wallstreet Exchange</title>
+    <link rel="stylesheet" href="./css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body data-page="exchange">
+    <header class="topbar">
+        <a class="brand" href="./index.html">
+            <img src="./assets/logo-transparent.png" alt="ADDITION Logo">
+            <div><strong>ADDITION</strong><span>The Wallstreet Exchange</span></div>
+        </a>
+        <nav class="nav-links">
+            <a href="./index.html">Home</a>
+            <a href="./exchange.html" class="active">Exchange</a>
+            <a href="./network.html">Network</a>
+            <a href="./node.html">Node</a>
+            <a href="./tokenomics.html">Tokenomics</a>
+            <a href="./about.html">About</a>
+            <a href="./chat/">Private Chat</a>
+        </nav>
+    </header>
+
+    <main>
+        <section class="panel fade-up">
+            <h2>Exchange Execution Desk</h2>
+            <p class="sub">Route quote and signed execution endpoint connected to your local node backend.</p>
+            <div class="exchange-layout">
+                <div class="panel">
+                    <div class="field">
+                        <label for="swap-token-in">Token In</label>
+                        <input id="swap-token-in" value="USDT">
+                    </div>
+                    <div class="field">
+                        <label for="swap-token-out">Token Out</label>
+                        <input id="swap-token-out" value="ADD">
+                    </div>
+                    <div class="field">
+                        <label for="swap-amount-in">Amount In</label>
+                        <input id="swap-amount-in" type="number" value="100" min="1">
+                    </div>
+                    <div class="hero-actions">
+                        <button class="btn btn-secondary" id="btn-swap-switch" type="button">Switch</button>
+                        <button class="btn btn-primary" id="btn-swap-quote" type="button">Get Best Route</button>
+                    </div>
+                    <p class="result mono" id="swap-result">Idle</p>
+                </div>
+
+                <div class="panel">
+                    <article class="metric">
+                        <label>Quoted Amount Out</label>
+                        <strong id="swap-quote-out">—</strong>
+                    </article>
+                    <article class="metric" style="margin-top:.75rem;">
+                        <label>Estimated Route</label>
+                        <strong id="swap-route">—</strong>
+                    </article>
+                    <div class="raw-box" id="swap-raw">No data</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer"><p>© 2026 ADDITION NETWORK — The Wallstreet Exchange</p></footer>
+    <script src="./js/app.js"></script>
+</body>
+</html>
