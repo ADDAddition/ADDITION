@@ -9,22 +9,6 @@
 **ADDITION** is a next-generation Layer 1 blockchain engineered to survive the quantum computing era. It features a native hybrid cryptographic core (Dilithium + SHA3-512), a deterministic parallel execution engine, and a fully modular runtime for privacy, smart contracts, and interoperability.
 
 ---
-
-## 🌐 Official Network Portals
-
-Access the mainnet explorer, wallet, and web nodes via our global edge network (powered by Cloudflare):
-
-| Region / Mirror | Domain | Status |
-| :--- | :--- | :--- |
-| **Global Primary** | [**bitcoins.express**](https://bitcoins.express) | 🟢 Online |
-| **Mirror A** | [**bnkchain.com**](https://bnkchain.com) | 🟢 Online |
-| **Mirror B** | [**chainbnk.com**](https://chainbnk.com) | 🟢 Online |
-| **Doge Ecosystem** | [**dogecointoday.com**](https://dogecointoday.com) | 🟢 Online |
-| **AI Node** | [**gcli.ai**](https://gcli.ai) | 🟢 Online |
-| **Exchange Hub** | [**tradexai.ai**](https://tradexai.ai) | 🟢 Online |
-
----
-
 ## 🚀 Key Features (Audited v3.0)
 
 ### 🛡️ Quantum-Resistant Core
