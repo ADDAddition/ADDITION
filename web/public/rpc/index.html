@@ -40,7 +40,8 @@ curl 'http://HOST:38545/rpc?cmd=getblock%200'</pre>
         <li><code>getblock &lt;height_or_hash&gt;</code></li>
         <li><code>getblockhash &lt;height&gt;</code></li>
       </ul>
-      <p>Everything else, including <code>mine</code>, <code>sendtx*</code>, <code>createwallet</code>, and identity rotation, returns <code>error: command disabled on public RPC</code>.</p>
+      <p>Everything else, including <code>mine</code>, <code>sendtx*</code>, <code>createwallet</code>, <code>wallet_*</code>, and identity rotation, returns <code>error: command disabled on public RPC</code>.</p>
+      <p>Wallet create/send lives on localhost: <a href="/wallet/">/wallet/</a> or <code>python3 web/addition_wallet_gui.py</code>.</p>
     </section>
     <section class="panel">
       <h2>What stays private</h2>

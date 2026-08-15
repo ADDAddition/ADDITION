@@ -37,7 +37,7 @@
 
     <h2>5. Ledger and contracts (what the code does)</h2>
     <ul>
-      <li>UTXO-style transactions with PQ signatures and a minimum fee.</li>
+      <li>UTXO-style transactions with PQ signatures and a minimum fee. Local wallets use <code>createwallet</code> (ML-DSA-87) and <code>wallet_send</code> / <code>tx_build</code>+<code>sendtx_signed</code>. Bitcoin-like user model, not BIP compatibility.</li>
       <li>In-process key-value contracts: <code>contract_deploy</code>, <code>contract_call</code> <code>set|add|get</code>.</li>
       <li>Token / NFT / swap engines in-process. A swap quote without a pool returns <code>error: pool not found</code>.</li>
       <li>EVM helper is a <strong>bootstrap</strong> JSON-RPC map. Not a full EVM. <code>eth_sendRawTransaction</code> is disabled.</li>

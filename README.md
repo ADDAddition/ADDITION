@@ -105,6 +105,26 @@ printf 'getinfo\n' | nc 127.0.0.1 8545
 
 `getinfo` reports `network=testnet` and `network_name=addition-testnet`.
 
+### Local wallet (Bitcoin-like user model)
+
+Trusted RPC only (`127.0.0.1:8545`). `createwallet` generates ML-DSA-87 keys and writes them to `data/wallets/<name>.wal` (owner-only). The reply has `priv_printed=0`. This is keys / UTXOs / send / receive / fee — not BIP compatibility and not a Bitcoin fork.
+
+```bash
+printf 'createwallet alice\n' | nc 127.0.0.1 8545
+printf 'wallet_info alice\n' | nc 127.0.0.1 8545
+printf 'getbalance <address>\n' | nc 127.0.0.1 8545
+printf 'wallet_send alice <to> 10 1\n' | nc 127.0.0.1 8545
+```
+
+`wallet_send` signs on the node from the local file. The explicit path is `tx_build` + `wallet_sign` + `sendtx_signed` (still no raw privkey on the wire). Legacy `sendtx` needs `ADDITION_ALLOW_INSECURE_TX_COMMANDS=1`.
+
+Honest UI:
+
+* Page: `/wallet/` via `python3 web/serve.py` (loopback `/local-rpc` only)
+* Desktop: `python3 web/addition_wallet_gui.py` or `--cli getinfo`
+
+A fresh wallet balance is `0` until you `mine <address>` on local RPC (memory-hard; reward 50 on a fresh testnet) or receive a UTXO. Public RPC cannot create wallets or send.
+
 ### Public read-only RPC
 
 Local RPC on `127.0.0.1:8545` stays trusted (mine, wallets, sends). To expose a **read-only** public bind:
@@ -141,12 +161,13 @@ python3 web/serve.py
 | `/status/` | getinfo, monetary_info, selftest, peers |
 | `/rpc/` | How to talk to the public allowlist |
 | `/docs/` | Architecture, commands, PoUW spec, getting started, runbook, ZK contract |
+| `/wallet/` | Local createwallet / UTXO send via `/local-rpc` (loopback) |
 | `/contracts/` `/swap/` `/evm/` | Only methods verified on a local node; EVM is bootstrap |
 | `/whitepaper/` `/legal/` | Honest research copy. No fake ticker or mainnet live |
 
 Explorer/status call `/api/rpc`. On a static host without a backend they fail closed. Optional `?rpc=http://HOST:38545/rpc`.
 
-`/contracts` and `/swap` use loopback `/local-rpc` → `127.0.0.1:8545`. They print the node’s real reply (`error: pool not found` if you have no pool).
+`/wallet`, `/contracts`, and `/swap` use loopback `/local-rpc` → `127.0.0.1:8545`. They print the node’s real reply (`error: pool not found` if you have no pool).
 
 ```bash
 python3 web/evm/evm_rpc_bridge.py

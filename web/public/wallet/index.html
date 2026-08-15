@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION local wallet</title>
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body data-title="Wallet" data-sub="Local/testnet only. Bitcoin-like keys, UTXOs, send/receive, fee — not BIP, not a live mainnet.">
+  <header id="site-header"></header>
+  <main>
+    <div class="banner">
+      This page talks to <code>/local-rpc</code> → <code>127.0.0.1:8545</code> only.
+      Public read RPC cannot create wallets or send. Keys stay in the node file
+      <code>data/wallets/&lt;name&gt;.wal</code> (ML-DSA-87). The browser never sees a private key.
+      On a static public host this page stays <strong>RPC offline</strong>.
+    </div>
+    <p id="rpc-state" class="offline">Checking local RPC…</p>
+    <p id="height-line" class="note"></p>
+
+    <section class="panel">
+      <h2>What this is</h2>
+      <ul>
+        <li>UTXO receive/send, <code>createwallet</code> (ML-DSA-87), <code>getbalance</code> / <code>wallet_balance</code></li>
+        <li>Default send: <code>wallet_send</code> (node signs from the local file; no raw privkey on the wire)</li>
+        <li>Explicit send: <code>tx_build</code> + <code>wallet_sign</code> + <code>sendtx_signed</code></li>
+        <li>Fees: spec <code>min_fee=1</code>, plus the node’s <code>fee_info</code> floor. Cap: 50,000,000</li>
+        <li>Desktop helper: <code>python3 web/addition_wallet_gui.py</code> (same local RPC)</li>
+      </ul>
+      <p class="note">“Like Bitcoin” here means the user model. This tree does not implement BIP-32/39/44 or Bitcoin P2P/script.</p>
+    </section>
+
+    <section class="panel">
+      <h2>createwallet / balance</h2>
+      <label for="name">wallet name</label>
+      <input id="name" value="default">
+      <button id="create-btn" type="button">createwallet</button>
+      <button id="list-btn" type="button">wallet_list</button>
+      <button id="info-btn" type="button">wallet_info</button>
+      <button id="bal-btn" type="button">wallet_balance</button>
+      <pre id="wallet-raw" class="raw"></pre>
+    </section>
+
+    <section class="panel">
+      <h2>wallet_send</h2>
+      <label for="to">to address</label>
+      <input id="to">
+      <label for="amount">amount</label>
+      <input id="amount" value="1">
+      <label for="fee">fee (blank = node floor)</label>
+      <input id="fee" value="1">
+      <button id="send-btn" type="button">Send</button>
+      <pre id="send-raw" class="raw"></pre>
+    </section>
+
+    <section class="panel">
+      <h2>mine to this wallet</h2>
+      <p class="note">Memory-hard. Can take a long time. Local trusted RPC only. Reward is the node’s <code>next_reward</code> (50 on a fresh testnet).</p>
+      <button id="mine-btn" type="button">mine</button>
+      <pre id="mine-raw" class="raw"></pre>
+    </section>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/common.js"></script>
+  <script src="/chrome.js"></script>
+  <script>
+    async function localCmd(cmd, timeoutMs) {
+      const ctrl = timeoutMs ? new AbortController() : null;
+      const timer = timeoutMs ? setTimeout(function () { ctrl.abort(); }, timeoutMs) : null;
+      try {
+        const res = await fetch("/local-rpc?cmd=" + encodeURIComponent(cmd), {
+          cache: "no-store",
+          signal: ctrl ? ctrl.signal : undefined
+        });
+        const raw = (await res.text()).trim();
+        if (!res.ok || raw.charAt(0) === "<") {
+          return { offline: true, raw: raw && raw.charAt(0) !== "<" ? raw : "RPC offline" };
+        }
+        return { offline: raw === "RPC offline", raw: raw };
+      } catch (e) {
+        return { offline: true, raw: "RPC offline" };
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    }
+    function field(line, key) {
+      const parts = line.split(/\s+/);
+      const prefix = key + "=";
+      for (let i = 0; i < parts.length; i++) {
+        if (parts[i].indexOf(prefix) === 0) return parts[i].slice(prefix.length);
+      }
+      return "";
+    }
+    async function ping() {
+      const r = await localCmd("getinfo");
+      const el = document.getElementById("rpc-state");
+      const height = document.getElementById("height-line");
+      if (r.offline) {
+        el.className = "offline";
+        el.textContent = "RPC offline";
+        height.textContent = "";
+        return;
+      }
+      el.className = "ok";
+      el.textContent = "Local trusted RPC answered";
+      height.textContent = "getinfo height=" + (field(r.raw, "height") || "?") +
+        " network=" + (field(r.raw, "network") || "?") +
+        " network_name=" + (field(r.raw, "network_name") || "?");
+    }
+    document.getElementById("create-btn").addEventListener("click", async function () {
+      const r = await localCmd("createwallet " + document.getElementById("name").value.trim());
+      document.getElementById("wallet-raw").textContent = r.raw;
+    });
+    document.getElementById("list-btn").addEventListener("click", async function () {
+      const r = await localCmd("wallet_list");
+      document.getElementById("wallet-raw").textContent = r.raw;
+    });
+    document.getElementById("info-btn").addEventListener("click", async function () {
+      const r = await localCmd("wallet_info " + document.getElementById("name").value.trim());
+      document.getElementById("wallet-raw").textContent = r.raw;
+    });
+    document.getElementById("bal-btn").addEventListener("click", async function () {
+      const r = await localCmd("wallet_balance " + document.getElementById("name").value.trim());
+      document.getElementById("wallet-raw").textContent = r.raw;
+    });
+    document.getElementById("send-btn").addEventListener("click", async function () {
+      const name = document.getElementById("name").value.trim();
+      const to = document.getElementById("to").value.trim();
+      const amount = document.getElementById("amount").value.trim();
+      const fee = document.getElementById("fee").value.trim();
+      let cmd = "wallet_send " + name + " " + to + " " + amount;
+      if (fee) cmd += " " + fee;
+      const r = await localCmd(cmd);
+      document.getElementById("send-raw").textContent = r.raw;
+    });
+    document.getElementById("mine-btn").addEventListener("click", async function () {
+      const info = await localCmd("wallet_info " + document.getElementById("name").value.trim());
+      if (info.offline || info.raw.indexOf("error:") === 0) {
+        document.getElementById("mine-raw").textContent = info.raw;
+        return;
+      }
+      const addr = field(info.raw, "address");
+      document.getElementById("mine-raw").textContent = "mining to " + addr + " …";
+      const r = await localCmd("mine " + addr, 300000);
+      document.getElementById("mine-raw").textContent = r.raw;
+      const bal = await localCmd("wallet_balance " + document.getElementById("name").value.trim());
+      document.getElementById("wallet-raw").textContent = bal.raw;
+      ping();
+    });
+    ping();
+  </script>
+</body>
+</html>

@@ -4,6 +4,7 @@
     ["/explorer/", "Explorer"],
     ["/status/", "Status"],
     ["/rpc/", "RPC"],
+    ["/wallet/", "Wallet"],
     ["/docs/", "Docs"],
     ["/contracts/", "Contracts"],
     ["/swap/", "Swap"],

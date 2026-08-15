@@ -26,7 +26,7 @@ Allowlist (everything else returns `error: command disabled on public RPC`):
 - `getblock <height_or_hash>`
 - `getblockhash <height>`
 
-Not on the public port: `mine`, `sendtx*`, `createwallet`, identity rotation, admin, contract/token writes.
+Not on the public port: `mine`, `sendtx*`, `createwallet`, `wallet_*`, identity rotation, admin, contract/token writes.
 
 TCP and a tiny HTTP adapter share the same port:
 
@@ -41,7 +41,12 @@ Override bind/port with `--public-rpc-bind`, `--public-rpc-port`, `ADDITION_PUBL
 - `getinfo`
 - `monetary_info`
 - `crypto_selftest`
-- `createwallet`
+- `createwallet [name]` — ML-DSA-87; writes `data/wallets/<name>.wal` (0600); returns address/pub/name/path; `priv_printed=0`
+- `wallet_list`
+- `wallet_info <name>`
+- `wallet_balance <name>`
+- `wallet_send <name> <to_addr> <amount> [fee]` — signs from the local file; no privkey on the wire
+- `wallet_sign <name> <message_hex_utf8>` — same as `sign_message` without sending the key
 - `getbalance <address>`
 - `getbalance_instant <address>`
 - `tx_build <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce>`
@@ -194,7 +199,8 @@ Notes:
 ## Notes
 - Build defaults to release-oriented mode with tests disabled unless explicitly enabled.
 - Build fails if liboqs is missing (fallback mode removed).
-- Wallet key generation uses ML-DSA-87 via liboqs when available (`createwallet` returns `algo=ml-dsa-87`).
+- Wallet key generation uses ML-DSA-87 via liboqs (`createwallet` returns `algo=ml-dsa-87` and stores the secret in `data/wallets/<name>.wal`).
+- User model is Bitcoin-like (keys, UTXOs, send/receive, fee). This is not BIP-32/39/44 and not a Bitcoin fork.
 - Monetary cap is enforced on-chain: `max_supply = 50,000,000`.
 - Runtime strict gates enabled:
 	- PQ signatures required for spend transactions (`signature` must be `pq=` format)
@@ -216,30 +222,24 @@ Notes:
 	- `peer_pins.dat`
 	- `node_identity.dat` (stable node PQ identity)
 	- `privacy.dat`
+	- `wallets/<name>.wal` (local ML-DSA-87 secrets; never commit)
 
-## Wallet GUI (Python)
-- File: `web/addition_wallet_gui.py`
-- Uses TCP RPC directly on `127.0.0.1:8545`
+## Wallet (local / testnet only)
+- File: `web/addition_wallet_gui.py` (Tk GUI, or `--cli` without a display)
+- Honest page: `/wallet/` via loopback `/local-rpc` → `127.0.0.1:8545`
+- Uses TCP RPC on `127.0.0.1:8545` only (refuses non-loopback hosts)
 - Supports:
-	- Wallet creation (`createwallet`)
-	- Balance refresh (`getbalance`)
-	- Secure send flow (`tx_build` + `sign_message` + `sendtx_signed_hash`)
-	- Mining to selected address (`mine <address>`)
+	- Wallet creation (`createwallet [name]`, ML-DSA-87, key stays in `data/wallets/`)
+	- Balance (`wallet_balance` / `getbalance`)
+	- Default send: `wallet_send` (no raw privkey on the wire)
+	- Explicit send: `tx_build` + `wallet_sign` + `sendtx_signed` / `sendtx_signed_hash`
+	- Mining to the wallet address (`mine <address>`) — memory-hard, can be slow
 	- Stake / unstake / claim
-
-## Professional UX Components
-- Advanced wallet UI: `web/addition_wallet_pro.py`
-- Live web portal: `web/portal/index.html`
-- Portal metrics backend: `web/portal/addition_portal_backend.py`
+- Not shipped in this tree: `web/addition_wallet_pro.py`, `web/portal/` (no `/api/getinfo` portal backend)
 - MetaMask EVM bridge (bootstrap): `web/evm/evm_rpc_bridge.py`
 
-Portal API endpoints:
-- `GET /api/getinfo`
-- `GET /api/monetary`
-- `GET /api/health`
-
 ## Honest website (fail-closed)
-- Static Pages root: `web/public/` (`/`, `/explorer/`, `/status/`, `/rpc/`, `/docs/`, `/contracts/`, `/swap/`, `/evm/`, `/whitepaper/`, `/legal/`)
+- Static Pages root: `web/public/` (`/`, `/explorer/`, `/status/`, `/rpc/`, `/wallet/`, `/docs/`, `/contracts/`, `/swap/`, `/evm/`, `/whitepaper/`, `/legal/`)
 - Local server: `python3 web/serve.py` (default `127.0.0.1:8080`)
 - `/api/rpc` (and `/rpc?cmd=`) proxy the public allowlist to port `38545`
 - `/rpc/` without `cmd` is the how-to page

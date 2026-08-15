@@ -30,6 +30,7 @@ add_library(addition_core
     src/rpc_access.cpp
     src/state_store.cpp
     src/wallet_keys.cpp
+    src/wallet_store.cpp
     src/staking.cpp
     src/contract_engine.cpp
     src/token_engine.cpp
@@ -65,4 +66,8 @@ if(ADDITION_BUILD_TESTS)
     add_executable(test_rpc_access tests/test_rpc_access.cpp)
     target_link_libraries(test_rpc_access PRIVATE addition_core)
     add_test(NAME test_rpc_access COMMAND test_rpc_access)
+
+    add_executable(test_wallet tests/test_wallet.cpp)
+    target_link_libraries(test_wallet PRIVATE addition_core)
+    add_test(NAME test_wallet COMMAND test_wallet)
 endif()

@@ -759,6 +759,10 @@ std::string daemon_help_text() {
            "LAN RPC stays token-gated (ADDITION_ENABLE_LAN_RPC=1 + ADDITION_LAN_RPC_TOKEN).\n"
            "P2P stays off unless ADDITION_ENABLE_P2P_RPC=1. Do not expose write RPC to the world.\n"
            "\n"
+           "Local wallet (trusted RPC only): createwallet [name], wallet_list, wallet_info,\n"
+           "  wallet_balance, wallet_send, wallet_sign. Keys stay in <data-dir>/wallets/*.wal.\n"
+           "  Bitcoin-like user model (keys, UTXOs, send/receive, fee). Not BIP-compatible.\n"
+           "\n"
            "This is a research prototype / testnet. It does not claim to be a live mainnet.\n";
 }
 

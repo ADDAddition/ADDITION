@@ -61,6 +61,16 @@ ctest --test-dir build --output-on-failure</pre>
 <p>The daemon reads commands on stdin. In another terminal:</p>
 <pre>printf &#x27;getinfo\n&#x27; | nc 127.0.0.1 8545</pre>
 <p><code>getinfo</code> reports <code>network=testnet</code> and <code>network_name=addition-testnet</code>.</p>
+<h3>Local wallet (Bitcoin-like user model)</h3>
+<p>Trusted RPC only (<code>127.0.0.1:8545</code>). <code>createwallet</code> generates ML-DSA-87 keys and writes them to <code>data/wallets/&lt;name&gt;.wal</code> (owner-only). The reply has <code>priv_printed=0</code>. This is keys / UTXOs / send / receive / fee — not BIP compatibility and not a Bitcoin fork.</p>
+<pre>printf &#x27;createwallet alice\n&#x27; | nc 127.0.0.1 8545
+printf &#x27;wallet_info alice\n&#x27; | nc 127.0.0.1 8545
+printf &#x27;getbalance &lt;address&gt;\n&#x27; | nc 127.0.0.1 8545
+printf &#x27;wallet_send alice &lt;to&gt; 10 1\n&#x27; | nc 127.0.0.1 8545</pre>
+<p><code>wallet_send</code> signs on the node from the local file. The explicit path is <code>tx_build</code> + <code>wallet_sign</code> + <code>sendtx_signed</code> (still no raw privkey on the wire). Legacy <code>sendtx</code> needs <code>ADDITION_ALLOW_INSECURE_TX_COMMANDS=1</code>.</p>
+<p>Honest UI:</p>
+<ul><li>Page: <code>/wallet/</code> via <code>python3 web/serve.py</code> (loopback <code>/local-rpc</code> only)</li><li>Desktop: <code>python3 web/addition_wallet_gui.py</code> or <code>--cli getinfo</code></li></ul>
+<p>A fresh wallet balance is <code>0</code> until you <code>mine &lt;address&gt;</code> on local RPC (memory-hard; reward 50 on a fresh testnet) or receive a UTXO. Public RPC cannot create wallets or send.</p>
 <h3>Public read-only RPC</h3>
 <p>Local RPC on <code>127.0.0.1:8545</code> stays trusted (mine, wallets, sends). To expose a <strong>read-only</strong> public bind:</p>
 <pre>./build/additiond --network testnet --public-rpc
@@ -74,9 +84,9 @@ printf &#x27;mine\n&#x27; | nc 127.0.0.1 38545   # error: command disabled on pu
 <h3>Honest website (static Pages)</h3>
 <p><code>web/public/</code> is a complete static site (explorer, RPC how-to, mirrored docs, white paper, legal notice). Publish that folder as the Pages root (for example additionblockchain.com). GitHub: <a href="https://github.com/ADDAddition/ADDITION">ADDAddition/ADDITION</a>.</p>
 <pre>python3 web/serve.py</pre>
-<table><tr><th>Path</th><th>Content</th></tr><tr><td><code>/</code></td><td>Research testnet home + live <code>getinfo</code> or <strong>RPC offline</strong></td></tr><tr><td><code>/explorer/</code></td><td>Block/tx lookup from the read RPC only</td></tr><tr><td><code>/status/</code></td><td>getinfo, monetary_info, selftest, peers</td></tr><tr><td><code>/rpc/</code></td><td>How to talk to the public allowlist</td></tr><tr><td><code>/docs/</code></td><td>Architecture, commands, PoUW spec, getting started, runbook, ZK contract</td></tr><tr><td><code>/contracts/</code> <code>/swap/</code> <code>/evm/</code></td><td>Only methods verified on a local node; EVM is bootstrap</td></tr><tr><td><code>/whitepaper/</code> <code>/legal/</code></td><td>Honest research copy. No fake ticker or mainnet live</td></tr></table>
+<table><tr><th>Path</th><th>Content</th></tr><tr><td><code>/</code></td><td>Research testnet home + live <code>getinfo</code> or <strong>RPC offline</strong></td></tr><tr><td><code>/explorer/</code></td><td>Block/tx lookup from the read RPC only</td></tr><tr><td><code>/status/</code></td><td>getinfo, monetary_info, selftest, peers</td></tr><tr><td><code>/rpc/</code></td><td>How to talk to the public allowlist</td></tr><tr><td><code>/docs/</code></td><td>Architecture, commands, PoUW spec, getting started, runbook, ZK contract</td></tr><tr><td><code>/wallet/</code></td><td>Local createwallet / UTXO send via <code>/local-rpc</code> (loopback)</td></tr><tr><td><code>/contracts/</code> <code>/swap/</code> <code>/evm/</code></td><td>Only methods verified on a local node; EVM is bootstrap</td></tr><tr><td><code>/whitepaper/</code> <code>/legal/</code></td><td>Honest research copy. No fake ticker or mainnet live</td></tr></table>
 <p>Explorer/status call <code>/api/rpc</code>. On a static host without a backend they fail closed. Optional <code>?rpc=http://HOST:38545/rpc</code>.</p>
-<p><code>/contracts</code> and <code>/swap</code> use loopback <code>/local-rpc</code> → <code>127.0.0.1:8545</code>. They print the node’s real reply (<code>error: pool not found</code> if you have no pool).</p>
+<p><code>/wallet</code>, <code>/contracts</code>, and <code>/swap</code> use loopback <code>/local-rpc</code> → <code>127.0.0.1:8545</code>. They print the node’s real reply (<code>error: pool not found</code> if you have no pool).</p>
 <pre>python3 web/evm/evm_rpc_bridge.py</pre>
 <p>Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a>.</p>
 <p>Help:</p>

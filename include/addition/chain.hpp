@@ -43,6 +43,8 @@ public:
                            std::string& error) const;
 
     std::uint64_t balance_of(const std::string& address) const;
+    std::uint64_t last_nonce(const std::string& address) const;
+    std::uint64_t next_nonce(const std::string& address) const;
     bool credit_balance(const std::string& address,
                         std::uint64_t amount,
                         const std::string& reason,

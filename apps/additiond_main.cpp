@@ -243,7 +243,8 @@ int main(int argc, char** argv) {
                             ai_optimizer,
                             node,
                             allow_insecure_tx_commands,
-                            strict_admin_mode);
+                            strict_admin_mode,
+                            (std::filesystem::path(node_cfg.data_dir) / "wallets").string());
     const bool enable_lan_rpc = []() {
         if (const char* v = std::getenv("ADDITION_ENABLE_LAN_RPC")) {
             return std::string(v) == "1";
@@ -382,7 +383,7 @@ int main(int argc, char** argv) {
         std::cout << ' ' << peer;
     }
     std::cout << '\n';
-    std::cout << "Commands: getinfo, fee_info, createwallet, sign_message <privkey_hex> <message_hex_utf8>, verify_message <pubkey_hex> <message_hex_utf8> <sig_hex>, getbalance <addr>, getbalance_instant <addr>, tx_build <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce>, sendtx_signed <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce> <sig_hex>, sendtx_signed_hash <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce> <sig_hex>, mine,\n"
+    std::cout << "Commands: getinfo, fee_info, createwallet [name], wallet_list, wallet_info <name>, wallet_balance <name>, wallet_send <name> <to> <amount> [fee], wallet_sign <name> <message_hex_utf8>, sign_message <privkey_hex> <message_hex_utf8>, verify_message <pubkey_hex> <message_hex_utf8> <sig_hex>, getbalance <addr>, getbalance_instant <addr>, tx_build <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce>, sendtx_signed <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce> <sig_hex>, sendtx_signed_hash <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce> <sig_hex>, mine,\n"
                  "monetary_info, crypto_selftest,\n"
                  "stake <addr> <amt>, unstake <addr> <amt>, staked <addr>, stake_reward <amt>, stake_claim <addr>,\n"
                  "stake_claimable <addr>, stake_policy <get|set> [cap_bps admin_addr admin_pubkey admin_sig],\n"
@@ -433,7 +434,7 @@ int main(int argc, char** argv) {
                  "identity_rotate_vote_broadcast, identity_rotate_commit, identity_rotate_status, quit\n";
 
     if (!allow_insecure_tx_commands) {
-        std::cout << "secure tx mode enabled: use tx_build + sign_message + sendtx_signed (insecure sendtx/sendtx_hash disabled)\n";
+        std::cout << "secure tx mode enabled: use wallet_send, or tx_build + wallet_sign/sign_message + sendtx_signed (insecure sendtx/sendtx_hash disabled)\n";
     } else {
         std::cout << "warning: insecure tx commands enabled (ADDITION_ALLOW_INSECURE_TX_COMMANDS=1)\n";
     }

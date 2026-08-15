@@ -151,6 +151,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             host = os.environ.get("ADDITION_LOCAL_RPC_HOST", "127.0.0.1")
             port = env_int("ADDITION_LOCAL_RPC_PORT", 8545)
+            timeout = 300.0 if token == "mine" else 30.0
         else:
             if token not in PUBLIC_ALLOWLIST:
                 self._send(403, "error: command disabled on public RPC")
@@ -158,7 +159,7 @@ class Handler(BaseHTTPRequestHandler):
             host = os.environ.get("ADDITION_PUBLIC_RPC_HOST", "127.0.0.1")
             port = env_int("ADDITION_PUBLIC_RPC_PORT", 38545)
         try:
-            reply = tcp_rpc(host, port, command)
+            reply = tcp_rpc(host, port, command, timeout if path == "/local-rpc" else 4.0)
         except OSError:
             self._send(503, "RPC offline")
             return
