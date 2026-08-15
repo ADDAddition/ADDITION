@@ -21,7 +21,8 @@ Relevant commands (see [FINAL_COMMANDS.md](FINAL_COMMANDS.md)):
 
 | Command | Role |
 |---|---|
-| `createwallet` | Node-side keygen probe. Returns `address`, `pub`, `algo=ml-dsa-87`, `priv_printed=0`. The secret is **not** returned and is **not** persisted. |
+| `createwallet [name]` | Node-side ML-DSA-87 keygen. Writes `data/wallets/<name>.wal`. Returns `address`, `pub`, `algo=ml-dsa-87`, `priv_printed=0`. |
+| `wallet_send <name> <to> <amount> [fee]` | Node signs from that `.wal` file. No privkey on the wire. |
 | `getbalance <address>` | Confirmed balance |
 | `fee_info` | `recommended_min_fee` (minimum `1`) |
 | `tx_build <from> <pubkey_hex> <to> <amount> <fee> <nonce>` | Builds the unsigned spend and returns `sign_hash=...` |
@@ -32,15 +33,15 @@ Relevant commands (see [FINAL_COMMANDS.md](FINAL_COMMANDS.md)):
 Legacy `sendtx` / `sendtx_hash` (private key on the RPC line) stay **disabled**
 unless `ADDITION_ALLOW_INSECURE_TX_COMMANDS=1`. Leave that unset.
 
-`sign_message <privkey_hex> ...` still exists on the daemon. The wallet client
-does **not** call it.
+`sign_message <privkey_hex> ...` still exists on the daemon. The standalone
+client does **not** call it.
 
-## Client (this is the spendable wallet)
+The node GUI / `/wallet/` page uses `wallet_send` and `data/wallets/`. This
+document is the **caller-disk** CLI: keys never enter the daemon wallet store.
 
-Files:
+## Standalone CLI (keys on the caller disk)
 
-* CLI: [`web/addition_wallet.py`](../web/addition_wallet.py)
-* Optional GUI: [`web/addition_wallet_gui.py`](../web/addition_wallet_gui.py) (needs `python3-tk`)
+File: [`web/addition_wallet.py`](../web/addition_wallet.py)
 
 Keys are generated **locally** with liboqs ML-DSA-87, using the same address
 formula as the node:
@@ -91,12 +92,6 @@ python3 web/addition_wallet.py --wallet data/addition.wallet \
 
 # If ADDITION_RPC_TOKEN is set on the daemon, export the same value
 # or pass --rpc-token.
-```
-
-GUI (if Tk is installed):
-
-```bash
-python3 web/addition_wallet_gui.py
 ```
 
 ### Spend path (what hits the socket)
