@@ -2,7 +2,7 @@
 
 **Date:** March 7, 2026  
 **Version:** 3.0-Final-Audit  
-**Status:** MAINNET LIVE (Audited)
+**Status:** Research prototype / testnet (not a live mainnet)
 
 ---
 

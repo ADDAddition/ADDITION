@@ -1,13 +1,63 @@
 #include "addition/chain.hpp"
+#include "addition/config.hpp"
 #include "addition/crypto.hpp"
 #include "addition/mempool.hpp"
 #include "addition/miner.hpp"
 #include "addition/wallet_keys.hpp"
 
 #include <iostream>
+#include <string>
 
 int main() {
-    addition::Chain chain;
+    if (addition::default_config().network_name != "addition-testnet" ||
+        addition::default_config().network_mode != "testnet") {
+        std::cerr << "test failed: default config must be addition-testnet\n";
+        return 1;
+    }
+
+    {
+        addition::Chain default_chain;
+        if (default_chain.config().network_mode != "testnet" ||
+            default_chain.config().network_name != "addition-testnet") {
+            std::cerr << "test failed: chain default network must be testnet\n";
+            return 1;
+        }
+    }
+
+    addition::ChainConfig easy = addition::testnet_chain_config();
+    easy.initial_difficulty_target = 0xFFFFFFFFFFFFFFFFULL;
+    easy.min_difficulty_target = 0xFFFFFFFFFFFFFFFFULL;
+    easy.max_difficulty_target = 0xFFFFFFFFFFFFFFFFULL;
+    addition::Chain chain(easy);
+
+    {
+        addition::NodeConfig ncfg;
+        bool help = false;
+        std::string err;
+        char arg0[] = "additiond";
+        char arg1[] = "--network";
+        char arg2[] = "testnet";
+        char* argv[] = {arg0, arg1, arg2};
+        if (!addition::apply_cli_args(3, argv, ncfg, help, err)) {
+            std::cerr << "test failed: cli parse: " << err << '\n';
+            return 1;
+        }
+        if (ncfg.mode != addition::NetworkMode::Testnet || ncfg.chain.network_mode != "testnet") {
+            std::cerr << "test failed: --network testnet not applied\n";
+            return 1;
+        }
+    }
+
+    {
+        addition::ChainConfig genesis = addition::testnet_chain_config();
+        std::string genesis_err;
+        bool loaded = addition::load_genesis_json("genesis.json", genesis, genesis_err) ||
+                      addition::load_genesis_json("../genesis.json", genesis, genesis_err);
+        if (loaded && (genesis.network_name != "addition-testnet" || genesis.block_reward != 50)) {
+            std::cerr << "test failed: genesis.json mismatch\n";
+            return 1;
+        }
+    }
     addition::Mempool mempool;
     addition::Miner miner(chain, mempool);
     std::string error;

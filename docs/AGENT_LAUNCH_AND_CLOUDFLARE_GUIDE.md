@@ -21,8 +21,7 @@ if (-not $env:ADDITION_LAN_RPC_TOKEN) {
   $env:ADDITION_LAN_RPC_TOKEN = [Convert]::ToBase64String((1..24 | ForEach-Object { Get-Random -Maximum 256 }))
 }
 
-# Mainnet + network interfaces
-$env:ADDITION_MAINNET_MODE = "1"
+# Research testnet (default). Do not default ADDITION_MAINNET_MODE=1.
 $env:ADDITION_ENABLE_LAN_RPC = "1"
 $env:ADDITION_ENABLE_P2P_RPC = "1"
 
@@ -35,7 +34,8 @@ Expected healthy outputs:
 - `local RPC listening on 127.0.0.1:8545`
 - `LAN RPC listening on 0.0.0.0:18545`
 - `P2P RPC listening on 0.0.0.0:28545`
-- `mainnet mode enabled (ADDITION_MAINNET_MODE=1)`
+- `testnet mode enabled (default)`
+- `getinfo` includes `network=testnet`
 
 ---
 

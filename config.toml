@@ -1,0 +1,28 @@
+# ADDITION research testnet configuration.
+# This is not a live mainnet. Default network is testnet.
+
+network = "testnet"
+network_name = "addition-testnet"
+network_id = "ADDITION_TESTNET_V1"
+data_dir = "data"
+genesis_file = "genesis.json"
+
+# Localhost examples only until a second real node exists.
+# Do not invent public peer lists or node counts.
+bootstrap_peers = [
+  "127.0.0.1:28545"
+]
+
+[ports]
+local_rpc = 8545
+lan_rpc = 18545
+p2p = 28545
+
+[chain]
+block_reward = 50
+max_supply = 50000000
+target_block_time_sec = 60
+halving_interval = 210000
+tail_emission_reward = 1
+min_fee = 1
+genesis_timestamp = 1763000000

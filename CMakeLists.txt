@@ -55,4 +55,9 @@ endif()
 add_executable(additiond apps/additiond_main.cpp)
 target_link_libraries(additiond PRIVATE addition_core)
 
-# Tests intentionally disabled in strict final profile.
+if(ADDITION_BUILD_TESTS)
+    enable_testing()
+    add_executable(test_chain tests/test_chain.cpp)
+    target_link_libraries(test_chain PRIVATE addition_core)
+    add_test(NAME test_chain COMMAND test_chain)
+endif()

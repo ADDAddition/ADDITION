@@ -1,4 +1,5 @@
 #include "addition/chain.hpp"
+#include "addition/config.hpp"
 #include "addition/bridge.hpp"
 #include "addition/contract_engine.hpp"
 #include "addition/decentralized_node.hpp"
@@ -75,13 +76,21 @@ bool parse_rpc_auth(const std::string& cmd,
 
 } // namespace
 
-int main() {
-    const bool mainnet_mode = []() {
-        if (const char* v = std::getenv("ADDITION_MAINNET_MODE")) {
-            return std::string(v) == "1";
-        }
-        return false;
-    }();
+int main(int argc, char** argv) {
+    addition::NodeConfig node_cfg = addition::default_node_config();
+    bool show_help = false;
+    std::string cli_error;
+    if (!addition::apply_cli_args(argc, argv, node_cfg, show_help, cli_error)) {
+        std::cerr << "fatal: " << cli_error << '\n';
+        return 1;
+    }
+    if (show_help) {
+        std::cout << addition::daemon_help_text();
+        return 0;
+    }
+
+    addition::set_runtime_network_mode(node_cfg.mode);
+    const bool mainnet_mode = node_cfg.mode == addition::NetworkMode::Mainnet;
 
     const bool allow_insecure_tx_commands = []() {
         if (const char* v = std::getenv("ADDITION_ALLOW_INSECURE_TX_COMMANDS")) {
@@ -100,11 +109,11 @@ int main() {
     const char* privacy_master_key_env = std::getenv("ADDITION_PRIVACY_MASTER_KEY");
     const bool has_privacy_master_key = privacy_master_key_env != nullptr && std::string(privacy_master_key_env).size() >= 32;
     if (mainnet_mode && !has_privacy_master_key) {
-        std::cerr << "fatal: ADDITION_PRIVACY_MASTER_KEY missing or too short (min 32 chars) while ADDITION_MAINNET_MODE=1\n";
+        std::cerr << "fatal: ADDITION_PRIVACY_MASTER_KEY missing or too short (min 32 chars) for --network mainnet\n";
         return 3;
     }
 
-    addition::Chain chain;
+    addition::Chain chain(node_cfg.chain);
     addition::Mempool mempool;
     addition::Miner miner(chain, mempool);
     addition::StakingEngine staking;
@@ -121,7 +130,7 @@ int main() {
     addition::WalletKeys node_keys{};
     node_keys.algorithm = "ml-dsa-87";
     {
-        const std::string id_path = "data/node_identity.dat";
+        const std::string id_path = (std::filesystem::path(node_cfg.data_dir) / "node_identity.dat").string();
         std::string legacy_priv_from_file;
         if (std::filesystem::exists(id_path)) {
             std::ifstream in(id_path, std::ios::binary);
@@ -151,14 +160,14 @@ int main() {
         if (node_keys.public_key.empty() || node_keys.private_key.empty()) {
             node_keys = addition::generate_wallet_keys();
             std::cout << "warning: generated ephemeral node private key; set ADDITION_NODE_PRIVKEY for restart persistence\n";
-            std::filesystem::create_directories("data");
+            std::filesystem::create_directories(node_cfg.data_dir);
             std::ofstream out(id_path, std::ios::binary | std::ios::trunc);
             out << "PUB|" << node_keys.public_key << '\n';
             // Intentionally do not persist private key on disk.
         }
 
         if (!node_keys.public_key.empty()) {
-            std::filesystem::create_directories("data");
+            std::filesystem::create_directories(node_cfg.data_dir);
             std::ofstream out(id_path, std::ios::binary | std::ios::trunc);
             out << "PUB|" << node_keys.public_key << '\n';
         }
@@ -171,7 +180,7 @@ int main() {
                                      mempool,
                                      peers,
                                      consensus);
-    addition::StateStore store("data");
+    addition::StateStore store(node_cfg.data_dir);
 
     {
         std::string report;
@@ -186,10 +195,10 @@ int main() {
     if (!store.load_all(chain, mempool, staking, contracts, tokens, bridge, peers, node, pouw_storage, pouw_compute, private_messaging, privacy, load_error)) {
         std::cout << "warning: state load failed: " << load_error << '\n';
     } else {
-        std::cout << "state loaded from ./data\n";
+        std::cout << "state loaded from " << node_cfg.data_dir << '\n';
     }
 
-    addition::RpcNetworkServer p2p_rpc("0.0.0.0", 28545, [&](const std::string& cmd) {
+    addition::RpcNetworkServer p2p_rpc("0.0.0.0", node_cfg.p2p_port, [&](const std::string& cmd) {
         std::istringstream iss(cmd);
         std::string peer;
         iss >> peer;
@@ -260,7 +269,7 @@ int main() {
     }
     const bool lan_rpc_auth_required = !lan_rpc_token.empty();
 
-    addition::RpcNetworkServer local_rpc("127.0.0.1", 8545, [&](const std::string& cmd) {
+    addition::RpcNetworkServer local_rpc("127.0.0.1", node_cfg.local_rpc_port, [&](const std::string& cmd) {
         if (!local_rpc_auth_required) {
             return rpc.handle_command(cmd, true);
         }
@@ -271,7 +280,7 @@ int main() {
         }
         return rpc.handle_command(stripped, true);
     });
-    addition::RpcNetworkServer lan_rpc("0.0.0.0", 18545, [&](const std::string& cmd) {
+    addition::RpcNetworkServer lan_rpc("0.0.0.0", node_cfg.lan_rpc_port, [&](const std::string& cmd) {
         if (!lan_rpc_auth_required) {
             return std::string("error: LAN RPC auth token not configured");
         }
@@ -287,7 +296,7 @@ int main() {
     if (!local_rpc.start(local_error)) {
         std::cout << "warning: local RPC failed to start: " << local_error << '\n';
     } else {
-        std::cout << "local RPC listening on 127.0.0.1:8545\n";
+        std::cout << "local RPC listening on 127.0.0.1:" << node_cfg.local_rpc_port << '\n';
         if (local_rpc_auth_required) {
             std::cout << "local RPC auth enabled (prefix command with token)\n";
         } else {
@@ -303,7 +312,7 @@ int main() {
         if (!lan_rpc.start(lan_error)) {
             std::cout << "warning: LAN RPC failed to start: " << lan_error << '\n';
         } else {
-            std::cout << "LAN RPC listening on 0.0.0.0:18545\n";
+            std::cout << "LAN RPC listening on 0.0.0.0:" << node_cfg.lan_rpc_port << '\n';
         }
     } else {
         std::cout << "LAN RPC disabled by default (set ADDITION_ENABLE_LAN_RPC=1 to enable)\n";
@@ -314,13 +323,28 @@ int main() {
         if (!p2p_rpc.start(p2p_error)) {
             std::cout << "warning: P2P RPC failed to start: " << p2p_error << '\n';
         } else {
-            std::cout << "P2P RPC listening on 0.0.0.0:28545\n";
+            std::cout << "P2P RPC listening on 0.0.0.0:" << node_cfg.p2p_port << '\n';
         }
     } else {
         std::cout << "P2P RPC disabled by default (set ADDITION_ENABLE_P2P_RPC=1 to enable)\n";
     }
 
-    std::cout << "ADDITION_FINAL daemon started. Commands: getinfo, fee_info, createwallet, sign_message <privkey_hex> <message_hex_utf8>, verify_message <pubkey_hex> <message_hex_utf8> <sig_hex>, getbalance <addr>, getbalance_instant <addr>, tx_build <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce>, sendtx_signed <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce> <sig_hex>, sendtx_signed_hash <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce> <sig_hex>, mine,\n"
+    std::cout << "ADDITION research daemon started. This is not a live mainnet.\n";
+    std::cout << "network=" << addition::network_mode_label(node_cfg.mode)
+              << " network_name=" << node_cfg.chain.network_name
+              << " network_id=" << node_cfg.chain.network_id << '\n';
+    if (!node_cfg.config_path.empty()) {
+        std::cout << "config=" << node_cfg.config_path << '\n';
+    }
+    if (!node_cfg.genesis_path.empty()) {
+        std::cout << "genesis=" << node_cfg.genesis_path << '\n';
+    }
+    std::cout << "bootstrap_peers (localhost examples until a second real node exists):";
+    for (const auto& peer : node_cfg.bootstrap_peers) {
+        std::cout << ' ' << peer;
+    }
+    std::cout << '\n';
+    std::cout << "Commands: getinfo, fee_info, createwallet, sign_message <privkey_hex> <message_hex_utf8>, verify_message <pubkey_hex> <message_hex_utf8> <sig_hex>, getbalance <addr>, getbalance_instant <addr>, tx_build <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce>, sendtx_signed <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce> <sig_hex>, sendtx_signed_hash <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce> <sig_hex>, mine,\n"
                  "monetary_info, crypto_selftest,\n"
                  "stake <addr> <amt>, unstake <addr> <amt>, staked <addr>, stake_reward <amt>, stake_claim <addr>,\n"
                  "stake_claimable <addr>, stake_policy <get|set> [cap_bps admin_addr admin_pubkey admin_sig],\n"
@@ -380,7 +404,9 @@ int main() {
         std::cout << "warning: strict admin mode disabled (ADDITION_STRICT_ADMIN_MODE=0)\n";
     }
     if (mainnet_mode) {
-        std::cout << "mainnet mode enabled (ADDITION_MAINNET_MODE=1)\n";
+        std::cout << "mainnet profile selected via --network/config/env; this binary still does not claim a live public mainnet\n";
+    } else {
+        std::cout << "testnet mode enabled (default)\n";
     }
     if (!has_privacy_master_key) {
         std::cout << "warning: ADDITION_PRIVACY_MASTER_KEY not set or too short (min 32); private note operations will fail\n";
@@ -437,7 +463,7 @@ int main() {
     if (!store.save_all(chain, mempool, staking, contracts, tokens, bridge, peers, node, pouw_storage, pouw_compute, private_messaging, privacy, save_error)) {
         std::cout << "warning: state save failed: " << save_error << '\n';
     } else {
-        std::cout << "state saved to ./data\n";
+        std::cout << "state saved to " << node_cfg.data_dir << '\n';
     }
 
     return 0;

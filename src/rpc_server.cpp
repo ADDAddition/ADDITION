@@ -172,11 +172,23 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
 
     if (cmd == "getinfo") {
         const auto dyn_fee = recommended_min_fee(mempool_.size(), chain_.total_fees_last_block());
+        const auto& net = chain_.config();
         std::ostringstream out;
-        out << "height=" << chain_.height() << " mempool=" << mempool_.size()
+        out << "network=" << net.network_mode
+            << " network_name=" << net.network_name
+            << " network_id=" << net.network_id
+            << " height=" << chain_.height()
+            << " mempool=" << mempool_.size()
             << " total_staked=" << staking_.total_staked()
             << " peers=" << peers_.peer_count()
-            << " difficulty_target=" << chain_.current_difficulty_target()
+            << " bootstrap_peers=";
+        for (std::size_t i = 0; i < net.bootstrap_peers.size(); ++i) {
+            if (i > 0) {
+                out << ',';
+            }
+            out << net.bootstrap_peers[i];
+        }
+        out << " difficulty_target=" << chain_.current_difficulty_target()
             << " next_reward=" << chain_.current_block_reward()
             << " fees_last_block=" << chain_.total_fees_last_block()
             << " dynamic_min_fee=" << dyn_fee
@@ -433,8 +445,9 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             return std::string("error: wallet generation failed: ") + e.what();
         }
         std::ostringstream out;
-        out << "address=" << keys.address << " pub=" << keys.public_key << " priv=" << keys.private_key
-            << " algo=" << keys.algorithm;
+        out << "address=" << keys.address << " pub=" << keys.public_key
+            << " algo=" << keys.algorithm
+            << " priv_printed=0";
         return out.str();
     }
 

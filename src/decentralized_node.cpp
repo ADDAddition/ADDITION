@@ -29,7 +29,6 @@ namespace addition {
 namespace {
 
 constexpr const char* kProtoVersion = "2";
-constexpr const char* kNetworkId = "ADDITION_MAINNET_V1";
 constexpr std::uint64_t kMsgSkewSec = 90;
 constexpr std::size_t kMaxP2PLineBytes = 32768;
 constexpr int kSocketTimeoutMs = 4000;
@@ -38,6 +37,13 @@ constexpr std::size_t kMaxNonceLen = 128;
 constexpr std::size_t kMaxPubKeyHexLen = 12000;
 constexpr std::size_t kMaxSigHexLen = 40000;
 constexpr std::size_t kMaxRotationIdLen = 128;
+
+std::string active_network_id(const Chain& chain) {
+    if (!chain.config().network_id.empty()) {
+        return chain.config().network_id;
+    }
+    return "ADDITION_TESTNET_V1";
+}
 
 std::uint64_t now_seconds() {
     const auto now = std::chrono::system_clock::now();
@@ -598,7 +604,7 @@ bool DecentralizedNode::sync_once(std::string& error) {
         const auto nonce_seed = std::chrono::steady_clock::now().time_since_epoch().count();
         const auto hello_ts = now_seconds();
         const std::string hello_nonce = "sync-" + std::to_string(nonce_seed);
-        const std::string hello_body = std::string(kProtoVersion) + "|" + kNetworkId + "|" +
+        const std::string hello_body = std::string(kProtoVersion) + "|" + active_network_id(chain_) + "|" +
                                        std::to_string(hello_ts) + "|" + hello_nonce + "|" +
                                        node_public_key_;
         std::string hello_sig;
@@ -609,7 +615,7 @@ bool DecentralizedNode::sync_once(std::string& error) {
             handshake_ok_[peer] = false;
             continue;
         }
-        hello_req << self_id_ << " HELLO|" << kProtoVersion << '|' << kNetworkId
+        hello_req << self_id_ << " HELLO|" << kProtoVersion << '|' << active_network_id(chain_)
                   << '|' << hello_ts << '|' << hello_nonce << '|' << node_public_key_ << '|' << hello_sig;
         std::string hello_resp;
         if (!send_p2p_request(peer, hello_req.str(), hello_resp)) {
@@ -644,7 +650,7 @@ bool DecentralizedNode::sync_once(std::string& error) {
                 continue;
             }
 
-            if (v != kProtoVersion || n != kNetworkId || nonce != hello_nonce || peer_pk.empty() || sig.empty()) {
+            if (v != kProtoVersion || n != active_network_id(chain_) || nonce != hello_nonce || peer_pk.empty() || sig.empty()) {
                 peers_.mark_peer_bad(peer);
                 handshake_ok_[peer] = false;
                 continue;
@@ -665,7 +671,7 @@ bool DecentralizedNode::sync_once(std::string& error) {
                 continue;
             }
 
-            const std::string ack_body = std::string(kProtoVersion) + "|" + kNetworkId + "|" + ts + "|" +
+            const std::string ack_body = std::string(kProtoVersion) + "|" + active_network_id(chain_) + "|" + ts + "|" +
                                          nonce + "|" + peer_pk;
             if (!verify_message_signature_hybrid(peer_pk, ack_body, sig)) {
                 peers_.mark_peer_bad(peer);
@@ -927,7 +933,7 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
             return false;
         }
 
-        if (version != kProtoVersion || network != kNetworkId) {
+        if (version != kProtoVersion || network != active_network_id(chain_)) {
             error = "handshake mismatch";
             peers_.mark_peer_bad(peer);
             handshake_ok_[peer] = false;
@@ -1006,7 +1012,7 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         peer_pubkeys_[peer] = peer_pk;
         pinned_peer_pubkeys_.emplace(peer, peer_pk);
 
-        const std::string ack_body = std::string(kProtoVersion) + "|" + kNetworkId + "|" +
+        const std::string ack_body = std::string(kProtoVersion) + "|" + active_network_id(chain_) + "|" +
                                      std::to_string(now) + "|" + nonce + "|" + node_public_key_;
         std::string ack_sig;
         try {
@@ -1019,7 +1025,7 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         }
 
         std::ostringstream ack;
-        ack << "HELLO_ACK|" << kProtoVersion << '|' << kNetworkId << '|' << now << '|' << nonce
+        ack << "HELLO_ACK|" << kProtoVersion << '|' << active_network_id(chain_) << '|' << now << '|' << nonce
             << '|' << node_public_key_ << '|' << ack_sig;
         outbound_.push_back(ack.str());
         peers_.mark_peer_good(peer);
