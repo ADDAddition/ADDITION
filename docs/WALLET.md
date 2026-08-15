@@ -1,0 +1,128 @@
+# Local testnet wallet
+
+Research prototype / **testnet only**. This is not a live mainnet, not a token
+sale, and not a hosted web wallet.
+
+A stranger with `additiond --network testnet` running can create an address,
+read a balance, and send a post-quantum signed transaction **without putting a
+private key on the TEXT RPC socket**.
+
+Public contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com)
+
+## What already exists on the daemon
+
+Trusted local TEXT RPC (one command line in, one line out), **not JSON-RPC**:
+
+```text
+127.0.0.1:8545
+```
+
+Relevant commands (see [FINAL_COMMANDS.md](FINAL_COMMANDS.md)):
+
+| Command | Role |
+|---|---|
+| `createwallet` | Node-side keygen probe. Returns `address`, `pub`, `algo=ml-dsa-87`, `priv_printed=0`. The secret is **not** returned and is **not** persisted. |
+| `getbalance <address>` | Confirmed balance |
+| `fee_info` | `recommended_min_fee` (minimum `1`) |
+| `tx_build <from> <pubkey_hex> <to> <amount> <fee> <nonce>` | Builds the unsigned spend and returns `sign_hash=...` |
+| `sendtx_signed_hash ... <sig_hex_without_pq_prefix>` | Submits a PQ signature. No private key argument. |
+| `mine <address>` | Optional local demo: mine one block to an address |
+| `getinfo` | `network=testnet`, `height`, `peers`, `pq_mode=strict`, `max_supply=50000000` |
+
+Legacy `sendtx` / `sendtx_hash` (private key on the RPC line) stay **disabled**
+unless `ADDITION_ALLOW_INSECURE_TX_COMMANDS=1`. Leave that unset.
+
+`sign_message <privkey_hex> ...` still exists on the daemon. The wallet client
+does **not** call it.
+
+## Client (this is the spendable wallet)
+
+Files:
+
+* CLI: [`web/addition_wallet.py`](../web/addition_wallet.py)
+* Optional GUI: [`web/addition_wallet_gui.py`](../web/addition_wallet_gui.py) (needs `python3-tk`)
+
+Keys are generated **locally** with liboqs ML-DSA-87, using the same address
+formula as the node:
+
+```text
+address = sha3_512("addr|" + pubkey_hex)[0:40]
+```
+
+The secret is written to a gitignored file (default `data/addition.wallet`,
+mode `0600`) and is used only in-process to sign `sign_hash`.
+
+### Prerequisites
+
+* A running local daemon: `./build/additiond --network testnet`
+* Python 3.10+
+* `liboqs` on the library path (the same library used to build `additiond`)
+
+If CMake cannot find liboqs, the daemon will not build. The wallet client loads
+`liboqs` via ctypes (`ADDITION_LIBOQS` overrides the path).
+
+### Exact commands
+
+From the repository root, with the daemon already listening on `127.0.0.1:8545`:
+
+```bash
+# 1. Create a local address (keys stay on disk; priv_printed=0)
+python3 web/addition_wallet.py createwallet
+
+# 2. Confirm the node is the research testnet
+python3 web/addition_wallet.py getinfo
+# expect: network=testnet  pq_mode=strict  max_supply=50000000
+
+# 3. Optional local demo: mine a coinbase to that address
+python3 web/addition_wallet.py mine
+python3 web/addition_wallet.py balance
+
+# 4. Send: tx_build on the node, ML-DSA-87 sign locally, sendtx_signed_hash
+python3 web/addition_wallet.py send <to_address> <amount>
+# fee defaults to fee_info.recommended_min_fee (at least 1)
+```
+
+Optional flags:
+
+```bash
+python3 web/addition_wallet.py --wallet data/addition.wallet \
+  --rpc-host 127.0.0.1 --rpc-port 8545 \
+  createwallet
+
+# If ADDITION_RPC_TOKEN is set on the daemon, export the same value
+# or pass --rpc-token.
+```
+
+GUI (if Tk is installed):
+
+```bash
+python3 web/addition_wallet_gui.py
+```
+
+### Spend path (what hits the socket)
+
+```text
+tx_build <from> <pub> <to> <amount> <fee> <nonce>
+        -> sign_hash=<hex>
+
+local ML-DSA-87 sign of the UTF-8 bytes of that hex string
+        -> sig_hex  (no pq= prefix, no private key)
+
+sendtx_signed_hash <from> <pub> <to> <amount> <fee> <nonce> <sig_hex>
+        -> tx hash
+```
+
+The client refuses to emit `sendtx`, `sendtx_hash`, or `sign_message`.
+
+### Tests without a running daemon
+
+```bash
+python3 tests/test_wallet_client.py
+```
+
+These tests mock the TEXT RPC and fail if a private key appears on the wire.
+
+### Out of scope
+
+This path does not add ZK-Shield, a DEX, tokens, EVM/MetaMask, a public
+explorer, wallet-connect, a miner pool, or a live mainnet.
