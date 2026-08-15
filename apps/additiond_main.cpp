@@ -26,10 +26,20 @@
 #include <fstream>
 #include <sstream>
 #include <cstdlib>
+#include <cstdio>
+#include <cstdint>
 #include <exception>
+#include <atomic>
+#include <csignal>
 
 #include <chrono>
 #include <thread>
+
+#ifdef _WIN32
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
 
 namespace {
 
@@ -73,6 +83,48 @@ bool parse_rpc_auth(const std::string& cmd,
         return false;
     }
     return true;
+}
+
+std::atomic<bool> g_stay_alive_stop{false};
+
+void handle_stop_signal(int) {
+    g_stay_alive_stop = true;
+}
+
+bool stdin_is_tty() {
+#ifdef _WIN32
+    return _isatty(_fileno(stdin)) != 0;
+#else
+    return ::isatty(::fileno(stdin)) != 0;
+#endif
+}
+
+bool parse_env_u16(const char* name, std::uint16_t& out) {
+    const char* v = std::getenv(name);
+    if (v == nullptr) {
+        return false;
+    }
+    try {
+        const auto port = std::stoul(v);
+        if (port > 0 && port <= 65535) {
+            out = static_cast<std::uint16_t>(port);
+            return true;
+        }
+    } catch (const std::exception&) {
+    }
+    return false;
+}
+
+bool is_self_p2p_endpoint(const std::string& endpoint, std::uint16_t p2p_port) {
+    const std::string suffix = ":" + std::to_string(p2p_port);
+    if (endpoint.size() <= suffix.size()) {
+        return false;
+    }
+    if (endpoint.compare(endpoint.size() - suffix.size(), suffix.size(), suffix) != 0) {
+        return false;
+    }
+    const std::string host = endpoint.substr(0, endpoint.size() - suffix.size());
+    return host == "127.0.0.1" || host == "0.0.0.0" || host == "localhost" || host == "::1";
 }
 
 } // namespace
@@ -264,19 +316,22 @@ int main(int argc, char** argv) {
             node_cfg.enable_public_rpc = true;
         }
     }
-    if (const char* v = std::getenv("ADDITION_PUBLIC_RPC_PORT")) {
-        try {
-            const auto port = std::stoul(v);
-            if (port > 0 && port <= 65535) {
-                node_cfg.public_rpc_port = static_cast<std::uint16_t>(port);
-            }
-        } catch (const std::exception&) {
-        }
-    }
+    parse_env_u16("ADDITION_PUBLIC_RPC_PORT", node_cfg.public_rpc_port);
     if (const char* v = std::getenv("ADDITION_PUBLIC_RPC_BIND")) {
         const std::string bind = trim_copy(v);
         if (!bind.empty()) {
             node_cfg.public_rpc_bind = bind;
+        }
+    }
+    parse_env_u16("ADDITION_LOCAL_RPC_PORT", node_cfg.local_rpc_port);
+    parse_env_u16("ADDITION_P2P_PORT", node_cfg.p2p_port);
+
+    for (const auto& peer : node_cfg.bootstrap_peers) {
+        if (is_self_p2p_endpoint(peer, node_cfg.p2p_port)) {
+            continue;
+        }
+        if (peers.add_peer(peer)) {
+            std::cout << "bootstrap addpeer " << peer << '\n';
         }
     }
 
@@ -453,7 +508,10 @@ int main(int argc, char** argv) {
     }
 
     auto last_sync = std::chrono::steady_clock::now();
+    std::signal(SIGINT, handle_stop_signal);
+    std::signal(SIGTERM, handle_stop_signal);
 
+    bool requested_quit = false;
     for (std::string line; std::getline(std::cin, line);) {
         const auto now = std::chrono::steady_clock::now();
         if (now - last_sync >= std::chrono::seconds(5)) {
@@ -463,6 +521,7 @@ int main(int argc, char** argv) {
         }
 
         if (line == "quit" || line == "exit") {
+            requested_quit = true;
             break;
         }
 
@@ -493,6 +552,19 @@ int main(int argc, char** argv) {
         }
 
         std::cout << rpc.handle_command(line, true) << '\n';
+    }
+
+    if (!requested_quit && !stdin_is_tty()) {
+        std::cout << "stdin closed; running until SIGINT/SIGTERM (write RPC stays 127.0.0.1)\n";
+        while (!g_stay_alive_stop) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            const auto now = std::chrono::steady_clock::now();
+            if (now - last_sync >= std::chrono::seconds(5)) {
+                std::string sync_err;
+                node.sync_once(sync_err);
+                last_sync = now;
+            }
+        }
     }
 
     local_rpc.stop();

@@ -219,6 +219,7 @@ std::string http_rpc_response(int status, const std::string& body) {
         << "Access-Control-Allow-Origin: *\r\n"
         << "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
         << "Access-Control-Allow-Headers: Content-Type\r\n"
+        << "Cache-Control: no-store\r\n"
         << "Connection: close\r\n"
         << "\r\n"
         << body;
