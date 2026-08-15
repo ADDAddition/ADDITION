@@ -30,7 +30,7 @@ PRIVACY_KEY = os.environ.get(
     "ADDITION_PRIVACY_MASTER_KEY",
     "research-testnet-privacy-master-key-32chars",
 )
-MINE_TIMEOUT = float(os.environ.get("ADDITION_MINE_TIMEOUT", "180"))
+MINE_TIMEOUT = float(os.environ.get("ADDITION_MINE_TIMEOUT", "45"))
 
 
 def kv_map(line: str) -> dict[str, str]:
@@ -75,6 +75,7 @@ def pick_ports() -> dict[str, int]:
 def tcp_rpc(host: str, port: int, command: str, timeout: float = 8.0) -> str:
     payload = command.strip() + "\n"
     with socket.create_connection((host, port), timeout=timeout) as sock:
+        sock.settimeout(timeout)
         sock.sendall(payload.encode("utf-8"))
         chunks: list[bytes] = []
         while True:
@@ -85,6 +86,13 @@ def tcp_rpc(host: str, port: int, command: str, timeout: float = 8.0) -> str:
             if b"\n" in data:
                 break
     return b"".join(chunks).decode("utf-8", errors="replace").strip()
+
+
+def safe_rpc(host: str, port: int, command: str, timeout: float = 8.0) -> str:
+    try:
+        return tcp_rpc(host, port, command, timeout=timeout)
+    except (OSError, TimeoutError) as exc:
+        return "error: rpc failed: %s" % exc
 
 
 def wait_port(host: str, port: int, timeout: float = 45.0) -> str:
@@ -150,9 +158,9 @@ def record(goal: str, status: str, detail: str, evidence: dict[str, Any] | None 
 
 
 def prove_quantum(host: str, port: int) -> dict[str, Any]:
-    info = tcp_rpc(host, port, "getinfo")
+    info = safe_rpc(host, port, "getinfo")
     fields = kv_map(info)
-    selftest = tcp_rpc(host, port, "crypto_selftest")
+    selftest = safe_rpc(host, port, "crypto_selftest")
     ok = (
         fields.get("network") == "testnet"
         and fields.get("pq_mode") == "strict"
@@ -173,14 +181,14 @@ def prove_quantum(host: str, port: int) -> dict[str, Any]:
 
 
 def prove_privacy(host: str, port: int) -> dict[str, Any]:
-    status = tcp_rpc(host, port, "privacy_status")
-    mode = tcp_rpc(host, port, "privacy_native_verifier pq_mldsa87")
-    garbage = tcp_rpc(
+    status = safe_rpc(host, port, "privacy_status")
+    mode = safe_rpc(host, port, "privacy_native_verifier pq_mldsa87")
+    garbage = safe_rpc(
         host,
         port,
         "privacy_mint_zk alice 1 aabbccdd 11223344 deadbeef cafe",
     )
-    created = tcp_rpc(host, port, "createwallet zkowner")
+    created = safe_rpc(host, port, "createwallet zkowner")
     created_fields = kv_map(created)
     owner = created_fields.get("address", "")
     vk = created_fields.get("pub", "")
@@ -190,14 +198,15 @@ def prove_privacy(host: str, port: int) -> dict[str, Any]:
     nullifier = "bb" * 32
     public_input = "mint|%s|5|%s|%s" % (owner, commitment, nullifier)
     msg_hex = public_input.encode("utf-8").hex()
-    signed = tcp_rpc(host, port, "wallet_sign zkowner %s" % msg_hex)
+    signed = safe_rpc(host, port, "wallet_sign zkowner %s" % msg_hex, timeout=20.0)
     proof = signed[3:] if signed.startswith("pq=") else signed
     mint = ""
     if owner and vk and signed.startswith("pq="):
-        mint = tcp_rpc(
+        mint = safe_rpc(
             host,
             port,
             "privacy_mint_zk %s 5 %s %s %s %s" % (owner, commitment, nullifier, proof, vk),
+            timeout=20.0,
         )
 
     spend = ""
@@ -205,13 +214,14 @@ def prove_privacy(host: str, port: int) -> dict[str, Any]:
     if mint and not mint.startswith("error:"):
         spend_input = "spend|%s|%s|bob|5|%s" % (owner, mint, nullifier)
         spend_hex = spend_input.encode("utf-8").hex()
-        spend_signed = tcp_rpc(host, port, "wallet_sign zkowner %s" % spend_hex)
+        spend_signed = safe_rpc(host, port, "wallet_sign zkowner %s" % spend_hex, timeout=20.0)
         spend_proof = spend_signed[3:] if spend_signed.startswith("pq=") else spend_signed
-        spend = tcp_rpc(
+        spend = safe_rpc(
             host,
             port,
             "privacy_spend_zk %s %s bob 5 %s %s %s"
             % (owner, mint, nullifier, spend_proof, vk),
+            timeout=20.0,
         )
         spend_kind = "mldsa_wrapped_ok" if spend and not spend.startswith("error:") else "mldsa_wrapped_fail"
     elif mint.startswith("error:"):
@@ -262,7 +272,7 @@ def prove_privacy(host: str, port: int) -> dict[str, Any]:
 
 
 def prove_speed(host: str, port: int) -> dict[str, Any]:
-    info = tcp_rpc(host, port, "getinfo")
+    info = safe_rpc(host, port, "getinfo")
     fields = kv_map(info)
     allowed = (
         "height",
@@ -283,67 +293,83 @@ def prove_speed(host: str, port: int) -> dict[str, Any]:
     )
 
 
-def prove_cost(host: str, port: int) -> dict[str, Any]:
-    fee_info = tcp_rpc(host, port, "fee_info")
+def prove_cost_reject(host: str, port: int) -> dict[str, Any]:
+    """Reject path only. Mine is attempted later so a hung hasher cannot hide other goals."""
+    fee_info = safe_rpc(host, port, "fee_info")
     fee_fields = kv_map(fee_info)
-    created = tcp_rpc(host, port, "createwallet feealice")
+    created = safe_rpc(host, port, "createwallet feealice")
     created_fields = kv_map(created)
     addr = created_fields.get("address", "")
     pub = created_fields.get("pub", "")
-    reject = tcp_rpc(host, port, "tx_build %s %s bob 1 0 1" % (addr, pub))
-
-    mine = ""
-    accept = ""
-    mined = False
-    try:
-        mine = tcp_rpc(host, port, "mine %s" % addr, timeout=MINE_TIMEOUT)
-        mined = mine.startswith("mined block")
-    except (OSError, TimeoutError) as exc:
-        mine = "error: mine timed out or failed: %s" % exc
-
-    if mined:
-        accept = tcp_rpc(host, port, "tx_build %s %s bob 1 1 1" % (addr, pub))
-
+    reject = safe_rpc(host, port, "tx_build %s %s bob 1 0 1" % (addr, pub))
     reject_ok = "fee too low" in reject
-    accept_ok = accept.startswith("sign_hash=")
-    if reject_ok and accept_ok:
-        outcome = "pass"
-        detail = "RPC rejected fee=0 and accepted fee=1 after a real mine"
-    elif reject_ok and not mined:
-        outcome = "partial"
-        detail = "RPC rejected fee=0 (min_fee=1). Accept path not shown because mine did not finish: %s" % mine
-    elif reject_ok:
-        outcome = "partial"
-        detail = "RPC rejected fee=0. fee=1 tx_build after mine: %s" % accept
-    else:
-        outcome = "fail"
-        detail = "expected fee=0 reject, got: %s" % reject
-
     return record(
         "cost",
-        outcome,
-        detail,
+        "partial" if reject_ok else "fail",
+        (
+            "RPC rejected fee=0 (min_fee=1 / recommended_min_fee=%s). "
+            "Live fee=1 accept is attempted after the other goals because mine "
+            "is memory-hard and can block the RPC thread."
+            % fee_fields.get("recommended_min_fee", "?")
+        )
+        if reject_ok
+        else "expected fee=0 reject, got: %s" % reject,
         {
             "fee_info": fee_info,
             "base_min_fee": fee_fields.get("base_min_fee"),
             "recommended_min_fee": fee_fields.get("recommended_min_fee"),
+            "createwallet": created,
             "tx_build_fee_0": reject,
-            "mine": mine,
-            "tx_build_fee_1": accept,
+            "wallet_address": addr,
+            "wallet_pub": pub,
+            "tx_build_fee_1": "",
+            "mine": "",
         },
     )
 
 
+def prove_cost_accept(host: str, port: int, cost: dict[str, Any]) -> dict[str, Any]:
+    evidence = dict(cost.get("evidence") or {})
+    addr = str(evidence.get("wallet_address") or "")
+    pub = str(evidence.get("wallet_pub") or "")
+    if not addr or not pub:
+        cost["detail"] = str(cost.get("detail", "")) + " (no wallet for mine/accept)"
+        return cost
+    mine = safe_rpc(host, port, "mine %s" % addr, timeout=MINE_TIMEOUT)
+    evidence["mine"] = mine
+    accept = ""
+    if mine.startswith("mined block"):
+        accept = safe_rpc(host, port, "tx_build %s %s bob 1 1 1" % (addr, pub), timeout=12.0)
+        evidence["tx_build_fee_1"] = accept
+    cost["evidence"] = evidence
+    reject_ok = "fee too low" in str(evidence.get("tx_build_fee_0", ""))
+    if reject_ok and accept.startswith("sign_hash="):
+        cost["status"] = "pass"
+        cost["detail"] = "RPC rejected fee=0 and accepted fee=1 after a real mine"
+    elif reject_ok and mine.startswith("mined block"):
+        cost["status"] = "partial"
+        cost["detail"] = "RPC rejected fee=0. Mine succeeded but fee=1 tx_build: %s" % accept
+    elif reject_ok:
+        cost["status"] = "partial"
+        cost["detail"] = (
+            "RPC rejected fee=0 (min_fee=1). Live mine did not finish within "
+            "%ss: %s. On-chain fee=1 accept is covered by test_chain "
+            "(easy difficulty). Do not invent a live accept."
+            % (int(MINE_TIMEOUT), mine)
+        )
+    return cost
+
+
 def prove_compatibility(host: str, port: int, evm_port: int) -> dict[str, Any]:
     steps: dict[str, str] = {}
-    steps["bridge_register"] = tcp_rpc(host, port, "bridge_register researchchain")
-    steps["bridge_lock"] = tcp_rpc(host, port, "bridge_lock researchchain alice 10")
-    steps["bridge_mint"] = tcp_rpc(host, port, "bridge_mint researchchain alice 10")
-    steps["bridge_balance_after_mint"] = tcp_rpc(host, port, "bridge_balance researchchain alice")
-    steps["bridge_burn"] = tcp_rpc(host, port, "bridge_burn researchchain alice 4")
-    steps["bridge_release"] = tcp_rpc(host, port, "bridge_release researchchain alice 4")
-    steps["bridge_balance_final"] = tcp_rpc(host, port, "bridge_balance researchchain alice")
-    steps["bridge_attestor"] = tcp_rpc(host, port, "bridge_attestor researchchain")
+    steps["bridge_register"] = safe_rpc(host, port, "bridge_register researchchain")
+    steps["bridge_lock"] = safe_rpc(host, port, "bridge_lock researchchain alice 10")
+    steps["bridge_mint"] = safe_rpc(host, port, "bridge_mint researchchain alice 10")
+    steps["bridge_balance_after_mint"] = safe_rpc(host, port, "bridge_balance researchchain alice")
+    steps["bridge_burn"] = safe_rpc(host, port, "bridge_burn researchchain alice 4")
+    steps["bridge_release"] = safe_rpc(host, port, "bridge_release researchchain alice 4")
+    steps["bridge_balance_final"] = safe_rpc(host, port, "bridge_balance researchchain alice")
+    steps["bridge_attestor"] = safe_rpc(host, port, "bridge_attestor researchchain")
 
     evm_path = ROOT / "web" / "evm" / "evm_rpc_bridge.py"
     evm: dict[str, Any] = {"exists": evm_path.is_file()}
@@ -415,12 +441,12 @@ def prove_two_node(proc_b_args: list[str], log_b: Path, a_write: int, a_p2p: int
     proc_b = start_node(proc_b_args, log_b)
     try:
         wait_port("127.0.0.1", b_write)
-        add = tcp_rpc("127.0.0.1", b_write, "addpeer 127.0.0.1:%s" % a_p2p)
-        peers_b = tcp_rpc("127.0.0.1", b_write, "peers")
-        peers_a = tcp_rpc("127.0.0.1", a_write, "peers")
-        info_a = tcp_rpc("127.0.0.1", a_write, "getinfo")
-        info_b = tcp_rpc("127.0.0.1", b_write, "getinfo")
-        sync = tcp_rpc("127.0.0.1", b_write, "sync", timeout=12.0)
+        add = safe_rpc("127.0.0.1", b_write, "addpeer 127.0.0.1:%s" % a_p2p)
+        peers_b = safe_rpc("127.0.0.1", b_write, "peers")
+        peers_a = safe_rpc("127.0.0.1", a_write, "peers")
+        info_a = safe_rpc("127.0.0.1", a_write, "getinfo")
+        info_b = safe_rpc("127.0.0.1", b_write, "getinfo")
+        sync = safe_rpc("127.0.0.1", b_write, "sync", timeout=12.0)
         listed = ("127.0.0.1:%s" % a_p2p) in peers_b
         handshake = sync.startswith("ok:")
         if listed and handshake:
@@ -497,32 +523,44 @@ def main() -> int:
         wait_port("127.0.0.1", ports["a_write"])
         wait_port("127.0.0.1", ports["a_pub"])
 
-        results.append(prove_quantum("127.0.0.1", ports["a_write"]))
-        results.append(prove_privacy("127.0.0.1", ports["a_write"]))
-        results.append(prove_speed("127.0.0.1", ports["a_write"]))
-        results.append(prove_cost("127.0.0.1", ports["a_write"]))
-        results.append(prove_compatibility("127.0.0.1", ports["a_write"], ports["evm"]))
-        results.append(
-            prove_two_node(
-                [
-                    str(BIN),
-                    "--network",
-                    "testnet",
-                    "--data-dir",
-                    str(node_b),
-                    "--local-rpc-port",
-                    str(ports["b_write"]),
-                    "--p2p-port",
-                    str(ports["b_p2p"]),
-                    "--bootstrap",
-                    "127.0.0.1:%s" % ports["a_p2p"],
-                ],
-                tmp / "node-b.log",
-                ports["a_write"],
-                ports["a_p2p"],
-                ports["b_write"],
-            )
+        def run_goal(fn, *args):
+            try:
+                results.append(fn(*args))
+            except Exception as exc:  # noqa: BLE001 — live harness must record the real crash
+                results.append(record(fn.__name__, "fail", "harness exception: %s" % exc, {}))
+
+        run_goal(prove_quantum, "127.0.0.1", ports["a_write"])
+        run_goal(prove_privacy, "127.0.0.1", ports["a_write"])
+        run_goal(prove_speed, "127.0.0.1", ports["a_write"])
+        run_goal(prove_cost_reject, "127.0.0.1", ports["a_write"])
+        run_goal(prove_compatibility, "127.0.0.1", ports["a_write"], ports["evm"])
+        run_goal(
+            prove_two_node,
+            [
+                str(BIN),
+                "--network",
+                "testnet",
+                "--data-dir",
+                str(node_b),
+                "--local-rpc-port",
+                str(ports["b_write"]),
+                "--p2p-port",
+                str(ports["b_p2p"]),
+                "--bootstrap",
+                "127.0.0.1:%s" % ports["a_p2p"],
+            ],
+            tmp / "node-b.log",
+            ports["a_write"],
+            ports["a_p2p"],
+            ports["b_write"],
         )
+        cost = next((item for item in results if item.get("goal") == "cost"), None)
+        if cost is not None:
+            try:
+                prove_cost_accept("127.0.0.1", ports["a_write"], cost)
+            except Exception as exc:  # noqa: BLE001
+                cost["status"] = "partial"
+                cost["detail"] = "fee=0 recorded; live mine/accept crashed: %s" % exc
 
         hard_fail = any(item["status"] == "fail" for item in results)
         report = {
@@ -537,6 +575,16 @@ def main() -> int:
         if hard_fail:
             return fail("one or more research goals hard-failed; see JSON above")
         return 0
+    except Exception as exc:  # noqa: BLE001
+        report = {
+            "network": "addition-testnet",
+            "honest": True,
+            "ports": ports,
+            "results": results
+            or [record("harness", "fail", "setup exception: %s" % exc, {})],
+        }
+        print(json.dumps(report, indent=2, sort_keys=False))
+        return fail("harness setup failed: %s" % exc)
     finally:
         stop_proc(proc_a)
         keep = os.environ.get("ADDITION_KEEP_RESEARCH_TMP") == "1"
