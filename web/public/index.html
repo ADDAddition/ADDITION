@@ -70,7 +70,7 @@ printf 'getinfo\n' | nc 127.0.0.1 38545</pre>
       const S = window.AdditionSite;
       const result = await S.rpcCommand("getinfo");
       S.setStatus(document.getElementById("rpc-state"), result);
-      document.getElementById("info-raw").textContent = result.raw;
+      document.getElementById("info-raw").textContent = result.offline ? "RPC offline" : result.raw;
       if (result.offline || !result.ok) {
         S.renderFields(document.getElementById("info-fields"), {}, "RPC offline");
         return;

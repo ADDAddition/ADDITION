@@ -44,7 +44,16 @@
       const res = await fetch(url, { method: "GET", cache: "no-store" });
       if (!res.ok) {
         const errText = (await res.text()).trim();
-        return { ok: false, offline: res.status >= 500, raw: errText || "RPC offline", fields: {} };
+        const looksLikeHtml = !errText
+          || errText.charAt(0) === "<"
+          || errText.indexOf("<!DOCTYPE") === 0
+          || errText.toLowerCase().indexOf("<html") === 0;
+        return {
+          ok: false,
+          offline: true,
+          raw: looksLikeHtml ? "RPC offline" : errText,
+          fields: {}
+        };
       }
       const raw = (await res.text()).trim();
       if (!raw) {
