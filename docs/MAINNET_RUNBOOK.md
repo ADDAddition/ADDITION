@@ -68,6 +68,9 @@ Expected:
   - `wallet_sign <name> <sign_hash_hex_utf8>`
   - `sendtx_signed_hash <from> <pub> <to> <amount> <fee> <nonce> <sig_hex_without_pq_prefix>`
 - GUI / page: `python3 web/addition_wallet_gui.py` or `/wallet/` (loopback only)
+- Standalone CLI (keys on the caller disk): see [WALLET.md](WALLET.md)
+  - `python3 web/addition_wallet.py createwallet`
+  - `python3 web/addition_wallet.py send <to_address> <amount>`
 - Track status:
   - `tx_status <tx_hash>`
 - Instant receive check:
