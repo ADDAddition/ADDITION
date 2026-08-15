@@ -43,11 +43,37 @@ echo $! >"$RUN_DIR/node-a.pid"
   >"$RUN_DIR/logs/node-b.log" 2>&1 </dev/null &
 echo $! >"$RUN_DIR/node-b.pid"
 
+rpc_line() {
+  local port="$1"
+  local cmd="$2"
+  python3 - "$port" "$cmd" <<'PY'
+import socket
+import sys
+
+port = int(sys.argv[1])
+cmd = sys.argv[2]
+try:
+    with socket.create_connection(("127.0.0.1", port), timeout=2) as sock:
+        sock.sendall((cmd + "\n").encode("utf-8"))
+        chunks = []
+        while True:
+            data = sock.recv(4096)
+            if not data:
+                break
+            chunks.append(data)
+            if b"\n" in data:
+                break
+    sys.stdout.write(b"".join(chunks).decode("utf-8", "replace").strip())
+except OSError:
+    sys.exit(2)
+PY
+}
+
 wait_rpc() {
   local port="$1"
   local i
   for i in $(seq 1 90); do
-    if printf 'getinfo\n' | nc -w 1 127.0.0.1 "$port" 2>/dev/null | grep -q 'network=testnet'; then
+    if rpc_line "$port" "getinfo" 2>/dev/null | grep -q 'network=testnet'; then
       return 0
     fi
     sleep 0.3
@@ -61,8 +87,14 @@ wait_rpc 8545
 wait_rpc 38545
 wait_rpc 8546
 
-ADD_OUT="$(printf 'addpeer 127.0.0.1:28545\n' | nc -w 2 127.0.0.1 8546 | tr -d '\r')"
-echo "node B addpeer: $ADD_OUT"
+ADD_OUT="$(rpc_line 8546 "addpeer 127.0.0.1:28545" || true)"
+if [[ "$ADD_OUT" == "ok" ]]; then
+  echo "node B addpeer: ok"
+elif [[ "$ADD_OUT" == "error: invalid/duplicate peer" ]]; then
+  echo "node B addpeer: already present (bootstrap)"
+else
+  echo "node B addpeer: $ADD_OUT"
+fi
 
 cat <<EOF
 two-node testnet running (honest local processes, not a public mainnet)
