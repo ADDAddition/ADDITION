@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION explorer (testnet)</title>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <header>
+    <h1>Explorer</h1>
+    <p>Shows only fields returned by the public read RPC. Empty if the node does not answer.</p>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/explorer">Explorer</a>
+      <a href="/status">Status</a>
+      <a href="/contracts">Contracts</a>
+      <a href="/swap">Swap</a>
+      <a href="/evm">EVM bridge</a>
+    </nav>
+  </header>
+  <main>
+    <div class="banner">Testnet explorer. Not MAINNET LIVE. No synthetic blocks when RPC fails.</div>
+    <p id="rpc-state" class="offline">Checking RPC…</p>
+    <section class="panel">
+      <h2>getinfo</h2>
+      <div id="info-fields"></div>
+      <pre id="info-raw" class="raw"></pre>
+    </section>
+    <section class="panel">
+      <h2>Block lookup</h2>
+      <label for="block-id">getblock &lt;height_or_hash&gt;</label>
+      <input id="block-id" value="0" autocomplete="off">
+      <button id="block-btn" type="button">Lookup block</button>
+      <div id="block-fields"></div>
+      <pre id="block-raw" class="raw"></pre>
+    </section>
+    <section class="panel">
+      <h2>Transaction lookup</h2>
+      <label for="tx-id">tx_status &lt;tx_hash&gt;</label>
+      <input id="tx-id" autocomplete="off">
+      <button id="tx-btn" type="button">Lookup tx</button>
+      <div id="tx-fields"></div>
+      <pre id="tx-raw" class="raw"></pre>
+    </section>
+  </main>
+  <footer>
+    <p>Contact: <a href="mailto:labjay69@gmail.com">labjay69@gmail.com</a></p>
+  </footer>
+  <script src="common.js"></script>
+  <script>
+    const S = window.AdditionSite;
+
+    async function loadInfo() {
+      const result = await S.rpcCommand("getinfo");
+      S.setStatus(document.getElementById("rpc-state"), result);
+      document.getElementById("info-raw").textContent = result.raw;
+      if (result.offline || !result.ok) {
+        S.renderFields(document.getElementById("info-fields"), {}, "RPC offline");
+        return;
+      }
+      S.renderFields(document.getElementById("info-fields"), result.fields, "Node returned no key=value fields.");
+    }
+
+    async function loadBlock() {
+      const id = document.getElementById("block-id").value.trim();
+      const box = document.getElementById("block-raw");
+      const fields = document.getElementById("block-fields");
+      if (!id) {
+        box.textContent = "";
+        S.renderFields(fields, {}, "Enter a height or hash from the node.");
+        return;
+      }
+      const result = await S.rpcCommand("getblock " + id);
+      box.textContent = result.raw;
+      if (result.offline) {
+        S.renderFields(fields, {}, "RPC offline");
+        return;
+      }
+      if (!result.ok || result.raw.indexOf("error:") === 0) {
+        S.renderFields(fields, {}, result.raw || "No block.");
+        return;
+      }
+      S.renderFields(fields, result.fields, "Node returned no key=value fields.");
+    }
+
+    async function loadTx() {
+      const id = document.getElementById("tx-id").value.trim();
+      const box = document.getElementById("tx-raw");
+      const fields = document.getElementById("tx-fields");
+      if (!id) {
+        box.textContent = "";
+        S.renderFields(fields, {}, "Enter a tx hash returned by the node.");
+        return;
+      }
+      const result = await S.rpcCommand("tx_status " + id);
+      box.textContent = result.raw;
+      if (result.offline) {
+        S.renderFields(fields, {}, "RPC offline");
+        return;
+      }
+      S.renderFields(fields, result.fields, result.raw || "No transaction.");
+    }
+
+    document.getElementById("block-btn").addEventListener("click", loadBlock);
+    document.getElementById("tx-btn").addEventListener("click", loadTx);
+    loadInfo();
+  </script>
+</body>
+</html>

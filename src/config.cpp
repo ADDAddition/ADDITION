@@ -200,6 +200,16 @@ bool apply_kv(NodeConfig& cfg, const std::string& table, const std::string& key,
     if (full == "ports.p2p" || full == "p2p_port") {
         return parse_u16(value, cfg.p2p_port);
     }
+    if (full == "ports.public_rpc" || full == "public_rpc_port") {
+        return parse_u16(value, cfg.public_rpc_port);
+    }
+    if (full == "ports.public_rpc_bind" || full == "public_rpc_bind") {
+        cfg.public_rpc_bind = value;
+        return true;
+    }
+    if (full == "enable_public_rpc" || full == "ports.enable_public_rpc") {
+        return parse_bool(value, cfg.enable_public_rpc);
+    }
     if (full == "chain.block_reward" || full == "block_reward") {
         return parse_u64(value, cfg.chain.block_reward);
     }
@@ -569,7 +579,10 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
     std::string cli_config;
     std::string cli_genesis;
     std::string cli_data_dir;
+    std::string cli_public_rpc_port;
+    std::string cli_public_rpc_bind;
     bool network_from_cli = false;
+    bool public_rpc_from_cli = false;
 
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i] ? argv[i] : "";
@@ -628,6 +641,30 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
             cli_data_dir = arg.substr(11);
             continue;
         }
+        if (arg == "--public-rpc") {
+            public_rpc_from_cli = true;
+            continue;
+        }
+        if (arg == "--public-rpc-port") {
+            if (!take_value(cli_public_rpc_port)) {
+                return false;
+            }
+            continue;
+        }
+        if (arg.rfind("--public-rpc-port=", 0) == 0) {
+            cli_public_rpc_port = arg.substr(18);
+            continue;
+        }
+        if (arg == "--public-rpc-bind") {
+            if (!take_value(cli_public_rpc_bind)) {
+                return false;
+            }
+            continue;
+        }
+        if (arg.rfind("--public-rpc-bind=", 0) == 0) {
+            cli_public_rpc_bind = arg.substr(18);
+            continue;
+        }
         error = "unknown argument: " + arg;
         return false;
     }
@@ -669,6 +706,18 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
     if (!cli_data_dir.empty()) {
         cfg.data_dir = cli_data_dir;
     }
+    if (public_rpc_from_cli) {
+        cfg.enable_public_rpc = true;
+    }
+    if (!cli_public_rpc_port.empty()) {
+        if (!parse_u16(cli_public_rpc_port, cfg.public_rpc_port)) {
+            error = "invalid --public-rpc-port";
+            return false;
+        }
+    }
+    if (!cli_public_rpc_bind.empty()) {
+        cfg.public_rpc_bind = cli_public_rpc_bind;
+    }
 
     if (network_from_cli) {
         bool ok = false;
@@ -692,11 +741,23 @@ std::string daemon_help_text() {
            "\n"
            "Usage:\n"
            "  additiond [--network testnet|mainnet] [--config PATH] [--genesis PATH] [--data-dir PATH]\n"
+           "            [--public-rpc] [--public-rpc-port PORT] [--public-rpc-bind IP]\n"
            "\n"
            "Defaults:\n"
            "  --network testnet\n"
            "  --config  config.toml (if present)\n"
            "  --genesis genesis.json (if present)\n"
+           "\n"
+           "Local trusted RPC: 127.0.0.1:8545 (all commands; optional ADDITION_RPC_TOKEN)\n"
+           "Public read RPC (opt-in, allowlist only):\n"
+           "  additiond --network testnet --public-rpc\n"
+           "  or ADDITION_ENABLE_PUBLIC_RPC=1\n"
+           "  bind 0.0.0.0:38545 by default (ADDITION_PUBLIC_RPC_PORT / ADDITION_PUBLIC_RPC_BIND)\n"
+           "  allowlist: getinfo monetary_info crypto_selftest tx_status peers getblock getblockhash\n"
+           "  TCP:  printf 'getinfo\\n' | nc HOST 38545\n"
+           "  HTTP: curl 'http://HOST:38545/rpc?cmd=getinfo'\n"
+           "LAN RPC stays token-gated (ADDITION_ENABLE_LAN_RPC=1 + ADDITION_LAN_RPC_TOKEN).\n"
+           "P2P stays off unless ADDITION_ENABLE_P2P_RPC=1. Do not expose write RPC to the world.\n"
            "\n"
            "This is a research prototype / testnet. It does not claim to be a live mainnet.\n";
 }

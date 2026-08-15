@@ -1,11 +1,41 @@
 # ADDITION_FINAL - Final Command Surface
 
 ## RPC Endpoints
-- Local-only RPC: `127.0.0.1:8545`
-- LAN RPC: `0.0.0.0:18545`
-- P2P transport RPC: `0.0.0.0:28545`
+- Local-only trusted RPC: `127.0.0.1:8545` (all commands; optional `ADDITION_RPC_TOKEN`)
+- Public read RPC (opt-in): `0.0.0.0:38545` — allowlist only, no auth token
+- LAN RPC: `0.0.0.0:18545` (off unless `ADDITION_ENABLE_LAN_RPC=1` + `ADDITION_LAN_RPC_TOKEN`)
+- P2P transport RPC: `0.0.0.0:28545` (off unless `ADDITION_ENABLE_P2P_RPC=1`)
 
 Each TCP request is one command line and returns one response line.
+
+### Public read RPC
+Enable with `--public-rpc` or `ADDITION_ENABLE_PUBLIC_RPC=1`:
+
+```bash
+./build/additiond --network testnet --public-rpc
+# or
+ADDITION_ENABLE_PUBLIC_RPC=1 ./build/additiond --network testnet
+```
+
+Allowlist (everything else returns `error: command disabled on public RPC`):
+- `getinfo`
+- `monetary_info`
+- `crypto_selftest`
+- `tx_status <tx_hash>`
+- `peers`
+- `getblock <height_or_hash>`
+- `getblockhash <height>`
+
+Not on the public port: `mine`, `sendtx*`, `createwallet`, identity rotation, admin, contract/token writes.
+
+TCP and a tiny HTTP adapter share the same port:
+
+```bash
+printf 'getinfo\n' | nc 127.0.0.1 38545
+curl 'http://127.0.0.1:38545/rpc?cmd=getinfo'
+```
+
+Override bind/port with `--public-rpc-bind`, `--public-rpc-port`, `ADDITION_PUBLIC_RPC_BIND`, or `ADDITION_PUBLIC_RPC_PORT`.
 
 ## Core chain
 - `getinfo`
@@ -20,6 +50,8 @@ Each TCP request is one command line and returns one response line.
 - `sendtx <from_addr> <pubkey_hex> <privkey_hex> <to_addr> <amount> <fee> <nonce>` (legacy, disabled unless `ADDITION_ALLOW_INSECURE_TX_COMMANDS=1`)
 - `sendtx_hash <from_addr> <pubkey_hex> <privkey_hex> <to_addr> <amount> <fee> <nonce>` (legacy, disabled unless `ADDITION_ALLOW_INSECURE_TX_COMMANDS=1`)
 - `tx_status <tx_hash>`
+- `getblock <height_or_hash>`
+- `getblockhash <height>`
 - `mine`
 
 ## P2P + Consensus
@@ -206,9 +238,16 @@ Portal API endpoints:
 - `GET /api/monetary`
 - `GET /api/health`
 
+## Honest website (fail-closed)
+- Pages: `web/public/` (`/`, `/explorer`, `/status`, `/contracts`, `/swap`, `/evm`)
+- Local server: `python3 web/serve.py` (default `127.0.0.1:8080`)
+- `/rpc` proxies the public allowlist to port `38545`
+- `/local-rpc` proxies trusted `127.0.0.1:8545` and only accepts loopback clients
+- If RPC is down the pages show `RPC offline` and stay empty. They do not invent blocks, hashrate, node counts, or supply.
+
 ## MetaMask (EVM bridge bootstrap)
 Run:
-- `python web/evm/evm_rpc_bridge.py`
+- `python3 web/evm/evm_rpc_bridge.py`
 
 Custom network values:
 - Network Name: `Addition EVM Bridge`

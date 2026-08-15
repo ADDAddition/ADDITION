@@ -13,10 +13,16 @@ bootstrap_peers = [
   "127.0.0.1:28545"
 ]
 
+# Public read RPC is off unless --public-rpc or ADDITION_ENABLE_PUBLIC_RPC=1.
+# It never exposes mine, sendtx, createwallet, or identity rotation.
+enable_public_rpc = false
+
 [ports]
 local_rpc = 8545
 lan_rpc = 18545
 p2p = 28545
+public_rpc = 38545
+public_rpc_bind = "0.0.0.0"
 
 [chain]
 block_reward = 50

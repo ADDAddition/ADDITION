@@ -2,6 +2,7 @@
 
 #include "addition/block.hpp"
 #include "addition/crypto.hpp"
+#include "addition/rpc_access.hpp"
 #include "addition/wallet_keys.hpp"
 
 #include <exception>
@@ -11,6 +12,7 @@
 #include <chrono>
 #include <iomanip>
 #include <limits>
+#include <optional>
 #include <thread>
 
 namespace addition {
@@ -58,38 +60,38 @@ std::vector<std::string> split_route(const std::string& route) {
     return out;
 }
 
-bool is_remote_allowed_command(const std::string& cmd) {
-    return cmd == "getinfo" ||
-           cmd == "protocol_status" ||
-           cmd == "fee_info" ||
-           cmd == "monetary_info" ||
-           cmd == "crypto_selftest" ||
-           cmd == "node_pubkey" ||
-           cmd == "peers" ||
-           cmd == "tx_status" ||
-           cmd == "getbalance" ||
-           cmd == "getbalance_instant" ||
-           cmd == "staked" ||
-           cmd == "stake_claimable" ||
-           cmd == "token_balance" ||
-           cmd == "token_info" ||
-           cmd == "swap_quote" ||
-           cmd == "swap_pool_info" ||
-           cmd == "swap_quote_route" ||
-           cmd == "swap_best_route" ||
-           cmd == "nft_owner" ||
-           cmd == "privacy_status" ||
-           cmd == "bridge_balance" ||
-           cmd == "bridge_attestor" ||
-           cmd == "pouw_storage_deal_status" ||
-           cmd == "pouw_storage_worker_status" ||
-           cmd == "pouw_compute_job_status" ||
-           cmd == "pouw_compute_worker_status" ||
-           cmd == "pm_inbox" ||
-           cmd == "pm_status" ||
-           cmd == "pm_fetch" ||
-           cmd == "verify_message" ||
-           cmd == "ai_status";
+bool is_all_digits(const std::string& s) {
+    if (s.empty()) {
+        return false;
+    }
+    for (char c : s) {
+        if (c < '0' || c > '9') {
+            return false;
+        }
+    }
+    return true;
+}
+
+std::string format_block(const Block& b) {
+    std::ostringstream out;
+    out << "height=" << b.header.height
+        << " hash=" << hash_block_header(b.header)
+        << " previous_hash=" << b.header.previous_hash
+        << " timestamp=" << b.header.timestamp
+        << " nonce=" << b.header.nonce
+        << " difficulty_target=" << b.header.difficulty_target
+        << " merkle_root=" << b.header.merkle_root
+        << " tx_count=" << b.transactions.size();
+    if (!b.transactions.empty()) {
+        out << " tx_hashes=";
+        for (std::size_t i = 0; i < b.transactions.size(); ++i) {
+            if (i > 0) {
+                out << ',';
+            }
+            out << hash_transaction(b.transactions[i]);
+        }
+    }
+    return out.str();
 }
 
 std::string derive_address_from_pubkey(const std::string& pubkey_hex) {
@@ -797,6 +799,47 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         }
 
         return "status=unknown tx_hash=" + tx_hash;
+    }
+
+    if (cmd == "getblock") {
+        std::string id;
+        iss >> id;
+        if (id.empty()) {
+            return "error: usage getblock <height_or_hash>";
+        }
+        std::optional<Block> found;
+        if (is_all_digits(id)) {
+            try {
+                const auto height = static_cast<std::uint64_t>(std::stoull(id));
+                found = chain_.block_at(height);
+            } catch (const std::exception&) {
+                return "error: invalid block height";
+            }
+        } else {
+            found = chain_.block_by_hash(id);
+        }
+        if (!found.has_value()) {
+            return "error: block not found";
+        }
+        return format_block(*found);
+    }
+
+    if (cmd == "getblockhash") {
+        std::string id;
+        iss >> id;
+        if (id.empty() || !is_all_digits(id)) {
+            return "error: usage getblockhash <height>";
+        }
+        try {
+            const auto height = static_cast<std::uint64_t>(std::stoull(id));
+            const auto found = chain_.block_at(height);
+            if (!found.has_value()) {
+                return "error: block not found";
+            }
+            return hash_block_header(found->header);
+        } catch (const std::exception&) {
+            return "error: invalid block height";
+        }
     }
 
     if (cmd == "stake") {

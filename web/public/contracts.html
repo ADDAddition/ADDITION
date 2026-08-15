@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION contracts (in-process)</title>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <header>
+    <h1>Contracts</h1>
+    <p>In-process KV runtime on a local testnet node. Not an EVM, not Solidity, not a public deployer.</p>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/explorer">Explorer</a>
+      <a href="/status">Status</a>
+      <a href="/contracts">Contracts</a>
+      <a href="/swap">Swap</a>
+      <a href="/evm">EVM bridge</a>
+    </nav>
+  </header>
+  <main>
+    <div class="banner">
+      Public read RPC does not expose <code>contract_deploy</code> / <code>contract_call</code>.
+      These forms talk to <code>/local-rpc</code> (loopback proxy to <code>127.0.0.1:8545</code>) or fail closed.
+    </div>
+    <p id="rpc-state" class="offline">Checking local RPC…</p>
+    <section class="panel">
+      <h2>Verified in-process methods</h2>
+      <ul>
+        <li><code>contract_deploy &lt;owner&gt; &lt;code&gt;</code> — returns contract id</li>
+        <li><code>contract_call &lt;id&gt; set|add|get &lt;key&gt; &lt;value&gt;</code></li>
+        <li><code>token_create</code> / <code>token_balance</code> / <code>token_info</code></li>
+      </ul>
+      <p class="note">Writes stay on trusted local RPC. The public port will answer <code>command disabled on public RPC</code>.</p>
+    </section>
+    <section class="panel">
+      <h2>contract_deploy</h2>
+      <label for="owner">owner</label>
+      <input id="owner" value="alice">
+      <label for="code">code</label>
+      <input id="code" value="kvstore">
+      <button id="deploy-btn" type="button">Deploy</button>
+      <pre id="deploy-raw" class="raw"></pre>
+    </section>
+    <section class="panel">
+      <h2>contract_call</h2>
+      <label for="cid">id</label>
+      <input id="cid">
+      <label for="method">method</label>
+      <select id="method">
+        <option>get</option>
+        <option>set</option>
+        <option>add</option>
+      </select>
+      <label for="key">key</label>
+      <input id="key" value="counter">
+      <label for="value">value</label>
+      <input id="value" value="1">
+      <button id="call-btn" type="button">Call</button>
+      <pre id="call-raw" class="raw"></pre>
+    </section>
+    <section class="panel">
+      <h2>token_info / token_balance</h2>
+      <label for="symbol">symbol</label>
+      <input id="symbol" value="TEST">
+      <label for="token-owner">owner</label>
+      <input id="token-owner" value="alice">
+      <button id="token-btn" type="button">Query token</button>
+      <pre id="token-raw" class="raw"></pre>
+    </section>
+  </main>
+  <footer>
+    <p>Contact: <a href="mailto:labjay69@gmail.com">labjay69@gmail.com</a></p>
+  </footer>
+  <script src="common.js"></script>
+  <script>
+    const S = window.AdditionSite;
+    const localBase = "/local-rpc";
+
+    async function localCmd(cmd) {
+      try {
+        const res = await fetch(localBase + "?cmd=" + encodeURIComponent(cmd), { cache: "no-store" });
+        const raw = (await res.text()).trim();
+        if (!res.ok) {
+          return { offline: res.status >= 500 || raw === "RPC offline", raw: raw || "RPC offline" };
+        }
+        return { offline: raw === "RPC offline", raw: raw };
+      } catch (e) {
+        return { offline: true, raw: "RPC offline" };
+      }
+    }
+
+    async function ping() {
+      const r = await localCmd("getinfo");
+      const el = document.getElementById("rpc-state");
+      if (r.offline) {
+        el.className = "offline";
+        el.textContent = "RPC offline";
+      } else {
+        el.className = "";
+        el.textContent = "Local trusted RPC answered";
+      }
+    }
+
+    document.getElementById("deploy-btn").addEventListener("click", async function () {
+      const owner = document.getElementById("owner").value.trim();
+      const code = document.getElementById("code").value.trim();
+      const r = await localCmd("contract_deploy " + owner + " " + code);
+      document.getElementById("deploy-raw").textContent = r.raw;
+      if (!r.offline && r.raw && r.raw.indexOf("error:") !== 0) {
+        document.getElementById("cid").value = r.raw;
+      }
+    });
+    document.getElementById("call-btn").addEventListener("click", async function () {
+      const cid = document.getElementById("cid").value.trim();
+      const method = document.getElementById("method").value;
+      const key = document.getElementById("key").value.trim();
+      const value = document.getElementById("value").value.trim() || "0";
+      const r = await localCmd("contract_call " + cid + " " + method + " " + key + " " + value);
+      document.getElementById("call-raw").textContent = r.raw;
+    });
+    document.getElementById("token-btn").addEventListener("click", async function () {
+      const symbol = document.getElementById("symbol").value.trim();
+      const owner = document.getElementById("token-owner").value.trim();
+      const info = await localCmd("token_info " + symbol);
+      const bal = await localCmd("token_balance " + symbol + " " + owner);
+      document.getElementById("token-raw").textContent =
+        "token_info: " + info.raw + "\ntoken_balance: " + bal.raw;
+    });
+    ping();
+  </script>
+</body>
+</html>

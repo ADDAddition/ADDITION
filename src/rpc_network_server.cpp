@@ -205,7 +205,10 @@ void RpcNetworkServer::run_loop() {
                 continue;
             }
 
-            const auto resp = handler_(req) + "\n";
+            std::string resp = handler_(req);
+            if (resp.rfind("HTTP/1.", 0) != 0 && (resp.empty() || resp.back() != '\n')) {
+                resp.push_back('\n');
+            }
 #ifdef _WIN32
             if (resp.size() > kMaxRpcLineBytes) {
                 const std::string too_big = "error: response too large\n";

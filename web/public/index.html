@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION testnet</title>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <header>
+    <h1>ADDITION</h1>
+    <p>Research prototype / honest testnet. Not a live mainnet.</p>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/explorer">Explorer</a>
+      <a href="/status">Status</a>
+      <a href="/contracts">Contracts</a>
+      <a href="/swap">Swap</a>
+      <a href="/evm">EVM bridge</a>
+    </nav>
+  </header>
+  <main>
+    <div class="banner">
+      This repository does not run a public mainnet, token sale, or CoinMarketCap listing.
+      If the read RPC is down, pages show <strong>RPC offline</strong> and stay empty. They never invent blocks, hashrate, node counts, or supply.
+    </div>
+    <section class="panel">
+      <h2>Public read RPC</h2>
+      <p>Trusted local RPC stays on <code>127.0.0.1:8545</code> (writes, wallets, mine). The public port is read-only.</p>
+      <pre>ADDITION_ENABLE_PUBLIC_RPC=1 ./build/additiond --network testnet
+# or
+./build/additiond --network testnet --public-rpc
+
+printf 'getinfo\n' | nc HOST 38545
+curl 'http://HOST:38545/rpc?cmd=getinfo'</pre>
+      <p class="note">Allowlist: <code>getinfo</code>, <code>monetary_info</code>, <code>crypto_selftest</code>, <code>tx_status</code>, <code>peers</code>, <code>getblock</code>, <code>getblockhash</code>.</p>
+      <p class="note">LAN/P2P stay off unless you set <code>ADDITION_ENABLE_LAN_RPC=1</code> (token required) or <code>ADDITION_ENABLE_P2P_RPC=1</code>. Do not open unauthenticated write RPC to the world.</p>
+    </section>
+    <section class="panel">
+      <h2>Site</h2>
+      <p>Serve these pages locally (binds loopback by default):</p>
+      <pre>python3 web/serve.py</pre>
+      <p>Then open <code>http://127.0.0.1:8080/explorer</code>. Optional <code>?rpc=http://HOST:38545/rpc</code> points the pages at a public read HTTP endpoint.</p>
+    </section>
+  </main>
+  <footer>
+    <p>Contact: <a href="mailto:labjay69@gmail.com">labjay69@gmail.com</a></p>
+  </footer>
+</body>
+</html>

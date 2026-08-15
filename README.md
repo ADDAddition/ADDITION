@@ -93,6 +93,45 @@ printf 'getinfo\n' | nc 127.0.0.1 8545
 
 `getinfo` reports `network=testnet` and `network_name=addition-testnet`.
 
+### Public read-only RPC
+
+Local RPC on `127.0.0.1:8545` stays trusted (mine, wallets, sends). To expose a **read-only** public bind:
+
+```bash
+./build/additiond --network testnet --public-rpc
+# equivalent: ADDITION_ENABLE_PUBLIC_RPC=1 ./build/additiond --network testnet
+```
+
+Default public bind is `0.0.0.0:38545`. Allowlist only:
+
+`getinfo`, `monetary_info`, `crypto_selftest`, `tx_status`, `peers`, `getblock`, `getblockhash`
+
+```bash
+printf 'getinfo\n' | nc 127.0.0.1 38545
+curl 'http://127.0.0.1:38545/rpc?cmd=getinfo'
+printf 'mine\n' | nc 127.0.0.1 38545   # error: command disabled on public RPC
+```
+
+LAN RPC (`18545`) still requires `ADDITION_ENABLE_LAN_RPC=1` and `ADDITION_LAN_RPC_TOKEN`. P2P stays off unless `ADDITION_ENABLE_P2P_RPC=1`. Do not open unauthenticated write RPC to the world.
+
+### Explorer / status / contracts
+
+```bash
+python3 web/serve.py
+```
+
+Open `http://127.0.0.1:8080/explorer` and `http://127.0.0.1:8080/status`. Those pages call the public read RPC and show **RPC offline** (empty) if the node does not answer. They never invent blocks, heights, hashrate, node counts, or supply.
+
+`/contracts` and `/swap` talk to loopback trusted RPC only (`/local-rpc` → `127.0.0.1:8545`). They print the node’s real reply (`error: pool not found` if you have no pool). No Uniswap liquidity and no token price.
+
+EVM bootstrap (not a full EVM; `eth_sendRawTransaction` disabled):
+
+```bash
+python3 web/evm/evm_rpc_bridge.py
+```
+
+Then `http://127.0.0.1:8080/evm`. Contact: [labjay69@gmail.com](mailto:labjay69@gmail.com).
+
 Help:
 
 ```bash
@@ -107,13 +146,14 @@ Private keys are not printed and must not be committed. `data/node_identity.dat`
 
 ## Ports (testnet defaults)
 
-| Service   | Bind              | Port  |
-|-----------|-------------------|-------|
-| Local RPC | `127.0.0.1`       | 8545  |
-| LAN RPC   | disabled by default | 18545 |
-| P2P       | disabled by default | 28545 |
+| Service        | Bind                | Port  |
+|----------------|---------------------|-------|
+| Local RPC      | `127.0.0.1`         | 8545  |
+| Public read RPC | `0.0.0.0` (opt-in) | 38545 |
+| LAN RPC        | disabled by default | 18545 |
+| P2P            | disabled by default | 28545 |
 
-LAN/P2P stay off unless you set `ADDITION_ENABLE_LAN_RPC=1` / `ADDITION_ENABLE_P2P_RPC=1`.
+Public read RPC stays off unless `--public-rpc` or `ADDITION_ENABLE_PUBLIC_RPC=1`. LAN/P2P stay off unless `ADDITION_ENABLE_LAN_RPC=1` / `ADDITION_ENABLE_P2P_RPC=1`.
 
 ---
 
