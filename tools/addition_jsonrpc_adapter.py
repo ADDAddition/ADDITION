@@ -16,7 +16,6 @@ import json
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from ipaddress import ip_address
-from socketserver import ThreadingMixIn
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 from urllib.parse import urlparse
 
@@ -193,7 +192,7 @@ def handle_one(rpc: TextRpcClient, item: Any, allow_writes: bool) -> Dict[str, A
         return jsonrpc_response(req_id, error={"code": -32000, "message": str(exc)})
 
 
-class AdapterServer(ThreadingMixIn, ThreadingHTTPServer):
+class AdapterServer(ThreadingHTTPServer):
     daemon_threads = True
 
     def __init__(

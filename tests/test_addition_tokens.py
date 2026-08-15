@@ -6,7 +6,7 @@ from __future__ import annotations
 import io
 import sys
 import unittest
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from typing import List
 
@@ -100,9 +100,11 @@ class TokenClientTests(unittest.TestCase):
 
 class TokenCliMainTests(unittest.TestCase):
     def test_help_exits_zero(self) -> None:
-        with self.assertRaises(SystemExit) as ctx:
+        buf = io.StringIO()
+        with redirect_stdout(buf), self.assertRaises(SystemExit) as ctx:
             main(["--help"])
         self.assertEqual(ctx.exception.code, 0)
+        self.assertIn("token_create", buf.getvalue())
 
     def test_non_loopback_host_is_rejected(self) -> None:
         buf = io.StringIO()
