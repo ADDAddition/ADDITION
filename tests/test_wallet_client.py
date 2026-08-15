@@ -103,6 +103,8 @@ class WalletClientTests(unittest.TestCase):
         self.assertTrue(self.wallet_path.is_file())
         self.assertEqual(record.private_key, SECRET)
         self.assertNotIn(SECRET, record.public_view())
+        self.assertIn("priv_printed=0", record.public_view())
+        self.assertNotIn(" pub=", record.public_view())
         shown = self.client.show()
         self.assertEqual(shown.address, record.address)
         self.assertEqual(self.rpc.sent, [])

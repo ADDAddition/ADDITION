@@ -170,12 +170,15 @@ class WalletRecord:
     private_key: str
     next_nonce: int
 
-    def public_view(self) -> str:
-        return (
+    def public_view(self, include_pubkey: bool = False) -> str:
+        line = (
             f"network={self.network} algorithm={self.algorithm} "
             f"address={self.address} next_nonce={self.next_nonce} "
-            f"pub={self.public_key}"
+            f"pub_bytes={len(self.public_key) // 2} priv_printed=0"
         )
+        if include_pubkey:
+            line += f" pub={self.public_key}"
+        return line
 
 
 class WalletStore:
@@ -425,7 +428,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
     create = sub.add_parser("createwallet", help="create a local ML-DSA-87 address")
     create.add_argument("--force", action="store_true")
-    sub.add_parser("show", help="print address and public key (never the private key)")
+    show = sub.add_parser("show", help="print address (never the private key)")
+    show.add_argument("--pub", action="store_true", help="also print the full public key hex")
     sub.add_parser("getinfo", help="query daemon getinfo")
     sub.add_parser("balance", help="getbalance for the local address")
     sub.add_parser("fee", help="fee_info")
@@ -452,10 +456,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             record = client.create(force=args.force)
             print(record.public_view())
             print(f"wallet_file={client.store.path}")
-            print("priv_printed=0")
             return 0
         if args.command == "show":
-            print(client.show().public_view())
+            print(client.show().public_view(include_pubkey=args.pub))
             return 0
         if args.command == "getinfo":
             print(client.getinfo())
