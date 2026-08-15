@@ -20,7 +20,7 @@
       <p id="rpc-state" class="offline">Checking RPC…</p>
       <div id="info-fields"></div>
       <pre id="info-raw" class="raw"></pre>
-      <p class="note">Only fields the node returned. Empty peer list means empty — not “42 nodes”.</p>
+      <p class="note">Only fields the node returned. An empty peer list is shown as empty.</p>
     </section>
 
     <section class="panel">
@@ -40,15 +40,15 @@
     </section>
 
     <section class="panel">
-      <h2>Research goals (design, not a live network)</h2>
-      <ul>
-        <li>Post-quantum signatures: <code>ML-DSA-87</code> via liboqs</li>
-        <li>Hashing: <code>SHA3-512</code></li>
-        <li>Memory-hard Proof of Measurable Work in the C++ miner/chain</li>
-        <li>Monetary cap in spec/config: <code>max_supply = 50,000,000</code></li>
-        <li>Default network: <code>addition-testnet</code> / <code>ADDITION_TESTNET_V1</code></li>
-      </ul>
-      <p class="note">Those are kernel constants and research aims. They are not evidence of public hashrate, listed markets, or a running mainnet.</p>
+      <h2>Research goals (design targets, not a live network)</h2>
+      <ol>
+        <li><strong>Quantum</strong> — ML-DSA-87 (FIPS 204) signatures; <code>pq_mode=strict</code> when the node answers <code>getinfo</code>.</li>
+        <li><strong>Privacy</strong> — native ZK path (<code>pq_mldsa87</code>); notes do not persist plaintext owner/amount.</li>
+        <li><strong>Speed</strong> — local testnet RPC. This page shows only fields a running node returned.</li>
+        <li><strong>Cost of transaction</strong> — spec <code>min_fee=1</code>. No invented USD fees or gas market.</li>
+        <li><strong>Compatibility</strong> — in-process <code>bridge_*</code> commands and the EVM bootstrap. Not a full EVM, not live Uniswap, not connected to every chain today.</li>
+      </ol>
+      <p class="note">Kernel constants such as <code>max_supply = 50,000,000</code> and SHA3-512 hashing are design parameters. They are not public hashrate, listed markets, or a running mainnet.</p>
     </section>
 
     <section class="panel">

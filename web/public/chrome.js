@@ -27,7 +27,7 @@
 
   function fillFooter(el) {
     el.innerHTML =
-      '<p>Contact: <a href="mailto:labjay69@gmail.com">labjay69@gmail.com</a></p>' +
+      '<p>Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>' +
       '<p><a href="https://github.com/ADDAddition/ADDITION">https://github.com/ADDAddition/ADDITION</a> · MIT · <a href="/legal/">Research notice</a></p>';
   }
 

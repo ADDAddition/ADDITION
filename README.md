@@ -7,7 +7,19 @@
 
 This repository does **not** claim production status, public node counts, a token sale, CoinMarketCap listing, or a live chain. CI badges are omitted until a green pipeline exists.
 
-Contact: [labjay69@gmail.com](mailto:labjay69@gmail.com)
+Contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com)
+
+---
+
+## Research goals (design targets)
+
+These are aims of the testnet / research prototype, not proof of a live public network:
+
+1. **Quantum** — ML-DSA-87 (FIPS 204) signatures, `pq_mode=strict` when `getinfo` answers
+2. **Privacy** — native ZK path (`pq_mldsa87`); notes do not persist plaintext owner/amount
+3. **Speed** — local testnet RPC; publish only real `getinfo` fields from a running node
+4. **Cost of transaction** — spec `min_fee=1`; no invented USD fees or gas market
+5. **Compatibility** — in-process `bridge_*` commands and the EVM bootstrap (`web/evm/evm_rpc_bridge.py`). Bootstrap / not a full EVM, not live Uniswap, not “connected to every chain today”
 
 ---
 
@@ -140,7 +152,7 @@ Explorer/status call `/api/rpc`. On a static host without a backend they fail cl
 python3 web/evm/evm_rpc_bridge.py
 ```
 
-Contact: [labjay69@gmail.com](mailto:labjay69@gmail.com).
+Contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com).
 
 Help:
 

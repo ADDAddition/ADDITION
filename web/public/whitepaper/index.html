@@ -22,15 +22,18 @@
     <h2>2. Problem statement (research framing)</h2>
     <p>Shor’s algorithm threatens elliptic-curve signatures used by many existing chains. This project experiments with lattice-based signatures at the node, not as a claim that the network is production-ready or “quantum-safe forever.”</p>
 
-    <h2>3. Cryptography actually in the daemon</h2>
-    <ul>
-      <li><strong>Signatures:</strong> ML-DSA-87 via liboqs (<code>createwallet</code> reports <code>algo=ml-dsa-87</code>). Build fails if liboqs is missing.</li>
-      <li><strong>Hashing:</strong> SHA3-512 (OpenSSL) for addresses, transactions, and block headers.</li>
-      <li><strong>Self-test:</strong> <code>crypto_selftest</code> on a running node. If RPC is down, this site does not invent a pass.</li>
-    </ul>
+    <h2>3. Research goals (design targets)</h2>
+    <ol>
+      <li><strong>Quantum</strong> — ML-DSA-87 (FIPS 204) via liboqs. <code>getinfo</code> reports <code>pq_mode=strict</code> when the node answers. Build fails if liboqs is missing.</li>
+      <li><strong>Privacy</strong> — native ZK path (<code>pq_mldsa87</code>). Private notes do not persist plaintext owner/amount.</li>
+      <li><strong>Speed</strong> — local testnet RPC. Publish only real <code>getinfo</code> fields from a running process.</li>
+      <li><strong>Cost of transaction</strong> — spec <code>min_fee=1</code>. This site does not invent USD fees or a gas market.</li>
+      <li><strong>Compatibility</strong> — in-process <code>bridge_*</code> commands and <code>web/evm/evm_rpc_bridge.py</code>. Bootstrap / not a full EVM, not live Uniswap, not connected to every chain today.</li>
+    </ol>
+    <p>Hashing in the daemon is SHA3-512 (OpenSSL). <code>crypto_selftest</code> is whatever the node returns; if RPC is down this page does not invent a pass.</p>
 
     <h2>4. Consensus experiment: Proof of Measurable Work</h2>
-    <p>The miner/chain use a memory-hard scratch path (about 1 MiB in <code>chain.cpp</code>) plus SHA3-512. <code>getinfo</code> can report <code>last_mine_ms</code>, <code>last_mined_txs</code>, and <code>last_tps</code> <em>from that process</em>. Those fields are not a public hashrate index and must not be shown as “124.8 KH/s” or similar marketing.</p>
+    <p>The miner/chain use a memory-hard scratch path (about 1 MiB in <code>chain.cpp</code>) plus SHA3-512. <code>getinfo</code> can report <code>last_mine_ms</code>, <code>last_mined_txs</code>, and <code>last_tps</code> <em>from that process</em>. Those fields are not a public hashrate index.</p>
 
     <h2>5. Ledger and contracts (what the code does)</h2>
     <ul>
@@ -54,11 +57,11 @@
 
     <h2>7. What this note does not claim</h2>
     <ul>
-      <li>No “#1” or “best blockchain in the world.”</li>
-      <li>No live mainnet, no CMC, no token sale, no wallet-connect lure.</li>
-      <li>No hardcoded 42 nodes, 124.8 KH/s, or 1,248,500 ADD as live stats.</li>
-      <li>No Addison Electronics identity. Contact is <a href="mailto:labjay69@gmail.com">labjay69@gmail.com</a>.</li>
+      <li>No ranking against other networks and no “best blockchain” marketing.</li>
+      <li>No live mainnet, listing, token sale, or wallet-connect lure.</li>
+      <li>No hardcoded public node counts, hashrate, or circulating-supply widgets.</li>
     </ul>
+    <p>Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
 
     <p>Companion pages: <a href="/docs/architecture/">architecture</a>, <a href="/docs/commands/">commands</a>, <a href="/docs/pouw/">PoUW spec</a>, <a href="/legal/">legal notice</a>.</p>
   </main>
