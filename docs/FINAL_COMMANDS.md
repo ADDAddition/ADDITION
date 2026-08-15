@@ -235,6 +235,7 @@ Notes:
 	- Explicit send: `tx_build` + `wallet_sign` + `sendtx_signed` / `sendtx_signed_hash`
 	- Mining to the wallet address (`mine <address>`) — memory-hard, can be slow
 	- Stake / unstake / claim
+- Standalone CLI (keys on the caller disk): `web/addition_wallet.py` — `tx_build` + local ML-DSA-87 + `sendtx_signed_hash`. See [WALLET.md](WALLET.md).
 - Not shipped in this tree: `web/addition_wallet_pro.py`, `web/portal/` (no `/api/getinfo` portal backend)
 - MetaMask EVM bridge (bootstrap): `web/evm/evm_rpc_bridge.py`
 

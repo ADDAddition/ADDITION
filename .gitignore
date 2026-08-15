@@ -61,6 +61,8 @@ desktop.ini
 # Secrets & Keys (SAFETY FIRST)
 *.pem
 *.key
+*.wallet
+**/addition.wallet
 *.json
 !package.json
 !tsconfig.json

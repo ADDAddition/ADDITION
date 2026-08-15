@@ -125,6 +125,17 @@ Honest UI:
 
 A fresh wallet balance is `0` until you `mine <address>` on local RPC (memory-hard; reward 50 on a fresh testnet) or receive a UTXO. Public RPC cannot create wallets or send.
 
+Standalone CLI that keeps keys on the **caller** disk (not `data/wallets/`) and signs ML-DSA-87 locally before `sendtx_signed_hash`:
+
+```bash
+python3 web/addition_wallet.py createwallet
+python3 web/addition_wallet.py mine
+python3 web/addition_wallet.py balance
+python3 web/addition_wallet.py send <to_address> <amount>
+```
+
+See [docs/WALLET.md](docs/WALLET.md).
+
 ### Public read-only RPC
 
 Local RPC on `127.0.0.1:8545` stays trusted (mine, wallets, sends). To expose a **read-only** public bind:
@@ -204,6 +215,7 @@ Public read RPC stays off unless `--public-rpc` or `ADDITION_ENABLE_PUBLIC_RPC=1
 
 * [Architecture notes](docs/ARCHITECTURE.md)
 * [Command reference](docs/FINAL_COMMANDS.md)
+* [Local testnet wallet](docs/WALLET.md)
 * [PoUW phase 1 spec](docs/POUW_PHASE1_SPEC.md)
 
 Older docs may still say “mainnet”. Treat those as historical. This tree is a research testnet.
