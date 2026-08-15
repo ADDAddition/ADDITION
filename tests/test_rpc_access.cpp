@@ -79,8 +79,17 @@ int main() {
     const auto resp = addition::http_rpc_response(200, "network=testnet");
     if (resp.find("HTTP/1.1 200 OK") == std::string::npos ||
         resp.find("network=testnet") == std::string::npos ||
-        resp.find("Access-Control-Allow-Origin: *") == std::string::npos) {
+        resp.find("Access-Control-Allow-Origin: *") == std::string::npos ||
+        resp.find("Cache-Control: no-store") == std::string::npos) {
         std::cerr << "test failed: HTTP response format\n";
+        return 1;
+    }
+
+    const auto preflight = addition::http_rpc_response(204, "");
+    if (preflight.find("HTTP/1.1 204 No Content") == std::string::npos ||
+        preflight.find("Access-Control-Allow-Origin: *") == std::string::npos ||
+        preflight.find("Cache-Control: no-store") == std::string::npos) {
+        std::cerr << "test failed: OPTIONS/CORS response format\n";
         return 1;
     }
 
@@ -101,6 +110,38 @@ int main() {
         }
         if (!ncfg.enable_public_rpc || ncfg.public_rpc_port != 38545) {
             std::cerr << "test failed: --public-rpc not applied\n";
+            return 1;
+        }
+    }
+
+    {
+        addition::NodeConfig ncfg;
+        bool help = false;
+        std::string err;
+        char arg0[] = "additiond";
+        char arg1[] = "--network";
+        char arg2[] = "testnet";
+        char arg3[] = "--public-rpc";
+        char arg4[] = "--public-rpc-bind";
+        char arg5[] = "127.0.0.1";
+        char arg6[] = "--local-rpc-port";
+        char arg7[] = "8546";
+        char arg8[] = "--p2p-port";
+        char arg9[] = "28546";
+        char arg10[] = "--bootstrap";
+        char arg11[] = "127.0.0.1:28545";
+        char* argv[] = {arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11};
+        if (!addition::apply_cli_args(12, argv, ncfg, help, err)) {
+            std::cerr << "test failed: cli two-node parse: " << err << '\n';
+            return 1;
+        }
+        if (!ncfg.enable_public_rpc ||
+            ncfg.public_rpc_bind != "127.0.0.1" ||
+            ncfg.local_rpc_port != 8546 ||
+            ncfg.p2p_port != 28546 ||
+            ncfg.bootstrap_peers.size() != 1 ||
+            ncfg.bootstrap_peers[0] != "127.0.0.1:28545") {
+            std::cerr << "test failed: two-node CLI flags not applied\n";
             return 1;
         }
     }

@@ -6,11 +6,11 @@ services:
       context: ../../
       dockerfile: deploy/github-docker/Dockerfile
     container_name: additiond
-    command: ["--network", "testnet", "--config", "config.toml"]
+    command: ["./build/additiond", "--network", "testnet", "--config", "config.toml"]
     ports:
-      - "8545:8545"
-      - "18545:18545"
+      - "127.0.0.1:8545:8545"
       - "28545:28545"
+      - "38545:38545"
     volumes:
       - ./data:/app/data
     restart: unless-stopped

@@ -163,6 +163,13 @@ def main() -> None:
         "This is an experimental <em>profile</em> runbook. The repository default is testnet. There is no live public mainnet.",
     )
     write_doc(
+        "docs/TWO_NODE_TESTNET.md",
+        OUT / "docs" / "two-node" / "index.html",
+        "ADDITION two-node local testnet",
+        "Two-node testnet",
+        "Two honest local processes. Not a public mainnet. No invented peers or hashrate.",
+    )
+    write_doc(
         "README.md",
         OUT / "docs" / "getting-started" / "index.html",
         "Build and run ADDITION testnet",

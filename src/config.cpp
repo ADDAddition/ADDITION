@@ -581,6 +581,9 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
     std::string cli_data_dir;
     std::string cli_public_rpc_port;
     std::string cli_public_rpc_bind;
+    std::string cli_local_rpc_port;
+    std::string cli_p2p_port;
+    std::vector<std::string> cli_bootstrap;
     bool network_from_cli = false;
     bool public_rpc_from_cli = false;
 
@@ -665,6 +668,38 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
             cli_public_rpc_bind = arg.substr(18);
             continue;
         }
+        if (arg == "--local-rpc-port") {
+            if (!take_value(cli_local_rpc_port)) {
+                return false;
+            }
+            continue;
+        }
+        if (arg.rfind("--local-rpc-port=", 0) == 0) {
+            cli_local_rpc_port = arg.substr(17);
+            continue;
+        }
+        if (arg == "--p2p-port") {
+            if (!take_value(cli_p2p_port)) {
+                return false;
+            }
+            continue;
+        }
+        if (arg.rfind("--p2p-port=", 0) == 0) {
+            cli_p2p_port = arg.substr(11);
+            continue;
+        }
+        if (arg == "--bootstrap") {
+            std::string peer;
+            if (!take_value(peer)) {
+                return false;
+            }
+            cli_bootstrap.push_back(std::move(peer));
+            continue;
+        }
+        if (arg.rfind("--bootstrap=", 0) == 0) {
+            cli_bootstrap.push_back(arg.substr(12));
+            continue;
+        }
         error = "unknown argument: " + arg;
         return false;
     }
@@ -718,6 +753,22 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
     if (!cli_public_rpc_bind.empty()) {
         cfg.public_rpc_bind = cli_public_rpc_bind;
     }
+    if (!cli_local_rpc_port.empty()) {
+        if (!parse_u16(cli_local_rpc_port, cfg.local_rpc_port)) {
+            error = "invalid --local-rpc-port";
+            return false;
+        }
+    }
+    if (!cli_p2p_port.empty()) {
+        if (!parse_u16(cli_p2p_port, cfg.p2p_port)) {
+            error = "invalid --p2p-port";
+            return false;
+        }
+    }
+    if (!cli_bootstrap.empty()) {
+        cfg.bootstrap_peers = cli_bootstrap;
+        cfg.chain.bootstrap_peers = cli_bootstrap;
+    }
 
     if (network_from_cli) {
         bool ok = false;
@@ -742,22 +793,27 @@ std::string daemon_help_text() {
            "Usage:\n"
            "  additiond [--network testnet|mainnet] [--config PATH] [--genesis PATH] [--data-dir PATH]\n"
            "            [--public-rpc] [--public-rpc-port PORT] [--public-rpc-bind IP]\n"
+           "            [--local-rpc-port PORT] [--p2p-port PORT] [--bootstrap IP:PORT]\n"
            "\n"
            "Defaults:\n"
            "  --network testnet\n"
            "  --config  config.toml (if present)\n"
            "  --genesis genesis.json (if present)\n"
            "\n"
-           "Local trusted RPC: 127.0.0.1:8545 (all commands; optional ADDITION_RPC_TOKEN)\n"
+           "Local trusted write RPC: 127.0.0.1:8545 (never bound to 0.0.0.0; optional ADDITION_RPC_TOKEN)\n"
+           "  Override port with --local-rpc-port or ADDITION_LOCAL_RPC_PORT (second node: 8546).\n"
            "Public read RPC (opt-in, allowlist only):\n"
            "  additiond --network testnet --public-rpc\n"
            "  or ADDITION_ENABLE_PUBLIC_RPC=1\n"
            "  bind 0.0.0.0:38545 by default (ADDITION_PUBLIC_RPC_PORT / ADDITION_PUBLIC_RPC_BIND)\n"
+           "  use --public-rpc-bind 127.0.0.1 for a local tunnel\n"
            "  allowlist: getinfo monetary_info crypto_selftest tx_status peers getblock getblockhash\n"
            "  TCP:  printf 'getinfo\\n' | nc HOST 38545\n"
            "  HTTP: curl 'http://HOST:38545/rpc?cmd=getinfo'\n"
            "LAN RPC stays token-gated (ADDITION_ENABLE_LAN_RPC=1 + ADDITION_LAN_RPC_TOKEN).\n"
-           "P2P stays off unless ADDITION_ENABLE_P2P_RPC=1. Do not expose write RPC to the world.\n"
+           "P2P stays off unless ADDITION_ENABLE_P2P_RPC=1. --p2p-port / ADDITION_P2P_PORT (second node: 28546).\n"
+           "--bootstrap IP:PORT replaces bootstrap_peers (IPv4 only; hostnames are not resolved).\n"
+           "Do not expose write RPC to the world.\n"
            "\n"
            "Local wallet (trusted RPC only): createwallet [name], wallet_list, wallet_info,\n"
            "  wallet_balance, wallet_send, wallet_sign. Keys stay in <data-dir>/wallets/*.wal.\n"

@@ -70,4 +70,15 @@ if(ADDITION_BUILD_TESTS)
     add_executable(test_wallet tests/test_wallet.cpp)
     target_link_libraries(test_wallet PRIVATE addition_core)
     add_test(NAME test_wallet COMMAND test_wallet)
+
+    find_package(Python3 COMPONENTS Interpreter)
+    if(Python3_Interpreter_FOUND)
+        add_test(
+            NAME test_public_rpc_two_node
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_public_rpc_two_node.py
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        )
+        set_tests_properties(test_public_rpc_two_node PROPERTIES
+            ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>")
+    endif()
 endif()

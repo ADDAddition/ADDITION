@@ -38,7 +38,7 @@ RUN set -eux; \
             -DOQS_LIBRARY="$OQS_LIB"; \
         cmake --build build --target additiond -v
 
-EXPOSE 8545 18545 28545 8080
+EXPOSE 8545 18545 28545 38545 8080
 
 # Research testnet daemon. This is not a live mainnet.
 CMD ["./build/additiond", "--network", "testnet", "--config", "config.toml"]

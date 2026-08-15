@@ -1,0 +1,17 @@
+# Node B — second local process. Bootstraps to node A P2P.
+network = "testnet"
+network_name = "addition-testnet"
+network_id = "ADDITION_TESTNET_V1"
+data_dir = "data/node-b"
+genesis_file = "genesis.json"
+enable_public_rpc = false
+bootstrap_peers = [
+  "127.0.0.1:28545"
+]
+
+[ports]
+local_rpc = 8546
+lan_rpc = 18546
+p2p = 28546
+public_rpc = 38546
+public_rpc_bind = "127.0.0.1"

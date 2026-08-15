@@ -1,0 +1,57 @@
+# Two honest local testnet processes. Not a public mainnet.
+# Host networking so P2P can use 127.0.0.1 (IPv4 literals only; no DNS names).
+# Write RPC stays bound to 127.0.0.1 inside the daemon.
+
+services:
+  node-a:
+    build:
+      context: ../..
+      dockerfile: deploy/github-docker/Dockerfile
+    container_name: addition-testnet-a
+    network_mode: host
+    environment:
+      ADDITION_ENABLE_P2P_RPC: "1"
+    command:
+      - ./build/additiond
+      - --network
+      - testnet
+      - --public-rpc
+      - --public-rpc-port
+      - "38545"
+      - --public-rpc-bind
+      - "0.0.0.0"
+      - --data-dir
+      - data/node-a
+      - --local-rpc-port
+      - "8545"
+      - --p2p-port
+      - "28545"
+    volumes:
+      - ./data-a:/app/data/node-a
+    restart: unless-stopped
+
+  node-b:
+    build:
+      context: ../..
+      dockerfile: deploy/github-docker/Dockerfile
+    container_name: addition-testnet-b
+    network_mode: host
+    depends_on:
+      - node-a
+    environment:
+      ADDITION_ENABLE_P2P_RPC: "1"
+    command:
+      - ./build/additiond
+      - --network
+      - testnet
+      - --data-dir
+      - data/node-b
+      - --local-rpc-port
+      - "8546"
+      - --p2p-port
+      - "28546"
+      - --bootstrap
+      - 127.0.0.1:28545
+    volumes:
+      - ./data-b:/app/data/node-b
+    restart: unless-stopped
