@@ -15,6 +15,7 @@
 #include "addition/privacy.hpp"
 #include "addition/staking.hpp"
 #include "addition/token_engine.hpp"
+#include "addition/wallet_store.hpp"
 
 #include <string>
 
@@ -38,7 +39,8 @@ public:
               AIRoutingOptimizer& ai_optimizer,
               DecentralizedNode& node,
               bool allow_insecure_tx_commands,
-              bool strict_admin_mode);
+              bool strict_admin_mode,
+              std::string wallet_dir = {});
 
     std::string handle_command(const std::string& line, bool trusted = true);
 
@@ -60,6 +62,7 @@ private:
     DecentralizedNode& node_;
     bool allow_insecure_tx_commands_{false};
     bool strict_admin_mode_{true};
+    WalletStore wallets_;
 };
 
 } // namespace addition

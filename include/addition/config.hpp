@@ -39,6 +39,9 @@ struct NodeConfig {
     std::uint16_t local_rpc_port{8545};
     std::uint16_t lan_rpc_port{18545};
     std::uint16_t p2p_port{28545};
+    std::uint16_t public_rpc_port{38545};
+    std::string public_rpc_bind{"0.0.0.0"};
+    bool enable_public_rpc{false};
     std::vector<std::string> bootstrap_peers{"127.0.0.1:28545"};
     std::string data_dir{"data"};
     std::string config_path{};

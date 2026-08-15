@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION swap quote (in-process)</title>
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body data-title="Swap" data-sub="In-process AMM quotes. No Uniswap pool and no token price feed.">
+  <header id="site-header"></header>
+  <main>
+    <div class="banner">
+      If no pool exists on this node, the daemon returns <code>error: pool not found</code>.
+      This page prints that answer. It does not fabricate reserves or a USD price.
+    </div>
+    <p id="rpc-state" class="offline">Checking local RPC…</p>
+    <section class="panel">
+      <h2>swap_quote</h2>
+      <label for="tin">token_in</label>
+      <input id="tin" value="AAA">
+      <label for="tout">token_out</label>
+      <input id="tout" value="BBB">
+      <label for="amt">amount_in</label>
+      <input id="amt" value="1">
+      <button id="quote-btn" type="button">Quote</button>
+      <pre id="quote-raw" class="raw"></pre>
+    </section>
+    <section class="panel">
+      <h2>swap_pool_info</h2>
+      <label for="pa">token_a</label>
+      <input id="pa" value="AAA">
+      <label for="pb">token_b</label>
+      <input id="pb" value="BBB">
+      <button id="pool-btn" type="button">Pool info</button>
+      <div id="pool-fields"></div>
+      <pre id="pool-raw" class="raw"></pre>
+    </section>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/common.js"></script>
+  <script src="/chrome.js"></script>
+  <script>
+    const S = window.AdditionSite;
+    async function localCmd(cmd) {
+      try {
+        const res = await fetch("/local-rpc?cmd=" + encodeURIComponent(cmd), { cache: "no-store" });
+        const raw = (await res.text()).trim();
+        if (!res.ok || raw.charAt(0) === "<") {
+          return { offline: true, raw: "RPC offline", fields: {} };
+        }
+        return { offline: raw === "RPC offline", raw: raw, fields: S.parseFields(raw) };
+      } catch (e) {
+        return { offline: true, raw: "RPC offline", fields: {} };
+      }
+    }
+    async function ping() {
+      const r = await localCmd("getinfo");
+      const el = document.getElementById("rpc-state");
+      if (r.offline) {
+        el.className = "offline";
+        el.textContent = "RPC offline";
+      } else {
+        el.className = "ok";
+        el.textContent = "Local trusted RPC answered";
+      }
+    }
+    document.getElementById("quote-btn").addEventListener("click", async function () {
+      const r = await localCmd("swap_quote " + document.getElementById("tin").value.trim() + " " +
+        document.getElementById("tout").value.trim() + " " + document.getElementById("amt").value.trim());
+      document.getElementById("quote-raw").textContent = r.raw;
+    });
+    document.getElementById("pool-btn").addEventListener("click", async function () {
+      const r = await localCmd("swap_pool_info " + document.getElementById("pa").value.trim() + " " +
+        document.getElementById("pb").value.trim());
+      document.getElementById("pool-raw").textContent = r.raw;
+      if (r.offline || r.raw.indexOf("error:") === 0) {
+        S.renderFields(document.getElementById("pool-fields"), {}, r.raw || "RPC offline");
+      } else {
+        S.renderFields(document.getElementById("pool-fields"), r.fields, "Node returned no key=value fields.");
+      }
+    });
+    ping();
+  </script>
+</body>
+</html>

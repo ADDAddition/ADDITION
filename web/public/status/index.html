@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION status (testnet)</title>
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body data-title="Status" data-sub="Live fields from this node only.">
+  <header id="site-header"></header>
+  <main>
+    <div class="banner">Research testnet status. No advertised public node count, hashrate, or circulating supply widget.</div>
+    <p id="rpc-state" class="offline">Checking RPC…</p>
+    <section class="panel">
+      <h2>getinfo</h2>
+      <div id="info-fields"></div>
+      <pre id="info-raw" class="raw"></pre>
+    </section>
+    <section class="panel">
+      <h2>monetary_info</h2>
+      <div id="mon-fields"></div>
+      <pre id="mon-raw" class="raw"></pre>
+    </section>
+    <section class="panel">
+      <h2>crypto_selftest</h2>
+      <pre id="crypto-raw" class="raw"></pre>
+    </section>
+    <section class="panel">
+      <h2>peers</h2>
+      <pre id="peers-raw" class="raw"></pre>
+    </section>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/common.js"></script>
+  <script src="/chrome.js"></script>
+  <script>
+    const S = window.AdditionSite;
+    function fill(id, result, fieldId) {
+      document.getElementById(id).textContent = result.offline ? "RPC offline" : result.raw;
+      if (fieldId) {
+        if (result.offline || !result.ok) {
+          S.renderFields(document.getElementById(fieldId), {}, "RPC offline");
+        } else {
+          S.renderFields(document.getElementById(fieldId), result.fields, "Node returned no key=value fields.");
+        }
+      }
+    }
+    async function load() {
+      const info = await S.rpcCommand("getinfo");
+      S.setStatus(document.getElementById("rpc-state"), info);
+      fill("info-raw", info, "info-fields");
+      fill("mon-raw", await S.rpcCommand("monetary_info"), "mon-fields");
+      fill("crypto-raw", await S.rpcCommand("crypto_selftest"));
+      const peers = await S.rpcCommand("peers");
+      if (peers.offline) {
+        document.getElementById("peers-raw").textContent = "RPC offline";
+      } else if (!peers.raw) {
+        document.getElementById("peers-raw").textContent = "(empty peer list from node)";
+      } else {
+        document.getElementById("peers-raw").textContent = peers.raw;
+      }
+    }
+    load();
+  </script>
+</body>
+</html>

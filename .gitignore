@@ -19,6 +19,8 @@ compile_commands.json
 data_backup_*/
 **/node_identity.dat
 **/*wallet*.dat
+**/*.wal
+**/wallets/
 *.dat
 *.log
 *.tmp

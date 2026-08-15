@@ -13,6 +13,7 @@
 #include "addition/privacy.hpp"
 #include "addition/rpc_server.hpp"
 #include "addition/rpc_network_server.hpp"
+#include "addition/rpc_access.hpp"
 #include "addition/state_store.hpp"
 #include "addition/staking.hpp"
 #include "addition/wallet_keys.hpp"
@@ -25,7 +26,7 @@
 #include <fstream>
 #include <sstream>
 #include <cstdlib>
-#include <cstdlib>
+#include <exception>
 
 #include <chrono>
 #include <thread>
@@ -242,7 +243,8 @@ int main(int argc, char** argv) {
                             ai_optimizer,
                             node,
                             allow_insecure_tx_commands,
-                            strict_admin_mode);
+                            strict_admin_mode,
+                            (std::filesystem::path(node_cfg.data_dir) / "wallets").string());
     const bool enable_lan_rpc = []() {
         if (const char* v = std::getenv("ADDITION_ENABLE_LAN_RPC")) {
             return std::string(v) == "1";
@@ -256,6 +258,27 @@ int main(int argc, char** argv) {
         }
         return false;
     }();
+
+    if (const char* v = std::getenv("ADDITION_ENABLE_PUBLIC_RPC")) {
+        if (std::string(v) == "1") {
+            node_cfg.enable_public_rpc = true;
+        }
+    }
+    if (const char* v = std::getenv("ADDITION_PUBLIC_RPC_PORT")) {
+        try {
+            const auto port = std::stoul(v);
+            if (port > 0 && port <= 65535) {
+                node_cfg.public_rpc_port = static_cast<std::uint16_t>(port);
+            }
+        } catch (const std::exception&) {
+        }
+    }
+    if (const char* v = std::getenv("ADDITION_PUBLIC_RPC_BIND")) {
+        const std::string bind = trim_copy(v);
+        if (!bind.empty()) {
+            node_cfg.public_rpc_bind = bind;
+        }
+    }
 
     std::string local_rpc_token;
     if (const char* v = std::getenv("ADDITION_RPC_TOKEN")) {
@@ -290,6 +313,9 @@ int main(int argc, char** argv) {
             return error;
         }
         return rpc.handle_command(stripped, false);
+    });
+    addition::RpcNetworkServer public_rpc(node_cfg.public_rpc_bind, node_cfg.public_rpc_port, [&](const std::string& cmd) {
+        return addition::dispatch_public_read_rpc(rpc, cmd);
     });
 
     std::string local_error;
@@ -329,6 +355,19 @@ int main(int argc, char** argv) {
         std::cout << "P2P RPC disabled by default (set ADDITION_ENABLE_P2P_RPC=1 to enable)\n";
     }
 
+    std::string public_error;
+    if (node_cfg.enable_public_rpc) {
+        if (!public_rpc.start(public_error)) {
+            std::cout << "warning: public read RPC failed to start: " << public_error << '\n';
+        } else {
+            std::cout << "public read RPC listening on " << node_cfg.public_rpc_bind << ':'
+                      << node_cfg.public_rpc_port
+                      << " allowlist=getinfo,monetary_info,crypto_selftest,tx_status,peers,getblock,getblockhash\n";
+        }
+    } else {
+        std::cout << "public read RPC disabled (set --public-rpc or ADDITION_ENABLE_PUBLIC_RPC=1)\n";
+    }
+
     std::cout << "ADDITION research daemon started. This is not a live mainnet.\n";
     std::cout << "network=" << addition::network_mode_label(node_cfg.mode)
               << " network_name=" << node_cfg.chain.network_name
@@ -344,7 +383,7 @@ int main(int argc, char** argv) {
         std::cout << ' ' << peer;
     }
     std::cout << '\n';
-    std::cout << "Commands: getinfo, fee_info, createwallet, sign_message <privkey_hex> <message_hex_utf8>, verify_message <pubkey_hex> <message_hex_utf8> <sig_hex>, getbalance <addr>, getbalance_instant <addr>, tx_build <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce>, sendtx_signed <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce> <sig_hex>, sendtx_signed_hash <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce> <sig_hex>, mine,\n"
+    std::cout << "Commands: getinfo, fee_info, createwallet [name], wallet_list, wallet_info <name>, wallet_balance <name>, wallet_send <name> <to> <amount> [fee], wallet_sign <name> <message_hex_utf8>, sign_message <privkey_hex> <message_hex_utf8>, verify_message <pubkey_hex> <message_hex_utf8> <sig_hex>, getbalance <addr>, getbalance_instant <addr>, tx_build <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce>, sendtx_signed <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce> <sig_hex>, sendtx_signed_hash <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce> <sig_hex>, mine,\n"
                  "monetary_info, crypto_selftest,\n"
                  "stake <addr> <amt>, unstake <addr> <amt>, staked <addr>, stake_reward <amt>, stake_claim <addr>,\n"
                  "stake_claimable <addr>, stake_policy <get|set> [cap_bps admin_addr admin_pubkey admin_sig],\n"
@@ -389,12 +428,13 @@ int main(int argc, char** argv) {
                  "swap_best_route_exact_in_signed <token_in> <token_out> <trader> <amount_in> <min_out> <deadline_unix> <max_hops> <trader_pubkey> <trader_sig>,\n"
                  "nft_mint <collection> <token_id> <owner> <metadata>, nft_transfer <collection> <token_id> <from> <to>, nft_owner <collection> <token_id>,\n"
                  "sendtx_hash <from_addr> <pubkey_hex> <privkey_hex> <to_addr> <amount> <fee> <nonce> (insecure legacy), tx_status <tx_hash>,\n"
+                 "getblock <height_or_hash>, getblockhash <height>,\n"
                  "peer_inbound <peer> <payload>, gossip_flush, sync, node_pubkey,\n"
                  "identity_rotate_propose <new_pub> <new_priv> <grace_sec>, identity_rotate_vote <peer_id>,\n"
                  "identity_rotate_vote_broadcast, identity_rotate_commit, identity_rotate_status, quit\n";
 
     if (!allow_insecure_tx_commands) {
-        std::cout << "secure tx mode enabled: use tx_build + sign_message + sendtx_signed (insecure sendtx/sendtx_hash disabled)\n";
+        std::cout << "secure tx mode enabled: use wallet_send, or tx_build + wallet_sign/sign_message + sendtx_signed (insecure sendtx/sendtx_hash disabled)\n";
     } else {
         std::cout << "warning: insecure tx commands enabled (ADDITION_ALLOW_INSECURE_TX_COMMANDS=1)\n";
     }
@@ -457,6 +497,7 @@ int main(int argc, char** argv) {
 
     local_rpc.stop();
     lan_rpc.stop();
+    public_rpc.stop();
     p2p_rpc.stop();
 
     std::string save_error;

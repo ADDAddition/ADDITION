@@ -207,6 +207,15 @@ std::uint64_t Chain::balance_of(const std::string& address) const {
     return it == address_index_.end() ? 0ULL : it->second;
 }
 
+std::uint64_t Chain::last_nonce(const std::string& address) const {
+    const auto it = signer_last_nonce_.find(address);
+    return it == signer_last_nonce_.end() ? 0ULL : it->second;
+}
+
+std::uint64_t Chain::next_nonce(const std::string& address) const {
+    return last_nonce(address) + 1ULL;
+}
+
 bool Chain::credit_balance(const std::string& address,
                           std::uint64_t amount,
                           const std::string& reason,

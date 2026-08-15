@@ -1,17 +1,52 @@
 # ADDITION_FINAL - Final Command Surface
 
 ## RPC Endpoints
-- Local-only RPC: `127.0.0.1:8545`
-- LAN RPC: `0.0.0.0:18545`
-- P2P transport RPC: `0.0.0.0:28545`
+- Local-only trusted RPC: `127.0.0.1:8545` (all commands; optional `ADDITION_RPC_TOKEN`)
+- Public read RPC (opt-in): `0.0.0.0:38545` — allowlist only, no auth token
+- LAN RPC: `0.0.0.0:18545` (off unless `ADDITION_ENABLE_LAN_RPC=1` + `ADDITION_LAN_RPC_TOKEN`)
+- P2P transport RPC: `0.0.0.0:28545` (off unless `ADDITION_ENABLE_P2P_RPC=1`)
 
 Each TCP request is one command line and returns one response line.
+
+### Public read RPC
+Enable with `--public-rpc` or `ADDITION_ENABLE_PUBLIC_RPC=1`:
+
+```bash
+./build/additiond --network testnet --public-rpc
+# or
+ADDITION_ENABLE_PUBLIC_RPC=1 ./build/additiond --network testnet
+```
+
+Allowlist (everything else returns `error: command disabled on public RPC`):
+- `getinfo`
+- `monetary_info`
+- `crypto_selftest`
+- `tx_status <tx_hash>`
+- `peers`
+- `getblock <height_or_hash>`
+- `getblockhash <height>`
+
+Not on the public port: `mine`, `sendtx*`, `createwallet`, `wallet_*`, identity rotation, admin, contract/token writes.
+
+TCP and a tiny HTTP adapter share the same port:
+
+```bash
+printf 'getinfo\n' | nc 127.0.0.1 38545
+curl 'http://127.0.0.1:38545/rpc?cmd=getinfo'
+```
+
+Override bind/port with `--public-rpc-bind`, `--public-rpc-port`, `ADDITION_PUBLIC_RPC_BIND`, or `ADDITION_PUBLIC_RPC_PORT`.
 
 ## Core chain
 - `getinfo`
 - `monetary_info`
 - `crypto_selftest`
-- `createwallet`
+- `createwallet [name]` — ML-DSA-87; writes `data/wallets/<name>.wal` (0600); returns address/pub/name/path; `priv_printed=0`
+- `wallet_list`
+- `wallet_info <name>`
+- `wallet_balance <name>`
+- `wallet_send <name> <to_addr> <amount> [fee]` — signs from the local file; no privkey on the wire
+- `wallet_sign <name> <message_hex_utf8>` — same as `sign_message` without sending the key
 - `getbalance <address>`
 - `getbalance_instant <address>`
 - `tx_build <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce>`
@@ -20,6 +55,8 @@ Each TCP request is one command line and returns one response line.
 - `sendtx <from_addr> <pubkey_hex> <privkey_hex> <to_addr> <amount> <fee> <nonce>` (legacy, disabled unless `ADDITION_ALLOW_INSECURE_TX_COMMANDS=1`)
 - `sendtx_hash <from_addr> <pubkey_hex> <privkey_hex> <to_addr> <amount> <fee> <nonce>` (legacy, disabled unless `ADDITION_ALLOW_INSECURE_TX_COMMANDS=1`)
 - `tx_status <tx_hash>`
+- `getblock <height_or_hash>`
+- `getblockhash <height>`
 - `mine`
 
 ## P2P + Consensus
@@ -162,7 +199,8 @@ Notes:
 ## Notes
 - Build defaults to release-oriented mode with tests disabled unless explicitly enabled.
 - Build fails if liboqs is missing (fallback mode removed).
-- Wallet key generation uses ML-DSA-87 via liboqs when available (`createwallet` returns `algo=ml-dsa-87`).
+- Wallet key generation uses ML-DSA-87 via liboqs (`createwallet` returns `algo=ml-dsa-87` and stores the secret in `data/wallets/<name>.wal`).
+- User model is Bitcoin-like (keys, UTXOs, send/receive, fee). This is not BIP-32/39/44 and not a Bitcoin fork.
 - Monetary cap is enforced on-chain: `max_supply = 50,000,000`.
 - Runtime strict gates enabled:
 	- PQ signatures required for spend transactions (`signature` must be `pq=` format)
@@ -184,31 +222,33 @@ Notes:
 	- `peer_pins.dat`
 	- `node_identity.dat` (stable node PQ identity)
 	- `privacy.dat`
+	- `wallets/<name>.wal` (local ML-DSA-87 secrets; never commit)
 
-## Wallet GUI (Python)
-- File: `web/addition_wallet_gui.py`
-- Uses TCP RPC directly on `127.0.0.1:8545`
+## Wallet (local / testnet only)
+- File: `web/addition_wallet_gui.py` (Tk GUI, or `--cli` without a display)
+- Honest page: `/wallet/` via loopback `/local-rpc` → `127.0.0.1:8545`
+- Uses TCP RPC on `127.0.0.1:8545` only (refuses non-loopback hosts)
 - Supports:
-	- Wallet creation (`createwallet`)
-	- Balance refresh (`getbalance`)
-	- Secure send flow (`tx_build` + `sign_message` + `sendtx_signed_hash`)
-	- Mining to selected address (`mine <address>`)
+	- Wallet creation (`createwallet [name]`, ML-DSA-87, key stays in `data/wallets/`)
+	- Balance (`wallet_balance` / `getbalance`)
+	- Default send: `wallet_send` (no raw privkey on the wire)
+	- Explicit send: `tx_build` + `wallet_sign` + `sendtx_signed` / `sendtx_signed_hash`
+	- Mining to the wallet address (`mine <address>`) — memory-hard, can be slow
 	- Stake / unstake / claim
-
-## Professional UX Components
-- Advanced wallet UI: `web/addition_wallet_pro.py`
-- Live web portal: `web/portal/index.html`
-- Portal metrics backend: `web/portal/addition_portal_backend.py`
+- Not shipped in this tree: `web/addition_wallet_pro.py`, `web/portal/` (no `/api/getinfo` portal backend)
 - MetaMask EVM bridge (bootstrap): `web/evm/evm_rpc_bridge.py`
 
-Portal API endpoints:
-- `GET /api/getinfo`
-- `GET /api/monetary`
-- `GET /api/health`
+## Honest website (fail-closed)
+- Static Pages root: `web/public/` (`/`, `/explorer/`, `/status/`, `/rpc/`, `/wallet/`, `/docs/`, `/contracts/`, `/swap/`, `/evm/`, `/whitepaper/`, `/legal/`)
+- Local server: `python3 web/serve.py` (default `127.0.0.1:8080`)
+- `/api/rpc` (and `/rpc?cmd=`) proxy the public allowlist to port `38545`
+- `/rpc/` without `cmd` is the how-to page
+- `/local-rpc` proxies trusted `127.0.0.1:8545` and only accepts loopback clients
+- If RPC is down the pages show `RPC offline` and stay empty. They do not invent blocks, hashrate, node counts, or supply.
 
 ## MetaMask (EVM bridge bootstrap)
 Run:
-- `python web/evm/evm_rpc_bridge.py`
+- `python3 web/evm/evm_rpc_bridge.py`
 
 Custom network values:
 - Network Name: `Addition EVM Bridge`

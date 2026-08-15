@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION EVM bridge (bootstrap)</title>
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body data-title="EVM bridge" data-sub="Bootstrap JSON-RPC only. Not a full EVM.">
+  <header id="site-header"></header>
+  <main>
+    <div class="banner">
+      Compatibility goal: a bootstrap JSON-RPC map plus in-process <code>bridge_*</code> commands.
+      Not a full EVM, not live Uniswap, not connected to every chain today. <code>eth_sendRawTransaction</code> stays disabled.
+    </div>
+    <section class="panel">
+      <h2>Run the bootstrap</h2>
+      <pre>python3 web/evm/evm_rpc_bridge.py
+# listens on 127.0.0.1:9545 and reads 127.0.0.1:8545</pre>
+      <p>Local wallet values only:</p>
+      <ul>
+        <li>Network Name: <code>Addition EVM Bridge (bootstrap)</code></li>
+        <li>RPC URL: <code>http://127.0.0.1:9545</code></li>
+        <li>Chain ID: <code>424242</code></li>
+        <li>Currency Symbol: <code>ADD</code></li>
+      </ul>
+    </section>
+    <section class="panel">
+      <h2>Live bootstrap probe</h2>
+      <p class="note">Calls <code>http://127.0.0.1:9545</code> from this browser. If the bridge is not running, the panel stays <strong>RPC offline</strong>.</p>
+      <p id="rpc-state" class="offline">Checking bridge…</p>
+      <pre id="evm-raw" class="raw"></pre>
+    </section>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/chrome.js"></script>
+  <script>
+    async function evm(method, params) {
+      const res = await fetch("http://127.0.0.1:9545", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: method, params: params || [] })
+      });
+      return res.json();
+    }
+    async function probe() {
+      const el = document.getElementById("rpc-state");
+      const box = document.getElementById("evm-raw");
+      try {
+        const version = await evm("web3_clientVersion");
+        const chain = await evm("eth_chainId");
+        const block = await evm("eth_blockNumber");
+        const send = await evm("eth_sendRawTransaction", ["0x00"]);
+        el.className = "ok";
+        el.textContent = "Bootstrap bridge answered";
+        box.textContent =
+          "web3_clientVersion: " + JSON.stringify(version.result || version.error) + "\n" +
+          "eth_chainId: " + JSON.stringify(chain.result || chain.error) + "\n" +
+          "eth_blockNumber: " + JSON.stringify(block.result || block.error) + "\n" +
+          "eth_sendRawTransaction: " + JSON.stringify(send.error || send.result);
+      } catch (e) {
+        el.className = "offline";
+        el.textContent = "RPC offline";
+        box.textContent = "RPC offline";
+      }
+    }
+    probe();
+  </script>
+</body>
+</html>

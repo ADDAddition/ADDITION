@@ -2,7 +2,10 @@
 
 #include "addition/block.hpp"
 #include "addition/crypto.hpp"
+#include "addition/rpc_access.hpp"
+#include "addition/wallet.hpp"
 #include "addition/wallet_keys.hpp"
+#include "addition/wallet_store.hpp"
 
 #include <exception>
 #include <algorithm>
@@ -11,6 +14,7 @@
 #include <chrono>
 #include <iomanip>
 #include <limits>
+#include <optional>
 #include <thread>
 
 namespace addition {
@@ -58,38 +62,38 @@ std::vector<std::string> split_route(const std::string& route) {
     return out;
 }
 
-bool is_remote_allowed_command(const std::string& cmd) {
-    return cmd == "getinfo" ||
-           cmd == "protocol_status" ||
-           cmd == "fee_info" ||
-           cmd == "monetary_info" ||
-           cmd == "crypto_selftest" ||
-           cmd == "node_pubkey" ||
-           cmd == "peers" ||
-           cmd == "tx_status" ||
-           cmd == "getbalance" ||
-           cmd == "getbalance_instant" ||
-           cmd == "staked" ||
-           cmd == "stake_claimable" ||
-           cmd == "token_balance" ||
-           cmd == "token_info" ||
-           cmd == "swap_quote" ||
-           cmd == "swap_pool_info" ||
-           cmd == "swap_quote_route" ||
-           cmd == "swap_best_route" ||
-           cmd == "nft_owner" ||
-           cmd == "privacy_status" ||
-           cmd == "bridge_balance" ||
-           cmd == "bridge_attestor" ||
-           cmd == "pouw_storage_deal_status" ||
-           cmd == "pouw_storage_worker_status" ||
-           cmd == "pouw_compute_job_status" ||
-           cmd == "pouw_compute_worker_status" ||
-           cmd == "pm_inbox" ||
-           cmd == "pm_status" ||
-           cmd == "pm_fetch" ||
-           cmd == "verify_message" ||
-           cmd == "ai_status";
+bool is_all_digits(const std::string& s) {
+    if (s.empty()) {
+        return false;
+    }
+    for (char c : s) {
+        if (c < '0' || c > '9') {
+            return false;
+        }
+    }
+    return true;
+}
+
+std::string format_block(const Block& b) {
+    std::ostringstream out;
+    out << "height=" << b.header.height
+        << " hash=" << hash_block_header(b.header)
+        << " previous_hash=" << b.header.previous_hash
+        << " timestamp=" << b.header.timestamp
+        << " nonce=" << b.header.nonce
+        << " difficulty_target=" << b.header.difficulty_target
+        << " merkle_root=" << b.header.merkle_root
+        << " tx_count=" << b.transactions.size();
+    if (!b.transactions.empty()) {
+        out << " tx_hashes=";
+        for (std::size_t i = 0; i < b.transactions.size(); ++i) {
+            if (i > 0) {
+                out << ',';
+            }
+            out << hash_transaction(b.transactions[i]);
+        }
+    }
+    return out.str();
 }
 
 std::string derive_address_from_pubkey(const std::string& pubkey_hex) {
@@ -132,7 +136,8 @@ RpcServer::RpcServer(Chain& chain,
                                          AIRoutingOptimizer& ai_optimizer,
                                          DecentralizedNode& node,
                                          bool allow_insecure_tx_commands,
-                                         bool strict_admin_mode)
+                                         bool strict_admin_mode,
+                                         std::string wallet_dir)
         : chain_(chain),
             mempool_(mempool),
             miner_(miner),
@@ -149,7 +154,8 @@ RpcServer::RpcServer(Chain& chain,
             ai_optimizer_(ai_optimizer),
             node_(node),
             allow_insecure_tx_commands_(allow_insecure_tx_commands),
-            strict_admin_mode_(strict_admin_mode) {}
+            strict_admin_mode_(strict_admin_mode),
+            wallets_(std::move(wallet_dir)) {}
 
 std::string RpcServer::handle_command(const std::string& line, bool trusted) {
     std::istringstream iss(line);
@@ -438,16 +444,155 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
     }
 
     if (cmd == "createwallet") {
+        std::string name;
+        iss >> name;
+        if (name.empty()) {
+            name = "default";
+        }
+        if (!wallets_.configured()) {
+            return "error: wallet store not configured";
+        }
         WalletKeys keys{};
         try {
             keys = generate_wallet_keys();
         } catch (const std::exception& e) {
             return std::string("error: wallet generation failed: ") + e.what();
         }
+        StoredWallet stored{};
+        std::string error;
+        if (!wallets_.create(name, keys, stored, error)) {
+            return "error: " + error;
+        }
         std::ostringstream out;
-        out << "address=" << keys.address << " pub=" << keys.public_key
-            << " algo=" << keys.algorithm
+        out << "address=" << stored.address
+            << " pub=" << stored.public_key
+            << " algo=" << stored.algorithm
+            << " name=" << stored.name
+            << " path=" << stored.path
             << " priv_printed=0";
+        return out.str();
+    }
+
+    if (cmd == "wallet_list") {
+        std::string error;
+        const auto listed = wallets_.list(error);
+        if (!error.empty() && listed.empty()) {
+            return "error: " + error;
+        }
+        std::ostringstream out;
+        out << "wallets=" << listed.size();
+        for (const auto& w : listed) {
+            out << " name=" << w.name << " address=" << w.address << " algo=" << w.algorithm;
+        }
+        return out.str();
+    }
+
+    if (cmd == "wallet_info") {
+        std::string name;
+        iss >> name;
+        if (name.empty()) {
+            return "error: usage wallet_info <name>";
+        }
+        StoredWallet stored{};
+        std::string error;
+        if (!wallets_.load(name, stored, error, false)) {
+            return "error: " + error;
+        }
+        std::ostringstream out;
+        out << "name=" << stored.name
+            << " address=" << stored.address
+            << " pub=" << stored.public_key
+            << " algo=" << stored.algorithm
+            << " path=" << stored.path
+            << " next_nonce=" << chain_.next_nonce(stored.address)
+            << " confirmed=" << chain_.balance_of(stored.address);
+        return out.str();
+    }
+
+    if (cmd == "wallet_balance") {
+        std::string name;
+        iss >> name;
+        if (name.empty()) {
+            return "error: usage wallet_balance <name>";
+        }
+        StoredWallet stored{};
+        std::string error;
+        if (!wallets_.load(name, stored, error, false)) {
+            return "error: " + error;
+        }
+        std::ostringstream out;
+        out << "name=" << stored.name
+            << " address=" << stored.address
+            << " confirmed=" << chain_.balance_of(stored.address);
+        return out.str();
+    }
+
+    if (cmd == "wallet_sign") {
+        std::string name;
+        std::string message_hex;
+        iss >> name >> message_hex;
+        if (name.empty() || message_hex.empty()) {
+            return "error: usage wallet_sign <name> <message_hex_utf8>";
+        }
+        StoredWallet stored{};
+        std::string error;
+        if (!wallets_.load(name, stored, error, true)) {
+            return "error: " + error;
+        }
+        std::vector<std::uint8_t> msg_bytes;
+        if (!hex_to_bytes(message_hex, msg_bytes, error)) {
+            return "error: invalid message_hex: " + error;
+        }
+        if (msg_bytes.empty() || msg_bytes.size() > 8192) {
+            return "error: message size invalid";
+        }
+        const std::string msg(reinterpret_cast<const char*>(msg_bytes.data()), msg_bytes.size());
+        try {
+            return sign_message_hybrid(stored.private_key, msg);
+        } catch (const std::exception& e) {
+            return std::string("error: signing failed: ") + e.what();
+        }
+    }
+
+    if (cmd == "wallet_send") {
+        std::string name;
+        std::string to;
+        std::uint64_t amount = 0;
+        std::uint64_t fee = 0;
+        iss >> name >> to >> amount >> fee;
+        if (name.empty() || to.empty() || amount == 0) {
+            return "error: usage wallet_send <name> <to_addr> <amount> [fee]";
+        }
+        StoredWallet stored{};
+        std::string error;
+        if (!wallets_.load(name, stored, error, true)) {
+            return "error: " + error;
+        }
+        const auto required_fee = std::max(recommended_min_fee(mempool_.size(), chain_.total_fees_last_block()),
+                                           ai_optimizer_.recommended_fee_floor());
+        if (fee == 0) {
+            fee = required_fee;
+        }
+        if (fee < required_fee) {
+            return "error: fee too low, required>=" + std::to_string(required_fee);
+        }
+
+        Wallet wallet(stored.address, stored.public_key, stored.private_key);
+        Transaction tx{};
+        if (!wallet.build_signed_send(chain_, to, amount, fee, tx, error)) {
+            return "error: " + error;
+        }
+        if (!node_.submit_transaction(tx, error)) {
+            return "error: " + error;
+        }
+        std::ostringstream out;
+        out << "ok:gossiped"
+            << " hash=" << hash_transaction(tx)
+            << " from=" << stored.address
+            << " to=" << to
+            << " amount=" << amount
+            << " fee=" << fee
+            << " nonce=" << tx.nonce;
         return out.str();
     }
 
@@ -797,6 +942,47 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         }
 
         return "status=unknown tx_hash=" + tx_hash;
+    }
+
+    if (cmd == "getblock") {
+        std::string id;
+        iss >> id;
+        if (id.empty()) {
+            return "error: usage getblock <height_or_hash>";
+        }
+        std::optional<Block> found;
+        if (is_all_digits(id)) {
+            try {
+                const auto height = static_cast<std::uint64_t>(std::stoull(id));
+                found = chain_.block_at(height);
+            } catch (const std::exception&) {
+                return "error: invalid block height";
+            }
+        } else {
+            found = chain_.block_by_hash(id);
+        }
+        if (!found.has_value()) {
+            return "error: block not found";
+        }
+        return format_block(*found);
+    }
+
+    if (cmd == "getblockhash") {
+        std::string id;
+        iss >> id;
+        if (id.empty() || !is_all_digits(id)) {
+            return "error: usage getblockhash <height>";
+        }
+        try {
+            const auto height = static_cast<std::uint64_t>(std::stoull(id));
+            const auto found = chain_.block_at(height);
+            if (!found.has_value()) {
+                return "error: block not found";
+            }
+            return hash_block_header(found->header);
+        } catch (const std::exception&) {
+            return "error: invalid block height";
+        }
     }
 
     if (cmd == "stake") {

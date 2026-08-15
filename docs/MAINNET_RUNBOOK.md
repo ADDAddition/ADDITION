@@ -56,14 +56,18 @@ Expected:
   - `getinfo`
 
 ## 6) Wallet and transaction sanity
-- Create wallet:
-  - `createwallet`
-- Mine one block to bootstrap address:
+- Create a named local wallet (ML-DSA-87, secret written to `data/wallets/<name>.wal`, not printed):
+  - `createwallet [name]`
+  - `wallet_info <name>` / `wallet_balance <name>` / `getbalance <address>`
+- Mine one block to that address (local RPC only; memory-hard):
   - `mine <address>`
-- Build/sign/send tx (secure flow):
+- Default send (no privkey on the wire):
+  - `wallet_send <name> <to> <amount> [fee]`
+- Explicit send (still no privkey if you use `wallet_sign`):
   - `tx_build <from> <pub> <to> <amount> <fee> <nonce>`
-  - `sign_message <priv> <sign_hash_hex_utf8>`
+  - `wallet_sign <name> <sign_hash_hex_utf8>`
   - `sendtx_signed_hash <from> <pub> <to> <amount> <fee> <nonce> <sig_hex_without_pq_prefix>`
+- GUI / page: `python3 web/addition_wallet_gui.py` or `/wallet/` (loopback only)
 - Track status:
   - `tx_status <tx_hash>`
 - Instant receive check:
@@ -80,12 +84,11 @@ Important:
 - In mainnet mode (`ADDITION_MAINNET_MODE=1`), daemon startup is blocked if `ADDITION_PRIVACY_MASTER_KEY` is missing or shorter than 32 chars.
 - Keep `ADDITION_PRIVACY_MASTER_KEY` stable across restarts, otherwise previously sealed private notes cannot be unsealed.
 
-## 8) Portal + metrics
-- Start portal backend:
-  - `python web/portal/addition_portal_backend.py`
-- Open portal:
-  - `web/portal/index.html`
-- Check `/api/health`, `/api/dashboard`
+## 8) Site + wallet (what exists)
+- Honest static site: `python3 web/serve.py` → `http://127.0.0.1:8080`
+- Local wallet page: `/wallet/` (loopback `/local-rpc` only)
+- Desktop/CLI helper: `python3 web/addition_wallet_gui.py` (`--cli` without a display)
+- `web/portal/` is not in this tree. Use `/status/` and `/explorer/` instead.
 
 ## 9) Mainnet go/no-go
 Go only if all true:

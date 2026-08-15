@@ -7,7 +7,19 @@
 
 This repository does **not** claim production status, public node counts, a token sale, CoinMarketCap listing, or a live chain. CI badges are omitted until a green pipeline exists.
 
-Contact: [labjay69@gmail.com](mailto:labjay69@gmail.com)
+Contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com)
+
+---
+
+## Research goals (design targets)
+
+These are aims of the testnet / research prototype, not proof of a live public network:
+
+1. **Quantum** — ML-DSA-87 (FIPS 204) signatures, `pq_mode=strict` when `getinfo` answers
+2. **Privacy** — native ZK path (`pq_mldsa87`); notes do not persist plaintext owner/amount
+3. **Speed** — local testnet RPC; publish only real `getinfo` fields from a running node
+4. **Cost of transaction** — spec `min_fee=1`; no invented USD fees or gas market
+5. **Compatibility** — in-process `bridge_*` commands and the EVM bootstrap (`web/evm/evm_rpc_bridge.py`). Bootstrap / not a full EVM, not live Uniswap, not “connected to every chain today”
 
 ---
 
@@ -93,6 +105,76 @@ printf 'getinfo\n' | nc 127.0.0.1 8545
 
 `getinfo` reports `network=testnet` and `network_name=addition-testnet`.
 
+### Local wallet (Bitcoin-like user model)
+
+Trusted RPC only (`127.0.0.1:8545`). `createwallet` generates ML-DSA-87 keys and writes them to `data/wallets/<name>.wal` (owner-only). The reply has `priv_printed=0`. This is keys / UTXOs / send / receive / fee — not BIP compatibility and not a Bitcoin fork.
+
+```bash
+printf 'createwallet alice\n' | nc 127.0.0.1 8545
+printf 'wallet_info alice\n' | nc 127.0.0.1 8545
+printf 'getbalance <address>\n' | nc 127.0.0.1 8545
+printf 'wallet_send alice <to> 10 1\n' | nc 127.0.0.1 8545
+```
+
+`wallet_send` signs on the node from the local file. The explicit path is `tx_build` + `wallet_sign` + `sendtx_signed` (still no raw privkey on the wire). Legacy `sendtx` needs `ADDITION_ALLOW_INSECURE_TX_COMMANDS=1`.
+
+Honest UI:
+
+* Page: `/wallet/` via `python3 web/serve.py` (loopback `/local-rpc` only)
+* Desktop: `python3 web/addition_wallet_gui.py` or `--cli getinfo`
+
+A fresh wallet balance is `0` until you `mine <address>` on local RPC (memory-hard; reward 50 on a fresh testnet) or receive a UTXO. Public RPC cannot create wallets or send.
+
+### Public read-only RPC
+
+Local RPC on `127.0.0.1:8545` stays trusted (mine, wallets, sends). To expose a **read-only** public bind:
+
+```bash
+./build/additiond --network testnet --public-rpc
+# equivalent: ADDITION_ENABLE_PUBLIC_RPC=1 ./build/additiond --network testnet
+```
+
+Default public bind is `0.0.0.0:38545`. Allowlist only:
+
+`getinfo`, `monetary_info`, `crypto_selftest`, `tx_status`, `peers`, `getblock`, `getblockhash`
+
+```bash
+printf 'getinfo\n' | nc 127.0.0.1 38545
+curl 'http://127.0.0.1:38545/rpc?cmd=getinfo'
+printf 'mine\n' | nc 127.0.0.1 38545   # error: command disabled on public RPC
+```
+
+LAN RPC (`18545`) still requires `ADDITION_ENABLE_LAN_RPC=1` and `ADDITION_LAN_RPC_TOKEN`. P2P stays off unless `ADDITION_ENABLE_P2P_RPC=1`. Do not open unauthenticated write RPC to the world.
+
+### Honest website (static Pages)
+
+`web/public/` is a complete static site (explorer, RPC how-to, mirrored docs, white paper, legal notice). Publish that folder as the Pages root (for example additionblockchain.com). GitHub: [ADDAddition/ADDITION](https://github.com/ADDAddition/ADDITION).
+
+```bash
+python3 web/serve.py
+```
+
+| Path | Content |
+|------|---------|
+| `/` | Research testnet home + live `getinfo` or **RPC offline** |
+| `/explorer/` | Block/tx lookup from the read RPC only |
+| `/status/` | getinfo, monetary_info, selftest, peers |
+| `/rpc/` | How to talk to the public allowlist |
+| `/docs/` | Architecture, commands, PoUW spec, getting started, runbook, ZK contract |
+| `/wallet/` | Local createwallet / UTXO send via `/local-rpc` (loopback) |
+| `/contracts/` `/swap/` `/evm/` | Only methods verified on a local node; EVM is bootstrap |
+| `/whitepaper/` `/legal/` | Honest research copy. No fake ticker or mainnet live |
+
+Explorer/status call `/api/rpc`. On a static host without a backend they fail closed. Optional `?rpc=http://HOST:38545/rpc`.
+
+`/wallet`, `/contracts`, and `/swap` use loopback `/local-rpc` → `127.0.0.1:8545`. They print the node’s real reply (`error: pool not found` if you have no pool).
+
+```bash
+python3 web/evm/evm_rpc_bridge.py
+```
+
+Contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com).
+
 Help:
 
 ```bash
@@ -107,13 +189,14 @@ Private keys are not printed and must not be committed. `data/node_identity.dat`
 
 ## Ports (testnet defaults)
 
-| Service   | Bind              | Port  |
-|-----------|-------------------|-------|
-| Local RPC | `127.0.0.1`       | 8545  |
-| LAN RPC   | disabled by default | 18545 |
-| P2P       | disabled by default | 28545 |
+| Service        | Bind                | Port  |
+|----------------|---------------------|-------|
+| Local RPC      | `127.0.0.1`         | 8545  |
+| Public read RPC | `0.0.0.0` (opt-in) | 38545 |
+| LAN RPC        | disabled by default | 18545 |
+| P2P            | disabled by default | 28545 |
 
-LAN/P2P stay off unless you set `ADDITION_ENABLE_LAN_RPC=1` / `ADDITION_ENABLE_P2P_RPC=1`.
+Public read RPC stays off unless `--public-rpc` or `ADDITION_ENABLE_PUBLIC_RPC=1`. LAN/P2P stay off unless `ADDITION_ENABLE_LAN_RPC=1` / `ADDITION_ENABLE_P2P_RPC=1`.
 
 ---
 

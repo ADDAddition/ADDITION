@@ -1,0 +1,11 @@
+name = "addition-testnet-site"
+main = "worker.js"
+compatibility_date = "2026-03-03"
+
+[assets]
+directory = "."
+binding = "ASSETS"
+
+[vars]
+# Leave empty so the worker fail-closes with "RPC offline" unless an operator sets a real public read HTTP URL.
+PUBLIC_RPC_HTTP = ""
