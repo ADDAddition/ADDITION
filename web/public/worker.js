@@ -10,6 +10,7 @@ const PAGE_ROUTES = {
   "/docs/commands": "/docs/commands/index.html",
   "/docs/pouw": "/docs/pouw/index.html",
   "/docs/runbook": "/docs/runbook/index.html",
+  "/docs/two-node": "/docs/two-node/index.html",
   "/docs/zk": "/docs/zk/index.html",
   "/contracts": "/contracts/index.html",
   "/swap": "/swap/index.html",

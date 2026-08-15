@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION two-node local testnet</title>
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body data-title="Two-node testnet" data-sub="Mirrored from the public repository. Research testnet, not a live mainnet.">
+  <header id="site-header"></header>
+  <main class="prose">
+    <div class="banner">Two honest local processes. Not a public mainnet. No invented peers or hashrate.</div>
+    <h2>Two-node local testnet runbook</h2>
+<p>This starts <strong>two honest <code>additiond</code> processes</strong> on one machine. It is not a public</p>
+<p>mainnet, not a token sale, and it does not invent peer counts or hashrate.</p>
+<p>Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
+<h2>Ports</h2>
+<table><tr><th>Node</th><th>Write RPC (loopback only)</th><th>P2P</th><th>Public read RPC</th></tr><tr><td>A</td><td><code>127.0.0.1:8545</code></td><td><code>28545</code></td><td><code>38545</code> (opt-in <code>--public-rpc</code>)</td></tr><tr><td>B</td><td><code>127.0.0.1:8546</code></td><td><code>28546</code></td><td>off</td></tr></table>
+<p>Write RPC is always bound to <code>127.0.0.1</code>. Never publish it to <code>0.0.0.0</code>.</p>
+<p>Public read RPC default bind is <code>0.0.0.0:38545</code>. For a local tunnel use</p>
+<p><code>--public-rpc-bind 127.0.0.1</code>. The helper script defaults to <code>127.0.0.1</code>; set</p>
+<p><code>ADDITION_PUBLIC_RPC_BIND=0.0.0.0</code> when you intentionally expose the read port.</p>
+<h2>Start (scripts)</h2>
+<p>Build first:</p>
+<pre>cmake -S . -B build
+cmake --build build --target additiond</pre>
+<p>Then:</p>
+<pre>chmod +x scripts/start_two_node_testnet.sh scripts/stop_two_node_testnet.sh
+./scripts/start_two_node_testnet.sh</pre>
+<p>Equivalent manual commands:</p>
+<pre>export ADDITION_ENABLE_P2P_RPC=1
+
+./build/additiond --network testnet --public-rpc \
+  --data-dir data/two-node/node-a \
+  --local-rpc-port 8545 --p2p-port 28545 \
+  --public-rpc-port 38545 --public-rpc-bind 127.0.0.1
+
+# second terminal
+./build/additiond --network testnet \
+  --data-dir data/two-node/node-b \
+  --local-rpc-port 8546 --p2p-port 28546 \
+  --bootstrap 127.0.0.1:28545</pre>
+<p>Node B also accepts <code>addpeer</code> on the trusted write port:</p>
+<pre>printf &#x27;addpeer 127.0.0.1:28545\n&#x27; | nc 127.0.0.1 8546
+printf &#x27;peers\n&#x27; | nc 127.0.0.1 8546
+printf &#x27;sync\n&#x27; | nc 127.0.0.1 8546</pre>
+<h2>Start (compose)</h2>
+<p>Linux host network (P2P endpoints are IPv4 literals; hostnames are not resolved):</p>
+<pre>docker compose -f deploy/testnet-two-node/docker-compose.yml up --build</pre>
+<p>Write ports stay on loopback via the daemon bind. Public read RPC is on node A only.</p>
+<h2>Public read checks (node A)</h2>
+<pre>printf &#x27;getinfo\n&#x27; | nc 127.0.0.1 38545
+curl -s &#x27;http://127.0.0.1:38545/rpc?cmd=getinfo&#x27;
+printf &#x27;mine\n&#x27; | nc 127.0.0.1 38545
+printf &#x27;createwallet\n&#x27; | nc 127.0.0.1 38545</pre>
+<p>Writes (<code>mine</code>, <code>sendtx*</code>, <code>createwallet</code>, <code>wallet_*</code>, identity rotation) return</p>
+<p>exactly:</p>
+<pre>error: command disabled on public RPC</pre>
+<p>HTTP responses include <code>Access-Control-Allow-Origin: *</code>, <code>OPTIONS</code> → <code>204</code>, and</p>
+<p><code>Cache-Control: no-store</code> so a static site can call the port without caching.</p>
+<h2>Point the website at a real public RPC</h2>
+<p><code>web/public/wrangler.toml</code> ships with:</p>
+<pre>PUBLIC_RPC_HTTP = &quot;&quot;</pre>
+<p>Leave it empty. The worker and static pages fail closed with <strong>RPC offline</strong>.</p>
+<p>They do not invent blocks, peers, or hashrate.</p>
+<p>When an operator has a <strong>real</strong> public-rpc HTTP URL (this machine, a VPS, or a</p>
+<p>tunnel the operator created), set the worker variable to that URL:</p>
+<pre>PUBLIC_RPC_HTTP = &quot;http://127.0.0.1:38545/rpc&quot;</pre>
+<p>or, for a durable hostname the operator controls:</p>
+<pre>npx wrangler secret put PUBLIC_RPC_HTTP
+# paste the real http(s) URL ending in /rpc</pre>
+<p>Do <strong>not</strong> commit trycloudflare or other ephemeral tunnel URLs.</p>
+<p>Local site proxy (<code>python3 web/serve.py</code>) talks to <code>127.0.0.1:38545</code> when the</p>
+<p>public port is up. If the daemon is down, pages show <strong>RPC offline</strong>.</p>
+<h2>Honest P2P limits</h2>
+<ul><li>P2P transport is off unless <code>ADDITION_ENABLE_P2P_RPC=1</code>.</li><li>Endpoints are IPv4 <code>ip:port</code> only (<code>inet_pton</code>). Docker DNS names do not work.</li><li><code>bootstrap_peers</code> / <code>--bootstrap</code> skip this process’s own P2P port.</li><li><code>addpeer</code> is a trusted-write command. Public RPC can only <code>peers</code>.</li><li><code>sync</code> on two fresh nodes at height 0 has nothing to fetch. That is not a</li></ul>
+<p>  live network and not a peer-count claim.</p>
+<ul><li>DEX / ZK-Shield commands stay off the public allowlist. Do not advertise</li></ul>
+<p>  them unless they succeed on the trusted local port of a running node.</p>
+<h2>Config keys</h2>
+<p>Same meaning as CLI / env:</p>
+<ul><li><code>enable_public_rpc</code></li><li><code>ports.public_rpc</code> / <code>ports.public_rpc_bind</code></li><li><code>ports.local_rpc</code> / <code>ports.p2p</code></li><li><code>bootstrap_peers</code></li></ul>
+<p>Env: <code>ADDITION_ENABLE_PUBLIC_RPC=1</code>, <code>ADDITION_PUBLIC_RPC_PORT</code>,</p>
+<p><code>ADDITION_PUBLIC_RPC_BIND</code>, <code>ADDITION_LOCAL_RPC_PORT</code>, <code>ADDITION_P2P_PORT</code>.</p>
+    <p class="note">Source file in the repository: <a href="https://github.com/ADDAddition/ADDITION/blob/main/docs/TWO_NODE_TESTNET.md">docs/TWO_NODE_TESTNET.md</a></p>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/chrome.js"></script>
+</body>
+</html>

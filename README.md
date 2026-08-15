@@ -157,6 +157,8 @@ printf 'mine\n' | nc 127.0.0.1 38545   # error: command disabled on public RPC
 
 LAN RPC (`18545`) still requires `ADDITION_ENABLE_LAN_RPC=1` and `ADDITION_LAN_RPC_TOKEN`. P2P stays off unless `ADDITION_ENABLE_P2P_RPC=1`. Do not open unauthenticated write RPC to the world.
 
+Config keys: `enable_public_rpc`, `ports.public_rpc`, `ports.public_rpc_bind`. Second local node: `--local-rpc-port 8546 --p2p-port 28546 --bootstrap 127.0.0.1:28545`. See [docs/TWO_NODE_TESTNET.md](docs/TWO_NODE_TESTNET.md).
+
 ### Honest website (static Pages)
 
 `web/public/` is a complete static site (explorer, RPC how-to, mirrored docs, white paper, legal notice). Publish that folder as the Pages root (for example additionblockchain.com). GitHub: [ADDAddition/ADDITION](https://github.com/ADDAddition/ADDITION).
@@ -177,6 +179,8 @@ python3 web/serve.py
 | `/whitepaper/` `/legal/` | Honest research copy. No fake ticker or mainnet live |
 
 Explorer/status call `/api/rpc`. On a static host without a backend they fail closed. Optional `?rpc=http://HOST:38545/rpc`.
+
+The Pages worker (`web/public/wrangler.toml`) ships `PUBLIC_RPC_HTTP = ""`. Leave it empty so the site fail-closes with **RPC offline**. An operator who runs `--public-rpc` sets `PUBLIC_RPC_HTTP` to that process’s real HTTP URL (for example `http://127.0.0.1:38545/rpc`). Do not commit trycloudflare or other ephemeral URLs.
 
 `/wallet`, `/contracts`, and `/swap` use loopback `/local-rpc` → `127.0.0.1:8545`. They print the node’s real reply (`error: pool not found` if you have no pool).
 
@@ -209,6 +213,8 @@ Private keys are not printed and must not be committed. `data/node_identity.dat`
 
 Public read RPC stays off unless `--public-rpc` or `ADDITION_ENABLE_PUBLIC_RPC=1`. LAN/P2P stay off unless `ADDITION_ENABLE_LAN_RPC=1` / `ADDITION_ENABLE_P2P_RPC=1`.
 
+Two local processes: `./scripts/start_two_node_testnet.sh` (A: write `8545` / public `38545` / P2P `28545`; B: write `8546` / P2P `28546`). Details in [docs/TWO_NODE_TESTNET.md](docs/TWO_NODE_TESTNET.md).
+
 ---
 
 ## Documentation
@@ -217,6 +223,7 @@ Public read RPC stays off unless `--public-rpc` or `ADDITION_ENABLE_PUBLIC_RPC=1
 * [Command reference](docs/FINAL_COMMANDS.md)
 * [Local testnet wallet](docs/WALLET.md)
 * [PoUW phase 1 spec](docs/POUW_PHASE1_SPEC.md)
+* [Two-node local testnet](docs/TWO_NODE_TESTNET.md)
 
 Older docs may still say “mainnet”. Treat those as historical. This tree is a research testnet.
 

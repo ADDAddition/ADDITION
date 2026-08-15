@@ -35,7 +35,19 @@ printf 'getinfo\n' | nc 127.0.0.1 38545
 curl 'http://127.0.0.1:38545/rpc?cmd=getinfo'
 ```
 
-Override bind/port with `--public-rpc-bind`, `--public-rpc-port`, `ADDITION_PUBLIC_RPC_BIND`, or `ADDITION_PUBLIC_RPC_PORT`.
+Override bind/port with `--public-rpc-bind`, `--public-rpc-port`, `ADDITION_PUBLIC_RPC_BIND`, or `ADDITION_PUBLIC_RPC_PORT`. HTTP replies send `Access-Control-Allow-Origin: *`, `OPTIONS` 204, and `Cache-Control: no-store`.
+
+Two-node local testnet (write RPC stays loopback):
+
+```bash
+./scripts/start_two_node_testnet.sh
+```
+
+Node A: `--public-rpc` on `38545`, P2P `28545`, write `127.0.0.1:8545`.
+Node B: `--data-dir` second tree, write `8546`, P2P `28546`, `--bootstrap 127.0.0.1:28545`.
+See [TWO_NODE_TESTNET.md](TWO_NODE_TESTNET.md).
+
+Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so the worker fail-closes with `RPC offline`. Set it only to a real public-rpc HTTP URL you operate. Do not commit trycloudflare URLs.
 
 ## Core chain
 - `getinfo`
