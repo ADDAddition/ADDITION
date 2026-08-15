@@ -1,0 +1,136 @@
+# ADDITION tokens (research testnet)
+
+Contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com)
+
+This document describes the **token commands that already exist** on a local
+`additiond` TEXT RPC (`127.0.0.1:8545`). It is not a token sale, not a live
+mainnet, not an ERC-20 / Uniswap / public DEX, and not ZK-Shield.
+
+## What works today
+
+The daemon keeps an in-process `TokenEngine` (`src/token_engine.cpp`) and
+exposes it as one-line TEXT commands (`src/rpc_server.cpp`). Verified local
+commands:
+
+| Command | Role | Notes |
+|---|---|---|
+| `token_create <symbol> <owner> <max_supply> <initial_mint>` | write | returns `ok` |
+| `token_create_ex <symbol> <name> <owner> <max_supply> <initial_mint> <decimals> <burnable_0_1> <dev_wallet_or_dash> <dev_allocation>` | write | name has no spaces |
+| `token_mint <symbol> <caller> <to> <amount>` | write | caller must be the token owner |
+| `token_transfer <symbol> <from> <to> <amount>` | write | unsigned; see honesty notes |
+| `token_balance <symbol> <owner>` | read | decimal string, `0` if missing |
+| `token_info <symbol>` | read | `key=value` fields |
+| `token_burn <symbol> <from> <amount>` | write | only if the token was created burnable |
+| `nft_mint <collection> <token_id> <owner> <metadata>` | write | in-process NFT record |
+| `nft_transfer <collection> <token_id> <from> <to>` | write | owner check only |
+| `nft_owner <collection> <token_id>` | read | address or `error: nft not found` |
+
+State is persisted to `data/tokens.dat` when the daemon shuts down (`quit`)
+and reloaded on the next start.
+
+These commands are **not** signed chain transactions. Anyone who can talk to
+the trusted local TEXT RPC can create, mint, or transfer by naming addresses.
+There is no private key on the wire, and no PQ signature check on
+`token_transfer`. Treat this as a local research ledger, not production token
+security.
+
+LAN / untrusted RPC (when enabled) already filters writes: `token_balance`,
+`token_info`, and `nft_owner` are on the remote allowlist; `token_create` /
+`token_mint` / `token_transfer` are not.
+
+## What this is not
+
+- Not a live mainnet and not a public token contract.
+- Not a DEX, Uniswap fork, or public AMM. `swap_*` commands exist on the
+  daemon as **in-process pool math** on the same `TokenEngine`. This slice
+  does not ship a swap UI, liquidity product, or public peer list for trading.
+- Not Ethereum JSON-RPC and not MetaMask.
+- Not ZK-Shield / private balances. Privacy commands are a separate, stricter
+  path and are out of scope here.
+
+## Local CLI
+
+Requires a running testnet daemon:
+
+```bash
+./build/additiond --network testnet
+```
+
+In another terminal, from the repository root (so `tools/` is on `sys.path`
+when you invoke the script as a file under `tools/`):
+
+```bash
+python3 tools/addition_tokens.py getinfo
+python3 tools/addition_tokens.py create DEMO alice 1000000 1000
+python3 tools/addition_tokens.py mint DEMO alice bob 50
+python3 tools/addition_tokens.py transfer DEMO alice bob 10
+python3 tools/addition_tokens.py balance DEMO alice
+python3 tools/addition_tokens.py balance DEMO bob
+python3 tools/addition_tokens.py info DEMO
+```
+
+`alice` / `bob` are opaque owner strings. They do not have to be mined
+addresses. That is how the current engine works.
+
+Optional NFT path:
+
+```bash
+python3 tools/addition_tokens.py nft-mint COL item1 alice demo-meta
+python3 tools/addition_tokens.py nft-transfer COL item1 alice bob
+python3 tools/addition_tokens.py nft-owner COL item1
+```
+
+Burn only works for tokens created with `create-ex` and `burnable=1`.
+
+If `ADDITION_RPC_TOKEN` is set on the daemon, pass the same value with
+`--rpc-token` or the environment variable. The CLI refuses non-loopback
+`--rpc-host` values. No public bootstrap IPs are documented here.
+
+## Local/testnet JSON-RPC adapter (optional)
+
+`tools/addition_jsonrpc_adapter.py` is a **loopback HTTP wrapper** around the
+same TEXT RPC. It is labeled a local/testnet adapter on purpose.
+
+- Bind: `127.0.0.1:8645` by default (`POST /rpc`)
+- Upstream: `127.0.0.1:8545` TEXT RPC
+- Method names are the **exact** TEXT commands (`getinfo`, `token_balance`, …)
+- `params` is a JSON array of strings/integers, joined as TEXT tokens
+- `result` is the raw TEXT response line
+- `eth_*` / `web3_*` / spend commands (`sendtx*`, `sign_message`, `tx_build`)
+  are refused
+- `swap_*` is not forwarded (in-process pool math is not published as a DEX)
+- Non-loopback bind is refused
+
+```bash
+python3 tools/addition_jsonrpc_adapter.py --bind 127.0.0.1 --port 8645
+```
+
+```bash
+curl -sS http://127.0.0.1:8645/rpc \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"getinfo","params":[]}'
+
+curl -sS http://127.0.0.1:8645/rpc \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":2,"method":"token_balance","params":["DEMO","alice"]}'
+```
+
+`--read-only` disables token/NFT writes on the adapter. Writes still require
+the trusted local TEXT RPC behind it.
+
+## Peers
+
+Do not publish public bootstrap IPs. `config.toml` lists localhost examples
+only (`127.0.0.1:28545`) until a second real node is actually run and a peer
+connection is proven. This slice does not add peers.
+
+## Client for strangers
+
+| Goal | Tool |
+|---|---|
+| Create / mint / transfer / balance | `python3 tools/addition_tokens.py …` |
+| Optional JSON wrapper | `python3 tools/addition_jsonrpc_adapter.py` |
+| Native ADD spend (keys on disk) | local wallet CLI from the separate wallet PR, when merged |
+
+If a listed TEXT command returns `error: unknown command` on your build, the
+daemon binary is older than `src/rpc_server.cpp` — rebuild `additiond`.
