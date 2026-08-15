@@ -77,9 +77,17 @@ cmake -S . -B build \
 
 ```bash
 cmake -S . -B build -DADDITION_BUILD_TESTS=ON
-cmake --build build --target test_chain
+cmake --build build
 ctest --test-dir build --output-on-failure
 ```
+
+Live research-goal proof against a real local `additiond` (honest; does not invent TPS or a ZK circuit):
+
+```bash
+python3 scripts/prove_research_goals.py
+```
+
+See [docs/RESEARCH_TESTNET_PROOF.md](docs/RESEARCH_TESTNET_PROOF.md).
 
 ---
 
@@ -224,6 +232,7 @@ Two local processes: `./scripts/start_two_node_testnet.sh` (A: write `8545` / pu
 * [Local testnet wallet](docs/WALLET.md)
 * [PoUW phase 1 spec](docs/POUW_PHASE1_SPEC.md)
 * [Two-node local testnet](docs/TWO_NODE_TESTNET.md)
+* [Research testnet proof (honest)](docs/RESEARCH_TESTNET_PROOF.md)
 
 Older docs may still say “mainnet”. Treat those as historical. This tree is a research testnet.
 

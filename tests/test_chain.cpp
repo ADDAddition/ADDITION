@@ -123,6 +123,53 @@ int main() {
         return 1;
     }
 
+    {
+        if (easy.min_fee != 1) {
+            std::cerr << "test failed: testnet min_fee must be 1, got " << easy.min_fee << '\n';
+            return 1;
+        }
+        addition::Transaction zero_fee{};
+        if (!chain.build_transaction(miner_keys.address, "carol", 1, 0, 2, zero_fee, error)) {
+            std::cerr << "test failed: build zero-fee tx: " << error << '\n';
+            return 1;
+        }
+        zero_fee.signer = miner_keys.address;
+        zero_fee.signer_pubkey = miner_keys.public_key;
+        {
+            addition::Transaction unsigned_zero = zero_fee;
+            unsigned_zero.signature.clear();
+            const auto msg = addition::hash_transaction(unsigned_zero);
+            zero_fee.signature = addition::sign_message_hybrid(miner_keys.private_key, msg);
+        }
+        std::string fee_error;
+        if (chain.validate_transaction(zero_fee, fee_error)) {
+            std::cerr << "test failed: fee=0 must be rejected by min_fee=1\n";
+            return 1;
+        }
+        if (fee_error.find("fee below network minimum") == std::string::npos) {
+            std::cerr << "test failed: unexpected fee=0 error: " << fee_error << '\n';
+            return 1;
+        }
+
+        addition::Transaction ok_fee{};
+        if (!chain.build_transaction(miner_keys.address, "carol", 1, 1, 2, ok_fee, error)) {
+            std::cerr << "test failed: build fee=1 tx: " << error << '\n';
+            return 1;
+        }
+        ok_fee.signer = miner_keys.address;
+        ok_fee.signer_pubkey = miner_keys.public_key;
+        {
+            addition::Transaction unsigned_ok = ok_fee;
+            unsigned_ok.signature.clear();
+            const auto msg = addition::hash_transaction(unsigned_ok);
+            ok_fee.signature = addition::sign_message_hybrid(miner_keys.private_key, msg);
+        }
+        if (!chain.validate_transaction(ok_fee, error)) {
+            std::cerr << "test failed: fee=1 must be accepted: " << error << '\n';
+            return 1;
+        }
+    }
+
     std::cout << "all tests passed\n";
     return 0;
 }

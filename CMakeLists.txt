@@ -71,6 +71,10 @@ if(ADDITION_BUILD_TESTS)
     target_link_libraries(test_wallet PRIVATE addition_core)
     add_test(NAME test_wallet COMMAND test_wallet)
 
+    add_executable(test_privacy tests/test_privacy.cpp)
+    target_link_libraries(test_privacy PRIVATE addition_core)
+    add_test(NAME test_privacy COMMAND test_privacy)
+
     find_package(Python3 COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
         add_test(
@@ -79,6 +83,16 @@ if(ADDITION_BUILD_TESTS)
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         )
         set_tests_properties(test_public_rpc_two_node PROPERTIES
-            ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>")
+            ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
+            TIMEOUT 120)
+
+        add_test(
+            NAME test_research_goals
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_research_goals.py
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        )
+        set_tests_properties(test_research_goals PROPERTIES
+            ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
+            TIMEOUT 300)
     endif()
 endif()

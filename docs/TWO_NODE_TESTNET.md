@@ -118,6 +118,15 @@ Do **not** commit trycloudflare or other ephemeral tunnel URLs.
 Local site proxy (`python3 web/serve.py`) talks to `127.0.0.1:38545` when the
 public port is up. If the daemon is down, pages show **RPC offline**.
 
+## Research-goal harness
+
+`scripts/prove_research_goals.py` starts two local `additiond` processes (or
+reuses the same localhost-only pattern as this runbook), talks to a real RPC
+socket, and writes [RESEARCH_TESTNET_PROOF.md](RESEARCH_TESTNET_PROOF.md).
+It records the exact `privacy_mint_zk` / `privacy_spend_zk` replies. Those
+commands verify an ML-DSA-87 signature of a public string when they succeed;
+they are not a range-proof circuit. `last_tps` is copied from `getinfo` only.
+
 ## Honest P2P limits
 
 - P2P transport is off unless `ADDITION_ENABLE_P2P_RPC=1`.
