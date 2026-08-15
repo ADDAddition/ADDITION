@@ -195,7 +195,7 @@ int main(int argc, char** argv) {
     if (!store.load_all(chain, mempool, staking, contracts, tokens, bridge, peers, node, pouw_storage, pouw_compute, private_messaging, privacy, load_error)) {
         std::cout << "warning: state load failed: " << load_error << '\n';
     } else {
-        std::cout << "state loaded from ./data\n";
+        std::cout << "state loaded from " << node_cfg.data_dir << '\n';
     }
 
     addition::RpcNetworkServer p2p_rpc("0.0.0.0", node_cfg.p2p_port, [&](const std::string& cmd) {
@@ -463,7 +463,7 @@ int main(int argc, char** argv) {
     if (!store.save_all(chain, mempool, staking, contracts, tokens, bridge, peers, node, pouw_storage, pouw_compute, private_messaging, privacy, save_error)) {
         std::cout << "warning: state save failed: " << save_error << '\n';
     } else {
-        std::cout << "state saved to ./data\n";
+        std::cout << "state saved to " << node_cfg.data_dir << '\n';
     }
 
     return 0;

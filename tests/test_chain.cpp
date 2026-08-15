@@ -15,12 +15,20 @@ int main() {
         return 1;
     }
 
-    addition::Chain chain;
-    if (chain.config().network_mode != "testnet" ||
-        chain.config().network_name != "addition-testnet") {
-        std::cerr << "test failed: chain default network must be testnet\n";
-        return 1;
+    {
+        addition::Chain default_chain;
+        if (default_chain.config().network_mode != "testnet" ||
+            default_chain.config().network_name != "addition-testnet") {
+            std::cerr << "test failed: chain default network must be testnet\n";
+            return 1;
+        }
     }
+
+    addition::ChainConfig easy = addition::testnet_chain_config();
+    easy.initial_difficulty_target = 0xFFFFFFFFFFFFFFFFULL;
+    easy.min_difficulty_target = 0xFFFFFFFFFFFFFFFFULL;
+    easy.max_difficulty_target = 0xFFFFFFFFFFFFFFFFULL;
+    addition::Chain chain(easy);
 
     {
         addition::NodeConfig ncfg;
