@@ -1,5 +1,6 @@
 #include "addition/privacy.hpp"
 
+#include "addition/config.hpp"
 #include "addition/crypto.hpp"
 
 #include <algorithm>
@@ -11,13 +12,6 @@ namespace addition {
 namespace {
 
 bool is_hex_even(const std::string& s);
-
-bool is_mainnet_mode_enabled() {
-    if (const char* v = std::getenv("ADDITION_MAINNET_MODE")) {
-        return std::string(v) == "1";
-    }
-    return false;
-}
 
 std::string mk_note_id(const std::string& owner,
                        std::uint64_t amount,
@@ -458,7 +452,7 @@ bool PrivacyPool::load_state(const std::string& state, std::string& error) {
         }
     }
 
-    if (is_mainnet_mode_enabled()) {
+    if (is_mainnet_runtime()) {
         strict_zk_mode_ = true;
     }
 

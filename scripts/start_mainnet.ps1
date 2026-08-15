@@ -60,5 +60,10 @@ if (-not $env:ADDITION_ALLOW_INSECURE_TX_COMMANDS) {
     Write-Host "[mainnet] ADDITION_ALLOW_INSECURE_TX_COMMANDS defaulted to 0"
 }
 
-Write-Host "[mainnet] starting daemon..."
-& $exe
+Write-Host "[testnet] starting research daemon (not a live mainnet)..."
+if ($env:ADDITION_MAINNET_MODE -eq "1") {
+    Write-Host "[warn] ADDITION_MAINNET_MODE=1 is set; using --network mainnet profile (still not a live public network)"
+    & $exe --network mainnet --config config.toml
+} else {
+    & $exe --network testnet --config config.toml
+}

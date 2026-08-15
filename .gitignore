@@ -1,5 +1,6 @@
 # Build artifacts
 build/
+build/**
 cmake-build-*/
 *.obj
 *.o
@@ -11,10 +12,13 @@ cmake-build-*/
 *.ilk
 *.exp
 ninja*
+compile_commands.json
 
-# Runtime data (CRITICAL: Do not commit chain state)
+# Runtime data (CRITICAL: Do not commit chain state or identity)
 /data/
 data_backup_*/
+**/node_identity.dat
+**/*wallet*.dat
 *.dat
 *.log
 *.tmp
@@ -44,6 +48,8 @@ node_modules/
 dist/
 coverage/
 .wrangler/
+**/.wrangler/
+deploy/cloudflare/.wrangler/
 
 # OS specific
 Thumbs.db
@@ -57,3 +63,6 @@ desktop.ini
 !package.json
 !tsconfig.json
 !wrangler.toml
+!genesis.json
+!**/manifest.json
+!**/Contents.json

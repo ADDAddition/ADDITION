@@ -1,0 +1,13 @@
+{
+  "network_name": "addition-testnet",
+  "network_id": "ADDITION_TESTNET_V1",
+  "network_mode": "testnet",
+  "comment": "Research testnet genesis. Not a live mainnet. No claimed node counts.",
+  "genesis_timestamp": 1763000000,
+  "max_supply": 50000000,
+  "block_reward": 50,
+  "tail_emission_reward": 1,
+  "target_block_time_sec": 60,
+  "halving_interval": 210000,
+  "min_fee": 1
+}

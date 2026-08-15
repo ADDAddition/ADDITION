@@ -40,5 +40,5 @@ RUN set -eux; \
 
 EXPOSE 8545 18545 28545 8080
 
-# Lancement du Daemon
-CMD ["./build/additiond"]
+# Research testnet daemon. This is not a live mainnet.
+CMD ["./build/additiond", "--network", "testnet", "--config", "config.toml"]

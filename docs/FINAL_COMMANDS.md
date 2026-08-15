@@ -43,8 +43,9 @@ Each TCP request is one command line and returns one response line.
 - Block payload binary codec now uses version marker `BLB2` with checksum trailer.
 - Decoder remains backward-compatible with `TXB1` / `BLB1` payloads for rolling upgrades.
 - Strict handshake required before peer message processing:
-	- request: `HELLO|2|ADDITION_MAINNET_V1|<unix_ts>|<nonce>|<peer_pubkey>|<peer_signature>`
-	- response: `HELLO_ACK|2|ADDITION_MAINNET_V1|<unix_ts>|<echo_nonce>|<responder_pubkey>|<responder_signature>`
+	- request: `HELLO|2|<network_id>|<unix_ts>|<nonce>|<peer_pubkey>|<peer_signature>`
+	- response: `HELLO_ACK|2|<network_id>|<unix_ts>|<echo_nonce>|<responder_pubkey>|<responder_signature>`
+	- testnet `network_id` is `ADDITION_TESTNET_V1` (default). There is no live public mainnet.
 	- inbound timestamp skew window: ±90s
 	- nonce replay is rejected per peer (rolling anti-replay set)
 	- signatures are validated with PQ verification (`ml-dsa-87`) over the signed handshake body

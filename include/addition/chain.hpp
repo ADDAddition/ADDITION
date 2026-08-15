@@ -16,6 +16,8 @@ class Chain {
 public:
     explicit Chain(ChainConfig cfg = default_config());
 
+    const ChainConfig& config() const { return cfg_; }
+
     void reset();
 
     const Block& genesis_block() const;

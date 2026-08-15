@@ -1,4 +1,7 @@
-# Addition (ADD) Mainnet Runbook
+# Addition (ADD) experimental profile runbook
+
+> This repository ships an honest **testnet**. There is no live public mainnet.
+> Default launch is `additiond --network testnet`. Do not set `ADDITION_MAINNET_MODE=1` unless you are explicitly testing the mainnet *profile*.
 
 ## 1) Pre-flight checklist
 - Build must succeed:

@@ -44,7 +44,7 @@ $mine = Invoke-RpcLine ("mine " + $address)
 $balance = Invoke-RpcLine ("getbalance " + $address)
 $info = Invoke-RpcLine 'getinfo'
 
-Write-Host ("wallet=" + $wallet)
+Write-Host ("wallet_address=" + $address)
 Write-Host ("mine=" + $mine)
 Write-Host ("balance=" + $balance)
 Write-Host ("info=" + $info)

@@ -2,26 +2,15 @@ version: '3.8'
 
 services:
   additiond:
-    image: ghcr.io/labrechejeremy/addition_final/additiond:latest
+    build:
+      context: ../../
+      dockerfile: deploy/github-docker/Dockerfile
     container_name: additiond
+    command: ["--network", "testnet", "--config", "config.toml"]
     ports:
       - "8545:8545"
       - "18545:18545"
       - "28545:28545"
     volumes:
       - ./data:/app/data
-    restart: unless-stopped
-
-  portal-backend:
-    build:
-      context: ../../
-      dockerfile: deploy/github-docker/Dockerfile.backend
-    container_name: portal-backend
-    ports:
-      - "8080:8080"
-    environment:
-      - ADDITION_RPC_HOST=additiond
-      - ADDITION_RPC_PORT=18545
-    depends_on:
-      - additiond
     restart: unless-stopped

@@ -2,11 +2,19 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace addition {
 
+enum class NetworkMode {
+    Testnet,
+    Mainnet,
+};
+
 struct ChainConfig {
-    std::string network_name{"mainnet"};
+    std::string network_mode{"testnet"};
+    std::string network_name{"addition-testnet"};
+    std::string network_id{"ADDITION_TESTNET_V1"};
     std::uint64_t genesis_timestamp{1'763'000'000ULL};
     std::uint64_t max_supply{50'000'000ULL};
     std::uint64_t block_reward{50ULL};
@@ -22,10 +30,35 @@ struct ChainConfig {
     bool require_privacy_pool{true};
     bool allow_zero_reward_blocks{true};
     std::uint64_t min_fee{1ULL};
+    std::vector<std::string> bootstrap_peers{"127.0.0.1:28545"};
 };
 
-static_assert(true, "ADDITION_FINAL strict profile: no fallback signatures, no test harness path");
+struct NodeConfig {
+    NetworkMode mode{NetworkMode::Testnet};
+    ChainConfig chain{};
+    std::uint16_t local_rpc_port{8545};
+    std::uint16_t lan_rpc_port{18545};
+    std::uint16_t p2p_port{28545};
+    std::vector<std::string> bootstrap_peers{"127.0.0.1:28545"};
+    std::string data_dir{"data"};
+    std::string config_path{};
+    std::string genesis_path{};
+};
 
 const ChainConfig& default_config();
+ChainConfig testnet_chain_config();
+ChainConfig mainnet_chain_config();
+NodeConfig default_node_config();
+
+void set_runtime_network_mode(NetworkMode mode);
+NetworkMode runtime_network_mode();
+bool is_mainnet_runtime();
+const char* network_mode_label(NetworkMode mode);
+NetworkMode parse_network_mode(const std::string& value, bool& ok);
+
+bool load_toml_config(const std::string& path, NodeConfig& cfg, std::string& error);
+bool load_genesis_json(const std::string& path, ChainConfig& chain, std::string& error);
+bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std::string& error);
+std::string daemon_help_text();
 
 } // namespace addition
