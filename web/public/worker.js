@@ -4,7 +4,7 @@ const PAGE_ROUTES = {
   "/status": "/status/index.html",
   "/rpc": "/rpc/index.html",
   "/docs": "/docs/index.html",
-  "/docs/build": "/docs/build/index.html",
+  "/docs/getting-started": "/docs/getting-started/index.html",
   "/docs/architecture": "/docs/architecture/index.html",
   "/docs/commands": "/docs/commands/index.html",
   "/docs/pouw": "/docs/pouw/index.html",

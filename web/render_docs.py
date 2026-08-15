@@ -164,7 +164,7 @@ def main() -> None:
     )
     write_doc(
         "README.md",
-        OUT / "docs" / "build" / "index.html",
+        OUT / "docs" / "getting-started" / "index.html",
         "Build and run ADDITION testnet",
         "Build and run",
         "How to build <code>additiond</code> with liboqs + OpenSSL and run the honest testnet. Copied from the repository README.",

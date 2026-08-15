@@ -128,7 +128,7 @@ python3 web/serve.py
 | `/explorer/` | Block/tx lookup from the read RPC only |
 | `/status/` | getinfo, monetary_info, selftest, peers |
 | `/rpc/` | How to talk to the public allowlist |
-| `/docs/` | Architecture, commands, PoUW spec, build, runbook, ZK contract |
+| `/docs/` | Architecture, commands, PoUW spec, getting started, runbook, ZK contract |
 | `/contracts/` `/swap/` `/evm/` | Only methods verified on a local node; EVM is bootstrap |
 | `/whitepaper/` `/legal/` | Honest research copy. No fake ticker or mainnet live |
 
