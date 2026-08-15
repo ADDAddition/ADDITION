@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION command reference</title>
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body data-title="Commands" data-sub="Mirrored from the public repository. Research testnet, not a live mainnet.">
+  <header id="site-header"></header>
+  <main class="prose">
+    <div class="banner">Full command surface from <code>docs/FINAL_COMMANDS.md</code>. Public read RPC exposes only the allowlisted subset.</div>
+    <h2>ADDITION_FINAL - Final Command Surface</h2>
+<h2>RPC Endpoints</h2>
+<ul><li>Local-only trusted RPC: <code>127.0.0.1:8545</code> (all commands; optional <code>ADDITION_RPC_TOKEN</code>)</li><li>Public read RPC (opt-in): <code>0.0.0.0:38545</code> — allowlist only, no auth token</li><li>LAN RPC: <code>0.0.0.0:18545</code> (off unless <code>ADDITION_ENABLE_LAN_RPC=1</code> + <code>ADDITION_LAN_RPC_TOKEN</code>)</li><li>P2P transport RPC: <code>0.0.0.0:28545</code> (off unless <code>ADDITION_ENABLE_P2P_RPC=1</code>)</li></ul>
+<p>Each TCP request is one command line and returns one response line.</p>
+<h3>Public read RPC</h3>
+<p>Enable with <code>--public-rpc</code> or <code>ADDITION_ENABLE_PUBLIC_RPC=1</code>:</p>
+<pre>./build/additiond --network testnet --public-rpc
+# or
+ADDITION_ENABLE_PUBLIC_RPC=1 ./build/additiond --network testnet</pre>
+<p>Allowlist (everything else returns <code>error: command disabled on public RPC</code>):</p>
+<ul><li><code>getinfo</code></li><li><code>monetary_info</code></li><li><code>crypto_selftest</code></li><li><code>tx_status &lt;tx_hash&gt;</code></li><li><code>peers</code></li><li><code>getblock &lt;height_or_hash&gt;</code></li><li><code>getblockhash &lt;height&gt;</code></li></ul>
+<p>Not on the public port: <code>mine</code>, <code>sendtx*</code>, <code>createwallet</code>, identity rotation, admin, contract/token writes.</p>
+<p>TCP and a tiny HTTP adapter share the same port:</p>
+<pre>printf &#x27;getinfo\n&#x27; | nc 127.0.0.1 38545
+curl &#x27;http://127.0.0.1:38545/rpc?cmd=getinfo&#x27;</pre>
+<p>Override bind/port with <code>--public-rpc-bind</code>, <code>--public-rpc-port</code>, <code>ADDITION_PUBLIC_RPC_BIND</code>, or <code>ADDITION_PUBLIC_RPC_PORT</code>.</p>
+<h2>Core chain</h2>
+<ul><li><code>getinfo</code></li><li><code>monetary_info</code></li><li><code>crypto_selftest</code></li><li><code>createwallet</code></li><li><code>getbalance &lt;address&gt;</code></li><li><code>getbalance_instant &lt;address&gt;</code></li><li><code>tx_build &lt;from_addr&gt; &lt;pubkey_hex&gt; &lt;to_addr&gt; &lt;amount&gt; &lt;fee&gt; &lt;nonce&gt;</code></li><li><code>sendtx_signed &lt;from_addr&gt; &lt;pubkey_hex&gt; &lt;to_addr&gt; &lt;amount&gt; &lt;fee&gt; &lt;nonce&gt; &lt;sig_hex_without_pq_prefix&gt;</code></li><li><code>sendtx_signed_hash &lt;from_addr&gt; &lt;pubkey_hex&gt; &lt;to_addr&gt; &lt;amount&gt; &lt;fee&gt; &lt;nonce&gt; &lt;sig_hex_without_pq_prefix&gt;</code></li><li><code>sendtx &lt;from_addr&gt; &lt;pubkey_hex&gt; &lt;privkey_hex&gt; &lt;to_addr&gt; &lt;amount&gt; &lt;fee&gt; &lt;nonce&gt;</code> (legacy, disabled unless <code>ADDITION_ALLOW_INSECURE_TX_COMMANDS=1</code>)</li><li><code>sendtx_hash &lt;from_addr&gt; &lt;pubkey_hex&gt; &lt;privkey_hex&gt; &lt;to_addr&gt; &lt;amount&gt; &lt;fee&gt; &lt;nonce&gt;</code> (legacy, disabled unless <code>ADDITION_ALLOW_INSECURE_TX_COMMANDS=1</code>)</li><li><code>tx_status &lt;tx_hash&gt;</code></li><li><code>getblock &lt;height_or_hash&gt;</code></li><li><code>getblockhash &lt;height&gt;</code></li><li><code>mine</code></li></ul>
+<h2>P2P + Consensus</h2>
+<ul><li><code>addpeer &lt;ip:port&gt;</code></li><li><code>delpeer &lt;ip:port&gt;</code></li><li><code>peers</code></li><li><code>vote &lt;peer&gt; &lt;height&gt; &lt;block_hash&gt;</code></li><li><code>quorum &lt;height&gt; &lt;block_hash&gt;</code></li><li><code>peer_inbound &lt;peer&gt; &lt;payload&gt;</code></li><li><code>gossip_flush</code></li><li><code>sync</code></li><li><code>node_pubkey</code></li><li><code>identity_rotate_propose &lt;new_pubkey_hex&gt; &lt;new_privkey_hex&gt; &lt;grace_seconds&gt;</code></li><li><code>identity_rotate_vote &lt;peer_id&gt;</code></li><li><code>identity_rotate_vote_broadcast</code></li><li><code>identity_rotate_commit</code></li><li><code>identity_rotate_status</code></li></ul>
+<h3>P2P transport payload protocol</h3>
+<ul><li>TX payload binary codec now uses version marker <code>TXB2</code> with checksum trailer.</li><li>Block payload binary codec now uses version marker <code>BLB2</code> with checksum trailer.</li><li>Decoder remains backward-compatible with <code>TXB1</code> / <code>BLB1</code> payloads for rolling upgrades.</li><li>Strict handshake required before peer message processing:</li><li>request: <code>HELLO|2|&lt;network_id&gt;|&lt;unix_ts&gt;|&lt;nonce&gt;|&lt;peer_pubkey&gt;|&lt;peer_signature&gt;</code></li><li>response: <code>HELLO_ACK|2|&lt;network_id&gt;|&lt;unix_ts&gt;|&lt;echo_nonce&gt;|&lt;responder_pubkey&gt;|&lt;responder_signature&gt;</code></li><li>testnet <code>network_id</code> is <code>ADDITION_TESTNET_V1</code> (default). There is no live public mainnet.</li><li>inbound timestamp skew window: ±90s</li><li>nonce replay is rejected per peer (rolling anti-replay set)</li><li>signatures are validated with PQ verification (<code>ml-dsa-87</code>) over the signed handshake body</li><li>mismatched protocol or network id is rejected and peer score is penalized.</li></ul>
+<p>	### Controlled node identity rotation</p>
+<ul><li>Rotation is staged (not immediate): <code>identity_rotate_propose ...</code></li><li>Activation only after:</li><li>grace period elapsed</li><li>quorum reached (<code>2/3 + 1</code> over <code>peers + self</code>)</li><li>Votes are registered through <code>identity_rotate_vote &lt;peer_id&gt;</code>.</li><li>Signed network vote broadcast available via <code>identity_rotate_vote_broadcast</code>.</li><li>Final switch by <code>identity_rotate_commit</code>.</li><li>Current state visible with <code>identity_rotate_status</code>.</li></ul>
+<p>	### Rotation gossip messages</p>
+<ul><li><code>IDROTATE|&lt;rotation_id&gt;|&lt;old_pubkey&gt;|&lt;new_pubkey&gt;|&lt;effective_after&gt;|&lt;proof_sig&gt;</code></li><li><code>IDVOTE|&lt;rotation_id&gt;|&lt;voter_id&gt;|&lt;voter_pubkey&gt;|&lt;vote_sig&gt;</code></li></ul>
+<p>	Both messages are signature-verified before being accepted.</p>
+<p>	Rotation messages are auto-relayed to connected peers after handshake, with deduplication to limit relay loops.</p>
+<p>	### P2P inbound rate limits</p>
+<ul><li>Generic messages: max <code>120</code> per peer per <code>10s</code> sliding window.</li><li>Expensive messages (<code>REQBLK</code>, <code>REQINV</code>, <code>BLKDATA</code>, <code>IDROTATE</code>, <code>IDVOTE</code>): max <code>24</code> per peer per <code>10s</code> sliding window.</li><li>Exceeding limits triggers peer penalty through existing scoring/ban path.</li></ul>
+<p>	### Transport hardening</p>
+<ul><li>Max request/response line size enforced: <code>32768</code> bytes.</li><li>Socket send/receive timeouts enforced on client and server sockets: <code>4000ms</code>.</li><li>Oversized requests are rejected with transport error and do not reach command handlers.</li></ul>
+<p>	### Parser field bounds (security)</p>
+<ul><li><code>peer_id</code> max length: <code>128</code></li><li><code>nonce</code> max length: <code>128</code></li><li><code>rotation_id</code> max length: <code>128</code></li><li><code>pubkey(hex)</code> max length: <code>12000</code></li><li><code>signature(hex)</code> max length: <code>40000</code></li></ul>
+<p>	Inbound <code>HELLO/HELLO_ACK</code>, <code>IDROTATE</code>, and <code>IDVOTE</code> exceeding these bounds are rejected and penalized.</p>
+<p>	### PQ key/signature validation hardening</p>
+<ul><li>Strict hex validation before decode: charset, even length, max size.</li><li>Private key hex length must exactly match ML-DSA-87 secret key size.</li><li>Public key hex length must exactly match ML-DSA-87 public key size.</li><li>Signature hex must be non-empty and within ML-DSA-87 max signature size.</li><li>Any mismatch fails signing/verification immediately.</li></ul>
+<h2>Privacy pool</h2>
+<ul><li><code>privacy_native_verifier &lt;pq_mldsa87&gt;</code></li><li><code>privacy_mint_zk &lt;owner&gt; &lt;amount&gt; &lt;commitment_hex&gt; &lt;nullifier_hex&gt; &lt;proof_hex&gt; &lt;vk_hex&gt;</code></li><li><code>privacy_spend_zk &lt;owner&gt; &lt;note_id&gt; &lt;recipient&gt; &lt;amount&gt; &lt;nullifier_hex&gt; &lt;proof_hex&gt; &lt;vk_hex&gt;</code></li></ul>
+<p>Strict privacy mode notes:</p>
+<ul><li><code>privacy_mint_zk</code> / <code>privacy_spend_zk</code> are verified only in-process via native mode <code>pq_mldsa87</code>.</li><li>Non-ZK privacy commands are removed; privacy flow is ZK-only.</li><li>Strict ZK privacy policy is always ON (runtime toggle removed).</li><li>External verifier wrappers are disabled in mainnet native-only mode.</li><li>Proof and verification key are mandatory; no internal simulation verifier is used.</li><li>Note storage hardening: <code>owner</code> and <code>amount</code> are not persisted in plaintext.</li><li>Required for private note operations: set <code>ADDITION_PRIVACY_MASTER_KEY</code> (minimum 32 chars) before node startup.</li><li><code>owner_tag</code> derivation is also keyed with <code>ADDITION_PRIVACY_MASTER_KEY</code> to avoid cross-dataset linkage from state files.</li><li>Private balance query commands are removed from command surface to reduce metadata leakage.</li></ul>
+<p>Verifier tooling:</p>
+<ul><li>Native verifier is integrated in C++ (<code>privacy.cpp</code>) and uses ML-DSA-87 verification primitives.</li></ul>
+<h2>Staking</h2>
+<ul><li><code>stake &lt;address&gt; &lt;amount&gt;</code></li><li><code>unstake &lt;address&gt; &lt;amount&gt;</code></li><li><code>staked &lt;address&gt;</code></li><li><code>stake_reward &lt;amount&gt;</code></li><li><code>stake_claim &lt;address&gt;</code></li></ul>
+<h2>Smart-contract runtime</h2>
+<ul><li><code>contract_deploy &lt;owner&gt; &lt;code&gt;</code></li><li><code>contract_call &lt;id&gt; &lt;set|add|get|token_balance|swap_quote|zk_mint|zk_spend|zk_privacy_status&gt; &lt;key&gt; &lt;value&gt;</code></li></ul>
+<h3>ZK privacy methods via <code>contract_call</code></h3>
+<ul><li><code>zk_mint</code></li><li>key format: <code>&lt;OWNER&gt;:&lt;COMMITMENT_HEX&gt;:&lt;NULLIFIER_HEX&gt;:&lt;PROOF_HEX&gt;:&lt;VK_HEX&gt;</code></li><li>value: amount to mint privately (<code>&gt; 0</code>)</li><li>return: created <code>note_id</code></li><li><code>zk_spend</code></li><li>key format: <code>&lt;OWNER&gt;:&lt;NOTE_ID&gt;:&lt;RECIPIENT&gt;:&lt;NULLIFIER_HEX&gt;:&lt;PROOF_HEX&gt;:&lt;VK_HEX&gt;</code></li><li>value: private amount to send (<code>&gt; 0</code>)</li><li>return: recipient new private <code>note_id</code></li><li><code>zk_privacy_status</code></li><li>key format: any non-empty token (for example <code>status</code>)</li><li>value: ignored (set <code>0</code>)</li><li>return: <code>verifier_configured</code>, <code>strict_zk_mode</code>, notes and nullifier stats</li></ul>
+<p>Notes:</p>
+<ul><li>For strongest privacy, keep <code>strict_zk_mode</code> ON.</li><li><code>zk_mint</code> and <code>zk_spend</code> require valid proof/vk hex and native in-process ML-DSA-87 verification.</li></ul>
+<h2>Token &amp; NFT runtime</h2>
+<ul><li><code>token_create &lt;symbol&gt; &lt;owner&gt; &lt;max_supply&gt; &lt;initial_mint&gt;</code></li><li><code>token_mint &lt;symbol&gt; &lt;caller&gt; &lt;to&gt; &lt;amount&gt;</code></li><li><code>token_transfer &lt;symbol&gt; &lt;from&gt; &lt;to&gt; &lt;amount&gt;</code></li><li><code>token_balance &lt;symbol&gt; &lt;owner&gt;</code></li><li><code>nft_mint &lt;collection&gt; &lt;token_id&gt; &lt;owner&gt; &lt;metadata&gt;</code></li><li><code>nft_transfer &lt;collection&gt; &lt;token_id&gt; &lt;from&gt; &lt;to&gt;</code></li><li><code>nft_owner &lt;collection&gt; &lt;token_id&gt;</code></li></ul>
+<h2>Bridge runtime</h2>
+<ul><li><code>bridge_register &lt;chain&gt;</code></li><li><code>bridge_lock &lt;chain&gt; &lt;user&gt; &lt;amount&gt;</code></li><li><code>bridge_mint &lt;chain&gt; &lt;user&gt; &lt;amount&gt;</code></li><li><code>bridge_burn &lt;chain&gt; &lt;user&gt; &lt;amount&gt;</code></li><li><code>bridge_release &lt;chain&gt; &lt;user&gt; &lt;amount&gt;</code></li><li><code>bridge_balance &lt;chain&gt; &lt;user&gt;</code></li></ul>
+<h2>Notes</h2>
+<ul><li>Build defaults to release-oriented mode with tests disabled unless explicitly enabled.</li><li>Build fails if liboqs is missing (fallback mode removed).</li><li>Wallet key generation uses ML-DSA-87 via liboqs when available (<code>createwallet</code> returns <code>algo=ml-dsa-87</code>).</li><li>Monetary cap is enforced on-chain: <code>max_supply = 50,000,000</code>.</li><li>Runtime strict gates enabled:</li><li>PQ signatures required for spend transactions (<code>signature</code> must be <code>pq=</code> format)</li><li>Minimum transaction fee enforced (<code>min_fee=1</code>)</li><li>RPC LAN commands are filtered by untrusted allowlist</li><li>Admin-sensitive commands require trusted interface when strict admin mode is enabled</li><li>Local/LAN RPC token auth supported via <code>ADDITION_RPC_TOKEN</code> / <code>ADDITION_LAN_RPC_TOKEN</code></li><li>Daemon refuses startup if liboqs is not linked</li><li>Staking requires sufficient on-chain balance</li><li><code>sendtx</code> is routed through decentralized gossip path (<code>ok:gossiped</code> on success)</li><li>Persistent state is stored in <code>./data</code> on daemon shutdown and restored on startup:</li><li><code>blocks.dat</code></li><li><code>mempool.dat</code></li><li><code>staking.dat</code></li><li><code>contracts.dat</code></li><li><code>tokens.dat</code></li><li><code>bridge.dat</code></li><li><code>peers.dat</code></li><li><code>peer_pins.dat</code></li><li><code>node_identity.dat</code> (stable node PQ identity)</li><li><code>privacy.dat</code></li></ul>
+<h2>Wallet GUI (Python)</h2>
+<ul><li>File: <code>web/addition_wallet_gui.py</code></li><li>Uses TCP RPC directly on <code>127.0.0.1:8545</code></li><li>Supports:</li><li>Wallet creation (<code>createwallet</code>)</li><li>Balance refresh (<code>getbalance</code>)</li><li>Secure send flow (<code>tx_build</code> + <code>sign_message</code> + <code>sendtx_signed_hash</code>)</li><li>Mining to selected address (<code>mine &lt;address&gt;</code>)</li><li>Stake / unstake / claim</li></ul>
+<h2>Professional UX Components</h2>
+<ul><li>Advanced wallet UI: <code>web/addition_wallet_pro.py</code></li><li>Live web portal: <code>web/portal/index.html</code></li><li>Portal metrics backend: <code>web/portal/addition_portal_backend.py</code></li><li>MetaMask EVM bridge (bootstrap): <code>web/evm/evm_rpc_bridge.py</code></li></ul>
+<p>Portal API endpoints:</p>
+<ul><li><code>GET /api/getinfo</code></li><li><code>GET /api/monetary</code></li><li><code>GET /api/health</code></li></ul>
+<h2>Honest website (fail-closed)</h2>
+<ul><li>Static Pages root: <code>web/public/</code> (<code>/</code>, <code>/explorer/</code>, <code>/status/</code>, <code>/rpc/</code>, <code>/docs/</code>, <code>/contracts/</code>, <code>/swap/</code>, <code>/evm/</code>, <code>/whitepaper/</code>, <code>/legal/</code>)</li><li>Local server: <code>python3 web/serve.py</code> (default <code>127.0.0.1:8080</code>)</li><li><code>/api/rpc</code> (and <code>/rpc?cmd=</code>) proxy the public allowlist to port <code>38545</code></li><li><code>/rpc/</code> without <code>cmd</code> is the how-to page</li><li><code>/local-rpc</code> proxies trusted <code>127.0.0.1:8545</code> and only accepts loopback clients</li><li>If RPC is down the pages show <code>RPC offline</code> and stay empty. They do not invent blocks, hashrate, node counts, or supply.</li></ul>
+<h2>MetaMask (EVM bridge bootstrap)</h2>
+<p>Run:</p>
+<ul><li><code>python3 web/evm/evm_rpc_bridge.py</code></li></ul>
+<p>Custom network values:</p>
+<ul><li>Network Name: <code>Addition EVM Bridge</code></li><li>RPC URL: <code>http://127.0.0.1:9545</code></li><li>Chain ID: <code>424242</code></li><li>Currency Symbol: <code>ADD</code></li><li>Block Explorer URL: <code>http://127.0.0.1:8080</code></li></ul>
+<p>Supported bootstrap methods:</p>
+<ul><li><code>web3_clientVersion</code></li><li><code>eth_chainId</code></li><li><code>net_version</code></li><li><code>eth_blockNumber</code></li><li><code>eth_getBlockByNumber</code></li><li><code>eth_gasPrice</code></li><li><code>eth_maxPriorityFeePerGas</code></li><li><code>eth_feeHistory</code></li><li><code>eth_getBalance</code></li><li><code>eth_accounts</code></li><li><code>eth_requestAccounts</code></li><li><code>eth_estimateGas</code></li><li><code>eth_getTransactionCount</code></li><li><code>eth_sendRawTransaction</code> (strict mode: disabled until native execution mapping)</li><li><code>eth_getTransactionReceipt</code></li><li><code>eth_getTransactionByHash</code></li><li><code>eth_getCode</code></li><li><code>eth_call</code></li><li><code>eth_syncing</code></li><li><code>wallet_addEthereumChain</code></li><li><code>wallet_switchEthereumChain</code></li></ul>
+<p>Limitations (current bridge stage):</p>
+<ul><li>Not a full EVM execution node.</li><li><code>eth_sendRawTransaction</code> is disabled in secure mode.</li><li><code>eth_getTransactionReceipt</code> / <code>eth_getTransactionByHash</code> map to native <code>tx_status</code>.</li><li>No smart-contract bytecode execution in EVM context yet.</li></ul>
+    <p class="note">Source file in the repository: <a href="https://github.com/ADDAddition/ADDITION/blob/main/docs/FINAL_COMMANDS.md">docs/FINAL_COMMANDS.md</a></p>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/chrome.js"></script>
+</body>
+</html>

@@ -4,21 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ADDITION swap quote (in-process)</title>
-  <link rel="stylesheet" href="common.css">
+  <link rel="stylesheet" href="/common.css">
 </head>
-<body>
-  <header>
-    <h1>Swap</h1>
-    <p>In-process AMM quotes from the local node. No Uniswap pool, no token price feed, no invented liquidity.</p>
-    <nav>
-      <a href="/">Home</a>
-      <a href="/explorer">Explorer</a>
-      <a href="/status">Status</a>
-      <a href="/contracts">Contracts</a>
-      <a href="/swap">Swap</a>
-      <a href="/evm">EVM bridge</a>
-    </nav>
-  </header>
+<body data-title="Swap" data-sub="In-process AMM quotes. No Uniswap pool and no token price feed.">
+  <header id="site-header"></header>
   <main>
     <div class="banner">
       If no pool exists on this node, the daemon returns <code>error: pool not found</code>.
@@ -47,25 +36,23 @@
       <pre id="pool-raw" class="raw"></pre>
     </section>
   </main>
-  <footer>
-    <p>Contact: <a href="mailto:labjay69@gmail.com">labjay69@gmail.com</a></p>
-  </footer>
-  <script src="common.js"></script>
+  <footer id="site-footer"></footer>
+  <script src="/common.js"></script>
+  <script src="/chrome.js"></script>
   <script>
     const S = window.AdditionSite;
     async function localCmd(cmd) {
       try {
         const res = await fetch("/local-rpc?cmd=" + encodeURIComponent(cmd), { cache: "no-store" });
         const raw = (await res.text()).trim();
-        if (!res.ok) {
-          return { offline: res.status >= 500 || raw === "RPC offline", raw: raw || "RPC offline" };
+        if (!res.ok || raw.charAt(0) === "<") {
+          return { offline: true, raw: "RPC offline", fields: {} };
         }
         return { offline: raw === "RPC offline", raw: raw, fields: S.parseFields(raw) };
       } catch (e) {
         return { offline: true, raw: "RPC offline", fields: {} };
       }
     }
-
     async function ping() {
       const r = await localCmd("getinfo");
       const el = document.getElementById("rpc-state");
@@ -73,21 +60,18 @@
         el.className = "offline";
         el.textContent = "RPC offline";
       } else {
-        el.className = "";
+        el.className = "ok";
         el.textContent = "Local trusted RPC answered";
       }
     }
-
     document.getElementById("quote-btn").addEventListener("click", async function () {
-      const cmd = "swap_quote " + document.getElementById("tin").value.trim() + " " +
-        document.getElementById("tout").value.trim() + " " + document.getElementById("amt").value.trim();
-      const r = await localCmd(cmd);
+      const r = await localCmd("swap_quote " + document.getElementById("tin").value.trim() + " " +
+        document.getElementById("tout").value.trim() + " " + document.getElementById("amt").value.trim());
       document.getElementById("quote-raw").textContent = r.raw;
     });
     document.getElementById("pool-btn").addEventListener("click", async function () {
-      const cmd = "swap_pool_info " + document.getElementById("pa").value.trim() + " " +
-        document.getElementById("pb").value.trim();
-      const r = await localCmd(cmd);
+      const r = await localCmd("swap_pool_info " + document.getElementById("pa").value.trim() + " " +
+        document.getElementById("pb").value.trim());
       document.getElementById("pool-raw").textContent = r.raw;
       if (r.offline || r.raw.indexOf("error:") === 0) {
         S.renderFields(document.getElementById("pool-fields"), {}, r.raw || "RPC offline");

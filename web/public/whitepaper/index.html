@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION research note</title>
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body data-title="White paper" data-sub="Research note from the public repository. Not a live-network prospectus.">
+  <header id="site-header"></header>
+  <main class="prose">
+    <div class="banner">
+      Regenerated from the honest testnet tree (<code>docs/WHITE_PAPER.md</code>, <code>config.hpp</code>, <code>genesis.json</code>).
+      Design goals below are <strong>not</strong> proof of a public mainnet, listing, or token sale.
+      The older V3 copy still in the repo contains a “mainnet launch completed” roadmap — treat that as outdated.
+    </div>
+
+    <h2>1. What this is</h2>
+    <p>ADDITION is a C++ research prototype for a post-quantum Layer 1 experiment. The runnable default is <code>additiond --network testnet</code> (<code>addition-testnet</code> / <code>ADDITION_TESTNET_V1</code>). There is no live public mainnet in this repository.</p>
+    <p>Source: <a href="https://github.com/ADDAddition/ADDITION">https://github.com/ADDAddition/ADDITION</a></p>
+
+    <h2>2. Problem statement (research framing)</h2>
+    <p>Shor’s algorithm threatens elliptic-curve signatures used by many existing chains. This project experiments with lattice-based signatures at the node, not as a claim that the network is production-ready or “quantum-safe forever.”</p>
+
+    <h2>3. Cryptography actually in the daemon</h2>
+    <ul>
+      <li><strong>Signatures:</strong> ML-DSA-87 via liboqs (<code>createwallet</code> reports <code>algo=ml-dsa-87</code>). Build fails if liboqs is missing.</li>
+      <li><strong>Hashing:</strong> SHA3-512 (OpenSSL) for addresses, transactions, and block headers.</li>
+      <li><strong>Self-test:</strong> <code>crypto_selftest</code> on a running node. If RPC is down, this site does not invent a pass.</li>
+    </ul>
+
+    <h2>4. Consensus experiment: Proof of Measurable Work</h2>
+    <p>The miner/chain use a memory-hard scratch path (about 1 MiB in <code>chain.cpp</code>) plus SHA3-512. <code>getinfo</code> can report <code>last_mine_ms</code>, <code>last_mined_txs</code>, and <code>last_tps</code> <em>from that process</em>. Those fields are not a public hashrate index and must not be shown as “124.8 KH/s” or similar marketing.</p>
+
+    <h2>5. Ledger and contracts (what the code does)</h2>
+    <ul>
+      <li>UTXO-style transactions with PQ signatures and a minimum fee.</li>
+      <li>In-process key-value contracts: <code>contract_deploy</code>, <code>contract_call</code> <code>set|add|get</code>.</li>
+      <li>Token / NFT / swap engines in-process. A swap quote without a pool returns <code>error: pool not found</code>.</li>
+      <li>EVM helper is a <strong>bootstrap</strong> JSON-RPC map. Not a full EVM. <code>eth_sendRawTransaction</code> is disabled.</li>
+    </ul>
+
+    <h2>6. Monetary constants in config (design, not a ticker)</h2>
+    <table>
+      <tr><th>Parameter</th><th>Value in genesis/config</th></tr>
+      <tr><td>max_supply</td><td>50,000,000</td></tr>
+      <tr><td>block_reward</td><td>50</td></tr>
+      <tr><td>halving_interval</td><td>210,000</td></tr>
+      <tr><td>target_block_time_sec</td><td>60</td></tr>
+      <tr><td>min_fee</td><td>1</td></tr>
+      <tr><td>network_name</td><td>addition-testnet</td></tr>
+    </table>
+    <p class="note">These are kernel parameters. They are not a circulating-supply figure, not a CoinMarketCap listing, and not a live “ADD price.”</p>
+
+    <h2>7. What this note does not claim</h2>
+    <ul>
+      <li>No “#1” or “best blockchain in the world.”</li>
+      <li>No live mainnet, no CMC, no token sale, no wallet-connect lure.</li>
+      <li>No hardcoded 42 nodes, 124.8 KH/s, or 1,248,500 ADD as live stats.</li>
+      <li>No Addison Electronics identity. Contact is <a href="mailto:labjay69@gmail.com">labjay69@gmail.com</a>.</li>
+    </ul>
+
+    <p>Companion pages: <a href="/docs/architecture/">architecture</a>, <a href="/docs/commands/">commands</a>, <a href="/docs/pouw/">PoUW spec</a>, <a href="/legal/">legal notice</a>.</p>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/chrome.js"></script>
+</body>
+</html>

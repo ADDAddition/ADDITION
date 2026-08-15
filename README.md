@@ -114,23 +114,33 @@ printf 'mine\n' | nc 127.0.0.1 38545   # error: command disabled on public RPC
 
 LAN RPC (`18545`) still requires `ADDITION_ENABLE_LAN_RPC=1` and `ADDITION_LAN_RPC_TOKEN`. P2P stays off unless `ADDITION_ENABLE_P2P_RPC=1`. Do not open unauthenticated write RPC to the world.
 
-### Explorer / status / contracts
+### Honest website (static Pages)
+
+`web/public/` is a complete static site (explorer, RPC how-to, mirrored docs, white paper, legal notice). Publish that folder as the Pages root (for example additionblockchain.com). GitHub: [ADDAddition/ADDITION](https://github.com/ADDAddition/ADDITION).
 
 ```bash
 python3 web/serve.py
 ```
 
-Open `http://127.0.0.1:8080/explorer` and `http://127.0.0.1:8080/status`. Those pages call the public read RPC and show **RPC offline** (empty) if the node does not answer. They never invent blocks, heights, hashrate, node counts, or supply.
+| Path | Content |
+|------|---------|
+| `/` | Research testnet home + live `getinfo` or **RPC offline** |
+| `/explorer/` | Block/tx lookup from the read RPC only |
+| `/status/` | getinfo, monetary_info, selftest, peers |
+| `/rpc/` | How to talk to the public allowlist |
+| `/docs/` | Architecture, commands, PoUW spec, build, runbook, ZK contract |
+| `/contracts/` `/swap/` `/evm/` | Only methods verified on a local node; EVM is bootstrap |
+| `/whitepaper/` `/legal/` | Honest research copy. No fake ticker or mainnet live |
 
-`/contracts` and `/swap` talk to loopback trusted RPC only (`/local-rpc` → `127.0.0.1:8545`). They print the node’s real reply (`error: pool not found` if you have no pool). No Uniswap liquidity and no token price.
+Explorer/status call `/api/rpc`. On a static host without a backend they fail closed. Optional `?rpc=http://HOST:38545/rpc`.
 
-EVM bootstrap (not a full EVM; `eth_sendRawTransaction` disabled):
+`/contracts` and `/swap` use loopback `/local-rpc` → `127.0.0.1:8545`. They print the node’s real reply (`error: pool not found` if you have no pool).
 
 ```bash
 python3 web/evm/evm_rpc_bridge.py
 ```
 
-Then `http://127.0.0.1:8080/evm`. Contact: [labjay69@gmail.com](mailto:labjay69@gmail.com).
+Contact: [labjay69@gmail.com](mailto:labjay69@gmail.com).
 
 Help:
 

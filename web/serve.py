@@ -19,14 +19,6 @@ PUBLIC_ALLOWLIST = {
     "getblock",
     "getblockhash",
 }
-PAGES = {
-    "/": "index.html",
-    "/explorer": "explorer.html",
-    "/status": "status.html",
-    "/contracts": "contracts.html",
-    "/swap": "swap.html",
-    "/evm": "evm.html",
-}
 
 
 def env_int(name: str, default: int) -> int:
@@ -61,16 +53,42 @@ def client_is_loopback(handler: BaseHTTPRequestHandler) -> bool:
     return host in {"127.0.0.1", "::1", "localhost"}
 
 
+def resolve_static(path: str) -> Path | None:
+    if path in {"", "/"}:
+        candidate = ROOT / "index.html"
+        return candidate if candidate.is_file() else None
+    rel = path.lstrip("/")
+    if ".." in rel:
+        return None
+    for candidate in (ROOT / rel / "index.html", ROOT / rel, ROOT / (rel + ".html")):
+        resolved = candidate.resolve()
+        if str(resolved).startswith(str(ROOT.resolve())) and resolved.is_file():
+            return resolved
+    return None
+
+
+def content_type(path: Path) -> str:
+    if path.suffix == ".css":
+        return "text/css; charset=utf-8"
+    if path.suffix == ".js":
+        return "application/javascript; charset=utf-8"
+    if path.suffix == ".html":
+        return "text/html; charset=utf-8"
+    if path.suffix == ".md":
+        return "text/markdown; charset=utf-8"
+    return "text/plain; charset=utf-8"
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "addition-site/0.1"
 
     def log_message(self, fmt: str, *args) -> None:
         print("%s - %s" % (self.address_string(), fmt % args))
 
-    def _send(self, status: int, body: str, content_type: str = "text/plain; charset=utf-8") -> None:
+    def _send(self, status: int, body: str, content_type_value: str = "text/plain; charset=utf-8") -> None:
         data = body.encode("utf-8")
         self.send_response(status)
-        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Type", content_type_value)
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Cache-Control", "no-store")
@@ -88,47 +106,34 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
-
-        if path in {"/rpc", "/local-rpc"}:
+        is_api = path in {"/api/rpc", "/local-rpc"} or (path == "/rpc" and "cmd" in query)
+        if is_api:
             cmd = (query.get("cmd") or [""])[0]
             self._rpc(path, cmd)
             return
-
-        page = PAGES.get(path)
-        if page:
-            self._file(ROOT / page, "text/html; charset=utf-8")
-            return
-
-        rel = path.lstrip("/")
-        if not rel or ".." in rel:
+        target = resolve_static(path)
+        if target is None:
+            not_found = ROOT / "404.html"
+            if not_found.is_file():
+                self._file(not_found, "text/html; charset=utf-8", 404)
+                return
             self._send(404, "error: not found")
             return
-        target = (ROOT / rel).resolve()
-        if not str(target).startswith(str(ROOT.resolve())) or not target.is_file():
-            self._send(404, "error: not found")
-            return
-        ctype = "text/plain; charset=utf-8"
-        if target.suffix == ".css":
-            ctype = "text/css; charset=utf-8"
-        elif target.suffix == ".js":
-            ctype = "application/javascript; charset=utf-8"
-        elif target.suffix == ".html":
-            ctype = "text/html; charset=utf-8"
-        self._file(target, ctype)
+        self._file(target, content_type(target), 200)
 
     def do_POST(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
-        if parsed.path not in {"/rpc", "/local-rpc"}:
+        if parsed.path not in {"/rpc", "/api/rpc", "/local-rpc"}:
             self._send(404, "error: not found")
             return
         length = int(self.headers.get("Content-Length") or "0")
         body = self.rfile.read(max(0, length)).decode("utf-8", errors="replace")
         self._rpc(parsed.path, body)
 
-    def _file(self, path: Path, content_type: str) -> None:
+    def _file(self, path: Path, type_value: str, status: int = 200) -> None:
         data = path.read_bytes()
-        self.send_response(200)
-        self.send_header("Content-Type", content_type)
+        self.send_response(status)
+        self.send_header("Content-Type", type_value)
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
@@ -140,18 +145,18 @@ class Handler(BaseHTTPRequestHandler):
             self._send(400, "error: missing cmd")
             return
         token = first_token(command)
-        if path == "/rpc":
-            if token not in PUBLIC_ALLOWLIST:
-                self._send(403, "error: command disabled on public RPC")
-                return
-            host = os.environ.get("ADDITION_PUBLIC_RPC_HOST", "127.0.0.1")
-            port = env_int("ADDITION_PUBLIC_RPC_PORT", 38545)
-        else:
+        if path == "/local-rpc":
             if not client_is_loopback(self):
                 self._send(403, "error: local RPC proxy is loopback-only")
                 return
             host = os.environ.get("ADDITION_LOCAL_RPC_HOST", "127.0.0.1")
             port = env_int("ADDITION_LOCAL_RPC_PORT", 8545)
+        else:
+            if token not in PUBLIC_ALLOWLIST:
+                self._send(403, "error: command disabled on public RPC")
+                return
+            host = os.environ.get("ADDITION_PUBLIC_RPC_HOST", "127.0.0.1")
+            port = env_int("ADDITION_PUBLIC_RPC_PORT", 38545)
         try:
             reply = tcp_rpc(host, port, command)
         except OSError:
@@ -165,7 +170,7 @@ def main() -> None:
     port = env_int("ADDITION_SITE_PORT", 8080)
     httpd = ThreadingHTTPServer((bind, port), Handler)
     print(
-        "ADDITION testnet site on http://%s:%s (public /rpc allowlist, /local-rpc loopback-only)"
+        "ADDITION testnet site on http://%s:%s (/api/rpc allowlist, /local-rpc loopback-only)"
         % (bind, port)
     )
     httpd.serve_forever()

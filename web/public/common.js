@@ -8,7 +8,7 @@
     if (window.ADDITION_RPC_HTTP) {
       return String(window.ADDITION_RPC_HTTP).replace(/\/$/, "");
     }
-    return "/rpc";
+    return "/api/rpc";
   }
 
   function parseFields(line) {
@@ -48,6 +48,9 @@
       }
       const raw = (await res.text()).trim();
       if (!raw) {
+        return { ok: false, offline: true, raw: "RPC offline", fields: {} };
+      }
+      if (raw.charAt(0) === "<" || raw.indexOf("<!DOCTYPE") === 0) {
         return { ok: false, offline: true, raw: "RPC offline", fields: {} };
       }
       if (raw === "RPC offline" || raw.indexOf("error: public read RPC") === 0) {

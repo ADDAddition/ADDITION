@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION experimental profile runbook</title>
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body data-title="Experimental runbook" data-sub="Mirrored from the public repository. Research testnet, not a live mainnet.">
+  <header id="site-header"></header>
+  <main class="prose">
+    <div class="banner">This is an experimental <em>profile</em> runbook. The repository default is testnet. There is no live public mainnet.</div>
+    <h2>Addition (ADD) experimental profile runbook</h2>
+<p class='note'>This repository ships an honest <strong>testnet</strong>. There is no live public mainnet.</p>
+<p class='note'>Default launch is <code>additiond --network testnet</code>. Do not set <code>ADDITION_MAINNET_MODE=1</code> unless you are explicitly testing the mainnet *profile*.</p>
+<h2>1) Pre-flight checklist</h2>
+<ul><li>Build must succeed:</li><li><code>cmake -S . -B build</code></li><li><code>cmake --build build</code></li><li><code>additiond.exe</code> exists in <code>build/</code></li><li>liboqs/OpenSSL available on host</li><li>Firewall rules configured for:</li><li>TCP 18545 (LAN RPC, optional public)</li><li>TCP 28545 (P2P transport)</li><li>Data backup path ready (<code>./data</code> snapshot)</li></ul>
+<h2>2) Security baseline</h2>
+<ul><li><code>node_identity.dat</code> now stores only <code>PUB|...</code> (no private key persisted).</li><li>Set secure runtime vars before launch:</li><li><code>ADDITION_MAINNET_MODE=1</code></li><li><code>ADDITION_RPC_TOKEN=&lt;strong_token&gt;</code></li><li><code>ADDITION_STRICT_ADMIN_MODE=1</code></li><li><code>ADDITION_PRIVACY_MASTER_KEY=&lt;strong_secret_min_32_chars&gt;</code></li><li>If enabling LAN RPC, also set:</li><li><code>ADDITION_ENABLE_LAN_RPC=1</code></li><li><code>ADDITION_LAN_RPC_TOKEN=&lt;strong_token&gt;</code></li><li>Keep <code>ADDITION_ALLOW_INSECURE_TX_COMMANDS</code> unset (or <code>0</code>) in production.</li><li>Privacy verifier is native in-process (ML-DSA-87); external wrappers are disabled.</li></ul>
+<h2>3) First startup</h2>
+<ul><li>Launch daemon:</li><li><code>build\additiond.exe</code></li><li>Verify startup self-test line contains:</li><li><code>selftest: ok</code></li><li>Verify listeners:</li><li><code>local RPC listening on 127.0.0.1:8545</code></li><li><code>P2P RPC listening on 0.0.0.0:28545</code></li></ul>
+<h2>4) Health checks</h2>
+<ul><li><code>getinfo</code></li><li><code>monetary_info</code></li><li><code>crypto_selftest</code></li><li><code>peers</code></li></ul>
+<p>Expected:</p>
+<ul><li><code>pq_mode=strict</code></li><li><code>max_supply=50000000</code></li><li><code>crypto_selftest</code> returns <code>ok:selftest: ok</code></li></ul>
+<h2>5) Network bootstrap</h2>
+<ul><li>Add known bootstrap peers:</li><li><code>addpeer &lt;ip:port&gt;</code></li><li>Trigger sync:</li><li><code>sync</code></li><li>Confirm chain progress:</li><li><code>getinfo</code></li></ul>
+<h2>6) Wallet and transaction sanity</h2>
+<ul><li>Create wallet:</li><li><code>createwallet</code></li><li>Mine one block to bootstrap address:</li><li><code>mine &lt;address&gt;</code></li><li>Build/sign/send tx (secure flow):</li><li><code>tx_build &lt;from&gt; &lt;pub&gt; &lt;to&gt; &lt;amount&gt; &lt;fee&gt; &lt;nonce&gt;</code></li><li><code>sign_message &lt;priv&gt; &lt;sign_hash_hex_utf8&gt;</code></li><li><code>sendtx_signed_hash &lt;from&gt; &lt;pub&gt; &lt;to&gt; &lt;amount&gt; &lt;fee&gt; &lt;nonce&gt; &lt;sig_hex_without_pq_prefix&gt;</code></li><li>Track status:</li><li><code>tx_status &lt;tx_hash&gt;</code></li><li>Instant receive check:</li><li><code>getbalance_instant &lt;to_address&gt;</code></li></ul>
+<h2>7) Privacy strict sanity</h2>
+<ul><li>Confirm native verifier mode:</li><li><code>privacy_native_verifier pq_mldsa87</code></li><li>Submit ZK mint/spend only (avoid non-ZK in strict operations):</li><li><code>privacy_mint_zk ...</code></li><li><code>privacy_spend_zk ...</code></li></ul>
+<p>Important:</p>
+<ul><li>In mainnet mode (<code>ADDITION_MAINNET_MODE=1</code>), daemon startup is blocked if <code>ADDITION_PRIVACY_MASTER_KEY</code> is missing or shorter than 32 chars.</li><li>Keep <code>ADDITION_PRIVACY_MASTER_KEY</code> stable across restarts, otherwise previously sealed private notes cannot be unsealed.</li></ul>
+<h2>8) Portal + metrics</h2>
+<ul><li>Start portal backend:</li><li><code>python web/portal/addition_portal_backend.py</code></li><li>Open portal:</li><li><code>web/portal/index.html</code></li><li>Check <code>/api/health</code>, <code>/api/dashboard</code></li></ul>
+<h2>9) Mainnet go/no-go</h2>
+<p>Go only if all true:</p>
+<ul><li>crypto self-test pass at boot and via command</li><li>peers connected and sync stable</li><li>tx submit + mined path working</li><li>monetary cap telemetry sane</li><li>no repeated P2P ban storms</li></ul>
+<h2>10) Rollback protocol</h2>
+<ul><li>Stop daemon cleanly (<code>quit</code>)</li><li>Snapshot <code>./data</code> to timestamped backup</li><li>Restore last known-good <code>./data</code> if anomaly detected</li><li>Relaunch and verify:</li><li><code>getinfo</code></li><li><code>monetary_info</code></li><li><code>crypto_selftest</code></li></ul>
+<h2>11) Operational cadence</h2>
+<ul><li>Every hour:</li><li><code>getinfo</code>, <code>peers</code>, <code>monetary_info</code></li><li>Every day:</li><li>backup <code>./data</code></li><li>verify portal health endpoint</li><li>Every release:</li><li>rebuild, self-test, staged restart, post-checks</li></ul>
+    <p class="note">Source file in the repository: <a href="https://github.com/ADDAddition/ADDITION/blob/main/docs/MAINNET_RUNBOOK.md">docs/MAINNET_RUNBOOK.md</a></p>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/chrome.js"></script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION architecture</title>
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body data-title="Architecture" data-sub="Mirrored from the public repository. Research testnet, not a live mainnet.">
+  <header id="site-header"></header>
+  <main class="prose">
+    <div class="banner">Notes from <code>docs/ARCHITECTURE.md</code>. Some items are historical (signatures are ML-DSA-87 now). This is not proof of a live network.</div>
+    <h2>ADDITION_FINAL Architecture (v1)</h2>
+<h2>Goals</h2>
+<ul><li>Production-oriented clean rewrite starting from zero</li><li>Single canonical codebase</li><li>Deterministic behavior and test coverage first</li></ul>
+<h2>Modules</h2>
+<ul><li><code>block.*</code>: data model and hashing helpers</li><li><code>chain.*</code>: canonical ledger state and block validation</li><li><code>mempool.*</code>: pending transaction queue</li><li><code>miner.*</code>: block template and simplified PoW loop</li><li><code>rpc_server.*</code>: text-command RPC handling</li><li><code>wallet.*</code>: transaction creation and submission</li></ul>
+<h2>Current status (v2 in progress)</h2>
+<p>1. SHA3-512 hashing implemented with OpenSSL (<code>src/crypto.cpp</code>)</p>
+<p>2. UTXO transaction model integrated (<code>TxInput</code>/<code>TxOutput</code> + <code>utxo_set_</code>)</p>
+<p>3. Wallet/RPC now build spends from available UTXOs</p>
+<p>4. Non-coinbase transactions now require signer + signature validation</p>
+<h2>Next hardening phases</h2>
+<p>1. Replace temporary deterministic signatures with real asymmetric keys</p>
+<p>2. Add p2p networking layer and peer sync</p>
+<p>3. Add persistent storage (LevelDB/RocksDB)</p>
+<p>4. Add authenticated JSON-RPC server</p>
+<p>5. Add reproducible release pipeline</p>
+    <p class="note">Source file in the repository: <a href="https://github.com/ADDAddition/ADDITION/blob/main/docs/ARCHITECTURE.md">docs/ARCHITECTURE.md</a></p>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/chrome.js"></script>
+</body>
+</html>

@@ -3,48 +3,79 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ADDITION testnet</title>
-  <link rel="stylesheet" href="common.css">
+  <title>ADDITION — research testnet</title>
+  <link rel="stylesheet" href="/common.css">
 </head>
-<body>
-  <header>
-    <h1>ADDITION</h1>
-    <p>Research prototype / honest testnet. Not a live mainnet.</p>
-    <nav>
-      <a href="/">Home</a>
-      <a href="/explorer">Explorer</a>
-      <a href="/status">Status</a>
-      <a href="/contracts">Contracts</a>
-      <a href="/swap">Swap</a>
-      <a href="/evm">EVM bridge</a>
-    </nav>
-  </header>
+<body data-title="ADDITION" data-sub="Research prototype / honest testnet. Not a live mainnet.">
+  <header id="site-header"></header>
   <main>
     <div class="banner">
-      This repository does not run a public mainnet, token sale, or CoinMarketCap listing.
-      If the read RPC is down, pages show <strong>RPC offline</strong> and stay empty. They never invent blocks, hashrate, node counts, or supply.
+      ADDITION is a public research repository. It does not run a live mainnet, token sale, or CoinMarketCap listing.
+      If the read RPC is down, this page shows <strong>RPC offline</strong> and stays empty. It never invents blocks, hashrate, node counts, or circulating supply.
     </div>
-    <section class="panel">
-      <h2>Public read RPC</h2>
-      <p>Trusted local RPC stays on <code>127.0.0.1:8545</code> (writes, wallets, mine). The public port is read-only.</p>
-      <pre>ADDITION_ENABLE_PUBLIC_RPC=1 ./build/additiond --network testnet
-# or
-./build/additiond --network testnet --public-rpc
+    <p><a class="github" href="https://github.com/ADDAddition/ADDITION">Source: github.com/ADDAddition/ADDITION</a></p>
 
-printf 'getinfo\n' | nc HOST 38545
-curl 'http://HOST:38545/rpc?cmd=getinfo'</pre>
-      <p class="note">Allowlist: <code>getinfo</code>, <code>monetary_info</code>, <code>crypto_selftest</code>, <code>tx_status</code>, <code>peers</code>, <code>getblock</code>, <code>getblockhash</code>.</p>
-      <p class="note">LAN/P2P stay off unless you set <code>ADDITION_ENABLE_LAN_RPC=1</code> (token required) or <code>ADDITION_ENABLE_P2P_RPC=1</code>. Do not open unauthenticated write RPC to the world.</p>
-    </section>
     <section class="panel">
-      <h2>Site</h2>
-      <p>Serve these pages locally (binds loopback by default):</p>
-      <pre>python3 web/serve.py</pre>
-      <p>Then open <code>http://127.0.0.1:8080/explorer</code>. Optional <code>?rpc=http://HOST:38545/rpc</code> points the pages at a public read HTTP endpoint.</p>
+      <h2>Public RPC status</h2>
+      <p id="rpc-state" class="offline">Checking RPC…</p>
+      <div id="info-fields"></div>
+      <pre id="info-raw" class="raw"></pre>
+      <p class="note">Only fields the node returned. Empty peer list means empty — not “42 nodes”.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Site map</h2>
+      <div class="cards">
+        <a href="/explorer/"><strong>Explorer</strong>Blocks and txs from the read RPC only.</a>
+        <a href="/status/"><strong>Status</strong>getinfo, monetary_info, selftest, peers.</a>
+        <a href="/rpc/"><strong>Public RPC</strong>How to call the allowlisted read port.</a>
+        <a href="/docs/"><strong>Docs</strong>Architecture, commands, PoUW spec, build.</a>
+        <a href="/docs/build/"><strong>Build / run</strong>liboqs + OpenSSL, start testnet.</a>
+        <a href="/contracts/"><strong>Contracts</strong>In-process KV methods verified locally.</a>
+        <a href="/swap/"><strong>Swap</strong>Quotes from the node, or pool not found.</a>
+        <a href="/evm/"><strong>EVM bootstrap</strong>Not a full EVM. sendRaw disabled.</a>
+        <a href="/whitepaper/"><strong>White paper</strong>Design goals, labeled as research.</a>
+        <a href="/legal/"><strong>Legal</strong>Research notice. No offering.</a>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Research goals (design, not a live network)</h2>
+      <ul>
+        <li>Post-quantum signatures: <code>ML-DSA-87</code> via liboqs</li>
+        <li>Hashing: <code>SHA3-512</code></li>
+        <li>Memory-hard Proof of Measurable Work in the C++ miner/chain</li>
+        <li>Monetary cap in spec/config: <code>max_supply = 50,000,000</code></li>
+        <li>Default network: <code>addition-testnet</code> / <code>ADDITION_TESTNET_V1</code></li>
+      </ul>
+      <p class="note">Those are kernel constants and research aims. They are not evidence of public hashrate, listed markets, or a running mainnet.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Run the testnet</h2>
+      <pre>git clone https://github.com/ADDAddition/ADDITION
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --target additiond
+./build/additiond --network testnet --public-rpc
+printf 'getinfo\n' | nc 127.0.0.1 38545</pre>
+      <p>Full steps: <a href="/docs/build/">Build and run</a>.</p>
     </section>
   </main>
-  <footer>
-    <p>Contact: <a href="mailto:labjay69@gmail.com">labjay69@gmail.com</a></p>
-  </footer>
+  <footer id="site-footer"></footer>
+  <script src="/common.js"></script>
+  <script src="/chrome.js"></script>
+  <script>
+    (async function () {
+      const S = window.AdditionSite;
+      const result = await S.rpcCommand("getinfo");
+      S.setStatus(document.getElementById("rpc-state"), result);
+      document.getElementById("info-raw").textContent = result.raw;
+      if (result.offline || !result.ok) {
+        S.renderFields(document.getElementById("info-fields"), {}, "RPC offline");
+        return;
+      }
+      S.renderFields(document.getElementById("info-fields"), result.fields, "Node returned no key=value fields.");
+    }());
+  </script>
 </body>
 </html>

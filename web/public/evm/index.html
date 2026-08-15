@@ -4,31 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ADDITION EVM bridge (bootstrap)</title>
-  <link rel="stylesheet" href="common.css">
+  <link rel="stylesheet" href="/common.css">
 </head>
-<body>
-  <header>
-    <h1>EVM bridge</h1>
-    <p>Bootstrap JSON-RPC only. Not a full EVM. <code>eth_sendRawTransaction</code> stays disabled.</p>
-    <nav>
-      <a href="/">Home</a>
-      <a href="/explorer">Explorer</a>
-      <a href="/status">Status</a>
-      <a href="/contracts">Contracts</a>
-      <a href="/swap">Swap</a>
-      <a href="/evm">EVM bridge</a>
-    </nav>
-  </header>
+<body data-title="EVM bridge" data-sub="Bootstrap JSON-RPC only. Not a full EVM.">
+  <header id="site-header"></header>
   <main>
     <div class="banner">
-      This is a research mapping from a few <code>eth_*</code> reads onto the native testnet node.
-      There is no bytecode execution, no Uniswap, and no MetaMask send path in secure mode.
+      Research mapping from a few <code>eth_*</code> reads onto the native testnet node.
+      No bytecode execution, no Uniswap, no MetaMask send path in secure mode.
     </div>
     <section class="panel">
       <h2>Run the bootstrap</h2>
       <pre>python3 web/evm/evm_rpc_bridge.py
 # listens on 127.0.0.1:9545 and reads 127.0.0.1:8545</pre>
-      <p>Wallet network values (local only):</p>
+      <p>Local wallet values only:</p>
       <ul>
         <li>Network Name: <code>Addition EVM Bridge (bootstrap)</code></li>
         <li>RPC URL: <code>http://127.0.0.1:9545</code></li>
@@ -43,9 +32,8 @@
       <pre id="evm-raw" class="raw"></pre>
     </section>
   </main>
-  <footer>
-    <p>Contact: <a href="mailto:labjay69@gmail.com">labjay69@gmail.com</a></p>
-  </footer>
+  <footer id="site-footer"></footer>
+  <script src="/chrome.js"></script>
   <script>
     async function evm(method, params) {
       const res = await fetch("http://127.0.0.1:9545", {
@@ -55,7 +43,6 @@
       });
       return res.json();
     }
-
     async function probe() {
       const el = document.getElementById("rpc-state");
       const box = document.getElementById("evm-raw");
@@ -64,7 +51,7 @@
         const chain = await evm("eth_chainId");
         const block = await evm("eth_blockNumber");
         const send = await evm("eth_sendRawTransaction", ["0x00"]);
-        el.className = "";
+        el.className = "ok";
         el.textContent = "Bootstrap bridge answered";
         box.textContent =
           "web3_clientVersion: " + JSON.stringify(version.result || version.error) + "\n" +
@@ -77,7 +64,6 @@
         box.textContent = "RPC offline";
       }
     }
-
     probe();
   </script>
 </body>

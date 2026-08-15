@@ -20,7 +20,35 @@ body {
 a { color: #8ab4f8; }
 header, main, footer { max-width: 880px; margin: 0 auto; padding: 1rem 1.25rem; }
 header { border-bottom: 1px solid var(--line); }
-nav { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.5rem; }
+nav { display: flex; flex-wrap: wrap; gap: 0.65rem 0.9rem; margin-top: 0.5rem; }
+.github-line { margin: 0.4rem 0 0; }
+a.github {
+  display: inline-block;
+  background: #2b4c7e;
+  color: #fff;
+  text-decoration: none;
+  padding: 0.35rem 0.7rem;
+  border-radius: 4px;
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+.cards a {
+  display: block;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 0.85rem;
+  text-decoration: none;
+  color: var(--ink);
+}
+.cards a strong { color: #8ab4f8; display: block; margin-bottom: 0.25rem; }
+.prose h2, .prose h3 { margin-top: 1.4rem; }
+.prose table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; }
+.prose th, .prose td { border: 1px solid var(--line); padding: 0.4rem 0.5rem; text-align: left; vertical-align: top; }
+.prose ul { padding-left: 1.2rem; }
+.ok { color: var(--ok); font-weight: 600; }
 .banner {
   background: #2a2416;
   color: var(--warn);

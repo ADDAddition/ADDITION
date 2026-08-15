@@ -239,9 +239,10 @@ Portal API endpoints:
 - `GET /api/health`
 
 ## Honest website (fail-closed)
-- Pages: `web/public/` (`/`, `/explorer`, `/status`, `/contracts`, `/swap`, `/evm`)
+- Static Pages root: `web/public/` (`/`, `/explorer/`, `/status/`, `/rpc/`, `/docs/`, `/contracts/`, `/swap/`, `/evm/`, `/whitepaper/`, `/legal/`)
 - Local server: `python3 web/serve.py` (default `127.0.0.1:8080`)
-- `/rpc` proxies the public allowlist to port `38545`
+- `/api/rpc` (and `/rpc?cmd=`) proxy the public allowlist to port `38545`
+- `/rpc/` without `cmd` is the how-to page
 - `/local-rpc` proxies trusted `127.0.0.1:8545` and only accepts loopback clients
 - If RPC is down the pages show `RPC offline` and stay empty. They do not invent blocks, hashrate, node counts, or supply.
 

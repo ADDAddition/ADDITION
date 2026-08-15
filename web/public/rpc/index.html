@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION public read RPC</title>
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body data-title="Public read RPC" data-sub="Allowlisted reads only. Writes stay on localhost.">
+  <header id="site-header"></header>
+  <main class="prose">
+    <div class="banner">
+      This page documents the read-only public port. It is not a JSON-RPC marketplace and not a live mainnet endpoint advertisement.
+    </div>
+    <p id="rpc-state" class="offline">Checking RPC…</p>
+    <section class="panel">
+      <h2>Example: getinfo</h2>
+      <pre id="sample-raw" class="raw"></pre>
+    </section>
+    <section class="panel">
+      <h2>Enable the port</h2>
+      <pre>./build/additiond --network testnet --public-rpc
+# or
+ADDITION_ENABLE_PUBLIC_RPC=1 ./build/additiond --network testnet</pre>
+      <p>Default bind: <code>0.0.0.0:38545</code>. Override with <code>--public-rpc-port</code>, <code>--public-rpc-bind</code>, <code>ADDITION_PUBLIC_RPC_PORT</code>, <code>ADDITION_PUBLIC_RPC_BIND</code>.</p>
+    </section>
+    <section class="panel">
+      <h2>Talk to it</h2>
+      <p>One command line in, one response line out (same as local RPC):</p>
+      <pre>printf 'getinfo\n' | nc HOST 38545
+curl 'http://HOST:38545/rpc?cmd=getinfo'
+curl 'http://HOST:38545/rpc?cmd=getblock%200'</pre>
+      <p>Allowlist:</p>
+      <ul>
+        <li><code>getinfo</code></li>
+        <li><code>monetary_info</code></li>
+        <li><code>crypto_selftest</code></li>
+        <li><code>tx_status &lt;tx_hash&gt;</code></li>
+        <li><code>peers</code></li>
+        <li><code>getblock &lt;height_or_hash&gt;</code></li>
+        <li><code>getblockhash &lt;height&gt;</code></li>
+      </ul>
+      <p>Everything else, including <code>mine</code>, <code>sendtx*</code>, <code>createwallet</code>, and identity rotation, returns <code>error: command disabled on public RPC</code>.</p>
+    </section>
+    <section class="panel">
+      <h2>What stays private</h2>
+      <ul>
+        <li>Trusted RPC: <code>127.0.0.1:8545</code> (optional <code>ADDITION_RPC_TOKEN</code>)</li>
+        <li>LAN RPC: off unless <code>ADDITION_ENABLE_LAN_RPC=1</code> and <code>ADDITION_LAN_RPC_TOKEN</code></li>
+        <li>P2P: off unless <code>ADDITION_ENABLE_P2P_RPC=1</code></li>
+      </ul>
+      <p>Do not open unauthenticated write RPC to the world. Full command list: <a href="/docs/commands/">Commands</a>.</p>
+    </section>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/common.js"></script>
+  <script src="/chrome.js"></script>
+  <script>
+    (async function () {
+      const S = window.AdditionSite;
+      const result = await S.rpcCommand("getinfo");
+      S.setStatus(document.getElementById("rpc-state"), result);
+      document.getElementById("sample-raw").textContent = result.raw;
+    }());
+  </script>
+</body>
+</html>

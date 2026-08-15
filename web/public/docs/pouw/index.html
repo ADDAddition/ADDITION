@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION PoUW phase 1 spec</title>
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body data-title="PoUW spec" data-sub="Mirrored from the public repository. Research testnet, not a live mainnet.">
+  <header id="site-header"></header>
+  <main class="prose">
+    <div class="banner">Specification only. RPC names here are a design target. They are not a live product or a public node count.</div>
+    <h2>ADDITION PoUW Phase 1 Specification (Storage + AI Compute + Private TTL Messaging)</h2>
+<p>Version: 1.0</p>
+<p>Date: 2026-03-06</p>
+<p>Status: Phase 1 (specification only)</p>
+<hr>
+<h2>1. Objectives</h2>
+<p>Define a production-oriented architecture for:</p>
+<p>1. <strong>PoUW Storage Layer</strong> (decentralized cloud)</p>
+<p>2. <strong>PoUW Compute Layer</strong> (AI/compute jobs)</p>
+<p>3. <strong>Private TTL Messaging</strong> (E2E encrypted, expiring)</p>
+<p>4. <strong>Economic/security model</strong> (rewards, staking, slashing)</p>
+<p>5. <strong>Web product architecture</strong> (portal + explorer + cloud + AI jobs + messaging)</p>
+<p>This spec is compatible with current ADDITION runtime posture:</p>
+<ul><li>PQ signatures (<code>ml-dsa-87</code>)</li><li>strict RPC hardening</li><li>native token/swap/bridge/privacy modules</li><li>optional EVM compatibility layer</li></ul>
+<hr>
+<h2>2. High-level architecture</h2>
+<p>ADDITION target model:</p>
+<ul><li><strong>Core chain (native, PQ)</strong></li><li>consensus + settlement + rewards + slashing state</li><li><strong>PoUW coordinators (deterministic on-chain logic + off-chain workers)</strong></li><li>storage challenge lifecycle</li><li>compute job lifecycle</li><li><strong>Worker nodes</strong></li><li>storage workers (store encrypted chunks)</li><li>compute workers (run AI/compute tasks)</li><li><strong>Verifier network</strong></li><li>challenge verification</li><li>replicated result validation</li><li><strong>Client layer</strong></li><li>wallet + cloud uploader + AI job submitter + private messaging</li><li><strong>Web portal (professional)</strong></li><li>explorer, cloud console, AI jobs dashboard, messaging console, staking/slashing view</li></ul>
+<hr>
+<h2>3. PoUW Storage Layer specification</h2>
+<h3>3.1 Roles</h3>
+<ul><li><strong>Client</strong>: uploads encrypted file, pays storage contract</li><li><strong>Storage worker</strong>: commits to storing chunks</li><li><strong>Verifier</strong>: validates periodic proofs</li><li><strong>Chain</strong>: records commitments/challenges/verdicts/rewards/slashes</li></ul>
+<h3>3.2 Data model (logical)</h3>
+<ul><li><code>StorageDeal</code></li><li><code>deal_id</code></li><li><code>client_addr</code></li><li><code>content_root</code> (Merkle root of encrypted chunks)</li><li><code>chunk_count</code></li><li><code>replication_factor</code></li><li><code>start_height</code></li><li><code>end_height</code></li><li><code>price_per_epoch</code></li><li><code>worker_set[]</code></li><li><code>status</code></li></ul>
+<ul><li><code>StorageCommitment</code></li><li><code>deal_id</code></li><li><code>worker_addr</code></li><li><code>sealed_commitment</code></li><li><code>collateral_locked</code></li></ul>
+<ul><li><code>StorageChallenge</code></li><li><code>challenge_id</code></li><li><code>deal_id</code></li><li><code>worker_addr</code></li><li><code>random_seed</code></li><li><code>chunk_index</code></li><li><code>due_height</code></li></ul>
+<ul><li><code>StorageProof</code></li><li><code>challenge_id</code></li><li><code>proof_blob_hash</code></li><li><code>verdict</code> (pending/pass/fail)</li></ul>
+<h3>3.3 Protocol flow</h3>
+<p>1. Client encrypts file client-side and chunks it.</p>
+<p>2. Client computes chunk Merkle root and opens <code>StorageDeal</code>.</p>
+<p>3. Workers register commitments + lock collateral.</p>
+<p>4. Chain emits deterministic random challenges per epoch.</p>
+<p>5. Workers submit proofs before <code>due_height</code>.</p>
+<p>6. Verifiers/consensus validate proofs.</p>
+<p>7. Rewards distributed on pass; slashing on fail/miss.</p>
+<h3>3.4 Security properties</h3>
+<ul><li>Files remain encrypted off-chain.</li><li>Chain stores commitments/proof hashes, not plaintext.</li><li>Challenge randomness must be unbiased and verifiable.</li><li>Repeated non-response or invalid proofs =&gt; escalating slash.</li></ul>
+<hr>
+<h2>4. PoUW Compute (AI jobs) specification</h2>
+<h3>4.1 Roles</h3>
+<ul><li><strong>Requester</strong>: submits compute/AI job + budget</li><li><strong>Compute workers</strong>: execute jobs</li><li><strong>Validators</strong>: verify output correctness/probabilistic consistency</li><li><strong>Chain</strong>: settlement, reward, slashing, reputation</li></ul>
+<h3>4.2 Job model</h3>
+<ul><li><code>ComputeJob</code></li><li><code>job_id</code></li><li><code>requester_addr</code></li><li><code>job_type</code> (inference/training/data-processing)</li><li><code>input_ref</code> (content-addressed)</li><li><code>determinism_profile</code> (strict/probabilistic)</li><li><code>max_latency_sec</code></li><li><code>reward_budget</code></li><li><code>min_reputation</code></li><li><code>status</code></li></ul>
+<ul><li><code>ComputeAssignment</code></li><li><code>job_id</code></li><li><code>worker_addr</code></li><li><code>collateral_locked</code></li><li><code>assigned_at</code></li></ul>
+<ul><li><code>ComputeResult</code></li><li><code>job_id</code></li><li><code>worker_addr</code></li><li><code>output_ref</code></li><li><code>result_hash</code></li><li><code>proof_ref</code></li><li><code>submitted_at</code></li></ul>
+<ul><li><code>ComputeValidation</code></li><li><code>job_id</code></li><li><code>validator_addr</code></li><li><code>verdict</code></li><li><code>score</code></li></ul>
+<h3>4.3 Validation modes</h3>
+<ul><li><strong>Deterministic jobs</strong>: hash equality across replicas</li><li><strong>Probabilistic AI jobs</strong>:</li><li>consensus by validator quorum</li><li>bounded-drift checks</li><li>optional challenge re-run samples</li></ul>
+<h3>4.4 Anti-cheat</h3>
+<ul><li>mandatory collateral for workers</li><li>timeout slash</li><li>invalid result slash</li><li>reputation decay for non-performance</li><li>ban threshold for repeated fraud</li></ul>
+<hr>
+<h2>5. Private TTL Messaging specification</h2>
+<h2>5.1 Scope</h2>
+<p>Provide private messaging with expiration semantics using:</p>
+<ul><li>E2E encryption off-chain payloads</li><li>minimal on-chain anchors/metadata</li><li>key deletion strategy for practical self-destruction behavior</li></ul>
+<h2>5.2 Important constraint</h2>
+<p>Blockchains are immutable. “100% deletion on-chain” is not literal. Model is:</p>
+<ul><li>encrypted content</li><li>expiring access keys</li><li>metadata TTL enforcement</li><li>optional payload garbage collection by storage workers</li></ul>
+<h2>5.3 Message model</h2>
+<ul><li><code>PrivateMessageEnvelope</code></li><li><code>msg_id</code></li><li><code>sender_addr</code></li><li><code>recipient_addr</code></li><li><code>ciphertext_ref</code></li><li><code>created_at</code></li><li><code>ttl_sec</code></li><li><code>expire_at</code></li><li><code>policy</code> (single-read, auto-burn, forward-forbidden)</li><li><code>status</code> (active/expired/destroyed)</li></ul>
+<ul><li><code>MessageKeyMaterial</code></li><li>ephemeral key agreement output (off-chain)</li><li>never stored plaintext on-chain</li></ul>
+<h2>5.4 Protocol</h2>
+<p>1. Sender obtains recipient pre-key bundle.</p>
+<p>2. Sender encrypts payload (E2E) and uploads ciphertext.</p>
+<p>3. Sender submits envelope anchor to chain with TTL.</p>
+<p>4. Recipient decrypts while message active.</p>
+<p>5. On expiration: envelope state becomes expired and key material is discarded.</p>
+<h2>5.5 Optional advanced policies</h2>
+<ul><li>read-once receipts (signed)</li><li>delayed delivery windows</li><li>burn-on-open</li><li>group messaging with rotating group keys</li></ul>
+<hr>
+<h2>6. Economic model (PoUW + chain security)</h2>
+<h2>6.1 Reward split</h2>
+<p>Per epoch reward partition:</p>
+<ul><li><code>R_security</code>: base chain security reward</li><li><code>R_storage</code>: storage proof success pool</li><li><code>R_compute</code>: compute validated results pool</li><li><code>R_validators</code>: verifier/validator compensation</li></ul>
+<p>Constraint:</p>
+<p><code>R_total = R_security + R_storage + R_compute + R_validators</code></p>
+<h2>6.2 Collateral and slashing</h2>
+<ul><li>workers lock collateral before acceptance</li><li>slashing events:</li><li>missed challenge</li><li>invalid proof/result</li><li>equivocation/fraud</li><li>slash severity tiers:</li><li>minor miss</li><li>repeated miss</li><li>confirmed fraud (max slash + temporary ban)</li></ul>
+<h2>6.3 Reputation</h2>
+<ul><li>rolling score per worker</li><li>positive signals: uptime, valid submissions, low latency</li><li>negative signals: misses, invalid outputs, disputes lost</li><li>minimum score gates job eligibility</li></ul>
+<h2>6.4 Abuse resistance</h2>
+<ul><li>requester deposits budget escrow</li><li>anti-spam fee for job/deal submission</li><li>max outstanding jobs per account tier</li></ul>
+<hr>
+<h2>7. Consensus integration (Phase 2 target)</h2>
+<p>Consensus remains chain-safe first. PoUW additions are integrated as deterministic state transitions:</p>
+<ul><li>storage challenges generated from chain randomness</li><li>compute settlement based on validator quorum rules</li><li>slashing/rewards encoded in block application rules</li></ul>
+<p>No opaque/non-deterministic execution inside block validation.</p>
+<hr>
+<h2>8. RPC design (Phase 2 target)</h2>
+<h3>8.1 Storage RPC namespace</h3>
+<ul><li><code>storage_deal_create</code></li><li><code>storage_commit_register</code></li><li><code>storage_challenge_list</code></li><li><code>storage_proof_submit</code></li><li><code>storage_deal_status</code></li><li><code>storage_worker_status</code></li></ul>
+<h3>8.2 Compute RPC namespace</h3>
+<ul><li><code>compute_job_submit</code></li><li><code>compute_job_assign</code></li><li><code>compute_result_submit</code></li><li><code>compute_validate_submit</code></li><li><code>compute_job_status</code></li><li><code>compute_worker_status</code></li></ul>
+<h3>8.3 Private messaging RPC namespace</h3>
+<ul><li><code>msg_prekey_publish</code></li><li><code>msg_send_ttl</code></li><li><code>msg_inbox</code></li><li><code>msg_mark_read</code></li><li><code>msg_destroy</code></li><li><code>msg_status</code></li></ul>
+<p>All sensitive write methods require strict signature verification (PQ/hybrid policy aligned).</p>
+<hr>
+<h2>9. Web architecture (professional portal)</h2>
+<h2>9.1 Product areas</h2>
+<p>1. <strong>Explorer</strong></p>
+<ul><li>blocks, tx, validator stats, slashing events</li></ul>
+<p>2. <strong>Cloud Storage Console</strong></p>
+<ul><li>upload, deals, replicas, proof status, billing</li></ul>
+<p>3. <strong>AI Jobs Console</strong></p>
+<ul><li>submit jobs, track execution, validator results, costs</li></ul>
+<p>4. <strong>Private Messaging</strong></p>
+<ul><li>secure inbox, TTL controls, read receipts, burn policies</li></ul>
+<p>5. <strong>DeFi/Wallet</strong></p>
+<ul><li>send, staking, swap, token creator, bridge, governance</li></ul>
+<p>6. <strong>Node/Worker Ops</strong></p>
+<ul><li>worker registration, reputation, earnings, penalties</li></ul>
+<h2>9.2 Technical stack target</h2>
+<ul><li>Frontend: Next.js + TypeScript + Tailwind + component system</li><li>API gateway: authenticated backend (no direct privileged RPC from browser)</li><li>Realtime: websockets for job/proof/message status</li><li>Observability: metrics + logs + tracing</li></ul>
+<h2>9.3 Security baseline</h2>
+<ul><li>strict authn/authz at API layer</li><li>signed requests for critical operations</li><li>hardware-backed keys recommended for operators</li><li>rate limiting + abuse throttling</li></ul>
+<hr>
+<h2>10. EVM compatibility strategy</h2>
+<p>Recommended mode: <strong>Native-first + EVM compatibility layer</strong></p>
+<ul><li>Native modules implement PoUW/storage/compute/messaging economics</li><li>EVM compatibility exposes interoperability for wallets/tools/dApps</li><li>Keep PQ-native identity and signature policy as canonical trust layer</li></ul>
+<hr>
+<h2>11. Phase delivery plan</h2>
+<h2>Phase 1 (this document)</h2>
+<ul><li>finalized architecture/spec</li><li>RPC namespaces</li><li>state schemas</li><li>reward/slash model</li><li>web product blueprint</li></ul>
+<h2>Phase 2 (MVP implementation)</h2>
+<ul><li>implement storage/compute/message states + RPC</li><li>implement verification + settlement flows</li><li>deliver web v1 with all major sections</li></ul>
+<h2>Phase 3 (hardening)</h2>
+<ul><li>security audit + fuzz + chaos</li><li>load testing at target scale</li><li>anti-abuse tuning and SRE runbooks</li><li>mainnet-candidate gates</li></ul>
+<hr>
+<h2>12. Mainnet-candidate acceptance gates</h2>
+<p>Before official mainnet declaration:</p>
+<ul><li>deterministic replay consistency across nodes</li><li>sustained load test pass (storage + compute + messaging)</li><li>slashing and dispute workflows validated</li><li>external security audit findings addressed</li><li>incident response and backup/recovery drills passed</li></ul>
+<hr>
+<h2>13. Notes on “100% safe” claims</h2>
+<p>No distributed system is literally 100% safe. Practical target is:</p>
+<ul><li>defense-in-depth architecture</li><li>independent audits</li><li>continuous monitoring</li><li>controlled rollout and rollback readiness</li></ul>
+<p>This spec is designed for that operational reality.</p>
+    <p class="note">Source file in the repository: <a href="https://github.com/ADDAddition/ADDITION/blob/main/docs/POUW_PHASE1_SPEC.md">docs/POUW_PHASE1_SPEC.md</a></p>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/chrome.js"></script>
+</body>
+</html>
