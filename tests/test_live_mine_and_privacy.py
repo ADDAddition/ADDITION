@@ -23,7 +23,7 @@ PRIVACY_KEY = "addition-research-privacy-master-key-32"
 
 
 def field(text: str, name: str) -> str:
-    match = re.search(r"(?:^|\s)%s=(\S+)" % re.escape(name), text)
+    match = re.search(r"(?:^|[\s:])%s=(\S+)" % re.escape(name), text)
     return match.group(1) if match else ""
 
 
