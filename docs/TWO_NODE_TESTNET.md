@@ -96,7 +96,7 @@ HTTP responses include `Access-Control-Allow-Origin: *`, `OPTIONS` → `204`, an
 PUBLIC_RPC_HTTP = ""
 ```
 
-Leave it empty. The worker and static pages fail closed with **RPC offline**.
+Leave it empty. The worker and static pages show **RPC offline**.
 They do not invent blocks, peers, or hashrate.
 
 When an operator has a **real** public-rpc HTTP URL (this machine, a VPS, or a

@@ -65,7 +65,7 @@ Node B: `--data-dir` second tree, write `8546`, P2P `28546`, `--bootstrap 127.0.
 Operator public P2P (IPv4 only): `--bootstrap 34.27.30.115:28545`. Write RPC stays loopback.
 See [TWO_NODE_TESTNET.md](TWO_NODE_TESTNET.md).
 
-Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so the worker fail-closes with `RPC offline`. Set it only to a real public-rpc HTTP URL you operate. Do not commit trycloudflare URLs.
+Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so the worker shows `RPC offline`. Set it only to a real public-rpc HTTP URL you operate. Do not commit trycloudflare URLs.
 
 ## Core chain
 - `getinfo`
@@ -277,7 +277,7 @@ Notes:
 - Not shipped in this tree: `web/addition_wallet_pro.py`, `web/portal/` (no `/api/getinfo` portal backend)
 - MetaMask EVM bridge (bootstrap): `web/evm/evm_rpc_bridge.py`
 
-## Website (fail-closed)
+## Website
 - Static Pages root: `web/public/` (`/`, `/explorer/`, `/status/`, `/rpc/`, `/wallet/`, `/docs/`, `/contracts/`, `/swap/`, `/evm/`, `/whitepaper/`, `/legal/`)
 - Local server: `python3 web/serve.py` (default `127.0.0.1:8080`)
 - `/api/rpc` (and `/rpc?cmd=`) proxy the public allowlist to port `38545`

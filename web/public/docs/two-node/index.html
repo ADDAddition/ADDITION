@@ -61,7 +61,7 @@ printf &#x27;createwallet\n&#x27; | nc 127.0.0.1 38545</pre>
 <h2>Point the website at a real public RPC</h2>
 <p><code>web/public/wrangler.toml</code> ships with:</p>
 <pre>PUBLIC_RPC_HTTP = &quot;&quot;</pre>
-<p>Leave it empty. The worker and static pages fail closed with <strong>RPC offline</strong>.</p>
+<p>Leave it empty. The worker and static pages show <strong>RPC offline</strong>.</p>
 <p>They do not invent blocks, peers, or hashrate.</p>
 <p>When an operator has a <strong>real</strong> public-rpc HTTP URL (this machine, a VPS, or a</p>
 <p>tunnel the operator created), set the worker variable to that URL:</p>

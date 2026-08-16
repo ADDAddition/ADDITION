@@ -219,9 +219,9 @@ python3 web/serve.py
 | `/contracts/` `/swap/` `/evm/` | Local node methods only; EVM is bootstrap |
 | `/whitepaper/` `/legal/` | Research copy. No fake ticker or live mainnet |
 
-Explorer/status call `/api/rpc`. On a static host without a backend they fail closed. Optional `?rpc=http://HOST:38545/rpc`.
+Explorer/status call `/api/rpc`. On a static host without a backend they show **RPC offline**. Optional `?rpc=http://HOST:38545/rpc`.
 
-The Pages worker (`web/public/wrangler.toml`) ships `PUBLIC_RPC_HTTP = ""`. Leave it empty so the site fail-closes with **RPC offline**. An operator who runs `--public-rpc` sets `PUBLIC_RPC_HTTP` to that process’s real HTTP URL (for example `http://127.0.0.1:38545/rpc`). Do not commit trycloudflare or other ephemeral URLs.
+The Pages worker (`web/public/wrangler.toml`) ships `PUBLIC_RPC_HTTP = ""`. Leave it empty so the site shows **RPC offline**. An operator who runs `--public-rpc` sets `PUBLIC_RPC_HTTP` to that process’s real HTTP URL (for example `http://127.0.0.1:38545/rpc`). Do not commit trycloudflare or other ephemeral URLs.
 
 `/wallet`, `/contracts`, and `/swap` use loopback `/local-rpc` → `127.0.0.1:8545`. They print the node’s real reply (`error: pool not found` if you have no pool).
 
