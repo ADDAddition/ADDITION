@@ -77,9 +77,14 @@ cmake -S . -B build \
 
 ```bash
 cmake -S . -B build -DADDITION_BUILD_TESTS=ON
-cmake --build build --target test_chain
+cmake --build build
 ctest --test-dir build --output-on-failure
 ```
+
+What a local node proved vs what is not claimed:
+[`docs/LOCAL_NODE_PROOFS.md`](docs/LOCAL_NODE_PROOFS.md).
+Use `--regtest` for fast local mines. `--network testnet` is the
+shared-testnet min-diff profile (`economic_security=none`).
 
 ---
 

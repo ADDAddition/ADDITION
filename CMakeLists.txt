@@ -88,6 +88,10 @@ if(ADDITION_BUILD_TESTS)
     target_link_libraries(test_confirmations PRIVATE addition_core)
     add_test(NAME test_confirmations COMMAND test_confirmations)
 
+    add_executable(test_slh_dsa tests/test_slh_dsa.cpp)
+    target_link_libraries(test_slh_dsa PRIVATE addition_core)
+    add_test(NAME test_slh_dsa COMMAND test_slh_dsa)
+
     find_package(Python3 COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
         add_test(
