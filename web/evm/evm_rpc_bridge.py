@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
-"""ADDITION EVM JSON-RPC bootstrap. Not a full EVM. eth_sendRawTransaction disabled."""
+"""ADDITION local EVM JSON-RPC bootstrap. Not a public wallet network.
+
+Bind is loopback-only (127.0.0.1:9545). chainId/net_version are 424242.
+eth_sendRawTransaction stays disabled: there is no native execution mapping.
+"""
 
 from __future__ import annotations
 
 import json
 import os
 import socket
+import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from ipaddress import ip_address
 
 CHAIN_ID = 424242
 LISTEN_HOST = os.environ.get("ADDITION_EVM_BIND", "127.0.0.1")
@@ -14,6 +20,28 @@ LISTEN_PORT = int(os.environ.get("ADDITION_EVM_PORT", "9545"))
 NODE_HOST = os.environ.get("ADDITION_LOCAL_RPC_HOST", "127.0.0.1")
 NODE_PORT = int(os.environ.get("ADDITION_LOCAL_RPC_PORT", "8545"))
 CLIENT_VERSION = "addition-evm-bridge-bootstrap/0.1"
+NETWORK_NAME = "ADDITION local testnet (send disabled)"
+DISCLAIMER = (
+    "local testnet only; bind 127.0.0.1:9545; chainId 424242; "
+    "eth_sendRawTransaction disabled; not MetaMask/Trust/Binance public RPC"
+)
+
+
+def is_loopback_host(host: str) -> bool:
+    if host in {"localhost", "127.0.0.1", "::1"}:
+        return True
+    try:
+        return ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def require_loopback_bind(host: str) -> None:
+    if not is_loopback_host(host):
+        raise SystemExit(
+            "error: EVM bridge bind must be loopback (got %s). "
+            "Do not expose 9545 on 0.0.0.0." % host
+        )
 
 
 def tcp_rpc(command: str, timeout: float = 4.0) -> str:
@@ -45,6 +73,13 @@ def hex_qty(n: int) -> str:
     return hex(n)
 
 
+def native_address(raw: str) -> str:
+    addr = raw.strip()
+    if addr.startswith("0x") or addr.startswith("0X"):
+        addr = addr[2:]
+    return addr
+
+
 def parse_block_number(tag: str) -> int | None:
     if tag in {"latest", "pending", "safe", "finalized"}:
         info = kv_map(tcp_rpc("getinfo"))
@@ -68,6 +103,16 @@ def native_block(height: int) -> dict[str, str] | None:
     if "height" not in fields or "hash" not in fields:
         return None
     return fields
+
+
+def add_chain_params() -> dict:
+    return {
+        "chainId": hex_qty(CHAIN_ID),
+        "chainName": NETWORK_NAME,
+        "rpcUrls": ["http://127.0.0.1:%s" % LISTEN_PORT],
+        "nativeCurrency": {"name": "ADD", "symbol": "ADD", "decimals": 18},
+        "blockExplorerUrls": ["http://127.0.0.1:8080"],
+    }
 
 
 def handle(method: str, params: list) -> object:
@@ -98,7 +143,7 @@ def handle(method: str, params: list) -> object:
     if method == "eth_getBalance":
         if not params:
             raise ValueError("missing address")
-        raw = tcp_rpc("getbalance %s" % params[0])
+        raw = tcp_rpc("getbalance %s" % native_address(str(params[0])))
         if raw.startswith("error:"):
             raise RuntimeError(raw)
         return hex_qty(int(raw))
@@ -111,7 +156,7 @@ def handle(method: str, params: list) -> object:
     if method == "eth_call":
         raise RuntimeError("not a full EVM: eth_call unsupported")
     if method == "eth_sendRawTransaction":
-        raise RuntimeError("eth_sendRawTransaction disabled until native execution mapping")
+        raise RuntimeError("eth_sendRawTransaction disabled: local testnet only, no native execution mapping")
     if method == "eth_getBlockByNumber":
         if not params:
             raise ValueError("missing block tag")
@@ -122,10 +167,16 @@ def handle(method: str, params: list) -> object:
         if fields is None:
             return None
         tx_hashes = [h for h in fields.get("tx_hashes", "").split(",") if h]
+        parent = fields.get("previous_hash", "0x0")
+        if parent and not parent.startswith("0x"):
+            parent = "0x" + parent
+        block_hash = fields["hash"]
+        if not block_hash.startswith("0x"):
+            block_hash = "0x" + block_hash
         return {
             "number": hex_qty(int(fields["height"])),
-            "hash": "0x" + fields["hash"] if not fields["hash"].startswith("0x") else fields["hash"],
-            "parentHash": fields.get("previous_hash", "0x0"),
+            "hash": block_hash,
+            "parentHash": parent,
             "timestamp": hex_qty(int(fields.get("timestamp", "0"))),
             "nonce": hex_qty(int(fields.get("nonce", "0"))),
             "difficulty": hex_qty(int(fields.get("difficulty_target", "0"))),
@@ -146,7 +197,9 @@ def handle(method: str, params: list) -> object:
         }
     if method == "eth_feeHistory":
         raise RuntimeError("not a full EVM: eth_feeHistory unsupported")
-    if method in {"wallet_addEthereumChain", "wallet_switchEthereumChain"}:
+    if method == "wallet_addEthereumChain":
+        return add_chain_params()
+    if method == "wallet_switchEthereumChain":
         return None
     raise RuntimeError("method not available on EVM bootstrap: %s" % method)
 
@@ -160,9 +213,22 @@ class Handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self) -> None:
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
+
+    def do_GET(self) -> None:
+        body = (
+            "ADDITION EVM bootstrap\n"
+            "%s\n"
+            "eth_chainId=%s net_version=%s\n" % (DISCLAIMER, hex_qty(CHAIN_ID), CHAIN_ID)
+        ).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
 
     def do_POST(self) -> None:
         length = int(self.headers.get("Content-Length") or "0")
@@ -192,9 +258,13 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
+    require_loopback_bind(LISTEN_HOST)
+    if not is_loopback_host(NODE_HOST):
+        print("error: native TEXT RPC host must be loopback", file=sys.stderr)
+        raise SystemExit(1)
     print(
-        "ADDITION EVM bootstrap on http://%s:%s -> native RPC %s:%s (not a full EVM; sendRaw disabled)"
-        % (LISTEN_HOST, LISTEN_PORT, NODE_HOST, NODE_PORT)
+        "ADDITION EVM bootstrap on http://%s:%s -> native RPC %s:%s (%s)"
+        % (LISTEN_HOST, LISTEN_PORT, NODE_HOST, NODE_PORT, DISCLAIMER)
     )
     ThreadingHTTPServer((LISTEN_HOST, LISTEN_PORT), Handler).serve_forever()
 

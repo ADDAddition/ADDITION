@@ -52,7 +52,7 @@ POST http://HOST:38545/jsonrpc
 
 Join the operator testnet: `--bootstrap 34.27.30.115:28545`. `sync` uses HTTP `:80` then `:38545` (`getblockraw`). Write RPC stays `127.0.0.1`.
 
-Override bind/port with `--public-rpc-bind`, `--public-rpc-port`, `ADDITION_PUBLIC_RPC_BIND`, or `ADDITION_PUBLIC_RPC_PORT`. HTTP replies send `Access-Control-Allow-Origin: *`, `OPTIONS` 204, and `Cache-Control: no-store`.
+Override bind/port with `--public-rpc-bind`, `--public-rpc-port`, `ADDITION_PUBLIC_RPC_BIND`, or `ADDITION_PUBLIC_RPC_PORT`. HTTP replies send `Access-Control-Allow-Origin: *` (read-only allowlist, no cookies), `Access-Control-Allow-Methods: GET, OPTIONS`, `OPTIONS` 204, and `Cache-Control: no-store`. `curl /rpc?cmd=getinfo` is unchanged.
 
 Two-node local testnet (write RPC stays loopback):
 
@@ -65,7 +65,7 @@ Node B: `--data-dir` second tree, write `8546`, P2P `28546`, `--bootstrap 127.0.
 Operator public P2P (IPv4 only): `--bootstrap 34.27.30.115:28545`. Write RPC stays loopback.
 See [TWO_NODE_TESTNET.md](TWO_NODE_TESTNET.md).
 
-Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so the worker shows `RPC offline`. Set it only to a real public-rpc HTTP URL you operate. Do not commit trycloudflare URLs.
+Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so a down node shows `RPC offline`. Set it only to a real public-rpc HTTP URL you operate. Do not commit trycloudflare URLs.
 
 ## Core chain
 - `getinfo`
@@ -285,42 +285,37 @@ Notes:
 - `/local-rpc` proxies trusted `127.0.0.1:8545` and only accepts loopback clients
 - If RPC is down the pages show `RPC offline` and stay empty. They do not invent blocks, hashrate, node counts, or supply.
 
-## MetaMask (EVM bridge bootstrap)
+## MetaMask (local EVM bootstrap only)
 Run:
 - `python3 web/evm/evm_rpc_bridge.py`
 
-Custom network values:
-- Network Name: `Addition EVM Bridge`
+This is **local testnet only**. Bind is `127.0.0.1:9545` (refuses `0.0.0.0`).
+`eth_sendRawTransaction` is disabled. MetaMask/Trust/Binance cannot list this
+as a public network.
+
+Custom network values (Add-to-MetaMask helper on `/evm/` uses only these):
+- Network Name: `ADDITION local testnet (send disabled)`
 - RPC URL: `http://127.0.0.1:9545`
 - Chain ID: `424242`
 - Currency Symbol: `ADD`
-- Block Explorer URL: `http://127.0.0.1:8080`
 
 Supported bootstrap methods:
 - `web3_clientVersion`
-- `eth_chainId`
-- `net_version`
+- `eth_chainId` (`0x67932`)
+- `net_version` (`424242`)
 - `eth_blockNumber`
 - `eth_getBlockByNumber`
 - `eth_gasPrice`
 - `eth_maxPriorityFeePerGas`
-- `eth_feeHistory`
-- `eth_getBalance`
-- `eth_accounts`
-- `eth_requestAccounts`
-- `eth_estimateGas`
-- `eth_getTransactionCount`
-- `eth_sendRawTransaction` (strict mode: disabled until native execution mapping)
-- `eth_getTransactionReceipt`
-- `eth_getTransactionByHash`
-- `eth_getCode`
-- `eth_call`
-- `eth_syncing`
-- `wallet_addEthereumChain`
-- `wallet_switchEthereumChain`
+- `eth_getBalance` (native TEXT `getbalance`, `0x` prefix stripped)
+- `eth_accounts` / `eth_requestAccounts` (empty)
+- `eth_getCode` (`0x`)
+- `eth_syncing` (`false`)
+- `wallet_addEthereumChain` (returns the loopback params above)
+- `eth_sendRawTransaction` — always disabled
+- `eth_estimateGas` / `eth_call` / `eth_getTransactionCount` / `eth_feeHistory` — unsupported
 
-Limitations (current bridge stage):
-- Not a full EVM execution node.
-- `eth_sendRawTransaction` is disabled in secure mode.
+Limitations:
+- Not a full EVM execution node and not a public wallet RPC.
 - `eth_getTransactionReceipt` / `eth_getTransactionByHash` map to native `tx_status`.
-- No smart-contract bytecode execution in EVM context yet.
+- No smart-contract bytecode execution in EVM context.

@@ -1,4 +1,5 @@
 #include "addition/config.hpp"
+#include "addition/p2p.hpp"
 #include "addition/rpc_access.hpp"
 
 #include <iostream>
@@ -30,10 +31,18 @@ int main() {
         "wallet_sign",
         "identity_rotate_propose",
         "identity_rotate_commit",
+        "stake",
+        "unstake",
+        "stake_claim",
+        "stake_reward",
         "stake_policy",
         "contract_deploy",
         "token_create",
+        "swap_pool_create",
+        "swap_add_liquidity",
+        "add_liquidity",
         "swap_exact_in",
+        "swap_route_exact_in",
         "addpeer",
         "peer_inbound",
         "pm_inbox",
@@ -174,6 +183,40 @@ int main() {
             ncfg.bootstrap_peers.size() != 1 ||
             ncfg.bootstrap_peers[0] != "127.0.0.1:28545") {
             std::cerr << "test failed: two-node CLI flags not applied\n";
+            return 1;
+        }
+    }
+
+    if (!addition::is_loopback_host("127.0.0.1") ||
+        !addition::is_loopback_endpoint("127.0.0.1:28546") ||
+        addition::is_external_advertised_peer("127.0.0.1:28546") ||
+        addition::is_external_advertised_peer("self") ||
+        addition::is_external_advertised_peer("probe-self") ||
+        addition::is_external_advertised_peer("n-deadbeef") ||
+        !addition::is_self_peer_label("probe-self") ||
+        !addition::is_external_advertised_peer("34.27.30.115:28545")) {
+        std::cerr << "test failed: loopback/self must not count as external peers\n";
+        return 1;
+    }
+
+    {
+        addition::PeerNetwork net;
+        net.add_peer("self");
+        net.add_peer("probe-self");
+        net.add_peer("127.0.0.1:28546");
+        net.add_peer("n-abc");
+        net.add_peer("34.27.30.115:28545");
+        if (net.peer_count() != 5) {
+            std::cerr << "test failed: internal peer set must keep loopback/self for sync\n";
+            return 1;
+        }
+        if (net.advertised_peer_count() != 1 || net.loopback_peer_count() != 1) {
+            std::cerr << "test failed: advertised/local peer split\n";
+            return 1;
+        }
+        const auto remote = net.advertised_peers();
+        if (remote.size() != 1 || remote[0] != "34.27.30.115:28545") {
+            std::cerr << "test failed: advertised peer list\n";
             return 1;
         }
     }

@@ -10,5 +10,9 @@
   "target_block_time_sec": 60,
   "halving_interval": 210000,
   "min_fee": 1,
-  "pow_algorithm": "sha3_512"
+  "pow_algorithm": "sha3_512",
+  "initial_difficulty_target": 281474976710655,
+  "max_difficulty_target": 281474976710655,
+  "min_difficulty_target": 1099511627775,
+  "retarget_window": 30
 }

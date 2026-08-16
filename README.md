@@ -221,12 +221,13 @@ python3 web/serve.py
 
 Explorer/status call `/api/rpc`. On a static host without a backend they show **RPC offline**. Optional `?rpc=http://HOST:38545/rpc`.
 
-The Pages worker (`web/public/wrangler.toml`) ships `PUBLIC_RPC_HTTP = ""`. Leave it empty so the site shows **RPC offline**. An operator who runs `--public-rpc` sets `PUBLIC_RPC_HTTP` to that process’s real HTTP URL (for example `http://127.0.0.1:38545/rpc`). Do not commit trycloudflare or other ephemeral URLs.
+The Pages worker (`web/public/wrangler.toml`) ships `PUBLIC_RPC_HTTP = ""`. Leave it empty so a down node shows **RPC offline**. An operator who runs `--public-rpc` sets `PUBLIC_RPC_HTTP` to that process’s real HTTP URL (for example `http://127.0.0.1:38545/rpc`). Do not commit trycloudflare or other ephemeral URLs.
 
 `/wallet`, `/contracts`, and `/swap` use loopback `/local-rpc` → `127.0.0.1:8545`. They print the node’s real reply (`error: pool not found` if you have no pool).
 
 ```bash
 python3 web/evm/evm_rpc_bridge.py
+# 127.0.0.1:9545 only, chainId 424242, eth_sendRawTransaction disabled
 ```
 
 Contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com).

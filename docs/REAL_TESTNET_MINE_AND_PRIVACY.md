@@ -23,6 +23,17 @@ Bulletproofs, ZK-Shield, a DEX, or a token sale.
 - Testnet default: `pow_algorithm=sha3_512`. The header SHA3-512 digest’s
   first 64 bits are compared to `difficulty_target`. That is a real hash
   check, not a stub that skips PoW.
+- Easy / max target is `0x0000FFFFFFFFFFFF` (~2^16 hashes). The previous max
+  `0x00FFFFFFFFFFFFFF` (2^56-1) accepted a header in a few hundred hashes
+  (milliseconds). That ceiling is intentional and is a testnet knob in
+  `config.toml` / `genesis.json` (`max_difficulty_target`). Do not raise it
+  back to 2^56-1 unless you want free blocks.
+- Retarget is symmetric (`target * observed / expected`, clamped 4×) every
+  `retarget_window` (30) blocks. Genesis is skipped as the oldest bound so a
+  stale genesis timestamp cannot ease the chain to the old free max.
+- `min_difficulty_target` is below the easy bound so a burst of fast blocks
+  can harden. A fresh `blocks.dat` is required after this change if the old
+  chain stored targets above the new max.
 - `mine` has a **30s deadline**. On testnet a block is expected well inside
   that bound (about 2^16 cheap hashes at the default target).
 - Each RPC connection is handled on its own thread. `handle_command` is

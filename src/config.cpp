@@ -281,6 +281,23 @@ bool apply_kv(NodeConfig& cfg, const std::string& table, const std::string& key,
         }
         return true;
     }
+    if (full == "chain.initial_difficulty_target" || full == "initial_difficulty_target") {
+        return parse_u64(value, cfg.chain.initial_difficulty_target);
+    }
+    if (full == "chain.min_difficulty_target" || full == "min_difficulty_target") {
+        return parse_u64(value, cfg.chain.min_difficulty_target);
+    }
+    if (full == "chain.max_difficulty_target" || full == "max_difficulty_target") {
+        return parse_u64(value, cfg.chain.max_difficulty_target);
+    }
+    if (full == "chain.retarget_window" || full == "retarget_window") {
+        std::uint64_t v = 0;
+        if (!parse_u64(value, v) || v == 0 || v > 0xFFFFFFFFULL) {
+            return false;
+        }
+        cfg.chain.retarget_window = static_cast<std::uint32_t>(v);
+        return true;
+    }
     if (full == "comment" || full == "chain.comment") {
         return true;
     }
@@ -380,6 +397,35 @@ bool is_ipv4_endpoint(const std::string& endpoint) {
         octet.push_back(c);
     }
     return dots == 3 && flush_octet();
+}
+
+bool is_loopback_host(const std::string& host) {
+    return host == "127.0.0.1" || host == "0.0.0.0" || host == "localhost" || host == "::1";
+}
+
+bool is_loopback_endpoint(const std::string& endpoint) {
+    const auto colon = endpoint.rfind(':');
+    if (colon == std::string::npos || colon == 0) {
+        return false;
+    }
+    return is_loopback_host(endpoint.substr(0, colon));
+}
+
+bool is_self_peer_label(const std::string& endpoint) {
+    if (endpoint == "self" || endpoint == "probe-self") {
+        return true;
+    }
+    if (endpoint.rfind("self", 0) == 0 && !is_ipv4_endpoint(endpoint)) {
+        return true;
+    }
+    if (endpoint.rfind("probe-self", 0) == 0) {
+        return true;
+    }
+    return false;
+}
+
+bool is_external_advertised_peer(const std::string& endpoint) {
+    return is_ipv4_endpoint(endpoint) && !is_loopback_endpoint(endpoint) && !is_self_peer_label(endpoint);
 }
 
 const ChainConfig& default_config() {
@@ -607,6 +653,23 @@ bool load_genesis_json(const std::string& path, ChainConfig& chain, std::string&
             bool ok = false;
             chain.pow_algorithm = parse_pow_algorithm(v, ok);
             return ok;
+        }
+        if (k == "initial_difficulty_target") {
+            return parse_u64(v, chain.initial_difficulty_target);
+        }
+        if (k == "min_difficulty_target") {
+            return parse_u64(v, chain.min_difficulty_target);
+        }
+        if (k == "max_difficulty_target") {
+            return parse_u64(v, chain.max_difficulty_target);
+        }
+        if (k == "retarget_window") {
+            std::uint64_t n = 0;
+            if (!parse_u64(v, n) || n == 0 || n > 0xFFFFFFFFULL) {
+                return false;
+            }
+            chain.retarget_window = static_cast<std::uint32_t>(n);
+            return true;
         }
         error = "unknown genesis key: " + k;
         return false;
