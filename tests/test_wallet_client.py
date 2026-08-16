@@ -94,9 +94,13 @@ class WalletClientTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_address_derivation_matches_node_formula(self) -> None:
-        # sha3_512("addr|" + pubkey_hex)[:40] — same as src/rpc_server.cpp
-        self.assertEqual(len(derive_address(PUB)), 40)
-        self.assertEqual(derive_address(PUB), derive_address(PUB))
+        # SHA3-512(scheme_id || 0x00 || pubkey_bytes), 128 hex — same as src/crypto.cpp
+        addr = derive_address(PUB)
+        self.assertEqual(len(addr), 128)
+        self.assertEqual(addr, derive_address(PUB, "ml-dsa-87"))
+        self.assertNotEqual(addr, derive_address(PUB, "slh-dsa-shake-256s"))
+        self.assertNotEqual(addr, PUB)
+        self.assertNotEqual(addr, derive_address("00" * 32))
 
     def test_createwallet_keeps_secret_on_disk_only(self) -> None:
         record = self.client.create()
@@ -170,6 +174,8 @@ class LiboqsWalletTests(unittest.TestCase):
         record = backend.generate()
         self.assertEqual(record.algorithm, "ml-dsa-87")
         self.assertEqual(record.address, derive_address(record.public_key))
+        self.assertEqual(len(record.address), 128)
+        self.assertNotEqual(record.address, record.public_key)
         self.assertEqual(len(record.public_key), 2592 * 2)
         self.assertEqual(len(record.private_key), 4896 * 2)
         signature = backend.sign(record.private_key, b"abc123def456")

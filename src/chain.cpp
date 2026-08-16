@@ -14,8 +14,8 @@
 namespace addition {
 namespace {
 
-std::string derive_address_from_pubkey(const std::string& pubkey_hex) {
-    return to_hex(sha3_512_bytes("addr|" + pubkey_hex)).substr(0, 40);
+bool signer_binds_pubkey(const Transaction& tx, std::string& error) {
+    return address_binds_pubkey(tx.signer, kMlDsa87SchemeId, tx.signer_pubkey, error);
 }
 
 std::uint64_t now_seconds() {
@@ -573,8 +573,7 @@ bool Chain::validate_transaction_signature(const Transaction& tx, std::string& e
         return false;
     }
 
-    if (derive_address_from_pubkey(tx.signer_pubkey) != tx.signer) {
-        error = "signer/pubkey mismatch";
+    if (!signer_binds_pubkey(tx, error)) {
         return false;
     }
 
@@ -821,8 +820,7 @@ bool Chain::validate_block_transactions(const Block& candidate, std::string& err
             error = "non-coinbase tx missing PQ signature";
             return false;
         }
-        if (derive_address_from_pubkey(tx.signer_pubkey) != tx.signer) {
-            error = "signer/pubkey mismatch";
+        if (!signer_binds_pubkey(tx, error)) {
             return false;
         }
         Transaction unsigned_tx = tx;

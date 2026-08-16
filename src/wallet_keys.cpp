@@ -17,8 +17,8 @@ WalletKeys generate_wallet_keys() {
             OQS_SIG_free(sig);
             const auto public_key = bytes_to_hex(pub);
             const auto private_key = bytes_to_hex(sec);
-            const auto address = to_hex(sha3_512_bytes("addr|" + public_key)).substr(0, 40);
-            return WalletKeys{private_key, public_key, address, "ml-dsa-87"};
+            const auto address = hash_committed_address(kMlDsa87SchemeId, pub);
+            return WalletKeys{private_key, public_key, address, kMlDsa87SchemeId};
         }
         OQS_SIG_free(sig);
     }

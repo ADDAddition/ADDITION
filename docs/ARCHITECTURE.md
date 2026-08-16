@@ -10,7 +10,7 @@
 - `chain.*`: canonical ledger state and block validation
 - `mempool.*`: pending transaction queue; rejects unsigned / empty-input / duplicate-outpoint junk
 - `miner.*`: block template and SHA3-512 PoW; drops leftover invalid mempool txs instead of failing the block
-- `crypto.*`: ML-DSA-87 with thread-local OQS_SIG and parallel batch verify
+- `crypto.*`: ML-DSA-87 with thread-local OQS_SIG and parallel batch verify; addresses are SHA3-512(scheme_id || 0x00 || pubkey_bytes) (128 hex)
 - `rpc_server.*`: text-command RPC handling
 - `wallet.*`: transaction creation and submission
 

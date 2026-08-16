@@ -77,6 +77,10 @@ if(ADDITION_BUILD_TESTS)
     target_link_libraries(test_wallet PRIVATE addition_core)
     add_test(NAME test_wallet COMMAND test_wallet)
 
+    add_executable(test_hash_address tests/test_hash_address.cpp)
+    target_link_libraries(test_hash_address PRIVATE addition_core)
+    add_test(NAME test_hash_address COMMAND test_hash_address)
+
     add_executable(test_privacy tests/test_privacy.cpp)
     target_link_libraries(test_privacy PRIVATE addition_core)
     add_test(NAME test_privacy COMMAND test_privacy)

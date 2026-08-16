@@ -155,6 +155,60 @@ bool hex_to_bytes(const std::string& hex,
     return true;
 }
 
+std::string hash_committed_address(const std::string& scheme_id,
+                                   const std::vector<std::uint8_t>& pubkey) {
+    if (scheme_id.empty() || pubkey.empty()) {
+        return {};
+    }
+    std::vector<std::uint8_t> preimage;
+    preimage.reserve(scheme_id.size() + 1 + pubkey.size());
+    preimage.insert(preimage.end(), scheme_id.begin(), scheme_id.end());
+    preimage.push_back(0);
+    preimage.insert(preimage.end(), pubkey.begin(), pubkey.end());
+    return to_hex(sha3_512_bytes(preimage));
+}
+
+std::string hash_committed_address_hex(const std::string& scheme_id,
+                                       const std::string& pubkey_hex) {
+    std::vector<std::uint8_t> pk;
+    std::string error;
+    if (!hex_to_bytes(pubkey_hex, pk, error) || pk.empty()) {
+        return {};
+    }
+    return hash_committed_address(scheme_id, pk);
+}
+
+bool address_binds_pubkey(const std::string& address,
+                          const std::string& scheme_id,
+                          const std::string& pubkey_hex,
+                          std::string& error) {
+    if (scheme_id.empty()) {
+        error = "missing scheme_id";
+        return false;
+    }
+    if (address.size() != kHashCommittedAddressHexLen) {
+        error = "address is not a 128-hex hash commitment";
+        return false;
+    }
+    for (char c : address) {
+        if (!is_hex_char(c)) {
+            error = "address is not a 128-hex hash commitment";
+            return false;
+        }
+    }
+    std::vector<std::uint8_t> pk;
+    if (!hex_to_bytes(pubkey_hex, pk, error) || pk.empty()) {
+        error = "invalid pubkey hex";
+        return false;
+    }
+    const auto derived = hash_committed_address(scheme_id, pk);
+    if (derived.empty() || derived != address) {
+        error = "signer/pubkey hash-address mismatch";
+        return false;
+    }
+    return true;
+}
+
 std::string sign_message_hybrid(const std::string& private_key,
                                 const std::string& message,
                                 const std::string& pq_context) {

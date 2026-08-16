@@ -47,8 +47,12 @@ Keys are generated **locally** with liboqs ML-DSA-87, using the same address
 formula as the node:
 
 ```text
-address = sha3_512("addr|" + pubkey_hex)[0:40]
+address = sha3_512(scheme_id || 0x00 || pubkey_bytes)   # 128 hex, scheme_id = "ml-dsa-87"
 ```
+
+The spend path recomputes that hash from the revealed pubkey. A pubkey that
+does not commit to the address is rejected. The raw 2592-byte ML-DSA-87 key
+is not the address.
 
 The secret is written to a gitignored file (default `data/addition.wallet`,
 mode `0600`) and is used only in-process to sign `sign_hash`.
