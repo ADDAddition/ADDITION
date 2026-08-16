@@ -149,7 +149,7 @@ Local RPC on `127.0.0.1:8545` stays trusted (mine, wallets, sends). To expose a 
 
 Default public bind is `0.0.0.0:38545`. Allowlist only:
 
-`getinfo`, `monetary_info`, `crypto_selftest`, `tx_status`, `peers`, `getblock`, `getblockhash`
+`getinfo`, `monetary_info`, `crypto_selftest`, `tx_status`, `peers`, `getblock`, `getblockhash`, `getblockraw`
 
 ```bash
 printf 'getinfo\n' | nc 127.0.0.1 38545

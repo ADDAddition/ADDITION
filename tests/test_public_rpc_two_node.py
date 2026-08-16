@@ -2,7 +2,8 @@
 """Live public-RPC + two-node testnet check.
 
 Starts two additiond processes. Public port must serve getinfo and reject writes.
-addpeer is required to succeed. Sync is attempted and reported honestly.
+Node A mines several blocks. Node B starts at height 0, addpeer+sync, and must
+reach A's height. Genesis may have tx_count=0.
 """
 
 from __future__ import annotations
@@ -47,6 +48,14 @@ def pick_ports() -> dict[str, int]:
         "b_write": 19046,
         "b_p2p": 29046,
     }
+
+
+def field(text: str, name: str) -> str:
+    key = name + "="
+    for part in text.replace(",", " ").split():
+        if part.startswith(key):
+            return part[len(key) :]
+    return ""
 
 
 def tcp_rpc(host: str, port: int, command: str, timeout: float = 6.0) -> str:
@@ -219,6 +228,32 @@ def main() -> int:
         if "network=testnet" not in trusted:
             return fail("trusted write getinfo: " + trusted)
 
+        genesis = tcp_rpc("127.0.0.1", ports["a_write"], "getblock 0")
+        if "tx_count=0" not in genesis:
+            return fail("genesis must have tx_count=0: " + genesis)
+        if "timestamp=1763000000" not in genesis:
+            return fail("genesis timestamp: " + genesis)
+        raw0 = tcp_rpc("127.0.0.1", ports["a_pub"], "getblockraw 0")
+        if not raw0.startswith("ok:BLKDATA|"):
+            return fail("public getblockraw 0: " + raw0)
+        _, _, http_raw0 = http_request(ports["a_pub"], "GET", "/rpc?cmd=getblockraw%200")
+        if "ok:BLKDATA|" not in http_raw0:
+            return fail("public HTTP getblockraw 0: " + http_raw0)
+
+        for i in range(3):
+            mined = tcp_rpc("127.0.0.1", ports["a_write"], "mine miner1", timeout=35.0)
+            if mined.startswith("error:"):
+                return fail("mine %s: %s" % (i + 1, mined))
+
+        info_a = tcp_rpc("127.0.0.1", ports["a_write"], "getinfo")
+        height_a = field(info_a, "height")
+        if not height_a.isdigit() or int(height_a) < 3:
+            return fail("node A height after mine: " + info_a)
+
+        info_b = tcp_rpc("127.0.0.1", ports["b_write"], "getinfo")
+        if field(info_b, "height") != "0":
+            return fail("node B must start at height 0: " + info_b)
+
         add = tcp_rpc("127.0.0.1", ports["b_write"], "addpeer 127.0.0.1:%s" % ports["a_p2p"])
         if add not in {"ok", "error: invalid/duplicate peer"}:
             return fail("addpeer: " + add)
@@ -226,17 +261,17 @@ def main() -> int:
         if ("127.0.0.1:%s" % ports["a_p2p"]) not in peers_b:
             return fail("node B peers missing A: " + peers_b)
 
-        sync = tcp_rpc("127.0.0.1", ports["b_write"], "sync")
-        if sync.startswith("ok:"):
-            print("two-node sync:", sync)
-        else:
-            print(
-                "honest P2P limitation: sync did not complete (%s). "
-                "P2P is IPv4-only, off unless ADDITION_ENABLE_P2P_RPC=1, "
-                "and empty testnet chains have nothing to fetch." % sync
-            )
+        sync = tcp_rpc("127.0.0.1", ports["b_write"], "sync", timeout=45.0)
+        if sync == "ok:height=0":
+            return fail("sync returned ok:height=0 while A is at height %s" % height_a)
+        if not sync.startswith("ok:height="):
+            return fail("sync: " + sync)
+        height_b = sync.split("=", 1)[1]
+        if height_b != height_a:
+            return fail("B height %s != A height %s (sync=%s)" % (height_b, height_a, sync))
 
-        print("public RPC getinfo ok; writes rejected; two processes addpeer ok")
+        print("two-node sync:", sync)
+        print("public RPC getinfo ok; writes rejected; B pulled A's chain")
         print("ports", ports)
         return 0
     finally:

@@ -30,9 +30,41 @@ outsiders can `--bootstrap 34.27.30.115:28545`. Do not invent extra peers.
 The binary still leaves P2P off until that env is set; the public GCP
 node sets it.
 
+## Live seed P2P + public-read ingest
+
+The operator seed at **34.27.30.115:28545** loop-reads until `\n`. A
+well-connected host can send a ~16 KiB HELLO and get a proper error
+line (`hello timestamp skew`). A residential WAN path can still fail
+the same write: `addpeer` after `--bootstrap` is `invalid/duplicate`
+(already listed); `sync` must not print `ok:height=0`.
+
+Current `additiond` on the home client:
+
+- TCP_NODELAY, TCP_MAXSEG 1200, paced 1 KiB writes, 45s I/O timeout
+- wire id `n-<32 hex of SHA3(node-id|pubkey)>`, never the shared `self`
+- up to 8 HELLO attempts with `n-<hash>xN` on retry
+- leftover `ok:BLK|` counts as handshake-accepted only if `REQWORK`
+  then returns `HAVEWORK`
+- `sync` pulls via public-read HTTP first: `<seed-ip>:80` (nginx), then
+  `<seed-ip>:38545`. Home ISPs that blackhole 28545/38545 still reach
+  `getinfo` + `getblockraw <height>` on port 80 (`GET /rpc?cmd=`).
+  Host header is the IPv4 address. No TLS in this client.
+- `sync` returns `error: …` when both paths fail or the peer is still
+  longer; it must not print `ok:height=0` in those cases
+
+```text
+client: <peer_id> HELLO|2|ADDITION_TESTNET_V1|<unix_ts>|<nonce>|<ml-dsa-87-pubkey-hex>|<sig-hex>\n
+seed:   loop-read until '\n' (max 262144)
+seed:   ok:HELLO_ACK|2|ADDITION_TESTNET_V1|<unix_ts>|<same-nonce>|<ml-dsa-87-pubkey-hex>|<sig-hex>\n
+```
+
 Public allowlist: `getinfo`, `monetary_info`, `crypto_selftest`, `tx_status`,
-`peers`, `getblock`, `getblockhash`. Writes (`mine`, `sendtx*`, `createwallet`,
-`wallet_*`) return `error: command disabled on public RPC`.
+`peers`, `getblock`, `getblockhash`, `getblockraw`. Writes (`mine`,
+`sendtx*`, `createwallet`, `wallet_*`) return
+`error: command disabled on public RPC`.
+
+Write RPC stays `127.0.0.1`. Contact:
+[contact@additionblockchain.com](mailto:contact@additionblockchain.com).
 
 Do not commit trycloudflare or other ephemeral tunnel URLs. Point a website
 `PUBLIC_RPC_HTTP` at a durable HTTP URL you operate, or leave it empty so the

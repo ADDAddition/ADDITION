@@ -269,31 +269,7 @@ int main(int argc, char** argv) {
     });
 
     addition::RpcNetworkServer p2p_rpc("0.0.0.0", node_cfg.p2p_port, [&](const std::string& cmd) {
-        std::istringstream iss(cmd);
-        std::string peer;
-        iss >> peer;
-        std::string payload;
-        std::getline(iss, payload);
-        if (!payload.empty() && payload.front() == ' ') {
-            payload.erase(payload.begin());
-        }
-
-        if (peer.empty() || payload.empty()) {
-            return std::string("error: usage <peer> <payload>");
-        }
-
-        std::string err;
-        if (!node.handle_inbound_message(peer, payload, err)) {
-            return std::string("error: ") + err;
-        }
-
-        auto outbound = node.pull_outbound_messages();
-        if (outbound.empty()) {
-            return std::string("ok");
-        }
-        std::ostringstream out;
-        out << "ok:" << outbound.front();
-        return out.str();
+        return node.handle_p2p_line(cmd);
     });
 
     addition::RpcServer rpc(chain,
@@ -438,7 +414,7 @@ int main(int argc, char** argv) {
         } else {
             std::cout << "public read RPC listening on " << node_cfg.public_rpc_bind << ':'
                       << node_cfg.public_rpc_port
-                      << " allowlist=getinfo,monetary_info,crypto_selftest,tx_status,peers,getblock,getblockhash\n";
+                      << " allowlist=getinfo,monetary_info,crypto_selftest,tx_status,peers,getblock,getblockhash,getblockraw\n";
         }
     } else {
         std::cout << "public read RPC disabled (set --public-rpc or ADDITION_ENABLE_PUBLIC_RPC=1)\n";
@@ -522,7 +498,7 @@ int main(int argc, char** argv) {
                  "swap_best_route_exact_in_signed <token_in> <token_out> <trader> <amount_in> <min_out> <deadline_unix> <max_hops> <trader_pubkey> <trader_sig>,\n"
                  "nft_mint <collection> <token_id> <owner> <metadata>, nft_transfer <collection> <token_id> <from> <to>, nft_owner <collection> <token_id>,\n"
                  "sendtx_hash <from_addr> <pubkey_hex> <privkey_hex> <to_addr> <amount> <fee> <nonce> (insecure legacy), tx_status <tx_hash>,\n"
-                 "getblock <height_or_hash>, getblockhash <height>,\n"
+                 "getblock <height_or_hash>, getblockhash <height>, getblockraw <height>,\n"
                  "peer_inbound <peer> <payload>, gossip_flush, sync, node_pubkey,\n"
                  "identity_rotate_propose <new_pub> <new_priv> <grace_sec>, identity_rotate_vote <peer_id>,\n"
                  "identity_rotate_vote_broadcast, identity_rotate_commit, identity_rotate_status, quit\n";

@@ -25,6 +25,7 @@ Allowlist (everything else returns `error: command disabled on public RPC`):
 - `peers`
 - `getblock <height_or_hash>`
 - `getblockhash <height>`
+- `getblockraw <height>`
 
 Not on the public port: `mine`, `sendtx*`, `createwallet`, `wallet_*`, identity rotation, admin, contract/token writes.
 
@@ -70,6 +71,7 @@ Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so the worke
 - `tx_status <tx_hash>`
 - `getblock <height_or_hash>`
 - `getblockhash <height>`
+- `getblockraw <height>`
 - `mine` — testnet: SHA3-512 header PoW, 30s deadline. Trusted RPC / stdin only. Optional in-process auto-mine (`--auto-mine`, `ADDITION_AUTO_MINE=1`) is off by default, testnet only, and is not a public RPC command. `getinfo` reports `pow_algorithm=sha3_512` and `auto_mine=off|on`. The mainnet *profile* still uses memory-hard hashing and is not demonstrated live.
 
 ## P2P + Consensus
