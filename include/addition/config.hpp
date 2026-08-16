@@ -16,6 +16,11 @@ enum class PowAlgorithm {
     MemoryHard,
 };
 
+// Testnet PoW knobs. Easy = ~2^16 SHA3-512 header hashes; hard can approach ~60s.
+// Easy is also the ceiling: 2^56-1 (old max) mined in milliseconds.
+inline constexpr std::uint64_t kTestnetEasyDifficultyTarget = 0x0000FFFFFFFFFFFFULL;
+inline constexpr std::uint64_t kTestnetHardDifficultyTarget = 0x000000FFFFFFFFFFULL;
+
 struct ChainConfig {
     std::string network_mode{"testnet"};
     std::string network_name{"addition-testnet"};
@@ -27,9 +32,11 @@ struct ChainConfig {
     std::uint32_t target_block_time_sec{60U};
     std::uint32_t difficulty_window{120U};
     PowAlgorithm pow_algorithm{PowAlgorithm::Sha3_512};
-    std::uint64_t initial_difficulty_target{0x0000FFFFFFFFFFFFULL};
-    std::uint64_t min_difficulty_target{0x0000FFFFFFFFFFFFULL};
-    std::uint64_t max_difficulty_target{0x00FFFFFFFFFFFFFFULL};
+    // SHA3-512 first 64 bits vs target. Higher target = easier.
+    // Easy bound (~2^16 hashes) is the ceiling: 2^56-1 mined in milliseconds.
+    std::uint64_t initial_difficulty_target{kTestnetEasyDifficultyTarget};
+    std::uint64_t min_difficulty_target{kTestnetHardDifficultyTarget};
+    std::uint64_t max_difficulty_target{kTestnetEasyDifficultyTarget};
     std::uint32_t retarget_window{30U};
     std::uint32_t halving_interval{210000U};
     bool require_pq_signatures{true};
@@ -61,6 +68,10 @@ struct NodeConfig {
 inline constexpr const char* kOperatorPublicP2p = "34.27.30.115:28545";
 
 bool is_ipv4_endpoint(const std::string& endpoint);
+bool is_loopback_host(const std::string& host);
+bool is_loopback_endpoint(const std::string& endpoint);
+bool is_self_peer_label(const std::string& endpoint);
+bool is_external_advertised_peer(const std::string& endpoint);
 
 const ChainConfig& default_config();
 ChainConfig testnet_chain_config();

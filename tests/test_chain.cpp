@@ -32,6 +32,20 @@ int main() {
         std::cerr << "test failed: testnet must use sha3_512 header PoW\n";
         return 1;
     }
+    {
+        const auto tn = addition::testnet_chain_config();
+        if (tn.max_difficulty_target != addition::kTestnetEasyDifficultyTarget ||
+            tn.initial_difficulty_target != addition::kTestnetEasyDifficultyTarget ||
+            tn.min_difficulty_target != addition::kTestnetHardDifficultyTarget ||
+            tn.max_difficulty_target >= 0x00FFFFFFFFFFFFFFULL) {
+            std::cerr << "test failed: testnet max target must stay at the easy bound, not 2^56-1\n";
+            return 1;
+        }
+        if (tn.min_difficulty_target >= tn.max_difficulty_target) {
+            std::cerr << "test failed: testnet min target must be able to harden below the easy bound\n";
+            return 1;
+        }
+    }
     if (addition::mainnet_chain_config().pow_algorithm != addition::PowAlgorithm::MemoryHard) {
         std::cerr << "test failed: mainnet profile must keep memory_hard PoW\n";
         return 1;
@@ -198,6 +212,38 @@ int main() {
             return 1;
         }
         std::filesystem::remove_all(persist_dir);
+    }
+
+    {
+        addition::ChainConfig retarget = addition::testnet_chain_config();
+        retarget.retarget_window = 2;
+        addition::Chain fast(retarget);
+        addition::Mempool fast_pool;
+        addition::Miner fast_miner(fast, fast_pool);
+        const auto start_target = fast.current_difficulty_target();
+        std::string fast_hash;
+        if (!fast_miner.mine_next_block("retarget_miner", 8, 1, fast_hash, error)) {
+            std::cerr << "test failed: retarget mine b1: " << error << '\n';
+            return 1;
+        }
+        if (fast.current_difficulty_target() != start_target) {
+            std::cerr << "test failed: first block must not retarget\n";
+            return 1;
+        }
+        if (!fast_miner.mine_next_block("retarget_miner", 8, 1, fast_hash, error)) {
+            std::cerr << "test failed: retarget mine b2: " << error << '\n';
+            return 1;
+        }
+        const auto after = fast.current_difficulty_target();
+        if (after >= start_target) {
+            std::cerr << "test failed: burst mine must harden target, got " << after
+                      << " start " << start_target << '\n';
+            return 1;
+        }
+        if (after < retarget.min_difficulty_target || after > retarget.max_difficulty_target) {
+            std::cerr << "test failed: retarget left the configured band\n";
+            return 1;
+        }
     }
 
     std::cout << "all tests passed\n";

@@ -41,4 +41,11 @@ tail_emission_reward = 1
 min_fee = 1
 genesis_timestamp = 1763000000
 # Testnet PoW: SHA3-512 of the header vs difficulty_target. Not memory-hard.
+# Higher target = easier. Easy bound (~2^16 hashes) is also the ceiling.
+# The old max 0x00FFFFFFFFFFFFFF (2^56-1) mined in a few milliseconds.
+# Burst mining hardens toward min; a stale genesis timestamp is skipped.
 pow_algorithm = "sha3_512"
+initial_difficulty_target = 0x0000FFFFFFFFFFFF
+max_difficulty_target = 0x0000FFFFFFFFFFFF
+min_difficulty_target = 0x000000FFFFFFFFFF
+retarget_window = 30
