@@ -192,6 +192,52 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("RPC offline", contracts)
         self.assertNotIn("wallet-connect", swap.lower())
 
+    def test_wallet_swap_panel_chrome_images_only(self) -> None:
+        wallet = read("wallet/index.html")
+        swap = read("swap/index.html")
+        index = read("index.html")
+        chrome = read("chrome.js")
+        mark = "/wallet/chrome/addition-mark.png"
+        shot = "/wallet/chrome/getinfo-localhost.png"
+        for page in (wallet, swap):
+            self.assertIn(mark, page)
+            self.assertIn(shot, page)
+            self.assertIn("panel-chrome", page)
+            self.assertIn("ADDITION_TESTNET_V1", page)
+            self.assertIn("Chrome only", page)
+            self.assertNotIn("TVL", page)
+            self.assertNotIn("APY", page)
+            self.assertNotIn("hashrate", page.lower())
+            self.assertNotIn("token sale", page.lower())
+            self.assertNotIn("KH/s", page)
+        self.assertNotIn(mark, index)
+        self.assertNotIn(shot, index)
+        self.assertNotIn(mark, chrome)
+        self.assertNotIn(shot, chrome)
+        self.assertNotIn("/swap/", index)
+
+        png_magic = b"\x89PNG\r\n\x1a\n"
+        mark_path = PUBLIC / "wallet/chrome/addition-mark.png"
+        shot_path = PUBLIC / "wallet/chrome/getinfo-localhost.png"
+        raw_path = PUBLIC / "wallet/chrome/getinfo-localhost.txt"
+        self.assertTrue(mark_path.is_file())
+        self.assertTrue(shot_path.is_file())
+        self.assertTrue(raw_path.is_file())
+        self.assertEqual(mark_path.read_bytes()[:8], png_magic)
+        self.assertEqual(shot_path.read_bytes()[:8], png_magic)
+        self.assertGreater(mark_path.stat().st_size, 500)
+        self.assertGreater(shot_path.stat().st_size, 5000)
+        raw = raw_path.read_text(encoding="utf-8")
+        self.assertIn("network=testnet", raw)
+        self.assertIn("network_id=ADDITION_TESTNET_V1", raw)
+        self.assertIn("pq_mode=strict", raw)
+        self.assertNotIn("TVL", raw)
+        self.assertNotIn("APY", raw)
+
+        serve = (ROOT / "web" / "serve.py").read_text(encoding="utf-8")
+        self.assertIn('return "image/png"', serve)
+        self.assertIn('ADDITION_LOCAL_RPC_HOST", "127.0.0.1"', serve)
+
     def test_common_js_fail_closed_and_strip_keys(self) -> None:
         common = read("common.js")
         self.assertIn('raw: "RPC offline"', common)
