@@ -124,6 +124,18 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertLess(len(index.splitlines()), 50)
         self.assertIn("SHA3-512", index)
         self.assertIn("getinfo", index)
+        self.assertIn("getblockraw", index)
+
+    def test_rpc_page_documents_allowlist_and_json(self) -> None:
+        rpc = read("rpc/index.html")
+        self.assertIn("getblockraw", rpc)
+        self.assertIn("/jsonrpc?method=getinfo", rpc)
+        self.assertIn("34.27.30.115:28545", rpc)
+        self.assertIn(":80", rpc)
+        self.assertIn(":38545", rpc)
+        self.assertIn("127.0.0.1:8545", rpc)
+        self.assertNotIn("labreche_jeremy", rpc)
+        self.assertNotIn("outlook.com", rpc)
 
     def test_join_docs_state_live_bootstrap_and_sync(self) -> None:
         join = read("join/index.html")

@@ -36,6 +36,7 @@ TOKEN_READ_COMMANDS = {
     "token_balance",
     "token_info",
     "nft_owner",
+    "nft_info",
     "getinfo",
 }
 
@@ -165,6 +166,11 @@ class TokenClient:
         collection = _require_token(collection, "collection")
         token_id = _require_token(token_id, "token_id")
         return self._call(f"nft_owner {collection} {token_id}")
+
+    def nft_info(self, collection: str, token_id: str) -> str:
+        collection = _require_token(collection, "collection")
+        token_id = _require_token(token_id, "token_id")
+        return self._call(f"nft_info {collection} {token_id}")
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -17,7 +17,7 @@ import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from ipaddress import ip_address
 from typing import Any, Dict, List, Optional, Sequence, Tuple
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from addition_text_rpc import (
     CONTACT,
@@ -30,6 +30,19 @@ from addition_text_rpc import (
 
 DEFAULT_ADAPTER_HOST = "127.0.0.1"
 DEFAULT_ADAPTER_PORT = 8645
+DEFAULT_PUBLIC_RPC_PORT = 38545
+
+# Public-read allowlist. Same set as additiond public RPC / is_public_read_command.
+PUBLIC_READ_METHODS = {
+    "getinfo",
+    "getblock",
+    "getblockhash",
+    "getblockraw",
+    "monetary_info",
+    "peers",
+    "tx_status",
+    "crypto_selftest",
+}
 
 # Exact TEXT RPC command names. No invented methods. No eth_* aliases.
 READ_METHODS = {
@@ -40,10 +53,16 @@ READ_METHODS = {
     "token_balance",
     "token_info",
     "nft_owner",
+    "nft_info",
     "monetary_info",
     "fee_info",
     "protocol_status",
     "crypto_selftest",
+    "getblock",
+    "getblockhash",
+    "getblockraw",
+    "peers",
+    "swap_tvl",
 }
 
 # Exist on trusted local TEXT RPC. Unsigned in-process mutations. No keys.
@@ -110,9 +129,15 @@ def format_text_command(method: str, params: Sequence[Any]) -> str:
     return " ".join(parts)
 
 
-def classify_method(method: str) -> str:
+def classify_method(method: str, public_read: bool = False) -> str:
     if method in REFUSED_METHODS or method.startswith("eth_") or method.startswith("web3_"):
         return "refused"
+    if public_read:
+        if method in PUBLIC_READ_METHODS:
+            return "read"
+        if method in WRITE_METHODS:
+            return "refused"
+        return "unknown"
     if method in READ_METHODS:
         return "read"
     if method in WRITE_METHODS:
@@ -125,12 +150,13 @@ def dispatch(
     method: str,
     params: Sequence[Any],
     allow_writes: bool,
+    public_read: bool = False,
 ) -> str:
-    kind = classify_method(method)
+    kind = classify_method(method, public_read=public_read)
     if kind == "refused":
         raise AdapterError(
-            "refused: this local/testnet adapter does not forward spend/key "
-            "commands or Ethereum JSON-RPC methods",
+            "refused: this adapter does not forward spend/key "
+            "commands, writes on --public-read, or Ethereum JSON-RPC methods",
             -32601,
         )
     if kind == "unknown":
@@ -138,8 +164,8 @@ def dispatch(
             f"unknown TEXT RPC method {method!r}; this adapter is not Ethereum JSON-RPC",
             -32601,
         )
-    if kind == "write" and not allow_writes:
-        raise AdapterError("write methods disabled (--read-only)", -32601)
+    if kind == "write" and (not allow_writes or public_read):
+        raise AdapterError("write methods disabled (--read-only / --public-read)", -32601)
     command = format_text_command(method, params)
     reply = rpc.call(command)
     if reply.startswith("error:"):
@@ -156,17 +182,27 @@ def jsonrpc_response(req_id: Any, result: Any = None, error: Optional[Dict[str, 
     return body
 
 
-def handle_payload(rpc: TextRpcClient, payload: Any, allow_writes: bool) -> Any:
+def handle_payload(
+    rpc: TextRpcClient,
+    payload: Any,
+    allow_writes: bool,
+    public_read: bool = False,
+) -> Any:
     if isinstance(payload, list):
         if not payload:
             raise AdapterError("empty batch", -32600)
-        return [handle_one(rpc, item, allow_writes) for item in payload]
+        return [handle_one(rpc, item, allow_writes, public_read) for item in payload]
     if isinstance(payload, dict):
-        return handle_one(rpc, payload, allow_writes)
+        return handle_one(rpc, payload, allow_writes, public_read)
     raise AdapterError("JSON-RPC body must be an object or array", -32700)
 
 
-def handle_one(rpc: TextRpcClient, item: Any, allow_writes: bool) -> Dict[str, Any]:
+def handle_one(
+    rpc: TextRpcClient,
+    item: Any,
+    allow_writes: bool,
+    public_read: bool = False,
+) -> Dict[str, Any]:
     if not isinstance(item, dict):
         return jsonrpc_response(None, error={"code": -32600, "message": "invalid request"})
     req_id = item.get("id")
@@ -184,7 +220,7 @@ def handle_one(rpc: TextRpcClient, item: Any, allow_writes: bool) -> Dict[str, A
             error={"code": -32602, "message": "params must be a positional array"},
         )
     try:
-        result = dispatch(rpc, method, params, allow_writes)
+        result = dispatch(rpc, method, params, allow_writes, public_read)
         return jsonrpc_response(req_id, result=result)
     except AdapterError as exc:
         return jsonrpc_response(req_id, error={"code": exc.code, "message": str(exc)})
@@ -200,9 +236,11 @@ class AdapterServer(ThreadingHTTPServer):
         server_address: Tuple[str, int],
         rpc: TextRpcClient,
         allow_writes: bool,
+        public_read: bool = False,
     ) -> None:
         self.rpc = rpc
         self.allow_writes = allow_writes
+        self.public_read = public_read
         super().__init__(server_address, AdapterHandler)
 
 
@@ -221,19 +259,41 @@ class AdapterHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self) -> None:  # noqa: N802 — BaseHTTPRequestHandler API
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
+        path = parsed.path
+        if path in {"/jsonrpc", "/jsonrpc/"}:
+            query = parse_qs(parsed.query)
+            method = (query.get("method") or [""])[0]
+            raw_params = (query.get("params") or [""])[0]
+            params: List[Any] = [p for p in raw_params.split(",") if p] if raw_params else []
+            req_id_raw = (query.get("id") or ["1"])[0]
+            try:
+                req_id: Any = int(req_id_raw)
+            except ValueError:
+                req_id = req_id_raw
+            payload = {"jsonrpc": "2.0", "id": req_id, "method": method, "params": params}
+            response = handle_payload(
+                self.server.rpc,
+                payload,
+                self.server.allow_writes,
+                self.server.public_read,
+            )
+            self._send(200, json.dumps(response).encode("utf-8"), "application/json")
+            return
         if path not in {"/", "/rpc", "/health"}:
             self._send(404, b"not found\n", "text/plain; charset=utf-8")
             return
         text = (
-            "ADDITION local/testnet TEXT-RPC adapter. Not Ethereum JSON-RPC. "
-            f"POST JSON-RPC 2.0 to /rpc. Contact: {CONTACT}\n"
+            "ADDITION JSON-RPC adapter. Not Ethereum JSON-RPC. "
+            "POST JSON-RPC 2.0 to /rpc or /jsonrpc. "
+            "GET /jsonrpc?method=getinfo. "
+            f"Contact: {CONTACT}\n"
         )
         self._send(200, text.encode("utf-8"), "text/plain; charset=utf-8")
 
     def do_POST(self) -> None:  # noqa: N802 — BaseHTTPRequestHandler API
         path = urlparse(self.path).path
-        if path not in {"/", "/rpc"}:
+        if path not in {"/", "/rpc", "/jsonrpc", "/jsonrpc/"}:
             self._send(404, b"not found\n", "text/plain; charset=utf-8")
             return
         length_raw = self.headers.get("Content-Length", "")
@@ -254,7 +314,12 @@ class AdapterHandler(BaseHTTPRequestHandler):
             ).encode("utf-8")
             self._send(200, body, "application/json")
             return
-        response = handle_payload(self.server.rpc, payload, self.server.allow_writes)
+        response = handle_payload(
+            self.server.rpc,
+            payload,
+            self.server.allow_writes,
+            self.server.public_read,
+        )
         self._send(200, json.dumps(response).encode("utf-8"), "application/json")
 
 
@@ -275,25 +340,50 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="forward only read TEXT RPC commands",
     )
+    parser.add_argument(
+        "--public-read",
+        action="store_true",
+        help=(
+            "public-read JSON API: same allowlist as public RPC "
+            "(getinfo, getblock, getblockhash, getblockraw, monetary_info, "
+            "peers, tx_status, crypto_selftest). No writes. Bind may be 0.0.0.0."
+        ),
+    )
     return parser
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     args = build_parser().parse_args(argv)
-    if not is_loopback_host(args.bind) or not is_loopback_host(args.rpc_host):
-        print(
-            "error: adapter and TEXT RPC host must be loopback "
-            "(127.0.0.1 / localhost / ::1). No public JSON-RPC is published.",
-            file=sys.stderr,
-        )
-        return 2
+    if args.public_read:
+        if args.rpc_port == DEFAULT_RPC_PORT:
+            args.rpc_port = DEFAULT_PUBLIC_RPC_PORT
+        allow_writes = False
+    else:
+        if not is_loopback_host(args.bind) or not is_loopback_host(args.rpc_host):
+            print(
+                "error: adapter and TEXT RPC host must be loopback "
+                "(127.0.0.1 / localhost / ::1) unless --public-read.",
+                file=sys.stderr,
+            )
+            return 2
+        allow_writes = not args.read_only
     rpc = TextRpcClient(host=args.rpc_host, port=args.rpc_port, token=args.rpc_token)
-    server = AdapterServer((args.bind, args.port), rpc, allow_writes=not args.read_only)
-    mode = "read-only" if args.read_only else "read + local token writes"
+    server = AdapterServer(
+        (args.bind, args.port),
+        rpc,
+        allow_writes=allow_writes,
+        public_read=args.public_read,
+    )
+    if args.public_read:
+        mode = "public-read allowlist, no writes"
+    elif args.read_only:
+        mode = "read-only"
+    else:
+        mode = "read + local token writes"
     print(
-        f"ADDITION local/testnet JSON-RPC adapter on http://{args.bind}:{args.port}/rpc "
+        f"ADDITION JSON-RPC adapter on http://{args.bind}:{args.port}/jsonrpc "
         f"({mode}). Upstream TEXT RPC {args.rpc_host}:{args.rpc_port}. "
-        "Not Ethereum JSON-RPC."
+        "Not Ethereum JSON-RPC. GET /jsonrpc?method=getinfo or POST JSON-RPC 2.0."
     )
     try:
         server.serve_forever()

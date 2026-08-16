@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start two honest local testnet processes. Not a public mainnet.
+# Start two local testnet processes. Not a public mainnet.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -97,7 +97,7 @@ else
 fi
 
 cat <<EOF
-two-node testnet running (honest local processes, not a public mainnet)
+two-node testnet running (local processes, not a public mainnet)
 
   Node A write RPC   127.0.0.1:8545
   Node A public RPC  ${PUB_BIND}:38545   (reads only)

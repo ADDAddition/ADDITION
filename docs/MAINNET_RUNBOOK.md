@@ -1,6 +1,6 @@
 # Addition (ADD) experimental profile runbook
 
-> This repository ships an honest **testnet**. There is no live public mainnet.
+> This repository ships a **testnet**. There is no live public mainnet.
 > Default launch is `additiond --network testnet`. Do not set `ADDITION_MAINNET_MODE=1` unless you are explicitly testing the mainnet *profile*.
 
 ## 1) Pre-flight checklist
@@ -88,7 +88,7 @@ Important:
 - Keep `ADDITION_PRIVACY_MASTER_KEY` stable across restarts, otherwise previously sealed private notes cannot be unsealed.
 
 ## 8) Site + wallet (what exists)
-- Honest static site: `python3 web/serve.py` → `http://127.0.0.1:8080`
+- Static site: `python3 web/serve.py` → `http://127.0.0.1:8080`
 - Local wallet page: `/wallet/` (loopback `/local-rpc` only)
 - Desktop/CLI helper: `python3 web/addition_wallet_gui.py` (`--cli` without a display)
 - `web/portal/` is not in this tree. Use `/status/` and `/explorer/` instead.

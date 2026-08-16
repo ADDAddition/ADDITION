@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <string>
+#include <vector>
 
 int main() {
     if (!addition::is_public_read_command("getinfo") ||
@@ -89,6 +90,31 @@ int main() {
         resp.find("Cache-Control: no-store") == std::string::npos) {
         std::cerr << "test failed: HTTP response format\n";
         return 1;
+    }
+
+    {
+        std::string method;
+        std::vector<std::string> params;
+        std::string id_json;
+        std::string err;
+        const std::string body = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getinfo\",\"params\":[]}";
+        if (!addition::parse_jsonrpc_request(body, method, params, id_json, err) ||
+            method != "getinfo" || id_json != "1") {
+            std::cerr << "test failed: parse_jsonrpc_request getinfo: " << err << '\n';
+            return 1;
+        }
+        const std::string body2 = "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"getblockraw\",\"params\":[\"0\"]}";
+        if (!addition::parse_jsonrpc_request(body2, method, params, id_json, err) ||
+            method != "getblockraw" || params.size() != 1 || params[0] != "0") {
+            std::cerr << "test failed: parse_jsonrpc_request getblockraw: " << err << '\n';
+            return 1;
+        }
+        const auto encoded = addition::jsonrpc_result_body("1", "network=testnet");
+        if (encoded.find("\"jsonrpc\":\"2.0\"") == std::string::npos ||
+            encoded.find("network=testnet") == std::string::npos) {
+            std::cerr << "test failed: jsonrpc_result_body\n";
+            return 1;
+        }
     }
 
     const auto preflight = addition::http_rpc_response(204, "");

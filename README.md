@@ -3,7 +3,7 @@
 ![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)
 ![C++](https://img.shields.io/badge/C%2B%2B-20-blue?style=for-the-badge)
 
-**ADDITION** is a research prototype for a post-quantum Layer 1 experiment (Dilithium / ML-DSA + SHA3-512). Default network: `additiond --network testnet`.
+**ADDITION** is a research prototype for a post-quantum Layer 1 experiment (Dilithium / ML-DSA + SHA3-512). Default network: `additiond --network testnet`. It ships a **testnet**, not a live mainnet.
 
 This repository does **not** claim production status, public node counts, a token sale, CoinMarketCap listing, or a live chain. CI badges are omitted until a green pipeline exists.
 
@@ -144,7 +144,7 @@ printf 'wallet_send alice <to> 10 1\n' | nc 127.0.0.1 8545
 
 `wallet_send` signs on the node from the local file. The explicit path is `tx_build` + `wallet_sign` + `sendtx_signed` (still no raw privkey on the wire). Legacy `sendtx` needs `ADDITION_ALLOW_INSECURE_TX_COMMANDS=1`.
 
-UI:
+Local UI:
 
 * Page: `/wallet/` via `python3 web/serve.py` (loopback `/local-rpc` only)
 * Desktop: `python3 web/addition_wallet_gui.py` or `--cli getinfo`
@@ -178,8 +178,11 @@ Default public bind is `0.0.0.0:38545`. Allowlist only:
 ```bash
 printf 'getinfo\n' | nc 127.0.0.1 38545
 curl 'http://127.0.0.1:38545/rpc?cmd=getinfo'
+curl 'http://127.0.0.1:38545/jsonrpc?method=getinfo'
 printf 'mine\n' | nc 127.0.0.1 38545   # error: command disabled on public RPC
 ```
+
+Public-read JSON API (same allowlist, no writes): `GET /jsonrpc?method=getinfo` and `POST /jsonrpc` with JSON-RPC 2.0. Join path: `--bootstrap 34.27.30.115:28545`; `sync` uses HTTP `:80` then `:38545`.
 
 LAN RPC (`18545`) still requires `ADDITION_ENABLE_LAN_RPC=1` and `ADDITION_LAN_RPC_TOKEN`. P2P stays off unless `ADDITION_ENABLE_P2P_RPC=1`. Do not open unauthenticated write RPC to the world.
 
@@ -216,9 +219,9 @@ python3 web/serve.py
 | `/contracts/` `/swap/` `/evm/` | Local node methods only; EVM is bootstrap |
 | `/whitepaper/` `/legal/` | Research copy. No fake ticker or live mainnet |
 
-Explorer/status call `/api/rpc`. On a static host without a backend they fail closed. Optional `?rpc=http://HOST:38545/rpc`.
+Explorer/status call `/api/rpc`. On a static host without a backend they show **RPC offline**. Optional `?rpc=http://HOST:38545/rpc`.
 
-The Pages worker (`web/public/wrangler.toml`) ships `PUBLIC_RPC_HTTP = ""`. Leave it empty so the site fail-closes with **RPC offline**. An operator who runs `--public-rpc` sets `PUBLIC_RPC_HTTP` to that process’s real HTTP URL (for example `http://127.0.0.1:38545/rpc`). Do not commit trycloudflare or other ephemeral URLs.
+The Pages worker (`web/public/wrangler.toml`) ships `PUBLIC_RPC_HTTP = ""`. Leave it empty so the site shows **RPC offline**. An operator who runs `--public-rpc` sets `PUBLIC_RPC_HTTP` to that process’s real HTTP URL (for example `http://127.0.0.1:38545/rpc`). Do not commit trycloudflare or other ephemeral URLs.
 
 `/wallet`, `/contracts`, and `/swap` use loopback `/local-rpc` → `127.0.0.1:8545`. They print the node’s real reply (`error: pool not found` if you have no pool).
 
