@@ -466,8 +466,8 @@ def _client_from_args(args: argparse.Namespace) -> WalletClient:
 def main(argv: Optional[List[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    client = _client_from_args(args)
     try:
+        client = _client_from_args(args)
         if args.command == "createwallet":
             record = client.create(force=args.force)
             print(record.public_view())

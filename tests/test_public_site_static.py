@@ -259,6 +259,7 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertNotIn("wallet-connect", page.lower())
         self.assertNotIn("walletconnect", page.lower())
         self.assertNotIn("token sale", page.lower())
+        self.assertNotIn("tokenomics", page.lower())
         self.assertNotIn("market cap", page.lower())
         self.assertNotIn("coinmarketcap", page.lower())
         self.assertIn("not a hosted web wallet", page.lower())
