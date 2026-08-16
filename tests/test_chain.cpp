@@ -1,10 +1,14 @@
+#include "addition/block.hpp"
 #include "addition/chain.hpp"
 #include "addition/config.hpp"
 #include "addition/crypto.hpp"
 #include "addition/mempool.hpp"
 #include "addition/miner.hpp"
+#include "addition/state_store.hpp"
 #include "addition/wallet_keys.hpp"
 
+#include <chrono>
+#include <filesystem>
 #include <iostream>
 #include <string>
 
@@ -127,6 +131,54 @@ int main() {
     if (chain.balance_of(miner_keys.address) < 79) {
         std::cerr << "test failed: sender balance too low after spend\n";
         return 1;
+    }
+
+    {
+        const auto persist_dir = std::filesystem::temp_directory_path() /
+            ("addition-chain-persist-" +
+             std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        std::filesystem::create_directories(persist_dir);
+        addition::StateStore store(persist_dir.string());
+        if (!store.save_chain(chain, error)) {
+            std::cerr << "test failed: save_chain: " << error << '\n';
+            std::filesystem::remove_all(persist_dir);
+            return 1;
+        }
+        if (!store.chain_file_exists()) {
+            std::cerr << "test failed: blocks.dat missing after save_chain\n";
+            std::filesystem::remove_all(persist_dir);
+            return 1;
+        }
+
+        const auto height_before = chain.height();
+        const auto tip_hash = addition::hash_block_header(chain.tip().header);
+        const auto miner_bal = chain.balance_of("miner1");
+        const auto bob_bal = chain.balance_of("bob");
+
+        addition::Chain restored(live);
+        if (!store.load_chain(restored, error)) {
+            std::cerr << "test failed: load_chain: " << error << '\n';
+            std::filesystem::remove_all(persist_dir);
+            return 1;
+        }
+        if (restored.height() != height_before) {
+            std::cerr << "test failed: restored height " << restored.height()
+                      << " != " << height_before << '\n';
+            std::filesystem::remove_all(persist_dir);
+            return 1;
+        }
+        const auto restored_hash = addition::hash_block_header(restored.tip().header);
+        if (restored_hash != tip_hash) {
+            std::cerr << "test failed: restored tip hash mismatch\n";
+            std::filesystem::remove_all(persist_dir);
+            return 1;
+        }
+        if (restored.balance_of("miner1") != miner_bal || restored.balance_of("bob") != bob_bal) {
+            std::cerr << "test failed: restored UTXO balances mismatch\n";
+            std::filesystem::remove_all(persist_dir);
+            return 1;
+        }
+        std::filesystem::remove_all(persist_dir);
     }
 
     std::cout << "all tests passed\n";

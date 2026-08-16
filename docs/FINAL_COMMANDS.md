@@ -220,8 +220,8 @@ Notes:
 	- Daemon refuses startup if liboqs is not linked
 	- Staking requires sufficient on-chain balance
 	- `sendtx` is routed through decentralized gossip path (`ok:gossiped` on success)
-- Persistent state is stored in `./data` on daemon shutdown and restored on startup:
-	- `blocks.dat`
+- Persistent state is stored under `--data-dir` (default `./data`). `blocks.dat` is written after each accepted block (not only on `quit` / SIGTERM), so a restart does not reset height to 0. Other files are still flushed on shutdown and restored on startup:
+	- `blocks.dat` (headers + txs; UTXOs rebuilt by replay)
 	- `mempool.dat`
 	- `staking.dat`
 	- `contracts.dat`

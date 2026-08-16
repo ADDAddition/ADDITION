@@ -87,3 +87,9 @@ printf 'mine\n' | nc 127.0.0.1 38545
 
 `getinfo` should include `network=testnet`. That is a research testnet
 public-read RPC, not a live mainnet.
+
+`--data-dir` (`/var/lib/addition/testnet` in this unit) holds the chain.
+`blocks.dat` is written after each accepted block. A `systemctl restart`
+must keep the previous `getinfo` height and the same `getblock` hashes.
+If the directory only has `node_identity.dat` and `wallets/`, no block
+was persisted (old binary, or the node never mined).

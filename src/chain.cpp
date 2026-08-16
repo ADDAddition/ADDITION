@@ -75,6 +75,20 @@ Chain::Chain(ChainConfig cfg) : cfg_(std::move(cfg)) {
     cumulative_work_ = work_for_target(g.header.difficulty_target);
 }
 
+void Chain::set_on_commit(std::function<void()> hook) {
+    on_commit_ = std::move(hook);
+}
+
+void Chain::notify_commit() {
+    if (suppress_commit_ != 0 || !on_commit_) {
+        return;
+    }
+    try {
+        on_commit_();
+    } catch (...) {
+    }
+}
+
 void Chain::reset() {
     blocks_.clear();
     utxo_set_.clear();
@@ -825,6 +839,7 @@ bool Chain::add_block(const Block& block, std::string& error) {
     blocks_.push_back(block);
     cumulative_work_ += work_for_target(block.header.difficulty_target);
     difficulty_target_ = compute_next_difficulty_target();
+    notify_commit();
     return true;
 }
 
@@ -852,12 +867,32 @@ bool Chain::replace_with_chain(const std::vector<Block>& candidate,
     auto old_fees = total_fees_last_block_;
     auto old_work = cumulative_work_;
 
-    reset();
-    std::uint64_t candidate_work = cumulative_work_;
+    bool accepted = false;
+    {
+        ++suppress_commit_;
+        reset();
+        std::uint64_t candidate_work = cumulative_work_;
 
-    for (std::size_t i = 1; i < candidate.size(); ++i) {
-        std::string add_err;
-        if (!add_block(candidate[i], add_err)) {
+        for (std::size_t i = 1; i < candidate.size(); ++i) {
+            std::string add_err;
+            if (!add_block(candidate[i], add_err)) {
+                blocks_ = std::move(old_blocks);
+                utxo_set_ = std::move(old_utxo);
+                address_index_ = std::move(old_index);
+                seen_transactions_ = std::move(old_seen);
+                signer_last_nonce_ = std::move(old_nonce);
+                difficulty_target_ = old_difficulty;
+                total_emitted_ = old_emitted;
+                total_fees_last_block_ = old_fees;
+                cumulative_work_ = old_work;
+                error = "invalid candidate at height " + std::to_string(i) + ": " + add_err;
+                --suppress_commit_;
+                return false;
+            }
+            candidate_work = cumulative_work_;
+        }
+
+        if (candidate_work <= old_work) {
             blocks_ = std::move(old_blocks);
             utxo_set_ = std::move(old_utxo);
             address_index_ = std::move(old_index);
@@ -867,26 +902,17 @@ bool Chain::replace_with_chain(const std::vector<Block>& candidate,
             total_emitted_ = old_emitted;
             total_fees_last_block_ = old_fees;
             cumulative_work_ = old_work;
-            error = "invalid candidate at height " + std::to_string(i) + ": " + add_err;
+            error = "candidate work not higher";
+            --suppress_commit_;
             return false;
         }
-        candidate_work = cumulative_work_;
+        accepted = true;
+        --suppress_commit_;
     }
 
-    if (candidate_work <= old_work) {
-        blocks_ = std::move(old_blocks);
-        utxo_set_ = std::move(old_utxo);
-        address_index_ = std::move(old_index);
-        seen_transactions_ = std::move(old_seen);
-        signer_last_nonce_ = std::move(old_nonce);
-        difficulty_target_ = old_difficulty;
-        total_emitted_ = old_emitted;
-        total_fees_last_block_ = old_fees;
-        cumulative_work_ = old_work;
-        error = "candidate work not higher";
-        return false;
+    if (accepted) {
+        notify_commit();
     }
-
     return true;
 }
 

@@ -18,10 +18,12 @@
 2. UTXO transaction model integrated (`TxInput`/`TxOutput` + `utxo_set_`)
 3. Wallet/RPC now build spends from available UTXOs
 4. Non-coinbase transactions now require signer + signature validation
+5. Chain persistence: `--data-dir/blocks.dat` (text headers + txs). UTXOs are
+   rebuilt by replay. Not LevelDB/RocksDB.
 
 ## Next hardening phases
 1. Replace temporary deterministic signatures with real asymmetric keys
 2. Add p2p networking layer and peer sync
-3. Add persistent storage (LevelDB/RocksDB)
+3. Optional stronger on-disk format (LevelDB/RocksDB) — text `blocks.dat` already persists height across restart
 4. Add authenticated JSON-RPC server
 5. Add reproducible release pipeline
