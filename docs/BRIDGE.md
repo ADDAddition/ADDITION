@@ -38,7 +38,7 @@ are not on the public-read allowlist.
 A real bridge is ADDITION-native. It is not a rename of the in-process map.
 It does not import another project's bridge, messenger, or AMM.
 
-Minimum pieces before any `moves_*=1` claim:
+Minimum pieces before any move-flag may leave `0`:
 
 1. **Foreign-chain observation.** A watcher must see a confirmed lock or burn
    on the source chain using that chain's own confirmation rules. Registering
@@ -60,9 +60,8 @@ Minimum pieces before any `moves_*=1` claim:
    the observation path exists. Public-read RPC refuses those writes. No
    public `/bridge` page.
 
-`moves_bitcoin=1` / `moves_eth=1` / `moves_sol=1` are allowed only after the
-matching observation + custody + mint path is proven against that chain.
-Until then those flags stay `0`.
+Those flags stay `0` until the matching observation + custody + mint path
+is proven against that chain. They must not be advertised before that.
 
 This spec does not publish a transactions-per-second figure. It does not
 add a zero-knowledge proof of a foreign lock. Those are not substitutes

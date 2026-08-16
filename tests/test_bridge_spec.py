@@ -44,7 +44,8 @@ class BridgeSpecTests(unittest.TestCase):
         self.assertNotRegex(self.spec_lower, r"\bhonest\b")
         self.assertNotRegex(self.spec_lower, r"\bhonesty\b")
         self.assertNotIn("addison", self.spec_lower)
-        self.assertNotIn("token sale", self.spec_lower)
+        self.assertIn("no token sale", self.spec_lower)
+        self.assertNotIn("tokens for sale", self.spec_lower)
         self.assertNotIn("zk-stark", self.spec_lower)
         self.assertNotIn("groth16", self.spec_lower)
         self.assertNotRegex(self.spec, r"\bTPS\b")
@@ -59,7 +60,7 @@ class BridgeSpecTests(unittest.TestCase):
     def test_spec_names_a_later_rehearsal_without_shipping_one(self) -> None:
         self.assertIn("local rehearsal", self.spec_lower)
         self.assertIn("later; not in this tree yet", self.spec_lower)
-        self.assertIn("do not remake #12, #33, #38, or #39", self.spec_lower)
+        self.assertIn("must not remake #12, #33, #38, or #39", self.spec_lower)
         self.assertIn("0x000000FFFFFFFFFF", self.spec)
 
     def test_spec_is_not_published_on_the_public_site(self) -> None:
