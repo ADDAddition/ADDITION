@@ -51,12 +51,12 @@ These are aims of the testnet / research prototype, not proof of a live public n
 
 * A local / research **testnet** named `addition-testnet`
 * Default mode is **testnet** (`additiond --network testnet`)
-* Mainnet profile is opt-in only (`--network mainnet` or an explicit `ADDITION_MAINNET_MODE=1`). That profile is still experimental and is **not** a live public network.
+* `--mainnet` / `--network mainnet` starts a **separate** chain (`ADDITION_MAINNET_V1`, `genesis-mainnet.json`, `data-mainnet`). That chain is not public and is **not** a live network. The site stays on the testnet. See [docs/MAINNET_RUNBOOK.md](docs/MAINNET_RUNBOOK.md).
 
 Checked-in network files:
 
-* [`config.toml`](config.toml) — network name, ports, reward, localhost bootstrap examples
-* [`genesis.json`](genesis.json) — testnet genesis parameters (no fake node counts)
+* [`config.toml`](config.toml) / [`genesis.json`](genesis.json) — testnet
+* [`config-mainnet.toml`](config-mainnet.toml) / [`genesis-mainnet.json`](genesis-mainnet.json) — separate mainnet chain (not live)
 
 `bootstrap_peers` is IPv4 `ip:port` only. The operator’s current public P2P is `34.27.30.115:28545`. That is one real endpoint, not a peer-count claim. Local two-node runs still use `--bootstrap 127.0.0.1:28545`. Write RPC stays `127.0.0.1:8545`.
 
@@ -238,7 +238,7 @@ Help:
 ./build/additiond --help
 ```
 
-Do not set `ADDITION_MAINNET_MODE=1` unless you are explicitly experimenting with the mainnet *profile*. It is not a live network.
+`--mainnet` is a separate local/operator chain, not a live public network. Do not set `ADDITION_MAINNET_MODE=1` on the public testnet unit.
 
 Private keys are not printed and must not be committed. `data/node_identity.dat` (public identity only) and wallet files stay local and gitignored.
 
@@ -268,8 +268,9 @@ Two local processes: `./scripts/start_two_node_testnet.sh` (A: write `8545` / pu
 * [Two-node local testnet](docs/TWO_NODE_TESTNET.md)
 * [Mined block + SHA3 opening privacy](docs/REAL_TESTNET_MINE_AND_PRIVACY.md)
 * [Testnet public-read RPC (systemd)](docs/TESTNET_PUBLIC_RPC_RUNBOOK.md)
+* [Mainnet node (separate chain, not live)](docs/MAINNET_RUNBOOK.md)
 
-Older docs may still say “mainnet”. Treat those as historical. This tree is a research testnet.
+The public site and `rpc.additionblockchain.com` are the testnet. `--mainnet` does not change that.
 
 ---
 

@@ -9,27 +9,10 @@ function Assert-Ok([string]$step) {
     }
 }
 
-# Backup and sanitize potentially corrupted state files
-$dataDir = Join-Path $root "data"
-if (Test-Path $dataDir) {
-    $ts = Get-Date -Format "yyyyMMdd_HHmmss"
-    $backupDir = Join-Path $root "data_backup_$ts"
-    New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
-    $dataItems = Get-ChildItem -Path $dataDir -Force -ErrorAction SilentlyContinue
-    if ($dataItems) {
-        Copy-Item -Path (Join-Path $dataDir "*") -Destination $backupDir -Recurse -Force -ErrorAction SilentlyContinue
-    }
-
-    foreach ($f in @("blocks.dat", "mempool.dat", "staking.dat", "contracts.dat", "tokens.dat", "bridge.dat", "privacy.dat")) {
-        $p = Join-Path $dataDir $f
-        if (Test-Path $p) {
-            try {
-                Get-Content -Path $p -Raw | Out-Null
-            } catch {
-                Remove-Item -Path $p -Force -ErrorAction SilentlyContinue
-            }
-        }
-    }
+# Separate chain. Do not reuse the testnet data/ directory.
+$dataDir = Join-Path $root "data-mainnet"
+if (-not (Test-Path $dataDir)) {
+    New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
 }
 
 Get-Process additiond -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
@@ -45,6 +28,9 @@ if (-not (Test-Path $exe)) {
     throw "additiond.exe not found"
 }
 
+if (-not $env:ADDITION_PRIVACY_MASTER_KEY -or $env:ADDITION_PRIVACY_MASTER_KEY.Length -lt 32) {
+    throw "ADDITION_PRIVACY_MASTER_KEY must be set (min 32 chars) for --mainnet"
+}
 if (-not $env:ADDITION_RPC_TOKEN) {
     Write-Host "[mainnet][WARN] ADDITION_RPC_TOKEN not set (local RPC auth disabled)."
 }
@@ -60,10 +46,5 @@ if (-not $env:ADDITION_ALLOW_INSECURE_TX_COMMANDS) {
     Write-Host "[mainnet] ADDITION_ALLOW_INSECURE_TX_COMMANDS defaulted to 0"
 }
 
-Write-Host "[testnet] starting research daemon (not a live mainnet)..."
-if ($env:ADDITION_MAINNET_MODE -eq "1") {
-    Write-Host "[warn] ADDITION_MAINNET_MODE=1 is set; using --network mainnet profile (still not a live public network)"
-    & $exe --network mainnet --config config.toml
-} else {
-    & $exe --network testnet --config config.toml
-}
+Write-Host "[mainnet] starting ADDITION_MAINNET_V1 (not a live public network)..."
+& $exe --mainnet --config config-mainnet.toml --genesis genesis-mainnet.json --data-dir $dataDir

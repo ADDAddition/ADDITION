@@ -1,0 +1,18 @@
+{
+  "network_name": "addition-mainnet",
+  "network_id": "ADDITION_MAINNET_V1",
+  "network_mode": "mainnet",
+  "comment": "Separate mainnet genesis. Not a live public network. Do not mix with ADDITION_TESTNET_V1.",
+  "genesis_timestamp": 1770000000,
+  "max_supply": 50000000,
+  "block_reward": 50,
+  "tail_emission_reward": 1,
+  "target_block_time_sec": 60,
+  "halving_interval": 210000,
+  "min_fee": 1,
+  "pow_algorithm": "memory_hard",
+  "initial_difficulty_target": "0x000000FFFFFFFFFF",
+  "min_difficulty_target": "0x000000FFFFFFFFFF",
+  "max_difficulty_target": "0x000000FFFFFFFFFF",
+  "retarget_window": 30
+}

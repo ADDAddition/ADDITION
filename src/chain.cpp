@@ -108,7 +108,13 @@ void Chain::reset() {
 Block Chain::make_genesis() const {
     Block g{};
     g.header.height = 0;
-    g.header.previous_hash = "0";
+    // Testnet keeps previous_hash=0 so the live ADDITION_TESTNET_V1 genesis is unchanged.
+    // Mainnet binds the genesis header to its network_id so the hash cannot match testnet.
+    if (cfg_.network_id == kMainnetNetworkId) {
+        g.header.previous_hash = std::string("genesis:") + cfg_.network_id;
+    } else {
+        g.header.previous_hash = "0";
+    }
     g.header.timestamp = cfg_.genesis_timestamp;
     g.header.nonce = 0;
     g.header.difficulty_target = difficulty_target_;

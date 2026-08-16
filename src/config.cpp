@@ -129,27 +129,23 @@ bool parse_string_array(const std::string& in, std::vector<std::string>& out) {
     return true;
 }
 
+void apply_network_profile_chain(ChainConfig& chain, NetworkMode mode) {
+    const ChainConfig profile = (mode == NetworkMode::Testnet) ? testnet_chain_config() : mainnet_chain_config();
+    chain.network_mode = profile.network_mode;
+    chain.network_name = profile.network_name;
+    chain.network_id = profile.network_id;
+    chain.pow_algorithm = profile.pow_algorithm;
+    chain.genesis_timestamp = profile.genesis_timestamp;
+    chain.initial_difficulty_target = profile.initial_difficulty_target;
+    chain.min_difficulty_target = profile.min_difficulty_target;
+    chain.max_difficulty_target = profile.max_difficulty_target;
+    chain.retarget_window = profile.retarget_window;
+    chain.target_block_time_sec = profile.target_block_time_sec;
+}
+
 void apply_network_mode(NodeConfig& cfg, NetworkMode mode) {
     cfg.mode = mode;
-    if (mode == NetworkMode::Testnet) {
-        cfg.chain.network_mode = "testnet";
-        if (cfg.chain.network_name.empty() || cfg.chain.network_name == "mainnet") {
-            cfg.chain.network_name = "addition-testnet";
-        }
-        if (cfg.chain.network_id.empty() || cfg.chain.network_id == "ADDITION_MAINNET_V1") {
-            cfg.chain.network_id = "ADDITION_TESTNET_V1";
-        }
-        cfg.chain.pow_algorithm = PowAlgorithm::Sha3_512;
-        return;
-    }
-    cfg.chain.network_mode = "mainnet";
-    if (cfg.chain.network_name.empty() || cfg.chain.network_name == "addition-testnet") {
-        cfg.chain.network_name = "mainnet";
-    }
-    if (cfg.chain.network_id.empty() || cfg.chain.network_id == "ADDITION_TESTNET_V1") {
-        cfg.chain.network_id = "ADDITION_MAINNET_V1";
-    }
-    cfg.chain.pow_algorithm = PowAlgorithm::MemoryHard;
+    apply_network_profile_chain(cfg.chain, mode);
 }
 
 bool apply_kv(NodeConfig& cfg, const std::string& table, const std::string& key, const std::string& raw, std::string& error) {
@@ -486,18 +482,35 @@ const ChainConfig& default_config() {
 ChainConfig testnet_chain_config() {
     ChainConfig cfg{};
     cfg.network_mode = "testnet";
-    cfg.network_name = "addition-testnet";
-    cfg.network_id = "ADDITION_TESTNET_V1";
+    cfg.network_name = kTestnetNetworkName;
+    cfg.network_id = kTestnetNetworkId;
+    cfg.genesis_timestamp = kTestnetGenesisTimestamp;
     cfg.bootstrap_peers = {"127.0.0.1:28545"};
     return cfg;
 }
 
 ChainConfig mainnet_chain_config() {
-    ChainConfig cfg = testnet_chain_config();
+    ChainConfig cfg{};
     cfg.network_mode = "mainnet";
-    cfg.network_name = "mainnet";
-    cfg.network_id = "ADDITION_MAINNET_V1";
+    cfg.network_name = kMainnetNetworkName;
+    cfg.network_id = kMainnetNetworkId;
+    cfg.genesis_timestamp = kMainnetGenesisTimestamp;
+    cfg.max_supply = 50'000'000ULL;
+    cfg.block_reward = 50ULL;
+    cfg.tail_emission_reward = 1ULL;
+    cfg.target_block_time_sec = 60U;
+    cfg.difficulty_window = 120U;
     cfg.pow_algorithm = PowAlgorithm::MemoryHard;
+    cfg.initial_difficulty_target = kMainnetDifficultyTarget;
+    cfg.min_difficulty_target = kMainnetDifficultyTarget;
+    cfg.max_difficulty_target = kMainnetMaxDifficultyTarget;
+    cfg.retarget_window = 30U;
+    cfg.halving_interval = 210000U;
+    cfg.require_pq_signatures = true;
+    cfg.require_privacy_pool = true;
+    cfg.allow_zero_reward_blocks = true;
+    cfg.min_fee = 1ULL;
+    cfg.bootstrap_peers = {"127.0.0.1:28546"};
     return cfg;
 }
 
@@ -507,6 +520,56 @@ NodeConfig default_node_config() {
     cfg.chain = testnet_chain_config();
     cfg.bootstrap_peers = cfg.chain.bootstrap_peers;
     return cfg;
+}
+
+NodeConfig mainnet_node_config() {
+    NodeConfig cfg{};
+    cfg.mode = NetworkMode::Mainnet;
+    cfg.chain = mainnet_chain_config();
+    cfg.local_rpc_port = 8546;
+    cfg.lan_rpc_port = 18546;
+    cfg.p2p_port = 28546;
+    cfg.public_rpc_port = 38546;
+    cfg.public_rpc_bind = "0.0.0.0";
+    cfg.enable_public_rpc = false;
+    cfg.enable_auto_mine = false;
+    cfg.bootstrap_peers = cfg.chain.bootstrap_peers;
+    cfg.data_dir = "data-mainnet";
+    return cfg;
+}
+
+bool validate_network_profile(const NodeConfig& cfg, std::string& error) {
+    error.clear();
+    if (cfg.mode == NetworkMode::Mainnet) {
+        if (cfg.chain.network_mode != "mainnet" || cfg.chain.network_id != kMainnetNetworkId) {
+            error = "mainnet requires network_id=ADDITION_MAINNET_V1 and a mainnet genesis; "
+                    "refusing to relabel a testnet chain";
+            return false;
+        }
+        if (cfg.chain.genesis_timestamp == kTestnetGenesisTimestamp) {
+            error = "mainnet genesis must not reuse the testnet genesis timestamp";
+            return false;
+        }
+        if (cfg.chain.initial_difficulty_target > kTestnetHardDifficultyTarget ||
+            cfg.chain.max_difficulty_target > kTestnetHardDifficultyTarget) {
+            error = "mainnet difficulty must stay at or harder than the testnet hard target "
+                    "(not the ~4ms easy target)";
+            return false;
+        }
+        for (const auto& peer : cfg.bootstrap_peers) {
+            if (peer == kOperatorPublicP2p) {
+                error = "mainnet must not bootstrap the public testnet seed ";
+                error += kOperatorPublicP2p;
+                return false;
+            }
+        }
+        return true;
+    }
+    if (cfg.chain.network_id == kMainnetNetworkId || cfg.chain.network_mode == "mainnet") {
+        error = "testnet cannot load mainnet genesis (network_id=ADDITION_MAINNET_V1)";
+        return false;
+    }
+    return true;
 }
 
 void set_runtime_network_mode(NetworkMode mode) {
@@ -582,7 +645,7 @@ NetworkMode parse_network_mode(const std::string& value, bool& ok) {
         ok = true;
         return NetworkMode::Testnet;
     }
-    if (v == "mainnet") {
+    if (v == "mainnet" || v == "addition-mainnet") {
         ok = true;
         return NetworkMode::Mainnet;
     }
@@ -849,6 +912,11 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
             network_from_cli = true;
             continue;
         }
+        if (arg == "--mainnet") {
+            cli_network = "mainnet";
+            network_from_cli = true;
+            continue;
+        }
         if (arg == "--config") {
             if (!take_value(cli_config)) {
                 return false;
@@ -963,9 +1031,28 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
         return false;
     }
 
+    NetworkMode mode = NetworkMode::Testnet;
+    if (network_from_cli) {
+        bool ok = false;
+        mode = parse_network_mode(cli_network, ok);
+        if (!ok) {
+            error = "invalid --network value (use testnet, mainnet, or --mainnet)";
+            return false;
+        }
+    } else if (const char* v = std::getenv("ADDITION_MAINNET_MODE")) {
+        if (std::string(v) == "1") {
+            mode = NetworkMode::Mainnet;
+        }
+    }
+    cfg = (mode == NetworkMode::Mainnet) ? mainnet_node_config() : default_node_config();
+
     std::string config_path = cli_config;
     if (config_path.empty()) {
-        config_path = first_existing({"config.toml", "../config.toml"});
+        if (mode == NetworkMode::Mainnet) {
+            config_path = first_existing({"config-mainnet.toml", "../config-mainnet.toml"});
+        } else {
+            config_path = first_existing({"config.toml", "../config.toml"});
+        }
     } else if (!file_exists(config_path)) {
         error = "config file not found: " + config_path;
         return false;
@@ -980,6 +1067,8 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
     if (genesis_path.empty()) {
         if (!cfg.genesis_path.empty() && file_exists(cfg.genesis_path)) {
             genesis_path = cfg.genesis_path;
+        } else if (mode == NetworkMode::Mainnet) {
+            genesis_path = first_existing({"genesis-mainnet.json", "../genesis-mainnet.json"});
         } else {
             genesis_path = first_existing({"genesis.json", "../genesis.json"});
         }
@@ -1049,18 +1138,11 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
         cfg.auto_mine_reward = cli_auto_mine_reward;
     }
 
-    if (network_from_cli) {
-        bool ok = false;
-        const auto mode = parse_network_mode(cli_network, ok);
-        if (!ok) {
-            error = "invalid --network value (use testnet or mainnet)";
-            return false;
-        }
-        apply_network_mode(cfg, mode);
-    }
-
+    cfg.mode = mode;
     if (cfg.bootstrap_peers.empty()) {
-        cfg.bootstrap_peers = {"127.0.0.1:28545"};
+        cfg.bootstrap_peers = (mode == NetworkMode::Mainnet)
+                                  ? std::vector<std::string>{"127.0.0.1:28546"}
+                                  : std::vector<std::string>{"127.0.0.1:28545"};
         cfg.chain.bootstrap_peers = cfg.bootstrap_peers;
     }
     for (const auto& peer : cfg.bootstrap_peers) {
@@ -1075,24 +1157,32 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
             return false;
         }
     }
+    if (!validate_network_profile(cfg, error)) {
+        return false;
+    }
     return true;
 }
 
 std::string daemon_help_text() {
-    return "ADDITION research daemon (testnet by default; not a live mainnet)\n"
+    return "ADDITION research daemon (testnet by default; --mainnet is a separate local chain, not a live public network)\n"
            "\n"
            "Usage:\n"
-           "  additiond [--network testnet|mainnet] [--config PATH] [--genesis PATH] [--data-dir PATH]\n"
+           "  additiond [--network testnet|mainnet] [--mainnet] [--config PATH] [--genesis PATH] [--data-dir PATH]\n"
            "            [--public-rpc] [--public-rpc-port PORT] [--public-rpc-bind IP]\n"
            "            [--local-rpc-port PORT] [--p2p-port PORT] [--bootstrap IP:PORT]\n"
            "            [--auto-mine] [--auto-mine-interval SEC] [--auto-mine-reward ADDR]\n"
            "\n"
            "Defaults:\n"
            "  --network testnet\n"
-           "  --config  config.toml (if present)\n"
-           "  --genesis genesis.json (if present)\n"
+           "  --config  config.toml (testnet) or config-mainnet.toml (--mainnet)\n"
+           "  --genesis genesis.json (testnet) or genesis-mainnet.json (--mainnet)\n"
+           "  --data-dir data (testnet) or data-mainnet (--mainnet)\n"
            "\n"
-           "Local trusted write RPC: 127.0.0.1:8545 (never bound to 0.0.0.0; optional ADDITION_RPC_TOKEN)\n"
+           "--mainnet (same as --network mainnet) starts ADDITION_MAINNET_V1 from genesis-mainnet.json.\n"
+           "  It is a separate chain, not a live public network, and must not use the testnet seed.\n"
+           "  Default write RPC is 127.0.0.1:8546; public-read default is :38546; P2P default :28546 (off).\n"
+           "\n"
+           "Local trusted write RPC: 127.0.0.1 (never bound to 0.0.0.0; optional ADDITION_RPC_TOKEN)\n"
            "  Override port with --local-rpc-port or ADDITION_LOCAL_RPC_PORT (second node: 8546).\n"
            "Public read RPC (opt-in, allowlist only):\n"
            "  additiond --network testnet --public-rpc\n"

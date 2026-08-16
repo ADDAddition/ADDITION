@@ -263,6 +263,10 @@ int main(int argc, char** argv) {
         std::cout << "state loaded from " << node_cfg.data_dir
                   << " height=" << chain.height() << '\n';
     }
+    if (!store.ensure_network_marker(chain, load_error)) {
+        std::cerr << "fatal: " << load_error << '\n';
+        return 4;
+    }
 
     chain.set_on_commit([&]() {
         std::string persist_error;
@@ -442,8 +446,12 @@ int main(int argc, char** argv) {
     if (!node_cfg.genesis_path.empty()) {
         std::cout << "genesis=" << node_cfg.genesis_path << '\n';
     }
-    std::cout << "bootstrap_peers (IPv4 only; operator public P2P is "
-              << addition::kOperatorPublicP2p << "):";
+    if (mainnet_mode) {
+        std::cout << "bootstrap_peers (IPv4 only; not the public testnet seed):";
+    } else {
+        std::cout << "bootstrap_peers (IPv4 only; operator public P2P is "
+                  << addition::kOperatorPublicP2p << "):";
+    }
     for (const auto& peer : node_cfg.bootstrap_peers) {
         std::cout << ' ' << peer;
     }
@@ -532,7 +540,9 @@ int main(int argc, char** argv) {
         std::cout << "warning: strict admin mode disabled (ADDITION_STRICT_ADMIN_MODE=0)\n";
     }
     if (mainnet_mode) {
-        std::cout << "mainnet profile selected via --network/config/env; this binary still does not claim a live public mainnet\n";
+        std::cout << "mainnet chain " << node_cfg.chain.network_id
+                  << " data-dir=" << node_cfg.data_dir
+                  << "; this is not a live public network\n";
     } else {
         std::cout << "testnet mode enabled (default)\n";
     }
