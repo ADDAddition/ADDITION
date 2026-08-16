@@ -111,6 +111,198 @@ std::string lower_copy(std::string s) {
 
 } // namespace
 
+void PrivacyPool::compute_opening_relation(std::uint64_t amount,
+                                           const std::string& trapdoor,
+                                           std::string& commitment,
+                                           std::string& nullifier) {
+    commitment = to_hex(sha3_512_bytes("cm|" + std::to_string(amount) + "|" + trapdoor));
+    nullifier = to_hex(sha3_512_bytes("nf|" + trapdoor));
+}
+
+bool PrivacyPool::verify_opening(std::uint64_t amount,
+                                 const std::string& trapdoor,
+                                 const std::string& commitment,
+                                 const std::string& nullifier,
+                                 std::string& error) {
+    if (!is_hex_even(trapdoor) || trapdoor.size() < 32) {
+        error = "trapdoor must be even-length hex (>=16 bytes)";
+        return false;
+    }
+    if (!is_hex_even(commitment) || !is_hex_even(nullifier)) {
+        error = "commitment/nullifier must be even-length hex";
+        return false;
+    }
+    std::string expect_cm;
+    std::string expect_nf;
+    compute_opening_relation(amount, trapdoor, expect_cm, expect_nf);
+    if (expect_cm != commitment || expect_nf != nullifier) {
+        error = "opening relation rejected";
+        return false;
+    }
+    return true;
+}
+
+bool PrivacyPool::prepare_opening(std::uint64_t amount, OpeningNote& out, std::string& error) {
+    if (amount == 0) {
+        error = "amount must be > 0";
+        return false;
+    }
+    if (!random_hex(32, out.trapdoor, error)) {
+        return false;
+    }
+    compute_opening_relation(amount, out.trapdoor, out.commitment, out.nullifier);
+    return true;
+}
+
+std::string PrivacyPool::mint_open(const std::string& owner,
+                                   std::uint64_t amount,
+                                   const std::string& commitment,
+                                   const std::string& nullifier,
+                                   const std::string& trapdoor,
+                                   std::string& error) {
+    if (owner.empty() || amount == 0) {
+        error = "invalid mint_open params";
+        return {};
+    }
+    if (!verify_opening(amount, trapdoor, commitment, nullifier, error)) {
+        return {};
+    }
+    if (used_nullifiers_.count(nullifier)) {
+        error = "nullifier already used";
+        return {};
+    }
+    for (const auto& [id, existing] : notes_) {
+        (void)id;
+        if (existing.nullifier == nullifier) {
+            error = "nullifier already assigned";
+            return {};
+        }
+    }
+
+    const auto note_id = mk_note_id(owner, amount, commitment);
+    if (notes_.count(note_id)) {
+        error = "note already exists";
+        return {};
+    }
+
+    std::string sealed_amount;
+    if (!seal_amount(amount, note_id, "open", sealed_amount, error)) {
+        return {};
+    }
+
+    std::string owner_tag;
+    if (!owner_tag_for(owner, owner_tag, error)) {
+        return {};
+    }
+
+    notes_[note_id] = PrivateNote{owner_tag,
+                                  sealed_amount,
+                                  "open",
+                                  commitment,
+                                  nullifier,
+                                  false};
+    return note_id;
+}
+
+bool PrivacyPool::spend_open(const std::string& owner,
+                             const std::string& note_id,
+                             const std::string& recipient,
+                             std::uint64_t amount,
+                             const std::string& trapdoor,
+                             std::string& new_note_id,
+                             OpeningNote& recipient_opening,
+                             std::string& change_note_id,
+                             OpeningNote& change_opening,
+                             std::string& error) {
+    new_note_id.clear();
+    change_note_id.clear();
+    recipient_opening = {};
+    change_opening = {};
+
+    if (owner.empty() || recipient.empty() || note_id.empty() || amount == 0) {
+        error = "invalid spend_open params";
+        return false;
+    }
+
+    auto it = notes_.find(note_id);
+    if (it == notes_.end()) {
+        error = "note not found";
+        return false;
+    }
+    auto& note = it->second;
+    if (note.spent) {
+        error = "note already spent";
+        return false;
+    }
+    std::string expected_owner_tag;
+    if (!owner_tag_for(owner, expected_owner_tag, error)) {
+        return false;
+    }
+    if (note.owner_tag != expected_owner_tag) {
+        error = "owner mismatch";
+        return false;
+    }
+    std::uint64_t note_amount = 0;
+    if (!unseal_amount(note.amount_sealed, note_id, note.blinding, note_amount, error)) {
+        return false;
+    }
+    if (note_amount < amount) {
+        error = "insufficient note amount";
+        return false;
+    }
+    if (!verify_opening(note_amount, trapdoor, note.commitment, note.nullifier, error)) {
+        return false;
+    }
+    if (used_nullifiers_.count(note.nullifier)) {
+        error = "nullifier already used";
+        return false;
+    }
+
+    if (!prepare_opening(amount, recipient_opening, error)) {
+        return false;
+    }
+    const auto minted = mint_open(recipient,
+                                  amount,
+                                  recipient_opening.commitment,
+                                  recipient_opening.nullifier,
+                                  recipient_opening.trapdoor,
+                                  error);
+    if (minted.empty()) {
+        recipient_opening = {};
+        return false;
+    }
+
+    OpeningNote local_change{};
+    std::string minted_change;
+    const auto change = note_amount - amount;
+    if (change > 0) {
+        if (!prepare_opening(change, local_change, error)) {
+            notes_.erase(minted);
+            recipient_opening = {};
+            return false;
+        }
+        minted_change = mint_open(owner,
+                                  change,
+                                  local_change.commitment,
+                                  local_change.nullifier,
+                                  local_change.trapdoor,
+                                  error);
+        if (minted_change.empty()) {
+            notes_.erase(minted);
+            recipient_opening = {};
+            change_opening = {};
+            return false;
+        }
+    }
+
+    note.spent = true;
+    used_nullifiers_.insert(note.nullifier);
+    new_note_id = minted;
+    change_note_id = minted_change;
+    change_opening = std::move(local_change);
+    return true;
+}
+
 bool PrivacyPool::set_native_verifier_mode(const std::string& mode, std::string& error) {
     const auto normalized = lower_copy(mode);
     if (normalized == "pq_mldsa87" || normalized == "pq" || normalized == "mldsa87") {
@@ -126,9 +318,13 @@ std::string PrivacyPool::native_verifier_mode() const {
     switch (native_verifier_mode_) {
         case NativeVerifierMode::pq_mldsa87:
             return "pq_mldsa87";
-        default:
-            return "pq_mldsa87";
     }
+    const NativeVerifierMode missing = native_verifier_mode_;
+    switch (missing) {
+        case NativeVerifierMode::pq_mldsa87:
+            break;
+    }
+    return "pq_mldsa87";
 }
 
 bool PrivacyPool::strict_zk_mode() const {
