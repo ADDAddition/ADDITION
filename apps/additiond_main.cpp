@@ -269,31 +269,7 @@ int main(int argc, char** argv) {
     });
 
     addition::RpcNetworkServer p2p_rpc("0.0.0.0", node_cfg.p2p_port, [&](const std::string& cmd) {
-        std::istringstream iss(cmd);
-        std::string peer;
-        iss >> peer;
-        std::string payload;
-        std::getline(iss, payload);
-        if (!payload.empty() && payload.front() == ' ') {
-            payload.erase(payload.begin());
-        }
-
-        if (peer.empty() || payload.empty()) {
-            return std::string("error: usage <peer> <payload>");
-        }
-
-        std::string err;
-        if (!node.handle_inbound_message(peer, payload, err)) {
-            return std::string("error: ") + err;
-        }
-
-        auto outbound = node.pull_outbound_messages();
-        if (outbound.empty()) {
-            return std::string("ok");
-        }
-        std::ostringstream out;
-        out << "ok:" << outbound.front();
-        return out.str();
+        return node.handle_p2p_line(cmd);
     });
 
     addition::RpcServer rpc(chain,

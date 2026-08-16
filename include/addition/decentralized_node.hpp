@@ -30,10 +30,17 @@ public:
     bool ingest_block(const Block& block, std::string& error);
     bool ingest_block_payload(const std::string& payload, std::string& error);
     bool get_block_payload(std::uint64_t height, std::string& payload, std::string& error) const;
+    bool decode_block_payload(const std::string& payload, Block& block, std::string& error) const;
     bool sync_once(std::string& error);
 
     std::vector<std::string> pull_outbound_messages();
     bool handle_inbound_message(const std::string& peer, const std::string& message, std::string& error);
+    bool handle_inbound_message(const std::string& peer,
+                                const std::string& message,
+                                std::string& reply,
+                                std::string& error);
+    std::string handle_p2p_line(const std::string& line);
+    const std::string& self_id() const;
     const std::string& node_public_key() const;
     const std::string& node_private_key() const;
     std::vector<std::pair<std::string, std::string>> peer_pins() const;
@@ -90,7 +97,7 @@ private:
     bool allow_peer_message(const std::string& peer, bool expensive, std::string& error);
     bool decode_tx_payload(const std::string& payload, Transaction& tx, std::string& error) const;
     std::string encode_block_payload(const Block& block) const;
-    bool decode_block_payload(const std::string& payload, Block& block, std::string& error) const;
+    bool fetch_blocks_from_peer(const std::string& peer, std::string& error);
     std::string encode_tx_gossip(const Transaction& tx) const;
     std::string encode_block_announce(const Block& block) const;
     bool decode_tx_gossip(const std::string& payload, Transaction& tx, std::string& error) const;

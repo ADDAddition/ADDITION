@@ -36,6 +36,7 @@ add_library(addition_core
     src/token_engine.cpp
     src/bridge.cpp
     src/decentralized_node.cpp
+    src/net_io.cpp
     src/p2p.cpp
     src/consensus_engine.cpp
     src/privacy.cpp
@@ -80,6 +81,11 @@ if(ADDITION_BUILD_TESTS)
     target_link_libraries(test_auto_mine PRIVATE addition_core)
     add_test(NAME test_auto_mine COMMAND test_auto_mine)
 
+    add_executable(test_p2p_sync tests/test_p2p_sync.cpp)
+    target_link_libraries(test_p2p_sync PRIVATE addition_core)
+    add_test(NAME test_p2p_sync COMMAND test_p2p_sync)
+    set_tests_properties(test_p2p_sync PROPERTIES TIMEOUT 120)
+
     find_package(Python3 COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
         add_test(
@@ -88,7 +94,8 @@ if(ADDITION_BUILD_TESTS)
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         )
         set_tests_properties(test_public_rpc_two_node PROPERTIES
-            ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>")
+            ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
+            TIMEOUT 180)
         add_test(
             NAME test_live_mine_and_privacy
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_live_mine_and_privacy.py
