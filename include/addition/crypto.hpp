@@ -18,6 +18,20 @@ bool hex_to_bytes(const std::string& hex,
 				  std::vector<std::uint8_t>& out,
 				  std::string& error);
 
+// Address = SHA3-512(scheme_id || 0x00 || pubkey_bytes), full 128-hex digest.
+// scheme_id is in the preimage so a later SLH-DSA key can coexist with ML-DSA-87.
+inline constexpr const char* kMlDsa87SchemeId = "ml-dsa-87";
+inline constexpr std::size_t kHashCommittedAddressHexLen = 128;
+
+std::string hash_committed_address(const std::string& scheme_id,
+								   const std::vector<std::uint8_t>& pubkey);
+std::string hash_committed_address_hex(const std::string& scheme_id,
+									   const std::string& pubkey_hex);
+bool address_binds_pubkey(const std::string& address,
+						  const std::string& scheme_id,
+						  const std::string& pubkey_hex,
+						  std::string& error);
+
 // Hybrid signature wrapper (current deterministic base + optional PQ context marker)
 std::string sign_message_hybrid(const std::string& private_key,
 								const std::string& message,

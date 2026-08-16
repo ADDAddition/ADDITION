@@ -26,6 +26,7 @@ ML_DSA_87 = "ml-dsa-87"
 ML_DSA_87_PK_BYTES = 2592
 ML_DSA_87_SK_BYTES = 4896
 ML_DSA_87_SIG_BYTES = 4627
+HASH_COMMITTED_ADDRESS_HEX_LEN = 128
 OQS_SUCCESS = 0
 MAX_RPC_LINE = 32768
 CONTACT = "contact@additionblockchain.com"
@@ -38,8 +39,14 @@ class WalletError(RuntimeError):
     pass
 
 
-def derive_address(pubkey_hex: str) -> str:
-    return hashlib.sha3_512(("addr|" + pubkey_hex).encode("ascii")).hexdigest()[:40]
+def derive_address(pubkey_hex: str, scheme_id: str = ML_DSA_87) -> str:
+    """SHA3-512(scheme_id || 0x00 || pubkey_bytes) as a full 128-hex digest."""
+    if not scheme_id:
+        raise WalletError("missing scheme_id")
+    if not _looks_like_hex(pubkey_hex):
+        raise WalletError("invalid pubkey hex")
+    preimage = scheme_id.encode("ascii") + b"\x00" + bytes.fromhex(pubkey_hex)
+    return hashlib.sha3_512(preimage).hexdigest()
 
 
 def parse_kv(line: str) -> Dict[str, str]:
@@ -204,6 +211,8 @@ class WalletStore:
             raise WalletError("wallet file missing fields: " + ",".join(missing))
         if values["algorithm"] != ML_DSA_87:
             raise WalletError("unsupported wallet algorithm: " + values["algorithm"])
+        if len(values["address"]) != HASH_COMMITTED_ADDRESS_HEX_LEN:
+            raise WalletError("wallet address is not a 128-hex hash commitment")
         if derive_address(values["public_key"]) != values["address"]:
             raise WalletError("wallet address does not match public key")
         return WalletRecord(

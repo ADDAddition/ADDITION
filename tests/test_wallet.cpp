@@ -16,6 +16,7 @@
 #include "addition/rpc_server.hpp"
 #include "addition/staking.hpp"
 #include "addition/token_engine.hpp"
+#include "addition/crypto.hpp"
 #include "addition/wallet.hpp"
 #include "addition/wallet_keys.hpp"
 #include "addition/wallet_store.hpp"
@@ -64,6 +65,11 @@ int main() {
     }
     if (keys.algorithm != "ml-dsa-87" || keys.address.empty() || keys.private_key.empty()) {
         std::cerr << "test failed: ML-DSA-87 key material incomplete\n";
+        return 1;
+    }
+    if (keys.address.size() != addition::kHashCommittedAddressHexLen ||
+        keys.address == keys.public_key) {
+        std::cerr << "test failed: address must be 128-hex hash, not the raw key\n";
         return 1;
     }
 
@@ -184,6 +190,7 @@ int main() {
     const auto created_rpc = rpc.handle_command("createwallet demo");
     if (!expect_contains(created_rpc, "algo=ml-dsa-87", "createwallet algo") ||
         !expect_contains(created_rpc, "name=demo", "createwallet name") ||
+        !expect_contains(created_rpc, "address_chars=128", "createwallet address_chars") ||
         !expect_contains(created_rpc, "priv_printed=0", "createwallet priv") ||
         created_rpc.find("priv=") != std::string::npos) {
         std::cerr << "test failed: createwallet response: " << created_rpc << '\n';

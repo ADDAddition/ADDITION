@@ -109,7 +109,7 @@ std::string format_block(const Block& b) {
 }
 
 std::string derive_address_from_pubkey(const std::string& pubkey_hex) {
-    return to_hex(sha3_512_bytes("addr|" + pubkey_hex)).substr(0, 40);
+    return hash_committed_address_hex(kMlDsa87SchemeId, pubkey_hex);
 }
 
 bool verify_admin_signature(const std::string& admin_addr,
@@ -515,6 +515,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         }
         std::ostringstream out;
         out << "address=" << stored.address
+            << " address_chars=" << stored.address.size()
             << " pub=" << stored.public_key
             << " algo=" << stored.algorithm
             << " name=" << stored.name
