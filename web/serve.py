@@ -3,11 +3,13 @@
 
 from __future__ import annotations
 
+import json
 import os
 import socket
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent / "public"
 PUBLIC_ALLOWLIST = {
@@ -108,6 +110,17 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
+        if path in {"/jsonrpc", "/jsonrpc/"}:
+            method = (query.get("method") or [""])[0]
+            raw_params = (query.get("params") or [""])[0]
+            params = [p for p in raw_params.split(",") if p] if raw_params else []
+            req_id_raw = (query.get("id") or ["1"])[0]
+            try:
+                req_id: Any = int(req_id_raw)
+            except ValueError:
+                req_id = req_id_raw
+            self._jsonrpc({"jsonrpc": "2.0", "id": req_id, "method": method, "params": params})
+            return
         is_api = path in {"/api/rpc", "/local-rpc"} or (path == "/rpc" and "cmd" in query)
         if is_api:
             cmd = (query.get("cmd") or [""])[0]
@@ -125,6 +138,20 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
+        if parsed.path in {"/jsonrpc", "/jsonrpc/"}:
+            length = int(self.headers.get("Content-Length") or "0")
+            raw = self.rfile.read(max(0, length)).decode("utf-8", errors="replace")
+            try:
+                payload = json.loads(raw)
+            except json.JSONDecodeError:
+                self._send(
+                    200,
+                    json.dumps({"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "parse error"}}),
+                    "application/json",
+                )
+                return
+            self._jsonrpc(payload)
+            return
         if parsed.path not in {"/rpc", "/api/rpc", "/local-rpc"}:
             self._send(404, "error: not found")
             return
@@ -167,13 +194,81 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send(200, reply)
 
+    def _jsonrpc(self, payload: Any) -> None:
+        if not isinstance(payload, dict):
+            self._send(
+                200,
+                json.dumps({"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "invalid request"}}),
+                "application/json",
+            )
+            return
+        req_id = payload.get("id")
+        method = payload.get("method")
+        params = payload.get("params") or []
+        if not isinstance(method, str) or not method:
+            self._send(
+                200,
+                json.dumps({"jsonrpc": "2.0", "id": req_id, "error": {"code": -32600, "message": "method must be a string"}}),
+                "application/json",
+            )
+            return
+        if method not in PUBLIC_ALLOWLIST:
+            self._send(
+                200,
+                json.dumps(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": req_id,
+                        "error": {"code": -32601, "message": "error: command disabled on public RPC"},
+                    }
+                ),
+                "application/json",
+            )
+            return
+        if not isinstance(params, list):
+            self._send(
+                200,
+                json.dumps({"jsonrpc": "2.0", "id": req_id, "error": {"code": -32602, "message": "params must be a positional array"}}),
+                "application/json",
+            )
+            return
+        parts = [method]
+        for item in params:
+            if item is None or isinstance(item, bool):
+                self._send(
+                    200,
+                    json.dumps({"jsonrpc": "2.0", "id": req_id, "error": {"code": -32602, "message": "invalid params"}}),
+                    "application/json",
+                )
+                return
+            if isinstance(item, (int, float)):
+                parts.append(str(int(item)))
+            else:
+                parts.append(str(item))
+        command = " ".join(parts)
+        host = os.environ.get("ADDITION_PUBLIC_RPC_HOST", "127.0.0.1")
+        port = env_int("ADDITION_PUBLIC_RPC_PORT", 38545)
+        try:
+            reply = tcp_rpc(host, port, command, 4.0)
+        except OSError:
+            self._send(503, "RPC offline")
+            return
+        if reply.startswith("error:"):
+            self._send(
+                200,
+                json.dumps({"jsonrpc": "2.0", "id": req_id, "error": {"code": -32000, "message": reply}}),
+                "application/json",
+            )
+            return
+        self._send(200, json.dumps({"jsonrpc": "2.0", "id": req_id, "result": reply}), "application/json")
+
 
 def main() -> None:
     bind = os.environ.get("ADDITION_SITE_BIND", "127.0.0.1")
     port = env_int("ADDITION_SITE_PORT", 8080)
     httpd = ThreadingHTTPServer((bind, port), Handler)
     print(
-        "ADDITION testnet site on http://%s:%s (/api/rpc allowlist, /local-rpc loopback-only)"
+        "ADDITION testnet site on http://%s:%s (/api/rpc allowlist, /jsonrpc public-read, /local-rpc loopback-only)"
         % (bind, port)
     )
     httpd.serve_forever()
