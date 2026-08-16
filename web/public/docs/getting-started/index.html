@@ -9,29 +9,35 @@
 <body data-title="Build and run" data-sub="from the repo">
   <header id="site-header"></header>
   <main class="prose">
-    <div class="banner">Build <code>additiond</code> (liboqs + OpenSSL) from this repo on <code>main</code>. Live join: <a href="/join/">/join/</a>.</div>
-    <h2>Join the live testnet</h2>
-<p>Binary from <a href="https://github.com/ADDAddition/ADDITION">this repository</a> (<code>main</code>):</p>
-<pre>additiond --network testnet --data-dir &lt;dir&gt; --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545</pre>
-<p>Then type <code>sync</code>. Height should move. <code>addpeer</code> after bootstrap is <code>invalid/duplicate</code>.</p>
-<p><code>sync</code> tries HTTP <code>:80</code> first, then <code>:38545</code>, then P2P <code>HELLO</code>. Public read is <code>/rpc?cmd=getinfo</code> (not <code>/getinfo</code>). <code>:80</code> works when <code>38545</code> is filtered. <code>getblockraw</code> is allowed (<code>ok:BLKDATA</code>).</p>
-<p>Write RPC stays <code>127.0.0.1</code>. Public <code>mine</code> / <code>createwallet</code> are disabled. There is no public wallet, token, or NFT UI.</p>
-    <h2>ADDITION testnet</h2>
+    <div class="banner">Build <code>additiond</code> (liboqs + OpenSSL). From the repository README.</div>
+    <h2>ADDITION — research prototype / testnet</h2>
 <p>!<a href="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge">License</a></p>
 <p>!<a href="https://img.shields.io/badge/C%2B%2B-20-blue?style=for-the-badge">C++</a></p>
-<p><strong>ADDITION</strong> is a C++ node (ML-DSA-87 + SHA3-512). Default: <code>additiond --network testnet</code>.</p>
+<p><strong>ADDITION</strong> is a research prototype for a post-quantum Layer 1 experiment (Dilithium / ML-DSA + SHA3-512). Default network: <code>additiond --network testnet</code>.</p>
+<p>This repository does <strong>not</strong> claim production status, public node counts, a token sale, CoinMarketCap listing, or a live chain. CI badges are omitted until a green pipeline exists.</p>
 <p>Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
 <hr>
+<h2>Join the live testnet</h2>
+<p>Build <code>additiond</code> from this repository (<code>main</code>), then:</p>
+<pre>additiond --network testnet --data-dir &lt;dir&gt; --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545</pre>
+<p>Type <code>sync</code> on the daemon stdin (or send it to write RPC on <code>127.0.0.1</code>). Height should move. <code>addpeer</code> after <code>--bootstrap</code> is <code>invalid/duplicate</code>.</p>
+<p><code>sync</code> tries public-read HTTP <code>:80</code> first, then <code>:38545</code>, then P2P <code>HELLO</code>. <code>:80</code> works when <code>38545</code> is filtered.</p>
+<p>Public read is <code>/rpc?cmd=getinfo</code> (not <code>/getinfo</code>):</p>
+<pre>curl &#x27;https://rpc.additionblockchain.com/rpc?cmd=getinfo&#x27;
+curl &#x27;http://34.27.30.115/rpc?cmd=getinfo&#x27;
+curl &#x27;http://34.27.30.115:38545/rpc?cmd=getinfo&#x27;</pre>
+<p><code>getblockraw</code> is on the public allowlist (<code>ok:BLKDATA</code>). Public-read JSON-RPC 2.0 is on <code>/jsonrpc</code> (GET query or POST body) with the same allowlist and no writes. Public <code>mine</code> / <code>createwallet</code> return <code>error: command disabled on public RPC</code>. Write RPC stays <code>127.0.0.1</code>. There is no public wallet, token, or NFT UI. Local pool reserves are not a published network total.</p>
+<hr>
 <h2>Research goals (design targets)</h2>
-<p>What the node implements:</p>
+<p>These are aims of the testnet / research prototype, not proof of a live public network:</p>
 <p>1. <strong>Quantum</strong> — ML-DSA-87 (FIPS 204) signatures, <code>pq_mode=strict</code> when <code>getinfo</code> answers</p>
 <p>2. <strong>Privacy</strong> — SHA3-512 commitment + nullifier <strong>opening</strong> (<code>privacy_mint_open</code> / <code>privacy_spend_open</code>). This is a real hash relation, not a circuit. <code>privacy_*_zk</code> remains an ML-DSA wrap of a mint/spend string. Not Groth16, not Bulletproofs, not ZK-Shield.</p>
 <p>3. <strong>Speed</strong> — local testnet RPC; publish only real <code>getinfo</code> fields from a running node</p>
-<p>4. <strong>Cost of transaction</strong> — spec <code>min_fee=1</code></p>
-<p>5. <strong>Compatibility</strong> — in-process <code>bridge_*</code> and <code>web/evm/evm_rpc_bridge.py</code> on localhost</p>
+<p>4. <strong>Cost of transaction</strong> — spec <code>min_fee=1</code>; no invented USD fees or gas market</p>
+<p>5. <strong>Compatibility</strong> — in-process <code>bridge_*</code> commands and the EVM bootstrap (<code>web/evm/evm_rpc_bridge.py</code>). Bootstrap / not a full EVM, not live Uniswap, not “connected to every chain today”</p>
 <hr>
 <h2>What this is</h2>
-<ul><li>Network name <code>addition-testnet</code></li><li>Default: <code>additiond --network testnet</code></li><li>Opt-in profile: <code>--network mainnet</code> or <code>ADDITION_MAINNET_MODE=1</code></li></ul>
+<ul><li>A local / research <strong>testnet</strong> named <code>addition-testnet</code></li><li>Default mode is <strong>testnet</strong> (<code>additiond --network testnet</code>)</li><li>Mainnet profile is opt-in only (<code>--network mainnet</code> or an explicit <code>ADDITION_MAINNET_MODE=1</code>). That profile is still experimental and is <strong>not</strong> a live public network.</li></ul>
 <p>Checked-in network files:</p>
 <ul><li><a href="config.toml"><code>config.toml</code></a> — network name, ports, reward, localhost bootstrap examples</li><li><a href="genesis.json"><code>genesis.json</code></a> — testnet genesis parameters (no fake node counts)</li></ul>
 <p><code>bootstrap_peers</code> is IPv4 <code>ip:port</code> only. The operator’s current public P2P is <code>34.27.30.115:28545</code>. That is one real endpoint, not a peer-count claim. Local two-node runs still use <code>--bootstrap 127.0.0.1:28545</code>. Write RPC stays <code>127.0.0.1:8545</code>.</p>
@@ -87,25 +93,29 @@ python3 web/addition_wallet.py send &lt;to_address&gt; &lt;amount&gt;</pre>
 <p>Local RPC on <code>127.0.0.1:8545</code> stays trusted (mine, wallets, sends). To expose a <strong>read-only</strong> public bind:</p>
 <pre>./build/additiond --network testnet --public-rpc
 # equivalent: ADDITION_ENABLE_PUBLIC_RPC=1 ./build/additiond --network testnet</pre>
-<p>Default public bind is <code>0.0.0.0:38545</code>. Live seed also serves HTTP <code>:80</code> (nginx) when <code>38545</code> is filtered. Path is <code>/rpc?cmd=getinfo</code>, not <code>/getinfo</code>. Allowlist only:</p>
+<p>Default public bind is <code>0.0.0.0:38545</code>. Allowlist only:</p>
 <p><code>getinfo</code>, <code>monetary_info</code>, <code>crypto_selftest</code>, <code>tx_status</code>, <code>peers</code>, <code>getblock</code>, <code>getblockhash</code>, <code>getblockraw</code></p>
-<pre>curl &#x27;https://rpc.additionblockchain.com/rpc?cmd=getinfo&#x27;
-curl &#x27;http://34.27.30.115/rpc?cmd=getinfo&#x27;
-curl &#x27;http://34.27.30.115:38545/rpc?cmd=getinfo&#x27;
-printf &#x27;mine\n&#x27; | nc 34.27.30.115 38545   # error: command disabled on public RPC</pre>
+<pre>printf &#x27;getinfo\n&#x27; | nc 127.0.0.1 38545
+curl &#x27;http://127.0.0.1:38545/rpc?cmd=getinfo&#x27;
+curl &#x27;http://127.0.0.1:38545/jsonrpc?method=getinfo&#x27;
+curl &#x27;http://127.0.0.1:38545/jsonrpc?method=getblockraw&amp;params=0&#x27;
+curl -H &#x27;Content-Type: application/json&#x27; \
+  -d &#x27;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;getinfo&quot;,&quot;params&quot;:[]}&#x27; \
+  &#x27;http://127.0.0.1:38545/jsonrpc&#x27;
+printf &#x27;mine\n&#x27; | nc 127.0.0.1 38545   # error: command disabled on public RPC</pre>
 <p>LAN RPC (<code>18545</code>) still requires <code>ADDITION_ENABLE_LAN_RPC=1</code> and <code>ADDITION_LAN_RPC_TOKEN</code>. P2P stays off unless <code>ADDITION_ENABLE_P2P_RPC=1</code>. Do not open unauthenticated write RPC to the world.</p>
-<p>Config keys: <code>enable_public_rpc</code>, <code>ports.public_rpc</code>, <code>ports.public_rpc_bind</code>, <code>enable_auto_mine</code>, <code>auto_mine_interval_sec</code>, <code>auto_mine_reward</code>, <code>bootstrap_peers</code>. Second local node: <code>--local-rpc-port 8546 --p2p-port 28546 --bootstrap 127.0.0.1:28545</code>. To join the live testnet: <code>--bootstrap 34.27.30.115:28545</code> then type <code>sync</code> (HTTP <code>:80</code>, then <code>:38545</code>, then P2P <code>HELLO</code>). <code>addpeer</code> after bootstrap is <code>invalid/duplicate</code>. See <a href="/join/">/join/</a>.</p>
+<p>Config keys: <code>enable_public_rpc</code>, <code>ports.public_rpc</code>, <code>ports.public_rpc_bind</code>, <code>enable_auto_mine</code>, <code>auto_mine_interval_sec</code>, <code>auto_mine_reward</code>, <code>bootstrap_peers</code>. Second local node: <code>--local-rpc-port 8546 --p2p-port 28546 --bootstrap 127.0.0.1:28545</code>. To join the operator testnet: <code>--bootstrap 34.27.30.115:28545</code> (IPv4 only; P2P stays off unless <code>ADDITION_ENABLE_P2P_RPC=1</code>). See <a href="docs/TWO_NODE_TESTNET.md">docs/TWO_NODE_TESTNET.md</a>.</p>
 <h3>Testnet auto-mine (off by default)</h3>
 <p>The chain only grows when something mines. That can be a human/<code>mine</code> on localhost <strong>or</strong> an optional in-process timer:</p>
 <pre>./build/additiond --network testnet --auto-mine --auto-mine-interval 60 --auto-mine-reward miner1
 # equivalent: ADDITION_AUTO_MINE=1 ADDITION_AUTO_MINE_INTERVAL=60 ./build/additiond --network testnet</pre>
 <p>Auto-mine is refused on <code>--network mainnet</code>. It is not a public RPC command (<code>mine</code> stays rejected on port 38545). Each accepted block is persisted to <code>--data-dir/blocks.dat</code> as today.</p>
 <h3>Website (static Pages)</h3>
-<p><code>web/public/</code> is the Pages root (additionblockchain.com). GitHub: <a href="https://github.com/ADDAddition/ADDITION">ADDAddition/ADDITION</a>.</p>
+<p><code>web/public/</code> is a complete static site (explorer, RPC how-to, mirrored docs, white paper, legal notice). Publish that folder as the Pages root (for example additionblockchain.com). GitHub: <a href="https://github.com/ADDAddition/ADDITION">ADDAddition/ADDITION</a>.</p>
 <pre>python3 web/serve.py</pre>
-<table><tr><th>Path</th><th>Content</th></tr><tr><td><code>/</code></td><td>Home + live <code>getinfo</code> or <strong>RPC offline</strong></td></tr><tr><td><code>/join/</code></td><td>Run <code>additiond</code> from <code>main</code>, bootstrap <code>34.27.30.115:28545</code>, then <code>sync</code></td></tr><tr><td><code>/explorer/</code></td><td>getinfo height + last few <code>getblock</code> results, or <strong>RPC offline</strong></td></tr><tr><td><code>/status/</code></td><td>getinfo, monetary_info, selftest, peers</td></tr><tr><td><code>/rpc/</code></td><td>Public read <code>/rpc?cmd=getinfo</code> on :80 and :38545</td></tr><tr><td><code>/docs/</code></td><td>Architecture, commands, PoUW, getting started</td></tr><tr><td><code>/wallet/</code></td><td>createwallet via <code>/local-rpc</code> → 127.0.0.1:8545</td></tr><tr><td><code>/contracts/</code> <code>/swap/</code> <code>/evm/</code></td><td>Local node methods; EVM bootstrap</td></tr><tr><td><code>/whitepaper/</code> <code>/legal/</code></td><td>White paper, MIT</td></tr></table>
-<p>Explorer/status call <code>/api/rpc</code>. Optional <code>?rpc=http://HOST:38545/rpc</code>.</p>
-<p>The Pages worker (<code>web/public/wrangler.toml</code>) ships <code>PUBLIC_RPC_HTTP = &quot;&quot;</code>. Down node → <strong>RPC offline</strong>. An operator who runs <code>--public-rpc</code> sets <code>PUBLIC_RPC_HTTP</code> to that process’s HTTP URL (for example <code>http://127.0.0.1:38545/rpc</code>). Do not commit trycloudflare URLs.</p>
+<table><tr><th>Path</th><th>Content</th></tr><tr><td><code>/</code></td><td>Testnet home + live <code>getinfo</code> or <strong>RPC offline</strong></td></tr><tr><td><code>/join/</code></td><td>Run <code>additiond</code> from <code>main</code>, bootstrap <code>34.27.30.115:28545</code>, then <code>sync</code></td></tr><tr><td><code>/explorer/</code></td><td>Height + last few real <code>getblock</code> results from the read RPC, or <strong>RPC offline</strong></td></tr><tr><td><code>/status/</code></td><td>getinfo, recent <code>getblock</code>, monetary_info, selftest, peers</td></tr><tr><td><code>/rpc/</code></td><td>Public read <code>/rpc?cmd=getinfo</code> on :80 and :38545</td></tr><tr><td><code>/docs/</code></td><td>Architecture, commands, PoUW spec, getting started, runbook, ZK contract</td></tr><tr><td><code>/wallet/</code></td><td>Local createwallet / UTXO send via <code>/local-rpc</code> (loopback)</td></tr><tr><td><code>/contracts/</code> <code>/swap/</code> <code>/evm/</code></td><td>Local node methods only; EVM is bootstrap</td></tr><tr><td><code>/whitepaper/</code> <code>/legal/</code></td><td>Research copy. No fake ticker or live mainnet</td></tr></table>
+<p>Explorer/status call <code>/api/rpc</code>. On a static host without a backend they show <strong>RPC offline</strong>. Optional <code>?rpc=http://HOST:38545/rpc</code>.</p>
+<p>The Pages worker (<code>web/public/wrangler.toml</code>) ships <code>PUBLIC_RPC_HTTP = &quot;&quot;</code>. Leave it empty so the site shows <strong>RPC offline</strong>. An operator who runs <code>--public-rpc</code> sets <code>PUBLIC_RPC_HTTP</code> to that process’s real HTTP URL (for example <code>http://127.0.0.1:38545/rpc</code>). Do not commit trycloudflare or other ephemeral URLs.</p>
 <p><code>/wallet</code>, <code>/contracts</code>, and <code>/swap</code> use loopback <code>/local-rpc</code> → <code>127.0.0.1:8545</code>. They print the node’s real reply (<code>error: pool not found</code> if you have no pool).</p>
 <pre>python3 web/evm/evm_rpc_bridge.py</pre>
 <p>Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a>.</p>

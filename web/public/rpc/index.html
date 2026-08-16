@@ -31,8 +31,10 @@ ADDITION_ENABLE_PUBLIC_RPC=1 ./build/additiond --network testnet</pre>
       <pre>curl 'https://rpc.additionblockchain.com/rpc?cmd=getinfo'
 curl 'http://34.27.30.115/rpc?cmd=getinfo'
 curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'
+curl 'http://34.27.30.115:38545/jsonrpc?method=getinfo'
+curl 'http://34.27.30.115:38545/jsonrpc?method=getblockraw&params=0'
 printf 'getinfo\n' | nc 34.27.30.115 38545</pre>
-      <p><code>:80</code> (nginx) works when <code>38545</code> is filtered. Path is <code>/rpc?cmd=getinfo</code>, not <code>/getinfo</code>.</p>
+      <p><code>:80</code> (nginx) works when <code>38545</code> is filtered. Path is <code>/rpc?cmd=getinfo</code> or <code>/jsonrpc?method=getinfo</code>, not <code>/getinfo</code>. JSON-RPC 2.0 POST to <code>/jsonrpc</code> uses the same allowlist and never proxies writes.</p>
       <p>Allowlist:</p>
       <ul>
         <li><code>getinfo</code></li>

@@ -31,7 +31,7 @@ curl 'http://34.27.30.115/rpc?cmd=getinfo'
 curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'
 ```
 
-`getblockraw` is on the public allowlist (`ok:BLKDATA`). Public `mine` / `createwallet` return `error: command disabled on public RPC`. Write RPC stays `127.0.0.1`. There is no public wallet, token, or NFT UI.
+`getblockraw` is on the public allowlist (`ok:BLKDATA`). Public-read JSON-RPC 2.0 is on `/jsonrpc` (GET query or POST body) with the same allowlist and no writes. Public `mine` / `createwallet` return `error: command disabled on public RPC`. Write RPC stays `127.0.0.1`. There is no public wallet, token, or NFT UI. Local pool reserves are not a published network total.
 
 ---
 
@@ -178,6 +178,11 @@ Default public bind is `0.0.0.0:38545`. Allowlist only:
 ```bash
 printf 'getinfo\n' | nc 127.0.0.1 38545
 curl 'http://127.0.0.1:38545/rpc?cmd=getinfo'
+curl 'http://127.0.0.1:38545/jsonrpc?method=getinfo'
+curl 'http://127.0.0.1:38545/jsonrpc?method=getblockraw&params=0'
+curl -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"getinfo","params":[]}' \
+  'http://127.0.0.1:38545/jsonrpc'
 printf 'mine\n' | nc 127.0.0.1 38545   # error: command disabled on public RPC
 ```
 
@@ -216,9 +221,9 @@ python3 web/serve.py
 | `/contracts/` `/swap/` `/evm/` | Local node methods only; EVM is bootstrap |
 | `/whitepaper/` `/legal/` | Research copy. No fake ticker or live mainnet |
 
-Explorer/status call `/api/rpc`. On a static host without a backend they fail closed. Optional `?rpc=http://HOST:38545/rpc`.
+Explorer/status call `/api/rpc`. On a static host without a backend they show **RPC offline**. Optional `?rpc=http://HOST:38545/rpc`.
 
-The Pages worker (`web/public/wrangler.toml`) ships `PUBLIC_RPC_HTTP = ""`. Leave it empty so the site fail-closes with **RPC offline**. An operator who runs `--public-rpc` sets `PUBLIC_RPC_HTTP` to that process’s real HTTP URL (for example `http://127.0.0.1:38545/rpc`). Do not commit trycloudflare or other ephemeral URLs.
+The Pages worker (`web/public/wrangler.toml`) ships `PUBLIC_RPC_HTTP = ""`. Leave it empty so the site shows **RPC offline**. An operator who runs `--public-rpc` sets `PUBLIC_RPC_HTTP` to that process’s real HTTP URL (for example `http://127.0.0.1:38545/rpc`). Do not commit trycloudflare or other ephemeral URLs.
 
 `/wallet`, `/contracts`, and `/swap` use loopback `/local-rpc` → `127.0.0.1:8545`. They print the node’s real reply (`error: pool not found` if you have no pool).
 

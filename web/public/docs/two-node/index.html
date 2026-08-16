@@ -9,9 +9,10 @@
 <body data-title="Two-node testnet" data-sub="from the repo">
   <header id="site-header"></header>
   <main class="prose">
-    <div class="banner">From <code>docs/TWO_NODE_TESTNET.md</code>. Two local <code>additiond</code> processes. Live join: <a href="/join/">/join/</a> — bootstrap <code>34.27.30.115:28545</code>, then <code>sync</code>.</div>
+    <div class="banner">From <code>docs/TWO_NODE_TESTNET.md</code>. Two local <code>additiond</code> processes.</div>
     <h2>Two-node local testnet runbook</h2>
-<p>This starts <strong>two <code>additiond</code> processes</strong> on one machine.</p>
+<p>This starts <strong>two local <code>additiond</code> processes</strong> on one machine. It is not a public</p>
+<p>mainnet, not a token sale, and it does not invent peer counts or hashrate.</p>
 <p>Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
 <h2>Ports</h2>
 <table><tr><th>Node</th><th>Write RPC (loopback only)</th><th>P2P</th><th>Public read RPC</th></tr><tr><td>A</td><td><code>127.0.0.1:8545</code></td><td><code>28545</code></td><td><code>38545</code> (opt-in <code>--public-rpc</code>)</td></tr><tr><td>B</td><td><code>127.0.0.1:8546</code></td><td><code>28546</code></td><td>off</td></tr></table>
@@ -60,7 +61,8 @@ printf &#x27;createwallet\n&#x27; | nc 127.0.0.1 38545</pre>
 <h2>Point the website at a real public RPC</h2>
 <p><code>web/public/wrangler.toml</code> ships with:</p>
 <pre>PUBLIC_RPC_HTTP = &quot;&quot;</pre>
-<p>Leave it empty. Down node → <strong>RPC offline</strong>.</p>
+<p>Leave it empty. The worker and static pages show <strong>RPC offline</strong>.</p>
+<p>They do not invent blocks, peers, or hashrate.</p>
 <p>When an operator has a <strong>real</strong> public-rpc HTTP URL (this machine, a VPS, or a</p>
 <p>tunnel the operator created), set the worker variable to that URL:</p>
 <pre>PUBLIC_RPC_HTTP = &quot;http://127.0.0.1:38545/rpc&quot;</pre>
@@ -70,8 +72,14 @@ printf &#x27;createwallet\n&#x27; | nc 127.0.0.1 38545</pre>
 <p>Do <strong>not</strong> commit trycloudflare or other ephemeral tunnel URLs.</p>
 <p>Local site proxy (<code>python3 web/serve.py</code>) talks to <code>127.0.0.1:38545</code> when the</p>
 <p>public port is up. If the daemon is down, pages show <strong>RPC offline</strong>.</p>
-<h2>P2P</h2>
-<ul><li>P2P transport is off unless <code>ADDITION_ENABLE_P2P_RPC=1</code>.</li><li>The operator node allows inbound TCP <strong>28545</strong> (GCP rule <code>allow-addition-p2p</code>) only while P2P is enabled. Never open <strong>8545</strong> or <strong>18545</strong>.</li><li>Endpoints are IPv4 <code>ip:port</code> only (<code>inet_pton</code>). Docker DNS names do not work.</li><li><code>bootstrap_peers</code> / <code>--bootstrap</code> skip this process’s own P2P port.</li><li>IPv4 only. Public P2P: <code>34.27.30.115:28545</code> (<code>--bootstrap 34.27.30.115:28545</code>). Write RPC stays <code>127.0.0.1:8545</code>.</li><li><code>addpeer</code> is a trusted-write command. Public RPC can only <code>peers</code>.</li><li><code>sync</code> on two fresh nodes at height 0 has nothing to fetch. That is not a</li></ul>
+<h2>P2P limits</h2>
+<ul><li>P2P transport is off unless <code>ADDITION_ENABLE_P2P_RPC=1</code>.</li><li>The live operator node sets that env and allows inbound TCP <strong>28545</strong></li></ul>
+<p>  (GCP rule <code>allow-addition-p2p</code>). Allow 28545 only while P2P is enabled.</p>
+<p>  Never open <strong>8545</strong> or <strong>18545</strong>.</p>
+<ul><li>Endpoints are IPv4 <code>ip:port</code> only (<code>inet_pton</code>). Docker DNS names do not work.</li><li><code>bootstrap_peers</code> / <code>--bootstrap</code> skip this process’s own P2P port.</li><li>IPv4 only. The operator’s current public P2P is <code>34.27.30.115:28545</code></li></ul>
+<p>  (<code>--bootstrap 34.27.30.115:28545</code>). Do not invent extra peers. Write RPC</p>
+<p>  stays <code>127.0.0.1:8545</code>.</p>
+<ul><li><code>addpeer</code> is a trusted-write command. Public RPC can only <code>peers</code>.</li><li><code>sync</code> on two fresh nodes at height 0 has nothing to fetch. That is not a</li></ul>
 <p>  live network and not a peer-count claim.</p>
 <ul><li>DEX / ZK-Shield commands stay off the public allowlist. Do not advertise</li></ul>
 <p>  them unless they succeed on the trusted local port of a running node.</p>

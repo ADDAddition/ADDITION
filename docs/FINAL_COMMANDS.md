@@ -29,15 +29,20 @@ Allowlist (everything else returns `error: command disabled on public RPC`):
 
 Not on the public port: `mine`, `sendtx*`, `createwallet`, `wallet_*`, identity rotation, admin, contract/token writes.
 
-TCP and a tiny HTTP adapter share the same port:
+TCP and a tiny HTTP adapter share the same port. Public-read JSON-RPC 2.0 uses the same allowlist (no writes):
 
 ```bash
 curl 'https://rpc.additionblockchain.com/rpc?cmd=getinfo'
 curl 'http://34.27.30.115/rpc?cmd=getinfo'
 curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'
+curl 'http://34.27.30.115:38545/jsonrpc?method=getinfo'
+curl 'http://34.27.30.115:38545/jsonrpc?method=getblockraw&params=0'
+curl -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"getinfo","params":[]}' \
+  'http://34.27.30.115:38545/jsonrpc'
 ```
 
-Path is `/rpc?cmd=getinfo`, not `/getinfo`. `:80` works when `38545` is filtered.
+Path is `/rpc?cmd=getinfo` or `/jsonrpc?method=getinfo`, not `/getinfo`. `:80` works when `38545` is filtered. `mine` / `createwallet` / `wallet_*` stay disabled on this port.
 
 Override bind/port with `--public-rpc-bind`, `--public-rpc-port`, `ADDITION_PUBLIC_RPC_BIND`, or `ADDITION_PUBLIC_RPC_PORT`. HTTP replies send `Access-Control-Allow-Origin: *`, `OPTIONS` 204, and `Cache-Control: no-store`.
 
@@ -52,7 +57,7 @@ Node B: `--data-dir` second tree, write `8546`, P2P `28546`, `--bootstrap 127.0.
 Operator public P2P (IPv4 only): `--bootstrap 34.27.30.115:28545`. Write RPC stays loopback.
 See [TWO_NODE_TESTNET.md](TWO_NODE_TESTNET.md).
 
-Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so the worker fail-closes with `RPC offline`. Set it only to a real public-rpc HTTP URL you operate. Do not commit trycloudflare URLs.
+Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so the worker shows `RPC offline`. Set it only to a real public-rpc HTTP URL you operate. Do not commit trycloudflare URLs.
 
 ## Core chain
 - `getinfo`
@@ -75,7 +80,8 @@ Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so the worke
 - `getblock <height_or_hash>`
 - `getblockhash <height>`
 - `getblockraw <height>`
-- `mine` — testnet: SHA3-512 header PoW, 30s deadline. Trusted RPC / stdin only. Optional in-process auto-mine (`--auto-mine`, `ADDITION_AUTO_MINE=1`) is off by default, testnet only, and is not a public RPC command. `getinfo` reports `pow_algorithm=sha3_512` and `auto_mine=off|on`. The mainnet *profile* still uses memory-hard hashing and is not demonstrated live.
+- `benchmark_objective <blocks> <notes_per_block>` — header PoW on a parked mempool plus SHA3-512 opening hashes. Does not inject fake spends. `objective_privacy_ok=false` (`claim=opening_not_zk`). Trusted RPC only.
+- `mine` — testnet: SHA3-512 header PoW, 30s deadline. Trusted RPC / stdin only. Optional in-process auto-mine (`--auto-mine`, `ADDITION_AUTO_MINE=1`) is off by default, testnet only, and is not a public RPC command. `getinfo` reports `pow_algorithm=sha3_512` and `auto_mine=off|on`. The mainnet *profile* still uses memory-hard hashing and is not demonstrated live. Leftover invalid mempool txs are dropped and do not fail a later `mine`.
 
 ## P2P + Consensus
 - `addpeer <ip:port>`
@@ -158,9 +164,9 @@ Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so the worke
 - `privacy_mint_zk <owner> <amount> <commitment_hex> <nullifier_hex> <proof_hex> <vk_hex>`
 - `privacy_spend_zk <owner> <note_id> <recipient> <amount> <nullifier_hex> <proof_hex> <vk_hex>`
 
-Honest verifier notes:
+Opening verifier notes:
 - The real proving path in this tree is **SHA3-512 commitment + nullifier opening**. The verifier recomputes `SHA3-512("cm|"+amount+"|"+trapdoor)` and `SHA3-512("nf|"+trapdoor)`. A garbage trapdoor is rejected. The node sees the opening. This is **not** zero-knowledge, not Groth16, not Bulletproofs, not ZK-Shield.
-- `privacy_mint_zk` / `privacy_spend_zk` still verify an ML-DSA-87 signature of `mint|...` / `spend|...`. That is a signature wrap, not a circuit. Keep those commands only for compatibility.
+- `privacy_mint_zk` / `privacy_spend_zk` still verify an ML-DSA-87 signature of `mint|...` / `spend|...`. That is a signature wrap, not a circuit. Garbage proofs stay `error:`. Do not advertise these as ZK.
 - Note storage hardening: `owner` and `amount` are not persisted in plaintext (`ADDITION_PRIVACY_MASTER_KEY`, minimum 32 chars).
 - `owner_tag` derivation is keyed with `ADDITION_PRIVACY_MASTER_KEY`.
 - Write privacy commands stay off the public RPC allowlist.
@@ -170,7 +176,8 @@ Honest verifier notes:
 - `unstake <address> <amount>`
 - `staked <address>`
 - `stake_reward <amount>`
-- `stake_claim <address>`
+- `stake_claim <address>` — credits only when `staked * reward_cap_bps / 10000 > 0` (default cap 300 bps)
+- `getbalance` / `wallet_send` use unlocked = on-chain minus staked
 
 ## Smart-contract runtime
 - `contract_deploy <owner> <code>`
@@ -191,8 +198,8 @@ Honest verifier notes:
 	- return: `verifier_configured`, `strict_zk_mode`, notes and nullifier stats
 
 Notes:
-- For strongest privacy, keep `strict_zk_mode` ON.
-- `zk_mint` and `zk_spend` require valid proof/vk hex and native in-process ML-DSA-87 verification.
+- `zk_mint` / `zk_spend` / `zk_privacy_status` are the same ML-DSA wrap as `privacy_*_zk`, not a circuit.
+- `protocol_status` reports `objective_privacy_ok=false` and `privacy_claim=opening_not_zk`. `verifier_configured` is not a ZK circuit.
 
 ## Token & NFT runtime
 - `token_create <symbol> <owner> <max_supply> <initial_mint>`
@@ -202,14 +209,21 @@ Notes:
 - `nft_mint <collection> <token_id> <owner> <metadata>`
 - `nft_transfer <collection> <token_id> <from> <to>`
 - `nft_owner <collection> <token_id>`
+- `nft_info <collection> <token_id>` — `owner=` plus stored `metadata=`
+- `swap_pool_create`, `add_liquidity` (alias of `swap_add_liquidity`), `swap_quote`, `swap_exact_in`, `swap_quote_route`, `swap_route_exact_in`, `swap_best_route`, `swap_best_route_exact_in_signed`
+- In-process AMM math only. Local pool reserves are not a published network total and are not shown on the public site.
 
 ## Bridge runtime
+In-process balances only. No external chain, no lock on another network.
 - `bridge_register <chain>`
 - `bridge_lock <chain> <user> <amount>`
 - `bridge_mint <chain> <user> <amount>`
 - `bridge_burn <chain> <user> <amount>`
 - `bridge_release <chain> <user> <amount>`
 - `bridge_balance <chain> <user>`
+
+## PoUW commands
+Ledger/status commands only. `pouw_compute_*` has no job runtime. `pouw_storage_submit_proof` checks nibble parity of a hash against the challenge seed, not a storage proof.
 
 ## Notes
 - Build defaults to release-oriented mode with tests disabled unless explicitly enabled.
@@ -241,7 +255,7 @@ Notes:
 
 ## Wallet (local / testnet only)
 - File: `web/addition_wallet_gui.py` (Tk GUI, or `--cli` without a display)
-- Honest page: `/wallet/` via loopback `/local-rpc` → `127.0.0.1:8545`
+- Wallet page: `/wallet/` via loopback `/local-rpc` → `127.0.0.1:8545`
 - Uses TCP RPC on `127.0.0.1:8545` only (refuses non-loopback hosts)
 - Supports:
 	- Wallet creation (`createwallet [name]`, ML-DSA-87, key stays in `data/wallets/`)
@@ -254,7 +268,7 @@ Notes:
 - Not shipped in this tree: `web/addition_wallet_pro.py`, `web/portal/` (no `/api/getinfo` portal backend)
 - MetaMask EVM bridge (bootstrap): `web/evm/evm_rpc_bridge.py`
 
-## Honest website (fail-closed)
+## Website (shows RPC offline)
 - Static Pages root: `web/public/` (`/`, `/explorer/`, `/status/`, `/rpc/`, `/wallet/`, `/docs/`, `/contracts/`, `/swap/`, `/evm/`, `/whitepaper/`, `/legal/`)
 - Local server: `python3 web/serve.py` (default `127.0.0.1:8080`)
 - `/api/rpc` (and `/rpc?cmd=`) proxy the public allowlist to port `38545`
