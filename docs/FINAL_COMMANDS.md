@@ -69,7 +69,7 @@ Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so the worke
 - `tx_status <tx_hash>`
 - `getblock <height_or_hash>`
 - `getblockhash <height>`
-- `mine`
+- `mine` — testnet: SHA3-512 header PoW, 30s deadline. `getinfo` reports `pow_algorithm=sha3_512`. The mainnet *profile* still uses memory-hard hashing and is not demonstrated live.
 
 ## P2P + Consensus
 - `addpeer <ip:port>`
@@ -144,23 +144,20 @@ Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so the worke
 	- Any mismatch fails signing/verification immediately.
 
 ## Privacy pool
+- `privacy_note_prepare <amount>` — returns `trapdoor`, `commitment`, `nullifier` for the SHA3-512 opening relation
+- `privacy_mint_open <owner> <amount> <commitment_hex> <nullifier_hex> <trapdoor_hex>`
+- `privacy_spend_open <owner> <note_id> <recipient> <amount> <trapdoor_hex>`
+- `privacy_status` — reports `opening_verifier=sha3_opening` and `claim=opening_not_zk`
 - `privacy_native_verifier <pq_mldsa87>`
 - `privacy_mint_zk <owner> <amount> <commitment_hex> <nullifier_hex> <proof_hex> <vk_hex>`
 - `privacy_spend_zk <owner> <note_id> <recipient> <amount> <nullifier_hex> <proof_hex> <vk_hex>`
 
-Strict privacy mode notes:
-- `privacy_mint_zk` / `privacy_spend_zk` are verified only in-process via native mode `pq_mldsa87`.
-- Non-ZK privacy commands are removed; privacy flow is ZK-only.
-- Strict ZK privacy policy is always ON (runtime toggle removed).
-- External verifier wrappers are disabled in mainnet native-only mode.
-- Proof and verification key are mandatory; no internal simulation verifier is used.
-- Note storage hardening: `owner` and `amount` are not persisted in plaintext.
-- Required for private note operations: set `ADDITION_PRIVACY_MASTER_KEY` (minimum 32 chars) before node startup.
-- `owner_tag` derivation is also keyed with `ADDITION_PRIVACY_MASTER_KEY` to avoid cross-dataset linkage from state files.
-- Private balance query commands are removed from command surface to reduce metadata leakage.
-
-Verifier tooling:
-- Native verifier is integrated in C++ (`privacy.cpp`) and uses ML-DSA-87 verification primitives.
+Honest verifier notes:
+- The real proving path in this tree is **SHA3-512 commitment + nullifier opening**. The verifier recomputes `SHA3-512("cm|"+amount+"|"+trapdoor)` and `SHA3-512("nf|"+trapdoor)`. A garbage trapdoor is rejected. The node sees the opening. This is **not** zero-knowledge, not Groth16, not Bulletproofs, not ZK-Shield.
+- `privacy_mint_zk` / `privacy_spend_zk` still verify an ML-DSA-87 signature of `mint|...` / `spend|...`. That is a signature wrap, not a circuit. Keep those commands only for compatibility.
+- Note storage hardening: `owner` and `amount` are not persisted in plaintext (`ADDITION_PRIVACY_MASTER_KEY`, minimum 32 chars).
+- `owner_tag` derivation is keyed with `ADDITION_PRIVACY_MASTER_KEY`.
+- Write privacy commands stay off the public RPC allowlist.
 
 ## Staking
 - `stake <address> <amount>`
