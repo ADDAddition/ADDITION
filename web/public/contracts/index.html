@@ -29,7 +29,7 @@
       <input id="owner" value="alice">
       <label for="code">code</label>
       <input id="code" value="kvstore">
-      <button id="deploy-btn" type="button">Deploy</button>
+      <button id="deploy-btn" type="button" disabled>Deploy</button>
       <pre id="deploy-raw" class="raw"></pre>
     </section>
     <section class="panel">
@@ -46,7 +46,7 @@
       <input id="key" value="counter">
       <label for="value">value</label>
       <input id="value" value="1">
-      <button id="call-btn" type="button">Call</button>
+      <button id="call-btn" type="button" disabled>Call</button>
       <pre id="call-raw" class="raw"></pre>
     </section>
     <section class="panel">
@@ -55,7 +55,7 @@
       <input id="symbol" value="TEST">
       <label for="token-owner">owner</label>
       <input id="token-owner" value="alice">
-      <button id="token-btn" type="button">Query token</button>
+      <button id="token-btn" type="button" disabled>Query token</button>
       <pre id="token-raw" class="raw"></pre>
     </section>
   </main>
@@ -78,12 +78,22 @@
     async function ping() {
       const r = await localCmd("getinfo");
       const el = document.getElementById("rpc-state");
+      const buttons = document.querySelectorAll("main button");
       if (r.offline) {
         el.className = "offline";
         el.textContent = "RPC offline";
-      } else {
-        el.className = "ok";
-        el.textContent = "Local trusted RPC answered";
+        for (let i = 0; i < buttons.length; i += 1) {
+          buttons[i].disabled = true;
+        }
+        document.getElementById("deploy-raw").textContent = "RPC offline";
+        document.getElementById("call-raw").textContent = "RPC offline";
+        document.getElementById("token-raw").textContent = "RPC offline";
+        return;
+      }
+      el.className = "ok";
+      el.textContent = "Local trusted RPC answered";
+      for (let i = 0; i < buttons.length; i += 1) {
+        buttons[i].disabled = false;
       }
     }
     document.getElementById("deploy-btn").addEventListener("click", async function () {

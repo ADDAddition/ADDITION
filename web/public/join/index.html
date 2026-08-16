@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Join the ADDITION testnet</title>
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body data-title="Join" data-sub="live testnet">
+  <header id="site-header"></header>
+  <main class="prose">
+    <div class="banner">
+      Binary from <a href="https://github.com/ADDAddition/ADDITION">this repo</a> on <code>main</code>.
+      Public read is <code>/rpc?cmd=getinfo</code>, not <code>/getinfo</code>.
+    </div>
+
+    <section class="panel">
+      <h2>Start a node</h2>
+      <p>Build <code>additiond</code> from <code>main</code>, then:</p>
+      <pre>additiond --network testnet --data-dir &lt;dir&gt; --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545</pre>
+      <p>Type <code>sync</code> on the daemon stdin (or send it to write RPC on <code>127.0.0.1</code>). Height should move.</p>
+      <p><code>addpeer</code> after <code>--bootstrap</code> is <code>invalid/duplicate</code> (the seed is already listed).</p>
+    </section>
+
+    <section class="panel">
+      <h2>What <code>sync</code> does</h2>
+      <p>Current <code>main</code> tries public-read HTTP <code>:80</code> first, then <code>:38545</code>, then P2P <code>HELLO</code>.</p>
+      <p><code>:80</code> works when <code>38545</code> is filtered. Ingest uses <code>getinfo</code> plus <code>getblockraw</code> (<code>ok:BLKDATA</code>).</p>
+    </section>
+
+    <section class="panel">
+      <h2>Public read</h2>
+      <pre>curl 'https://rpc.additionblockchain.com/rpc?cmd=getinfo'
+curl 'http://34.27.30.115/rpc?cmd=getinfo'
+curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'</pre>
+      <p>Allowlist includes <code>getblockraw</code>. Public <code>mine</code> / <code>createwallet</code> return <code>error: command disabled on public RPC</code>.</p>
+      <p>Write RPC stays <code>127.0.0.1</code>. Do not publish port <code>8545</code>.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Wallet / tokens</h2>
+      <p>There is no public wallet, token, or NFT UI. <code>createwallet</code>, balances, and swap commands exist on localhost write RPC only.</p>
+      <p>Pages under <code>/wallet/</code> and <code>/swap/</code> talk to <code>/local-rpc</code> → <code>127.0.0.1:8545</code>. On this host they stay <strong>RPC offline</strong>.</p>
+    </section>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/chrome.js"></script>
+</body>
+</html>

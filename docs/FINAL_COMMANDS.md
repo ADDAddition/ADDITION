@@ -32,9 +32,12 @@ Not on the public port: `mine`, `sendtx*`, `createwallet`, `wallet_*`, identity 
 TCP and a tiny HTTP adapter share the same port:
 
 ```bash
-printf 'getinfo\n' | nc 127.0.0.1 38545
-curl 'http://127.0.0.1:38545/rpc?cmd=getinfo'
+curl 'https://rpc.additionblockchain.com/rpc?cmd=getinfo'
+curl 'http://34.27.30.115/rpc?cmd=getinfo'
+curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'
 ```
+
+Path is `/rpc?cmd=getinfo`, not `/getinfo`. `:80` works when `38545` is filtered.
 
 Override bind/port with `--public-rpc-bind`, `--public-rpc-port`, `ADDITION_PUBLIC_RPC_BIND`, or `ADDITION_PUBLIC_RPC_PORT`. HTTP replies send `Access-Control-Allow-Origin: *`, `OPTIONS` 204, and `Cache-Control: no-store`.
 

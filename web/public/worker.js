@@ -3,6 +3,7 @@ const PAGE_ROUTES = {
   "/explorer": "/explorer/index.html",
   "/status": "/status/index.html",
   "/rpc": "/rpc/index.html",
+  "/join": "/join/index.html",
   "/wallet": "/wallet/index.html",
   "/docs": "/docs/index.html",
   "/docs/getting-started": "/docs/getting-started/index.html",

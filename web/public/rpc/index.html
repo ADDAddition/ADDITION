@@ -6,11 +6,12 @@
   <title>ADDITION public read RPC</title>
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="Public read RPC" data-sub=":38545">
+<body data-title="Public read RPC" data-sub="/rpc?cmd=getinfo">
   <header id="site-header"></header>
   <main class="prose">
     <div class="banner">
-      Public read on <code>0.0.0.0:38545</code>. Write RPC on <code>127.0.0.1:8545</code>.
+      Public read is <code>/rpc?cmd=getinfo</code> (not <code>/getinfo</code>) on :80 and :38545.
+      Write RPC on <code>127.0.0.1:8545</code>.
     </div>
     <p id="rpc-state" class="offline">Checking RPC…</p>
     <section class="panel">
@@ -27,9 +28,11 @@ ADDITION_ENABLE_PUBLIC_RPC=1 ./build/additiond --network testnet</pre>
     <section class="panel">
       <h2>Talk to it</h2>
       <p>One command line in, one response line out (same as local RPC):</p>
-      <pre>printf 'getinfo\n' | nc HOST 38545
-curl 'http://HOST:38545/rpc?cmd=getinfo'
-curl 'http://HOST:38545/rpc?cmd=getblock%200'</pre>
+      <pre>curl 'https://rpc.additionblockchain.com/rpc?cmd=getinfo'
+curl 'http://34.27.30.115/rpc?cmd=getinfo'
+curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'
+printf 'getinfo\n' | nc 34.27.30.115 38545</pre>
+      <p><code>:80</code> (nginx) works when <code>38545</code> is filtered. Path is <code>/rpc?cmd=getinfo</code>, not <code>/getinfo</code>.</p>
       <p>Allowlist:</p>
       <ul>
         <li><code>getinfo</code></li>
@@ -39,6 +42,7 @@ curl 'http://HOST:38545/rpc?cmd=getblock%200'</pre>
         <li><code>peers</code></li>
         <li><code>getblock &lt;height_or_hash&gt;</code></li>
         <li><code>getblockhash &lt;height&gt;</code></li>
+        <li><code>getblockraw &lt;height&gt;</code> (<code>ok:BLKDATA</code>)</li>
       </ul>
       <p>Everything else, including <code>mine</code>, <code>sendtx*</code>, <code>createwallet</code>, <code>wallet_*</code>, and identity rotation, returns <code>error: command disabled on public RPC</code>.</p>
       <p>Wallet create/send lives on localhost: <a href="/wallet/">/wallet/</a> or <code>python3 web/addition_wallet_gui.py</code>.</p>

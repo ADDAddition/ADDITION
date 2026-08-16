@@ -111,6 +111,10 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("ADDITION testnet", index)
         self.assertIn(":38545", index)
         self.assertIn("127.0.0.1:8545", index)
+        self.assertIn("/rpc?cmd=getinfo", index)
+        self.assertIn("34.27.30.115:28545", index)
+        self.assertIn("sync", index)
+        self.assertIn("/join/", index)
         self.assertIn('data-i18n="heroLede"', index)
         self.assertNotIn("/swap/", index)
         self.assertNotIn("/evm/", index)
@@ -121,6 +125,39 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("SHA3-512", index)
         self.assertIn("getinfo", index)
 
+    def test_join_docs_state_live_bootstrap_and_sync(self) -> None:
+        join = read("join/index.html")
+        docs = read("docs/index.html")
+        started = read("docs/getting-started/index.html")
+        rpc = read("rpc/index.html")
+        chrome = read("chrome.js")
+        worker = read("worker.js")
+        blob = join + docs + started + rpc + chrome
+        self.assertIn(
+            "additiond --network testnet --data-dir &lt;dir&gt; --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545",
+            join,
+        )
+        self.assertIn("sync", join)
+        self.assertIn("invalid/duplicate", join)
+        self.assertIn("/rpc?cmd=getinfo", join)
+        self.assertIn("https://rpc.additionblockchain.com/rpc?cmd=getinfo", join)
+        self.assertIn("http://34.27.30.115/rpc?cmd=getinfo", join)
+        self.assertIn(":80", join)
+        self.assertIn("getblockraw", join)
+        self.assertIn("ok:BLKDATA", join)
+        self.assertIn("HELLO", join)
+        self.assertIn("127.0.0.1", join)
+        self.assertIn("error: command disabled on public RPC", join)
+        self.assertIn("/join/", docs)
+        self.assertIn("34.27.30.115:28545", started)
+        self.assertIn("/rpc?cmd=getinfo", rpc)
+        self.assertIn("getblockraw", rpc)
+        self.assertIn('"/join": "/join/index.html"', worker)
+        self.assertNotIn("cloudflared", blob.lower())
+        self.assertNotIn("0.0.0.0:8545", blob)
+        self.assertNotIn("https://rpc.additionblockchain.com/getinfo", blob)
+        self.assertNotIn("http://34.27.30.115/getinfo", blob)
+
     def test_wallet_stays_loopback_only(self) -> None:
         wallet = read("wallet/index.html")
         self.assertIn("/local-rpc", wallet)
@@ -129,6 +166,19 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("disabled", wallet)
         self.assertIn("RPC offline", wallet)
         self.assertNotIn("wallet-connect", wallet.lower())
+
+    def test_swap_and_contracts_fail_closed(self) -> None:
+        swap = read("swap/index.html")
+        contracts = read("contracts/index.html")
+        self.assertIn("/local-rpc", swap)
+        self.assertIn("127.0.0.1:8545", swap)
+        self.assertIn("disabled", swap)
+        self.assertIn("RPC offline", swap)
+        self.assertIn("/local-rpc", contracts)
+        self.assertIn("127.0.0.1:8545", contracts)
+        self.assertIn("disabled", contracts)
+        self.assertIn("RPC offline", contracts)
+        self.assertNotIn("wallet-connect", swap.lower())
 
     def test_common_js_fail_closed_and_strip_keys(self) -> None:
         common = read("common.js")
