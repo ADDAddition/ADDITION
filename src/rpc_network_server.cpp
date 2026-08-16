@@ -88,15 +88,39 @@ void RpcNetworkServer::stop() {
 
 #ifdef _WIN32
     if (listen_socket_ != static_cast<uintptr_t>(-1)) {
+        shutdown(static_cast<SocketT>(listen_socket_), SD_BOTH);
         close_socket(static_cast<SocketT>(listen_socket_));
         listen_socket_ = static_cast<uintptr_t>(-1);
     }
 #else
     if (listen_socket_ != -1) {
+        shutdown(listen_socket_, SHUT_RDWR);
         close_socket(listen_socket_);
         listen_socket_ = -1;
     }
 #endif
+
+    // Unblock accept() if close() did not wake it.
+    {
+        SocketT poke = ::socket(AF_INET, SOCK_STREAM, 0);
+        if (poke != kInvalidSocket) {
+            sockaddr_in addr{};
+            addr.sin_family = AF_INET;
+            addr.sin_port = htons(port_);
+            inet_pton(AF_INET, bind_ip_.c_str(), &addr.sin_addr);
+#ifdef _WIN32
+            DWORD ms = 200;
+            setsockopt(poke, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&ms), sizeof(ms));
+#else
+            timeval tv{};
+            tv.tv_sec = 0;
+            tv.tv_usec = 200000;
+            setsockopt(poke, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+#endif
+            ::connect(poke, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+            close_socket(poke);
+        }
+    }
 
     if (worker_.joinable()) {
         worker_.join();

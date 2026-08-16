@@ -50,6 +50,15 @@ bool port_open(const char* ip, std::uint16_t port) {
 #endif
         return false;
     }
+#ifdef _WIN32
+    DWORD ms = 400;
+    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&ms), sizeof(ms));
+#else
+    timeval tv{};
+    tv.tv_sec = 0;
+    tv.tv_usec = 400000;
+    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+#endif
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
@@ -98,6 +107,7 @@ struct NodeKit {
 };
 
 int test_genesis_zero_tx_decode() {
+    std::cerr << "test_p2p_sync: genesis decode\n";
     NodeKit kit(addition::testnet_chain_config());
     if (kit.chain.height() != 0) {
         return fail("fresh chain height");
@@ -128,6 +138,7 @@ int test_genesis_zero_tx_decode() {
 }
 
 int test_hello_reply_not_shadowed() {
+    std::cerr << "test_p2p_sync: hello reply\n";
     NodeKit miner(addition::testnet_chain_config());
     std::string mined;
     std::string err;
@@ -192,6 +203,7 @@ int test_hello_reply_not_shadowed() {
 }
 
 int test_two_node_socket_sync() {
+    std::cerr << "test_p2p_sync: two-node socket sync\n";
     NodeKit node_a(addition::testnet_chain_config());
     NodeKit node_b(addition::testnet_chain_config());
 
@@ -207,10 +219,12 @@ int test_two_node_socket_sync() {
     std::string err;
     for (int i = 0; i < 3; ++i) {
         std::string mined;
+        std::cerr << "test_p2p_sync: mining A block " << (i + 1) << "\n";
         if (!node_a.miner.mine_next_block("miner1", 8, 2, mined, err)) {
             return fail("mine A block: " + err);
         }
     }
+    std::cerr << "test_p2p_sync: A height=" << node_a.chain.height() << "\n";
     if (node_a.chain.height() < 3) {
         return fail("node A did not reach height 3");
     }
@@ -242,10 +256,12 @@ int test_two_node_socket_sync() {
         p2p_a->stop();
         return fail("addpeer");
     }
+    std::cerr << "test_p2p_sync: sync_once on 127.0.0.1:" << port << "\n";
     if (!node_b.node.sync_once(err)) {
         p2p_a->stop();
         return fail("sync_once: " + err);
     }
+    std::cerr << "test_p2p_sync: stopping p2p A\n";
     p2p_a->stop();
 
     if (node_b.chain.height() != node_a.chain.height()) {
