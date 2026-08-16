@@ -163,6 +163,12 @@ void RpcServer::set_auto_mine_status(bool enabled, std::uint32_t interval_sec) {
     auto_mine_interval_sec_ = interval_sec == 0 ? 60 : interval_sec;
 }
 
+std::uint64_t RpcServer::unlocked_balance(const std::string& address) const {
+    const auto on_chain = chain_.balance_of(address);
+    const auto staked = staking_.staked_of(address);
+    return on_chain > staked ? (on_chain - staked) : 0ULL;
+}
+
 std::string RpcServer::handle_command(const std::string& line, bool trusted) {
     std::lock_guard<std::mutex> lock(mu_);
     std::istringstream iss(line);
@@ -222,13 +228,17 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         std::ostringstream out;
         const auto last_tps = miner_.last_tps();
         const bool objective_tps_ok = last_tps >= kObjectiveTps;
-        const bool objective_privacy_ok = privacy_.strict_zk_mode() && privacy_.verifier_configured();
-        const bool objective_100_ok = objective_tps_ok && objective_privacy_ok;
+        // SHA3-512 opening is real. ML-DSA wrap is not a zk circuit. Do not claim privacy_ok.
+        const bool objective_privacy_ok = false;
+        const bool objective_100_ok = false;
 
         out << "objective_tps_target=" << std::fixed << std::setprecision(0) << kObjectiveTps
             << " objective_tps_last=" << std::fixed << std::setprecision(2) << last_tps
             << " objective_tps_ok=" << (objective_tps_ok ? "true" : "false")
             << " objective_privacy_ok=" << (objective_privacy_ok ? "true" : "false")
+            << " privacy_claim=opening_not_zk"
+            << " opening_verifier=sha3_opening"
+            << " zk_circuit=0"
             << " objective_100_ok=" << (objective_100_ok ? "true" : "false")
             << " strict_zk_mode=" << (privacy_.strict_zk_mode() ? "true" : "false")
             << " verifier_configured=" << (privacy_.verifier_configured() ? "true" : "false")
@@ -516,7 +526,9 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " algo=" << stored.algorithm
             << " path=" << stored.path
             << " next_nonce=" << chain_.next_nonce(stored.address)
-            << " confirmed=" << chain_.balance_of(stored.address);
+            << " confirmed=" << chain_.balance_of(stored.address)
+            << " unlocked=" << unlocked_balance(stored.address)
+            << " staked=" << staking_.staked_of(stored.address);
         return out.str();
     }
 
@@ -534,7 +546,9 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         std::ostringstream out;
         out << "name=" << stored.name
             << " address=" << stored.address
-            << " confirmed=" << chain_.balance_of(stored.address);
+            << " confirmed=" << chain_.balance_of(stored.address)
+            << " unlocked=" << unlocked_balance(stored.address)
+            << " staked=" << staking_.staked_of(stored.address);
         return out.str();
     }
 
@@ -587,6 +601,9 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         if (fee < required_fee) {
             return "error: fee too low, required>=" + std::to_string(required_fee);
         }
+        if (unlocked_balance(stored.address) < (amount + fee)) {
+            return "error: insufficient unlocked balance";
+        }
 
         Wallet wallet(stored.address, stored.public_key, stored.private_key);
         Transaction tx{};
@@ -633,58 +650,73 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
 
     if (cmd == "benchmark_objective") {
         std::size_t blocks = 0;
-        std::size_t tx_per_block = 0;
-        iss >> blocks >> tx_per_block;
-        if (blocks == 0 || tx_per_block == 0) {
-            return "error: usage benchmark_objective <blocks> <tx_per_block>";
+        std::size_t notes_per_block = 0;
+        iss >> blocks >> notes_per_block;
+        if (blocks == 0 || notes_per_block == 0) {
+            return "error: usage benchmark_objective <blocks> <notes_per_block>";
         }
 
+        // Isolate leftover mempool so a prior spent/conflict tx cannot fail the bench mine.
+        const auto leftover = mempool_.snapshot();
+        mempool_.clear();
+
         const auto bench_start = std::chrono::steady_clock::now();
-        std::size_t submitted = 0;
-        std::size_t mined_total = 0;
+        std::size_t mined_blocks = 0;
+        std::size_t hashed_notes = 0;
+        bool opening_hash_ok = true;
 
         for (std::size_t b = 0; b < blocks; ++b) {
-            for (std::size_t i = 0; i < tx_per_block; ++i) {
-                Transaction tx{};
-                tx.signer = "bench_signer";
-                tx.signer_pubkey = "bench_pub";
-                tx.signature = "pq=bench|privacy";
-                tx.fee = 10 + static_cast<std::uint64_t>(i % 10);
-                tx.nonce = static_cast<std::uint64_t>(b * tx_per_block + i + 1);
-                tx.outputs.push_back(TxOutput{"bench_to_" + std::to_string(i % 256), 1});
-                if (mempool_.submit(tx)) {
-                    ++submitted;
-                }
-            }
-
             std::string mined_hash;
             std::string error;
             const auto hw = std::thread::hardware_concurrency();
             const std::size_t threads = hw > 0 ? static_cast<std::size_t>(hw) : 1;
-            if (!miner_.mine_next_block("bench_miner", tx_per_block + 50, threads, mined_hash, error)) {
+            if (!miner_.mine_next_block("bench_miner", 0, threads, mined_hash, error)) {
+                for (const auto& tx : leftover) {
+                    mempool_.submit(tx);
+                }
                 return "error: benchmark mine failed: " + error;
             }
-            mined_total += miner_.last_mined_txs();
+            ++mined_blocks;
+
+            for (std::size_t i = 0; i < notes_per_block; ++i) {
+                OpeningNote note{};
+                std::string note_error;
+                if (!PrivacyPool::prepare_opening(1 + static_cast<std::uint64_t>(i % 16), note, note_error)) {
+                    opening_hash_ok = false;
+                    break;
+                }
+                ++hashed_notes;
+            }
+            if (!opening_hash_ok) {
+                break;
+            }
+        }
+
+        for (const auto& tx : leftover) {
+            std::string tx_error;
+            if (chain_.validate_transaction(tx, tx_error)) {
+                mempool_.submit(tx);
+            }
         }
 
         const auto bench_end = std::chrono::steady_clock::now();
         const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(bench_end - bench_start).count();
         const double sec = static_cast<double>(elapsed_ms > 0 ? elapsed_ms : 1) / 1000.0;
-        const double avg_tps = sec > 0.0 ? static_cast<double>(mined_total) / sec : static_cast<double>(mined_total);
+        const double avg_tps = sec > 0.0 ? static_cast<double>(mined_blocks) / sec : static_cast<double>(mined_blocks);
         const bool objective_tps_ok = avg_tps >= kObjectiveTps;
-        const bool objective_privacy_ok = privacy_.strict_zk_mode() && privacy_.verifier_configured();
-        const bool objective_100_ok = objective_tps_ok && objective_privacy_ok;
 
         std::ostringstream out;
-        out << "bench_blocks=" << blocks
-            << " bench_tx_per_block=" << tx_per_block
-            << " bench_submitted=" << submitted
-            << " bench_mined=" << mined_total
+        out << "bench_blocks=" << mined_blocks
+            << " bench_notes=" << hashed_notes
+            << " bench_notes_per_block=" << notes_per_block
             << " bench_elapsed_ms=" << elapsed_ms
             << " bench_avg_tps=" << std::fixed << std::setprecision(2) << avg_tps
             << " objective_tps_ok=" << (objective_tps_ok ? "true" : "false")
-            << " objective_privacy_ok=" << (objective_privacy_ok ? "true" : "false")
-            << " objective_100_ok=" << (objective_100_ok ? "true" : "false");
+            << " objective_privacy_ok=false"
+            << " privacy_claim=opening_not_zk"
+            << " opening_hash_ok=" << (opening_hash_ok ? "true" : "false")
+            << " zk_circuit=0"
+            << " objective_100_ok=false";
         return out.str();
     }
 
@@ -694,7 +726,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         if (addr.empty()) {
             return "error: usage getbalance <address>";
         }
-        return std::to_string(chain_.balance_of(addr));
+        return std::to_string(unlocked_balance(addr));
     }
 
     if (cmd == "getbalance_instant") {
@@ -714,10 +746,12 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             }
         }
 
+        const auto unlocked = unlocked_balance(addr);
         std::ostringstream out;
         out << "confirmed=" << chain_.balance_of(addr)
+            << " unlocked=" << unlocked
             << " incoming_unconfirmed=" << incoming_unconfirmed
-            << " instant_total=" << (chain_.balance_of(addr) + incoming_unconfirmed);
+            << " instant_total=" << (unlocked + incoming_unconfirmed);
         return out.str();
     }
 
@@ -741,6 +775,9 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
                                            ai_optimizer_.recommended_fee_floor());
         if (fee < required_fee) {
             return "error: fee too low, required>=" + std::to_string(required_fee);
+        }
+        if (unlocked_balance(from) < (amount + fee)) {
+            return "error: insufficient unlocked balance";
         }
 
         Transaction tx{};
@@ -787,6 +824,9 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
                                            ai_optimizer_.recommended_fee_floor());
         if (fee < required_fee) {
             return "error: fee too low, required>=" + std::to_string(required_fee);
+        }
+        if (unlocked_balance(from) < (amount + fee)) {
+            return "error: insufficient unlocked balance";
         }
 
         Transaction tx{};
@@ -836,6 +876,9 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         if (fee < required_fee) {
             return "error: fee too low, required>=" + std::to_string(required_fee);
         }
+        if (unlocked_balance(from) < (amount + fee)) {
+            return "error: insufficient unlocked balance";
+        }
 
         Transaction tx{};
         std::string error;
@@ -867,6 +910,9 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
                                            ai_optimizer_.recommended_fee_floor());
         if (fee < required_fee) {
             return "error: fee too low, required>=" + std::to_string(required_fee);
+        }
+        if (unlocked_balance(from) < (amount + fee)) {
+            return "error: insufficient unlocked balance";
         }
 
         Transaction tx{};
@@ -906,6 +952,9 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
                                            ai_optimizer_.recommended_fee_floor());
         if (fee < required_fee) {
             return "error: fee too low, required>=" + std::to_string(required_fee);
+        }
+        if (unlocked_balance(from) < (amount + fee)) {
+            return "error: insufficient unlocked balance";
         }
 
         Transaction tx{};
@@ -1508,7 +1557,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         return "ok";
     }
 
-    if (cmd == "swap_add_liquidity") {
+    if (cmd == "swap_add_liquidity" || cmd == "add_liquidity") {
         std::string token_a;
         std::string token_b;
         std::string provider;
@@ -1831,6 +1880,21 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         }
         const auto owner = tokens_.nft_owner_of(collection, token_id);
         return owner.empty() ? std::string("error: nft not found") : owner;
+    }
+
+    if (cmd == "nft_info") {
+        std::string collection;
+        std::string token_id;
+        iss >> collection >> token_id;
+        if (collection.empty() || token_id.empty()) {
+            return "error: usage nft_info <collection> <token_id>";
+        }
+        std::string out;
+        std::string error;
+        if (!tokens_.nft_info(collection, token_id, out, error)) {
+            return "error: " + error;
+        }
+        return out;
     }
 
     if (cmd == "privacy_note_prepare") {

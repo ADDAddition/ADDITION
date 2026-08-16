@@ -486,6 +486,24 @@ std::string TokenEngine::nft_owner_of(const std::string& collection, const std::
     return ait->second.owner;
 }
 
+bool TokenEngine::nft_info(const std::string& collection,
+                           const std::string& token_id,
+                           std::string& out,
+                           std::string& error) const {
+    const auto cit = nfts_.find(collection);
+    if (cit == nfts_.end()) {
+        error = "collection not found";
+        return false;
+    }
+    const auto ait = cit->second.find(token_id);
+    if (ait == cit->second.end()) {
+        error = "nft not found";
+        return false;
+    }
+    out = "owner=" + ait->second.owner + " metadata=" + ait->second.metadata;
+    return true;
+}
+
 bool TokenEngine::create_pool(const std::string& token_a,
                               const std::string& token_b,
                               std::uint64_t fee_bps,

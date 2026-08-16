@@ -48,6 +48,7 @@ public:
     void set_auto_mine_status(bool enabled, std::uint32_t interval_sec);
 
 private:
+    std::uint64_t unlocked_balance(const std::string& address) const;
     Chain& chain_;
     Mempool& mempool_;
     Miner& miner_;
