@@ -24,7 +24,7 @@
 - If enabling LAN RPC, also set:
   - `ADDITION_ENABLE_LAN_RPC=1`
   - `ADDITION_LAN_RPC_TOKEN=<strong_token>`
-- Keep `ADDITION_ALLOW_INSECURE_TX_COMMANDS` unset (or `0`) in production.
+- Keep `ADDITION_ALLOW_INSECURE_TX_COMMANDS` unset (or `0`) on any networked host.
 - Privacy verifier is native in-process (ML-DSA-87); external wrappers are disabled.
 
 ## 3) First startup
@@ -76,12 +76,13 @@ Expected:
 - Instant receive check:
   - `getbalance_instant <to_address>`
 
-## 7) Privacy strict sanity
-- Confirm native verifier mode:
-  - `privacy_native_verifier pq_mldsa87`
-- Submit ZK mint/spend only (avoid non-ZK in strict operations):
-  - `privacy_mint_zk ...`
-  - `privacy_spend_zk ...`
+## 7) Privacy (SHA3 opening)
+- Confirm `getinfo` reports `privacy_mode=sha3_opening`, `privacy_ok=true`, `privacy_verifier=sha3_opening`
+- Use the opening path:
+  - `privacy_note_prepare <amount>`
+  - `privacy_mint_open ...`
+  - `privacy_spend_open ...`
+- `privacy_mint_zk` / `privacy_spend_zk` are ML-DSA wraps, not a circuit. Garbage proofs error.
 
 Important:
 - In mainnet mode (`ADDITION_MAINNET_MODE=1`), daemon startup is blocked if `ADDITION_PRIVACY_MASTER_KEY` is missing or shorter than 32 chars.

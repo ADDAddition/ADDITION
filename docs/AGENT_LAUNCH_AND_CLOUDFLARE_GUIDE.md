@@ -112,7 +112,7 @@ Backend API should run separately (VPS / container / tunnel), e.g.:
 Current frontend JS default:
 - `LOCAL_API = 'http://127.0.0.1:8080'`
 
-For production behind Cloudflare, point API calls to your public backend domain.
+For a public host behind Cloudflare, point API calls to your public backend domain.
 
 ---
 

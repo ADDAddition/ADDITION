@@ -71,6 +71,17 @@ int main() {
     }
 
     addition::PrivacyPool pool;
+    std::string mode_err;
+    if (pool.set_native_verifier_mode("bulletproofs", mode_err) ||
+        mode_err.find("SHA3 opening") == std::string::npos) {
+        std::cerr << "test failed: bulletproofs mode must fail: " << mode_err << '\n';
+        return 1;
+    }
+    if (pool.set_native_verifier_mode("zk-snark", mode_err) ||
+        mode_err.find("SHA3 opening") == std::string::npos) {
+        std::cerr << "test failed: zk-snark mode must fail: " << mode_err << '\n';
+        return 1;
+    }
     const auto note_id = pool.mint_open("alice", 25, prepared.commitment, prepared.nullifier, prepared.trapdoor, error);
     if (note_id.empty()) {
         std::cerr << "test failed: mint_open: " << error << '\n';

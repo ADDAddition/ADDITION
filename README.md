@@ -214,7 +214,7 @@ python3 web/serve.py
 | `/explorer/` | Redirects to `/` |
 | `/status/` | Live `getinfo`, or **RPC offline** |
 | `/rpc/` | Public read `/rpc?cmd=getinfo` on :80 and :38545 |
-| `/docs/` | Architecture, commands, PoUW spec, getting started, runbook, ZK contract |
+| `/docs/` | Architecture, commands, PoUW spec, getting started, runbook, SHA3 opening notes |
 | `/wallet/` | Local createwallet / UTXO send via `/local-rpc` (loopback) |
 | `/contracts/` `/swap/` `/evm/` | Local node methods only; EVM is bootstrap |
 | `/whitepaper/` `/legal/` | Research copy. No fake ticker or live mainnet |

@@ -3,39 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ADDITION ZK verifier backend contract</title>
+  <title>ADDITION SHA3 opening notes</title>
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="ZK verifier contract" data-sub="from the repo">
+<body data-title="SHA3 opening notes" data-sub="from the repo">
   <header id="site-header"></header>
   <main class="prose">
-    <div class="banner">From <code>tools/zk_backend_contract.md</code>. In-process verify is ML-DSA-87.</div>
-    <h2>Addition ZK Verifier Backend Contract</h2>
-<p>The wrapper <code>tools/zk_verify_wrapper.py</code> now expects a <strong>real external verifier backend</strong>.</p>
-<h2>Environment Variable</h2>
-<p>Set:</p>
-<ul><li><code>ADDITION_ZK_VERIFY_CMD</code></li></ul>
-<p>Value example:</p>
-<ul><li><code>python C:/path/to/your_real_verifier.py</code></li><li><code>C:/path/to/native_verifier.exe</code></li></ul>
-<h2>Invocation Contract</h2>
-<p>Wrapper calls backend as:</p>
-<p><code>&lt;ADDITION_ZK_VERIFY_CMD&gt; &lt;request_json_path&gt; &lt;result_json_path&gt;</code></p>
-<h2>Input File (<code>request_json_path</code>)</h2>
-<p>JSON format:</p>
-<pre>{
-  &quot;public_input&quot;: &quot;string&quot;,
-  &quot;proof_hex&quot;: &quot;hex string&quot;,
-  &quot;vk_hex&quot;: &quot;hex string&quot;
-}</pre>
-<h2>Output File (<code>result_json_path</code>)</h2>
-<p>JSON format:</p>
-<pre>{
-  &quot;ok&quot;: true,
-  &quot;error&quot;: &quot;optional error message&quot;
-}</pre>
-<ul><li>If <code>ok: true</code> =&gt; wrapper returns <code>OK</code> and exit code <code>0</code>.</li><li>Any other output is treated as rejection.</li></ul>
-<h2>Strictness</h2>
-<ul><li>Wrapper validates that <code>proof_hex</code> and <code>vk_hex</code> are even-length valid hex before backend call.</li><li>Wrapper fails if backend exits non-zero, times out, or returns invalid output.</li><li>No internal fake verification remains.</li></ul>
+    <div class="banner">From <code>tools/zk_backend_contract.md</code>. Privacy is SHA3-512 opening, not a ZK circuit.</div>
+    <h2>SHA3 opening notes (not a ZK circuit)</h2>
+<p>This file used to describe an external <code>ADDITION_ZK_VERIFY_CMD</code> wrapper. That path is</p>
+<p><strong>not</strong> a Groth16 / SNARK / Bulletproofs / STARK verifier. This repository does not</p>
+<p>ship a ZK circuit.</p>
+<p>The privacy path that exists is <strong>SHA3-512 commitment + nullifier opening</strong>:</p>
+<ul><li><code>privacy_note_prepare</code></li><li><code>privacy_mint_open</code></li><li><code>privacy_spend_open</code></li></ul>
+<p><code>getinfo</code> reports <code>privacy_mode=sha3_opening</code>, <code>privacy_ok=true</code>, and</p>
+<p><code>privacy_verifier=sha3_opening</code>.</p>
+<p><code>privacy_mint_zk</code> / <code>privacy_spend_zk</code> remain an ML-DSA-87 signature wrap of a</p>
+<p>mint/spend string. A garbage proof returns <code>error:</code>. They are not a circuit.</p>
+<p><code>tools/zk_verify_wrapper.py</code> exits with an error if invoked. Do not set</p>
+<p><code>ADDITION_ZK_VERIFY_CMD</code> and do not advertise a ZK backend.</p>
     <p class="note">Source file in the repository: <a href="https://github.com/ADDAddition/ADDITION/blob/main/tools/zk_backend_contract.md">tools/zk_backend_contract.md</a></p>
   </main>
   <footer id="site-footer"></footer>

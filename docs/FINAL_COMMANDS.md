@@ -189,23 +189,23 @@ Verifier notes:
 - `contract_deploy <owner> <code>`
 - `contract_call <id> <set|add|get|token_balance|swap_quote|zk_mint|zk_spend|zk_privacy_status> <key> <value>`
 
-### ZK privacy methods via `contract_call`
+### Leftover `contract_call` aliases (ML-DSA wrap, not a ZK circuit)
 - `zk_mint`
 	- key format: `<OWNER>:<COMMITMENT_HEX>:<NULLIFIER_HEX>:<PROOF_HEX>:<VK_HEX>`
-	- value: amount to mint privately (`> 0`)
-	- return: created `note_id`
+	- value: amount to mint (`> 0`)
+	- return: created `note_id` after an ML-DSA-87 wrap check
 - `zk_spend`
 	- key format: `<OWNER>:<NOTE_ID>:<RECIPIENT>:<NULLIFIER_HEX>:<PROOF_HEX>:<VK_HEX>`
-	- value: private amount to send (`> 0`)
-	- return: recipient new private `note_id`
+	- value: amount to send (`> 0`)
+	- return: recipient `note_id`
 - `zk_privacy_status`
 	- key format: any non-empty token (for example `status`)
 	- value: ignored (set `0`)
-	- return: `verifier_configured`, `strict_zk_mode`, notes and nullifier stats
+	- return: `privacy_mode=sha3_opening`, `privacy_ok=true`, `privacy_verifier=sha3_opening`, notes and nullifier stats
 
 Notes:
-- For strongest privacy, keep `strict_zk_mode` ON.
-- `zk_mint` and `zk_spend` require valid proof/vk hex and native in-process ML-DSA-87 verification.
+- The real path is SHA3-512 opening (`privacy_mint_open` / `privacy_spend_open`).
+- `zk_mint` and `zk_spend` require valid proof/vk hex and in-process ML-DSA-87 verification. They are not Groth16 / Bulletproofs / SNARK.
 
 ## Token & NFT runtime
 - `token_create <symbol> <owner> <max_supply> <initial_mint>`

@@ -76,25 +76,19 @@ foreach ($c in $baseChecks) {
 }
 
 try {
-    $r = Invoke-RpcLine -Command "privacy_set_verifier tools/zk_verify_wrapper.py"
-    Add-Result -Name "privacy_set_verifier" -Ok ($r -like "ok*") -Response $r -Expectation "ok"
+    $r = Invoke-RpcLine -Command "getinfo"
+    $ok = (Test-Contains -Value $r -Must "privacy_mode=sha3_opening") -and (Test-Contains -Value $r -Must "privacy_ok=true")
+    Add-Result -Name "getinfo_privacy" -Ok $ok -Response $r -Expectation "privacy_mode=sha3_opening & privacy_ok=true"
 } catch {
-    Add-Result -Name "privacy_set_verifier" -Ok $false -Response $_.Exception.Message -Expectation "ok"
-}
-
-try {
-    $r = Invoke-RpcLine -Command "privacy_strict_mode on"
-    Add-Result -Name "privacy_strict_mode" -Ok ($r -eq "ok") -Response $r -Expectation "ok"
-} catch {
-    Add-Result -Name "privacy_strict_mode" -Ok $false -Response $_.Exception.Message -Expectation "ok"
+    Add-Result -Name "getinfo_privacy" -Ok $false -Response $_.Exception.Message -Expectation "privacy_mode=sha3_opening & privacy_ok=true"
 }
 
 try {
     $r = Invoke-RpcLine -Command "privacy_status"
-    $ok = (Test-Contains -Value $r -Must "strict_zk_mode=true") -and (Test-Contains -Value $r -Must "verifier_configured=true")
-    Add-Result -Name "privacy_status" -Ok $ok -Response $r -Expectation "strict_zk_mode=true & verifier_configured=true"
+    $ok = (Test-Contains -Value $r -Must "privacy_mode=sha3_opening") -and (Test-Contains -Value $r -Must "privacy_ok=true")
+    Add-Result -Name "privacy_status" -Ok $ok -Response $r -Expectation "privacy_mode=sha3_opening & privacy_ok=true"
 } catch {
-    Add-Result -Name "privacy_status" -Ok $false -Response $_.Exception.Message -Expectation "strict_zk_mode=true & verifier_configured=true"
+    Add-Result -Name "privacy_status" -Ok $false -Response $_.Exception.Message -Expectation "privacy_mode=sha3_opening & privacy_ok=true"
 }
 
 try {

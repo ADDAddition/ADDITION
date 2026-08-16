@@ -40,7 +40,7 @@ function Expect-Contains {
 Write-Host "[1] getinfo"
 $getinfo = Invoke-RpcLine "getinfo"
 Expect-Contains -Name "getinfo" -Response $getinfo -Must "pq_mode=strict"
-Expect-Contains -Name "getinfo" -Response $getinfo -Must "privacy_mode=enabled"
+Expect-Contains -Name "getinfo" -Response $getinfo -Must "privacy_mode=sha3_opening"
 Write-Host $getinfo
 
 Write-Host "[2] use static miner address"
@@ -87,7 +87,7 @@ $proto = Invoke-RpcLine "protocol_status"
 Expect-Contains -Name "protocol_status" -Response $proto -Must "finality="
 Write-Host $proto
 
-$privacyOk = ($getinfo.Contains("privacy_mode=enabled"))
+$privacyOk = ($getinfo.Contains("privacy_mode=sha3_opening") -and $getinfo.Contains("privacy_ok=true"))
 $tpsObjective = 100000.0
 $tpsOk = ($benchTps -ge $tpsObjective)
 

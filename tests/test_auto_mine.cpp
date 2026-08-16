@@ -185,6 +185,16 @@ int main() {
         std::cerr << "test failed: IPv4 endpoint validation\n";
         return 1;
     }
+    if (!addition::is_loopback_host("127.0.0.1") ||
+        !addition::is_loopback_endpoint("127.0.0.1:28545") ||
+        addition::is_external_advertised_peer("127.0.0.1:28545") ||
+        addition::is_external_advertised_peer("self") ||
+        addition::is_external_advertised_peer("node-id-abc") ||
+        addition::is_external_advertised_peer("0.0.0.0:28545") ||
+        !addition::is_external_advertised_peer("34.27.30.115:28545")) {
+        std::cerr << "test failed: public IPv4 endpoint filter\n";
+        return 1;
+    }
 
     std::cout << "all auto-mine tests passed\n";
     return 0;

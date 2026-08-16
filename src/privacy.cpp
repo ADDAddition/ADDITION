@@ -305,12 +305,21 @@ bool PrivacyPool::spend_open(const std::string& owner,
 
 bool PrivacyPool::set_native_verifier_mode(const std::string& mode, std::string& error) {
     const auto normalized = lower_copy(mode);
+    if (normalized.find("zk") != std::string::npos ||
+        normalized.find("snark") != std::string::npos ||
+        normalized.find("groth") != std::string::npos ||
+        normalized.find("bullet") != std::string::npos ||
+        normalized.find("stark") != std::string::npos ||
+        normalized.find("plonk") != std::string::npos) {
+        error = "not a ZK/SNARK/bulletproofs circuit; privacy is SHA3 opening";
+        return false;
+    }
     if (normalized == "pq_mldsa87" || normalized == "pq" || normalized == "mldsa87") {
         native_verifier_mode_ = NativeVerifierMode::pq_mldsa87;
         return true;
     }
 
-    error = "unsupported native verifier mode (use: pq_mldsa87)";
+    error = "unsupported native verifier mode (use: pq_mldsa87); SHA3 opening is the privacy path";
     return false;
 }
 
