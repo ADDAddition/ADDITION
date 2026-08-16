@@ -21,5 +21,6 @@ bool socket_send_all(std::uintptr_t sock, const char* data, std::size_t n);
 bool socket_send_paced(std::uintptr_t sock, const char* data, std::size_t n);
 bool socket_recv_line(std::uintptr_t sock, std::string& line, std::size_t max_bytes);
 bool socket_recv_request(std::uintptr_t sock, std::string& req, std::size_t max_bytes);
+bool socket_recv_http_response(std::uintptr_t sock, std::string& raw, std::size_t max_bytes);
 
 } // namespace addition

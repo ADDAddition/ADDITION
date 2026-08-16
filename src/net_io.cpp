@@ -276,4 +276,26 @@ bool socket_recv_request(std::uintptr_t sock_raw, std::string& req, std::size_t 
     return false;
 }
 
+bool socket_recv_http_response(std::uintptr_t sock_raw, std::string& raw, std::size_t max_bytes) {
+    raw.clear();
+    const SocketT sock = static_cast<SocketT>(sock_raw);
+    char buf[4096];
+    std::size_t header_end = 0;
+    std::size_t body_needed = 0;
+    while (raw.size() < max_bytes) {
+        if (header_end == 0 && headers_complete(raw, header_end)) {
+            body_needed = http_content_length(raw);
+        }
+        if (header_end != 0 && raw.size() >= header_end + body_needed) {
+            return true;
+        }
+        const int n = recv_chunk(sock, buf, std::min<std::size_t>(sizeof(buf), max_bytes - raw.size()));
+        if (n <= 0) {
+            return !raw.empty();
+        }
+        raw.append(buf, buf + n);
+    }
+    return false;
+}
+
 } // namespace addition

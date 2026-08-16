@@ -458,7 +458,8 @@ bool send_http_rpc(const std::string& endpoint, const std::string& cmd, std::str
         return false;
     }
     std::string http;
-    if (!socket_recv_request(static_cast<std::uintptr_t>(sock), http, kMaxLineBytes) || http.empty()) {
+    if (!socket_recv_http_response(static_cast<std::uintptr_t>(sock), http, kMaxLineBytes) ||
+        http.empty()) {
         close_socket(sock);
 #ifdef _WIN32
         WSACleanup();
