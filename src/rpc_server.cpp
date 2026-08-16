@@ -163,6 +163,12 @@ void RpcServer::set_auto_mine_status(bool enabled, std::uint32_t interval_sec) {
     auto_mine_interval_sec_ = interval_sec == 0 ? 60 : interval_sec;
 }
 
+std::uint64_t RpcServer::unlocked_balance(const std::string& address) const {
+    const auto confirmed = chain_.balance_of(address);
+    const auto staked = staking_.staked_of(address);
+    return confirmed > staked ? (confirmed - staked) : 0ULL;
+}
+
 std::string RpcServer::handle_command(const std::string& line, bool trusted) {
     std::lock_guard<std::mutex> lock(mu_);
     std::istringstream iss(line);
@@ -516,7 +522,8 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " algo=" << stored.algorithm
             << " path=" << stored.path
             << " next_nonce=" << chain_.next_nonce(stored.address)
-            << " confirmed=" << chain_.balance_of(stored.address);
+            << " confirmed=" << unlocked_balance(stored.address)
+            << " staked=" << staking_.staked_of(stored.address);
         return out.str();
     }
 
@@ -534,7 +541,8 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         std::ostringstream out;
         out << "name=" << stored.name
             << " address=" << stored.address
-            << " confirmed=" << chain_.balance_of(stored.address);
+            << " confirmed=" << unlocked_balance(stored.address)
+            << " staked=" << staking_.staked_of(stored.address);
         return out.str();
     }
 
@@ -586,6 +594,9 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         }
         if (fee < required_fee) {
             return "error: fee too low, required>=" + std::to_string(required_fee);
+        }
+        if (unlocked_balance(stored.address) < (amount + fee)) {
+            return "error: insufficient unlocked balance";
         }
 
         Wallet wallet(stored.address, stored.public_key, stored.private_key);
@@ -694,7 +705,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         if (addr.empty()) {
             return "error: usage getbalance <address>";
         }
-        return std::to_string(chain_.balance_of(addr));
+        return std::to_string(unlocked_balance(addr));
     }
 
     if (cmd == "getbalance_instant") {
@@ -715,9 +726,11 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         }
 
         std::ostringstream out;
-        out << "confirmed=" << chain_.balance_of(addr)
+        const auto confirmed = unlocked_balance(addr);
+        out << "confirmed=" << confirmed
             << " incoming_unconfirmed=" << incoming_unconfirmed
-            << " instant_total=" << (chain_.balance_of(addr) + incoming_unconfirmed);
+            << " instant_total=" << (confirmed + incoming_unconfirmed)
+            << " staked=" << staking_.staked_of(addr);
         return out.str();
     }
 
@@ -835,6 +848,9 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
                                            ai_optimizer_.recommended_fee_floor());
         if (fee < required_fee) {
             return "error: fee too low, required>=" + std::to_string(required_fee);
+        }
+        if (unlocked_balance(from) < (amount + fee)) {
+            return "error: insufficient unlocked balance";
         }
 
         Transaction tx{};
@@ -1508,7 +1524,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         return "ok";
     }
 
-    if (cmd == "swap_add_liquidity") {
+    if (cmd == "swap_add_liquidity" || cmd == "add_liquidity") {
         std::string token_a;
         std::string token_b;
         std::string provider;
@@ -1516,7 +1532,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         std::uint64_t amount_b = 0;
         iss >> token_a >> token_b >> provider >> amount_a >> amount_b;
         if (token_a.empty() || token_b.empty() || provider.empty() || amount_a == 0 || amount_b == 0) {
-            return "error: usage swap_add_liquidity <token_a> <token_b> <provider> <amount_a> <amount_b>";
+            return "error: usage add_liquidity <token_a> <token_b> <provider> <amount_a> <amount_b>";
         }
         std::string error;
         if (!tokens_.add_liquidity(token_a, token_b, provider, amount_a, amount_b, error)) {
@@ -1831,6 +1847,25 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         }
         const auto owner = tokens_.nft_owner_of(collection, token_id);
         return owner.empty() ? std::string("error: nft not found") : owner;
+    }
+
+    if (cmd == "nft_info") {
+        std::string collection;
+        std::string token_id;
+        iss >> collection >> token_id;
+        if (collection.empty() || token_id.empty()) {
+            return "error: usage nft_info <collection> <token_id>";
+        }
+        std::string out;
+        std::string error;
+        if (!tokens_.nft_info(collection, token_id, out, error)) {
+            return "error: " + error;
+        }
+        return out;
+    }
+
+    if (cmd == "swap_tvl") {
+        return "tvl=" + std::to_string(tokens_.swap_tvl());
     }
 
     if (cmd == "privacy_note_prepare") {

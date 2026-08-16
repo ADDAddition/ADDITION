@@ -46,6 +46,7 @@ public:
 
     std::string handle_command(const std::string& line, bool trusted = true);
     void set_auto_mine_status(bool enabled, std::uint32_t interval_sec);
+    std::uint64_t unlocked_balance(const std::string& address) const;
 
 private:
     Chain& chain_;

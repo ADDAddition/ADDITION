@@ -486,6 +486,44 @@ std::string TokenEngine::nft_owner_of(const std::string& collection, const std::
     return ait->second.owner;
 }
 
+bool TokenEngine::nft_info(const std::string& collection,
+                           const std::string& token_id,
+                           std::string& out,
+                           std::string& error) const {
+    const auto cit = nfts_.find(collection);
+    if (cit == nfts_.end()) {
+        error = "nft not found";
+        return false;
+    }
+    const auto ait = cit->second.find(token_id);
+    if (ait == cit->second.end()) {
+        error = "nft not found";
+        return false;
+    }
+    std::ostringstream oss;
+    oss << "owner=" << ait->second.owner
+        << " collection=" << collection
+        << " token_id=" << token_id
+        << " metadata=" << ait->second.metadata;
+    out = oss.str();
+    return true;
+}
+
+std::uint64_t TokenEngine::swap_tvl() const {
+    std::uint64_t sum = 0;
+    for (const auto& [_, p] : pools_) {
+        if (sum > (std::numeric_limits<std::uint64_t>::max() - p.reserve0)) {
+            return std::numeric_limits<std::uint64_t>::max();
+        }
+        sum += p.reserve0;
+        if (sum > (std::numeric_limits<std::uint64_t>::max() - p.reserve1)) {
+            return std::numeric_limits<std::uint64_t>::max();
+        }
+        sum += p.reserve1;
+    }
+    return sum;
+}
+
 bool TokenEngine::create_pool(const std::string& token_a,
                               const std::string& token_b,
                               std::uint64_t fee_bps,

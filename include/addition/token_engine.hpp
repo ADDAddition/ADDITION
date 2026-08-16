@@ -75,6 +75,11 @@ public:
                       const std::string& to,
                       std::string& error);
     std::string nft_owner_of(const std::string& collection, const std::string& token_id) const;
+    bool nft_info(const std::string& collection,
+                  const std::string& token_id,
+                  std::string& out,
+                  std::string& error) const;
+    std::uint64_t swap_tvl() const;
 
     bool create_pool(const std::string& token_a,
                      const std::string& token_b,
