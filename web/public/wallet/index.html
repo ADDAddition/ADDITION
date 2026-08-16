@@ -3,19 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ADDITION local wallet</title>
+  <title>ADDITION wallet</title>
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="Wallet" data-sub="Local/testnet only. Bitcoin-like keys, UTXOs, send/receive, fee — not BIP, not a live mainnet.">
+<body data-title="Wallet" data-sub="127.0.0.1:8545">
   <header id="site-header"></header>
   <main>
     <div class="banner">
-      A browser on the public site cannot <code>createwallet</code> against port 8545.
-      These forms talk to <code>/local-rpc</code> → <code>127.0.0.1:8545</code> only, when you run
-      <code>python3 web/serve.py</code> next to a local node. The Pages worker does not proxy writes.
-      Public read RPC cannot create wallets, mine, or send. Keys stay in
-      <code>data/wallets/&lt;name&gt;.wal</code> (ML-DSA-87). The browser never sees a private key.
-      On additionblockchain.com this page stays <strong>RPC offline</strong>.
+      <code>createwallet</code>, <code>wallet_send</code>, and <code>mine</code> go to
+      <code>/local-rpc</code> → <code>127.0.0.1:8545</code>.
+      Run <code>python3 web/serve.py</code> next to a local node.
+      The public read port (:38545) does not accept those commands.
+      Keys stay in <code>data/wallets/&lt;name&gt;.wal</code> (ML-DSA-87).
     </div>
     <p id="rpc-state" class="offline">Checking local RPC…</p>
     <p id="height-line" class="note"></p>
@@ -101,7 +100,7 @@
       if (r.offline) {
         el.className = "offline";
         el.textContent = "RPC offline";
-        height.textContent = "Public site and missing loopback proxy both fail closed. Start a local node, then python3 web/serve.py.";
+        height.textContent = "No node on 127.0.0.1:8545. Start additiond, then python3 web/serve.py.";
         for (let i = 0; i < buttons.length; i += 1) {
           buttons[i].disabled = true;
         }

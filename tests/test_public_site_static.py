@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static honesty checks for the ADDITION Control Center site."""
+"""Static copy and RPC checks for the ADDITION testnet site."""
 
 from __future__ import annotations
 
@@ -28,6 +28,16 @@ FAKE_CLAIMS = (
     "labreche_jeremy@outlook",
     "Addison Electronics",
     "Addison Electronique",
+)
+
+SERMONS = (
+    "honest testnet",
+    "honest website",
+    "research notice",
+    "never invent",
+    "we never invent",
+    "fail closed",
+    "fail-closed",
 )
 
 NAV_REQUIRED = (
@@ -68,6 +78,14 @@ class PublicSiteStaticTests(unittest.TestCase):
             for claim in FAKE_CLAIMS:
                 self.assertNotIn(claim, text, f"{rel} still contains {claim!r}")
 
+    def test_no_sermon_copy(self) -> None:
+        for rel, text in iter_site_text():
+            lower = text.lower()
+            for phrase in SERMONS:
+                self.assertNotIn(phrase, lower, f"{rel} still contains {phrase!r}")
+            self.assertNotRegex(lower, r"\bhonest\b", f"{rel} still contains 'honest'")
+            self.assertNotRegex(lower, r"\bhonesty\b", f"{rel} still contains 'honesty'")
+
     def test_contact_is_public_mailbox_only(self) -> None:
         chrome = read("chrome.js")
         self.assertIn("contact@additionblockchain.com", chrome)
@@ -77,7 +95,7 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertNotIn("labjay69", index)
         self.assertNotIn("outlook.com", index)
 
-    def test_chrome_nav_is_short_and_honest(self) -> None:
+    def test_chrome_nav_is_short(self) -> None:
         chrome = read("chrome.js")
         for item in NAV_REQUIRED:
             self.assertIn(item, chrome)
@@ -88,25 +106,26 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("emptyStripCells", chrome)
         self.assertIn("rpcQuerySuffix", chrome)
 
-    def test_homepage_is_short_control_center(self) -> None:
+    def test_homepage_is_short(self) -> None:
         index = read("index.html")
-        self.assertIn("ADDITION Control Center", index)
+        self.assertIn("ADDITION testnet", index)
+        self.assertIn(":38545", index)
+        self.assertIn("127.0.0.1:8545", index)
         self.assertIn('data-i18n="heroLede"', index)
         self.assertNotIn("/swap/", index)
         self.assertNotIn("/evm/", index)
         self.assertNotIn("/contracts/", index)
         self.assertNotIn("CoinMarketCap", index)
-        self.assertNotIn("token sale", index.lower().replace("no token sale", ""))
+        self.assertNotIn("token sale", index.lower())
         self.assertLess(len(index.splitlines()), 50)
-        self.assertNotIn("native ZK path", index)
         self.assertIn("SHA3-512", index)
-        self.assertIn("research / bootstrap", index)
+        self.assertIn("getinfo", index)
 
     def test_wallet_stays_loopback_only(self) -> None:
         wallet = read("wallet/index.html")
         self.assertIn("/local-rpc", wallet)
         self.assertIn("127.0.0.1:8545", wallet)
-        self.assertIn("cannot <code>createwallet</code> against port 8545", wallet)
+        self.assertIn("createwallet", wallet)
         self.assertIn("disabled", wallet)
         self.assertIn("RPC offline", wallet)
         self.assertNotIn("wallet-connect", wallet.lower())
@@ -224,7 +243,7 @@ S.rpcCommand("getinfo").then((offline) => {
         try:
             host, port = server.server_address
             index = urllib.request.urlopen(f"http://{host}:{port}/").read().decode("utf-8")
-            self.assertIn("ADDITION Control Center", index)
+            self.assertIn("ADDITION testnet", index)
             self.assertIn("/common.css", index)
             chrome = urllib.request.urlopen(f"http://{host}:{port}/chrome.js").read().decode("utf-8")
             self.assertIn("navExplorer", chrome)
