@@ -25,6 +25,18 @@
 <p><code>getinfo</code> reports <code>network=mainnet</code> and <code>network_id=ADDITION_MAINNET_V1</code> only when this chain is actually running.</p>
 <p>A testnet process still reports <code>network=testnet</code>. Mixing a testnet <code>blocks.dat</code> or <code>network.dat</code> into a mainnet <code>--data-dir</code> is refused.</p>
 <p><code>ADDITION_PRIVACY_MASTER_KEY</code> (min 32 characters) is required to start <code>--mainnet</code>. Auto-mine is refused.</p>
+<h2>Mine (local write RPC only)</h2>
+<p>The 30s <code>mine</code> deadline is a <strong>testnet leftover</strong>. On <code>--mainnet</code> the search</p>
+<p>runs until it finds a block (<code>mine_deadline_sec=0</code> in <code>getinfo</code>). Testnet</p>
+<p>keeps the 30s bound.</p>
+<p><code>mine</code> uses a multi-thread <code>memory_hard</code> miner (one 1 MiB scratch buffer per</p>
+<p>thread, <code>hardware_concurrency</code> workers by default) against the existing</p>
+<p>target <code>0x000000FFFFFFFFFF</code>. That is about 2^24 hashes. Do not loosen it.</p>
+<p>Do not invent TPS.</p>
+<p>Write RPC stays <code>127.0.0.1:8546</code>. Public read cannot mine. This is a local</p>
+<p>profile, not a live public network.</p>
+<pre>printf &#x27;mine miner1\n&#x27; | nc 127.0.0.1 8546
+# waits until a nonce meets the target; clients must not use a 30s timeout</pre>
 <h2>Difficulty (what we picked and why)</h2>
 <p>The existing retarget in <code>src/chain.cpp</code> compares the last <code>retarget_window</code> (30) block timestamps to <code>window * target_block_time_sec</code> (30 × 60s).</p>
 <p>If blocks arrive early, the target is multiplied by <code>9/10</code> (harder). If they arrive late, the target is scaled up, then clamped to <code>[min_difficulty_target, max_difficulty_target]</code>.</p>

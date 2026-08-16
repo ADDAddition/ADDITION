@@ -80,8 +80,7 @@ bool AutoMiner::maybe_mine(std::chrono::steady_clock::time_point now,
         return false;
     }
 
-    const auto hw = std::thread::hardware_concurrency();
-    const std::size_t threads = hw > 0 ? static_cast<std::size_t>(hw) : 1;
+    const std::size_t threads = default_mine_thread_count();
     if (!miner_.mine_next_block(settings_.reward_address, 500, threads, mined_hash, error)) {
         return false;
     }

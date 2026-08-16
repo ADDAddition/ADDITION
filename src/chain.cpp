@@ -1,14 +1,15 @@
 #include "addition/chain.hpp"
 
 #include "addition/crypto.hpp"
+#include "addition/miner.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <limits>
 #include <optional>
-#include <atomic>
+#include <string>
 #include <thread>
-#include <mutex>
 #include <vector>
 
 namespace addition {
@@ -34,41 +35,6 @@ std::uint64_t work_for_target(std::uint64_t target) {
         return std::numeric_limits<std::uint64_t>::max();
     }
     return std::numeric_limits<std::uint64_t>::max() / target;
-}
-
-std::uint64_t parse_hash_head64(const std::string& hex_hash) {
-    if (hex_hash.empty()) {
-        return std::numeric_limits<std::uint64_t>::max();
-    }
-    const auto take = std::min<std::size_t>(16, hex_hash.size());
-    return static_cast<std::uint64_t>(std::stoull(hex_hash.substr(0, take), nullptr, 16));
-}
-
-std::uint64_t memory_hard_head64(const std::string& seed_hex) {
-    constexpr std::size_t kScratchSize = 1 << 20; // 1 MiB
-    constexpr std::size_t kRounds = 16;
-
-    std::vector<std::uint8_t> scratch(kScratchSize, 0);
-    auto digest = sha3_512_bytes(seed_hex);
-
-    for (std::size_t i = 0; i < scratch.size(); ++i) {
-        scratch[i] = static_cast<std::uint8_t>(digest[i % digest.size()] ^ static_cast<std::uint8_t>(i & 0xFF));
-    }
-
-    for (std::size_t r = 0; r < kRounds; ++r) {
-        for (std::size_t i = 0; i < scratch.size(); ++i) {
-            const std::size_t j = (static_cast<std::size_t>(scratch[i]) * 1315423911ULL + i + r) % scratch.size();
-            scratch[i] = static_cast<std::uint8_t>(scratch[i] ^ scratch[j] ^ static_cast<std::uint8_t>((i + r) & 0xFF));
-        }
-        digest = sha3_512_bytes(std::string(reinterpret_cast<const char*>(scratch.data()), scratch.size()));
-        for (std::size_t i = 0; i < digest.size(); ++i) {
-            const std::size_t k = (i * 8191 + r) % scratch.size();
-            scratch[k] ^= digest[i];
-        }
-    }
-
-    const auto final_hex = to_hex(sha3_512_bytes(std::string(reinterpret_cast<const char*>(scratch.data()), scratch.size())));
-    return parse_hash_head64(final_hex);
 }
 
 } // namespace
@@ -174,7 +140,7 @@ std::string Chain::outpoint_key(const std::string& txid, std::uint32_t output_in
 bool Chain::hash_meets_target(const std::string& hex_hash, std::uint64_t target) const {
     switch (cfg_.pow_algorithm) {
     case PowAlgorithm::Sha3_512:
-        return parse_hash_head64(hex_hash) <= target;
+        return hash_head64(hex_hash) <= target;
     case PowAlgorithm::MemoryHard:
         return memory_hard_head64(hex_hash) <= target;
     }
@@ -184,7 +150,7 @@ bool Chain::hash_meets_target(const std::string& hex_hash, std::uint64_t target)
     case PowAlgorithm::MemoryHard:
         break;
     }
-    return parse_hash_head64(hex_hash) <= target;
+    return hash_head64(hex_hash) <= target;
 }
 
 std::uint64_t Chain::compute_block_reward(std::uint64_t h) const {
@@ -483,71 +449,40 @@ bool Chain::mine_and_add_block(const std::string& reward_address,
                                std::vector<Transaction> txs,
                                std::size_t threads,
                                std::string& mined_hash,
-                               std::string& error) {
+                               std::string& error,
+                               std::atomic<bool>* stop) {
     const auto emission_left = (cfg_.max_supply > total_emitted_) ? (cfg_.max_supply - total_emitted_) : 0ULL;
     const auto reward = std::min<std::uint64_t>(current_block_reward(), emission_left);
     auto b = make_block_template(reward_address, std::move(txs), reward);
 
-    if (threads == 0) {
-        threads = 1;
-    }
-    const auto hw = std::thread::hardware_concurrency();
-    if (hw > 0 && threads > hw) {
-        threads = hw;
-    }
+    PowSearchConfig search_cfg{};
+    search_cfg.algorithm = cfg_.pow_algorithm;
+    search_cfg.target = b.header.difficulty_target;
+    search_cfg.threads = threads;
+    search_cfg.deadline_sec = mine_deadline_seconds(cfg_);
+    search_cfg.stop = stop;
 
-    std::atomic<bool> found{false};
-    std::atomic<bool> deadline_hit{false};
-    std::atomic<std::uint64_t> winning_nonce{0};
-    std::string winning_hash;
-    std::mutex win_mu;
-    std::vector<std::thread> workers;
-    workers.reserve(threads);
-    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
-
-    for (std::size_t tid = 0; tid < threads; ++tid) {
-        workers.emplace_back([&, tid]() {
-            Block local = b;
-            const std::uint64_t step = static_cast<std::uint64_t>(threads);
-            for (std::uint64_t nonce = static_cast<std::uint64_t>(tid);
-                 nonce < std::numeric_limits<std::uint64_t>::max() && !found.load(std::memory_order_relaxed);
-                 nonce += step) {
-                if (std::chrono::steady_clock::now() >= deadline) {
-                    deadline_hit.store(true, std::memory_order_relaxed);
-                    return;
-                }
-                local.header.nonce = nonce;
-                const auto h = hash_block_header(local.header);
-                if (hash_meets_target(h, local.header.difficulty_target)) {
-                    bool expected = false;
-                    if (found.compare_exchange_strong(expected, true)) {
-                        winning_nonce.store(nonce, std::memory_order_relaxed);
-                        std::lock_guard<std::mutex> lk(win_mu);
-                        winning_hash = h;
-                    }
-                    return;
-                }
-            }
-        });
-    }
-
-    for (auto& th : workers) {
-        if (th.joinable()) {
-            th.join();
-        }
-    }
-
-    if (found.load(std::memory_order_relaxed)) {
-        b.header.nonce = winning_nonce.load(std::memory_order_relaxed);
+    const auto found = search_block_pow(b.header, search_cfg);
+    if (found.found) {
+        b.header.nonce = found.nonce;
         if (!add_block(b, error)) {
             return false;
         }
-        mined_hash = winning_hash;
+        mined_hash = found.header_hash;
         return true;
     }
 
-    if (deadline_hit.load(std::memory_order_relaxed)) {
-        error = "mining deadline exceeded (30s); testnet uses sha3_512 header PoW";
+    if (found.stopped) {
+        error = "mining stopped";
+        return false;
+    }
+
+    if (found.deadline_hit) {
+        if (search_cfg.deadline_sec == kTestnetMineDeadlineSec) {
+            error = "mining deadline exceeded (30s); testnet uses sha3_512 header PoW";
+        } else {
+            error = "mining deadline exceeded (" + std::to_string(search_cfg.deadline_sec) + "s)";
+        }
         return false;
     }
 

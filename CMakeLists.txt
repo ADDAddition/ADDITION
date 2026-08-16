@@ -69,6 +69,7 @@ if(ADDITION_BUILD_TESTS)
     add_executable(test_mainnet_chain tests/test_mainnet_chain.cpp)
     target_link_libraries(test_mainnet_chain PRIVATE addition_core)
     add_test(NAME test_mainnet_chain COMMAND test_mainnet_chain)
+    set_tests_properties(test_mainnet_chain PROPERTIES TIMEOUT 90)
 
     add_executable(test_rpc_access tests/test_rpc_access.cpp)
     target_link_libraries(test_rpc_access PRIVATE addition_core)
@@ -182,7 +183,7 @@ if(ADDITION_BUILD_TESTS)
         )
         set_tests_properties(test_mainnet_genesis PROPERTIES
             ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
-            TIMEOUT 90)
+            TIMEOUT 180)
         add_test(
             NAME test_evm_rpc_bridge
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_evm_rpc_bridge.py

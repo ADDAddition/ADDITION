@@ -147,9 +147,11 @@ def main() -> int:
             return fail("mainnet getinfo leaked testnet labels: " + main_info)
         if field(main_info, "pow_algorithm") != "memory_hard":
             return fail("mainnet pow: " + main_info)
+        if field(main_info, "mine_deadline_sec") != "0":
+            return fail("mainnet mine_deadline_sec must be 0 (no 30s leftover): " + main_info)
         diff = int(field(main_info, "difficulty_target") or "0")
-        if diff == 0 or diff > 0x000000FFFFFFFFFF:
-            return fail("mainnet difficulty_target too easy: " + main_info)
+        if diff != 0x000000FFFFFFFFFF:
+            return fail("mainnet difficulty_target must stay 0x000000FFFFFFFFFF: " + main_info)
 
         pub = tcp_rpc("127.0.0.1", main_pub, "getinfo")
         if field(pub, "network") != "mainnet" or field(pub, "network_id") != "ADDITION_MAINNET_V1":
@@ -225,6 +227,21 @@ def main() -> int:
         mix_log = log_mix.read_text(encoding="utf-8", errors="replace")
         if "chain load failed" not in mix_log and "network marker mismatch" not in mix_log:
             return fail("expected mix rejection in log: " + mix_log)
+
+        t0 = time.monotonic()
+        try:
+            mined = tcp_rpc("127.0.0.1", main_write, "mine miner1", timeout=35.0)
+            elapsed = time.monotonic() - t0
+            if "deadline exceeded (30s)" in mined:
+                return fail("mainnet mine aborted at 30s: " + mined)
+            if mined.startswith("error:") and elapsed < 34.0:
+                return fail("mainnet mine failed early (%.1fs): %s" % (elapsed, mined))
+            print("ok: mainnet mine reply after %.1fs (no 30s abort)" % elapsed)
+        except (socket.timeout, TimeoutError, OSError) as exc:
+            elapsed = time.monotonic() - t0
+            if elapsed < 30.0:
+                return fail("mainnet mine connection died before 30s: %s" % exc)
+            print("ok: mainnet mine still running after %.1fs (no 30s abort)" % elapsed)
 
         print("ok: mainnet getinfo network=mainnet network_id=ADDITION_MAINNET_V1")
         print("ok: testnet getinfo unchanged")

@@ -19,6 +19,9 @@ enum class SigScheme {
 Hash512 sha3_512_bytes(const std::vector<std::uint8_t>& data);
 Hash512 sha3_512_bytes(const std::string& data);
 std::string to_hex(const Hash512& hash);
+std::uint64_t hash_head64(const std::string& hex_hash);
+// 1 MiB x 16-round scratch hash. Consensus: do not change the mix.
+std::uint64_t memory_hard_head64(const std::string& seed_hex);
 std::string bytes_to_hex(const std::vector<std::uint8_t>& bytes);
 bool hex_to_bytes(const std::string& hex,
 				  std::vector<std::uint8_t>& out,

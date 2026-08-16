@@ -91,7 +91,7 @@ Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so a down no
 - `getblock <height_or_hash>`
 - `getblockhash <height>`
 - `getblockraw <height>`
-- `mine` — testnet: SHA3-512 header PoW, 30s deadline. Trusted RPC / stdin only. Optional in-process auto-mine (`--auto-mine`, `ADDITION_AUTO_MINE=1`) is off by default, testnet only, and is not a public RPC command. `getinfo` reports `pow_algorithm=sha3_512` and `auto_mine=off|on`. The mainnet *profile* still uses memory-hard hashing and is not demonstrated live.
+- `mine` — trusted RPC / stdin only. Testnet: SHA3-512 header PoW, 30s deadline (`mine_deadline_sec=30`). Mainnet *profile*: multi-thread `memory_hard` at `0x000000FFFFFFFFFF`, no 30s deadline (`mine_deadline_sec=0`; runs until a block is found). Not a live public network. Optional in-process auto-mine (`--auto-mine`, `ADDITION_AUTO_MINE=1`) is off by default, testnet only, and is not a public RPC command. `getinfo` reports `pow_algorithm` and `auto_mine=off|on`.
 
 ## P2P + Consensus
 - `addpeer <ip:port>`

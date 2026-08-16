@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -31,6 +32,12 @@ inline constexpr std::uint64_t kMainnetGenesisTimestamp = 1'770'000'000ULL;
 // ~4ms easy target. PoW is memory_hard (1 MiB x 16 rounds per attempt).
 inline constexpr std::uint64_t kMainnetDifficultyTarget = kTestnetHardDifficultyTarget;
 inline constexpr std::uint64_t kMainnetMaxDifficultyTarget = kTestnetHardDifficultyTarget;
+
+// Testnet mine search deadline. Easy SHA3-512 should finish well inside this.
+inline constexpr std::uint64_t kTestnetMineDeadlineSec = 30;
+// Mainnet memory_hard at 0x000000FFFFFFFFFF is ~2^24 hashes. The 30s testnet
+// leftover must not abort that search. 0 = run until a block is found.
+inline constexpr std::uint64_t kMainnetMineDeadlineSec = 0;
 
 struct ChainConfig {
     std::string network_mode{"testnet"};
@@ -107,6 +114,8 @@ const char* network_mode_label(NetworkMode mode);
 NetworkMode parse_network_mode(const std::string& value, bool& ok);
 const char* pow_algorithm_label(PowAlgorithm algorithm);
 PowAlgorithm parse_pow_algorithm(const std::string& value, bool& ok);
+std::uint64_t mine_deadline_seconds(const ChainConfig& cfg);
+std::size_t default_mine_thread_count();
 
 bool load_toml_config(const std::string& path, NodeConfig& cfg, std::string& error);
 bool load_genesis_json(const std::string& path, ChainConfig& chain, std::string& error);

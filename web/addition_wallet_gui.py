@@ -73,7 +73,7 @@ def cmd_send(name: str, to_addr: str, amount: str, fee: str) -> str:
 
 
 def cmd_mine(address: str) -> str:
-    return rpc("mine " + address, timeout=600.0)
+    return rpc("mine " + address, timeout=86400.0)
 
 
 def cmd_getinfo() -> str:

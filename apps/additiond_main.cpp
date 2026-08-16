@@ -610,8 +610,7 @@ int main(int argc, char** argv) {
 
             std::string mined_hash;
             std::string error;
-            const auto hw = std::thread::hardware_concurrency();
-            const std::size_t threads = hw > 0 ? static_cast<std::size_t>(hw) : 1;
+            const std::size_t threads = addition::default_mine_thread_count();
             if (!miner.mine_next_block(reward_address, 500, threads, mined_hash, error)) {
                 std::cout << "error: " << error << '\n';
             } else {

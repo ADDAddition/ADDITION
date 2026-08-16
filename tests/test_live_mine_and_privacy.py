@@ -141,6 +141,8 @@ def main() -> int:
             return fail("getinfo network: " + info0)
         if "pow_algorithm=sha3_512" not in info0:
             return fail("expected pow_algorithm=sha3_512: " + info0)
+        if field(info0, "mine_deadline_sec") != "30":
+            return fail("testnet mine_deadline_sec must stay 30: " + info0)
         if "privacy_verifier=sha3_opening" not in info0:
             return fail("expected privacy_verifier=sha3_opening: " + info0)
         if "privacy_mode=sha3_opening" not in info0 or "privacy_ok=true" not in info0:

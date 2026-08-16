@@ -243,6 +243,8 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " pq_mode=strict"
             << " allowed_sig_algs=" << allowed_sig_algs_list()
             << " pow_algorithm=" << pow_algorithm_label(net.pow_algorithm)
+            << " mine_deadline_sec=" << mine_deadline_seconds(net)
+            << " mine_threads=" << default_mine_thread_count()
             << " privacy_verifier=sha3_opening"
             << " privacy_mode=sha3_opening"
             << " privacy_claim=opening_not_zk"
@@ -763,8 +765,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             reward_address = "miner1";
         }
         if (threads == 0) {
-            const auto hw = std::thread::hardware_concurrency();
-            threads = hw > 0 ? static_cast<std::size_t>(hw) : 1;
+            threads = default_mine_thread_count();
         }
 
         std::string mined_hash;

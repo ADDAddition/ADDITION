@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <thread>
 
 namespace addition {
 namespace {
@@ -623,6 +624,18 @@ const char* pow_algorithm_label(PowAlgorithm algorithm) {
         break;
     }
     return "sha3_512";
+}
+
+std::uint64_t mine_deadline_seconds(const ChainConfig& cfg) {
+    if (cfg.network_mode == "mainnet" || cfg.network_id == kMainnetNetworkId) {
+        return kMainnetMineDeadlineSec;
+    }
+    return kTestnetMineDeadlineSec;
+}
+
+std::size_t default_mine_thread_count() {
+    const auto hw = std::thread::hardware_concurrency();
+    return hw > 0 ? static_cast<std::size_t>(hw) : 1;
 }
 
 PowAlgorithm parse_pow_algorithm(const std::string& value, bool& ok) {

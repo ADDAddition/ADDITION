@@ -365,7 +365,9 @@ class WalletClient:
     def mine(self, address: Optional[str] = None) -> str:
         record = self.store.load() if address is None else None
         target = address if address is not None else record.address
-        return self.rpc.call(f"mine {target}", timeout=180.0)
+        # Testnet finishes in seconds. Mainnet memory_hard has no 30s daemon
+        # deadline; a client must wait until a block is found.
+        return self.rpc.call(f"mine {target}", timeout=86400.0)
 
     def send(self, to_addr: str, amount: int, fee: Optional[int] = None) -> str:
         if amount <= 0:
