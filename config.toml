@@ -32,3 +32,5 @@ halving_interval = 210000
 tail_emission_reward = 1
 min_fee = 1
 genesis_timestamp = 1763000000
+# Testnet PoW: SHA3-512 of the header vs difficulty_target. Not memory-hard.
+pow_algorithm = "sha3_512"

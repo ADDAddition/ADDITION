@@ -17,6 +17,7 @@
 #include "addition/token_engine.hpp"
 #include "addition/wallet_store.hpp"
 
+#include <mutex>
 #include <string>
 
 namespace addition {
@@ -63,6 +64,7 @@ private:
     bool allow_insecure_tx_commands_{false};
     bool strict_admin_mode_{true};
     WalletStore wallets_;
+    mutable std::mutex mu_;
 };
 
 } // namespace addition

@@ -24,11 +24,17 @@ int main() {
         }
     }
 
-    addition::ChainConfig easy = addition::testnet_chain_config();
-    easy.initial_difficulty_target = 0xFFFFFFFFFFFFFFFFULL;
-    easy.min_difficulty_target = 0xFFFFFFFFFFFFFFFFULL;
-    easy.max_difficulty_target = 0xFFFFFFFFFFFFFFFFULL;
-    addition::Chain chain(easy);
+    if (addition::testnet_chain_config().pow_algorithm != addition::PowAlgorithm::Sha3_512) {
+        std::cerr << "test failed: testnet must use sha3_512 header PoW\n";
+        return 1;
+    }
+    if (addition::mainnet_chain_config().pow_algorithm != addition::PowAlgorithm::MemoryHard) {
+        std::cerr << "test failed: mainnet profile must keep memory_hard PoW\n";
+        return 1;
+    }
+
+    addition::ChainConfig live = addition::testnet_chain_config();
+    addition::Chain chain(live);
 
     {
         addition::NodeConfig ncfg;
