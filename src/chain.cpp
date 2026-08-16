@@ -229,8 +229,9 @@ std::uint64_t Chain::compute_next_difficulty_target() const {
         return clamp_difficulty_target(difficulty_target_);
     }
 
-    const auto floor_span = std::max<std::uint64_t>(1ULL, expected / 4ULL);
-    const auto observed_capped = std::min(std::max(observed, floor_span), expected * 4ULL);
+    const std::uint64_t floor_span = std::max<std::uint64_t>(1ULL, expected / 4ULL);
+    const std::uint64_t observed_capped =
+        std::min<std::uint64_t>(std::max<std::uint64_t>(observed, floor_span), expected * 4ULL);
 
     std::uint64_t next = difficulty_target_;
     if (difficulty_target_ > (std::numeric_limits<std::uint64_t>::max() / observed_capped)) {
