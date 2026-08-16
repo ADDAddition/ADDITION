@@ -70,7 +70,6 @@
     const offline = !result || result.offline || !result.raw ||
       result.raw === "RPC offline" || result.raw.indexOf("error:") === 0;
     if (offline) {
-      img.removeAttribute("src");
       img.src = PLACEHOLDER_SRC;
       img.alt = PLACEHOLDER_ALT;
       return;
