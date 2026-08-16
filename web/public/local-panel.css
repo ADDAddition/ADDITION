@@ -1,0 +1,20 @@
+.local-visuals .local-visual-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+}
+.local-logo {
+  width: 64px;
+  height: 64px;
+  display: block;
+  background: var(--accent-dim);
+  border: 1px solid var(--line);
+}
+.getinfo-shot {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  background: #0d0f12;
+}

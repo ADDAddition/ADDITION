@@ -79,6 +79,10 @@ def content_type(path: Path) -> str:
         return "text/html; charset=utf-8"
     if path.suffix == ".md":
         return "text/markdown; charset=utf-8"
+    if path.suffix == ".svg":
+        return "image/svg+xml"
+    if path.suffix == ".png":
+        return "image/png"
     return "text/plain; charset=utf-8"
 
 

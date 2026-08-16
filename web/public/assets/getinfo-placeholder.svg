@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="140" viewBox="0 0 560 140" role="img" aria-label="PLACEHOLDER: RPC offline. No getinfo shot.">
+  <title>PLACEHOLDER: RPC offline. No getinfo shot.</title>
+  <rect width="560" height="140" fill="#0d0f12"/>
+  <rect x="1" y="1" width="558" height="138" fill="none" stroke="#1c232c"/>
+  <text x="16" y="28" fill="#d35454" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13" font-weight="700">PLACEHOLDER</text>
+  <text x="16" y="52" fill="#dce3ea" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">RPC offline. No getinfo shot.</text>
+  <text x="16" y="76" fill="#7d8794" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">Start additiond on 127.0.0.1:8545, then python3 web/serve.py.</text>
+  <text x="16" y="100" fill="#7d8794" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">This image is empty on purpose. It is not a dashboard.</text>
+  <text x="16" y="124" fill="#7d8794" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">No height, peers, TVL, volume, or hashrate are drawn here.</text>
+</svg>

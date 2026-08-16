@@ -14,6 +14,8 @@ import os
 import socket
 import sys
 
+from local_panel_images import LOGO_PNG
+
 
 def env_int(name: str, default: int) -> int:
     raw = os.environ.get(name, "").strip()
@@ -175,6 +177,11 @@ def run_gui() -> int:
 
     frm = ttk.Frame(root, padding=10)
     frm.pack(fill="both", expand=True)
+    logo_holder = None
+    if LOGO_PNG.is_file():
+        logo_holder = tk.PhotoImage(file=str(LOGO_PNG))
+        ttk.Label(frm, image=logo_holder).pack(anchor="w")
+        root._addition_logo = logo_holder
     ttk.Label(frm, textvariable=status, wraplength=680).pack(anchor="w")
     ttk.Label(
         frm,

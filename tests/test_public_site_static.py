@@ -195,6 +195,10 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("disabled", wallet)
         self.assertIn("RPC offline", wallet)
         self.assertNotIn("wallet-connect", wallet.lower())
+        self.assertIn("/assets/addition-logo.svg", wallet)
+        self.assertIn("/assets/getinfo-placeholder.svg", wallet)
+        self.assertIn("/local-panel.js", wallet)
+        self.assertIn("applyGetinfoShot", wallet)
 
     def test_swap_and_contracts_fail_closed(self) -> None:
         swap = read("swap/index.html")
@@ -208,6 +212,20 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("disabled", contracts)
         self.assertIn("RPC offline", contracts)
         self.assertNotIn("wallet-connect", swap.lower())
+        for page in (swap, contracts):
+            self.assertIn("/assets/addition-logo.svg", page)
+            self.assertIn("/assets/getinfo-placeholder.svg", page)
+            self.assertIn("/local-panel.js", page)
+            self.assertIn("applyGetinfoShot", page)
+
+    def test_public_lander_has_no_local_panel_images(self) -> None:
+        index = read("index.html")
+        join = read("join/index.html")
+        for page in (index, join):
+            self.assertNotIn("/local-panel.js", page)
+            self.assertNotIn("getinfo-shot", page)
+            self.assertNotIn("/assets/addition-logo.svg", page)
+            self.assertNotIn("/assets/getinfo-placeholder.svg", page)
 
     def test_common_js_fail_closed_and_strip_keys(self) -> None:
         common = read("common.js")

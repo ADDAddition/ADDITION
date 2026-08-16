@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ADDITION contracts (in-process)</title>
   <link rel="stylesheet" href="/common.css">
+  <link rel="stylesheet" href="/local-panel.css">
 </head>
 <body data-title="Contracts" data-sub="In-process KV runtime. Not an EVM and not a public deployer.">
   <header id="site-header"></header>
@@ -14,6 +15,14 @@
       These forms talk to <code>/local-rpc</code> → <code>127.0.0.1:8545</code>. Public read (:38545) does not expose <code>contract_deploy</code>.
     </div>
     <p id="rpc-state" class="offline">Checking local RPC…</p>
+    <section class="panel local-visuals">
+      <h2>Logo and getinfo shot</h2>
+      <p class="note">In-repo logo. The getinfo image is built from the live <code>127.0.0.1:8545</code> reply, or the labeled placeholder if RPC is down.</p>
+      <div class="local-visual-row">
+        <img class="local-logo" src="/assets/addition-logo.svg" width="64" height="64" alt="ADDITION">
+        <img id="getinfo-shot" class="getinfo-shot" src="/assets/getinfo-placeholder.svg" alt="PLACEHOLDER: RPC offline. No getinfo shot.">
+      </div>
+    </section>
     <section class="panel">
       <h2>Verified against a running local testnet node</h2>
       <ul>
@@ -61,6 +70,7 @@
   </main>
   <footer id="site-footer"></footer>
   <script src="/common.js"></script>
+  <script src="/local-panel.js"></script>
   <script src="/chrome.js"></script>
   <script>
     async function localCmd(cmd) {
@@ -79,6 +89,7 @@
       const r = await localCmd("getinfo");
       const el = document.getElementById("rpc-state");
       const buttons = document.querySelectorAll("main button");
+      window.AdditionLocalPanel.applyGetinfoShot(document.getElementById("getinfo-shot"), r);
       if (r.offline) {
         el.className = "offline";
         el.textContent = "RPC offline";
