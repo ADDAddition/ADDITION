@@ -37,9 +37,9 @@ curl &#x27;http://34.27.30.115:38545/rpc?cmd=getinfo&#x27;</pre>
 <p>5. <strong>Compatibility</strong> — in-process <code>bridge_*</code> commands and the EVM bootstrap (<code>web/evm/evm_rpc_bridge.py</code>). Bootstrap / not a full EVM, not live Uniswap, not “connected to every chain today”</p>
 <hr>
 <h2>What this is</h2>
-<ul><li>A local / research <strong>testnet</strong> named <code>addition-testnet</code></li><li>Default mode is <strong>testnet</strong> (<code>additiond --network testnet</code>)</li><li>Mainnet profile is opt-in only (<code>--network mainnet</code> or an explicit <code>ADDITION_MAINNET_MODE=1</code>). That profile is still experimental and is <strong>not</strong> a live public network.</li></ul>
+<ul><li>A local / research <strong>testnet</strong> named <code>addition-testnet</code></li><li>Default mode is <strong>testnet</strong> (<code>additiond --network testnet</code>)</li><li><code>--mainnet</code> / <code>--network mainnet</code> starts a <strong>separate</strong> chain (<code>ADDITION_MAINNET_V1</code>, <code>genesis-mainnet.json</code>, <code>data-mainnet</code>). That chain is not public and is <strong>not</strong> a live network. The site stays on the testnet. See <a href="docs/MAINNET_RUNBOOK.md">docs/MAINNET_RUNBOOK.md</a>.</li></ul>
 <p>Checked-in network files:</p>
-<ul><li><a href="config.toml"><code>config.toml</code></a> — network name, ports, reward, localhost bootstrap examples</li><li><a href="genesis.json"><code>genesis.json</code></a> — testnet genesis parameters (no fake node counts)</li></ul>
+<ul><li><a href="config.toml"><code>config.toml</code></a> / <a href="genesis.json"><code>genesis.json</code></a> — testnet</li><li><a href="config-mainnet.toml"><code>config-mainnet.toml</code></a> / <a href="genesis-mainnet.json"><code>genesis-mainnet.json</code></a> — separate mainnet chain (not live)</li></ul>
 <p><code>bootstrap_peers</code> is IPv4 <code>ip:port</code> only. The operator’s current public P2P is <code>34.27.30.115:28545</code>. That is one real endpoint, not a peer-count claim. Local two-node runs still use <code>--bootstrap 127.0.0.1:28545</code>. Write RPC stays <code>127.0.0.1:8545</code>.</p>
 <hr>
 <h2>Build (liboqs + OpenSSL)</h2>
@@ -119,7 +119,7 @@ printf &#x27;mine\n&#x27; | nc 127.0.0.1 38545   # error: command disabled on pu
 <p>Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a>.</p>
 <p>Help:</p>
 <pre>./build/additiond --help</pre>
-<p>Do not set <code>ADDITION_MAINNET_MODE=1</code> unless you are explicitly experimenting with the mainnet *profile*. It is not a live network.</p>
+<p><code>--mainnet</code> is a separate local/operator chain, not a live public network. Do not set <code>ADDITION_MAINNET_MODE=1</code> on the public testnet unit.</p>
 <p>Private keys are not printed and must not be committed. <code>data/node_identity.dat</code> (public identity only) and wallet files stay local and gitignored.</p>
 <hr>
 <h2>Ports (testnet defaults)</h2>
@@ -128,8 +128,8 @@ printf &#x27;mine\n&#x27; | nc 127.0.0.1 38545   # error: command disabled on pu
 <p>Two local processes: <code>./scripts/start_two_node_testnet.sh</code> (A: write <code>8545</code> / public <code>38545</code> / P2P <code>28545</code>; B: write <code>8546</code> / P2P <code>28546</code>). Details in <a href="docs/TWO_NODE_TESTNET.md">docs/TWO_NODE_TESTNET.md</a>.</p>
 <hr>
 <h2>Documentation</h2>
-<ul><li><a href="docs/ARCHITECTURE.md">Architecture notes</a></li><li><a href="docs/FINAL_COMMANDS.md">Command reference</a></li><li><a href="docs/WALLET.md">Local testnet wallet</a></li><li><a href="docs/POUW_PHASE1_SPEC.md">PoUW phase 1 spec</a></li><li><a href="docs/TWO_NODE_TESTNET.md">Two-node local testnet</a></li><li><a href="docs/REAL_TESTNET_MINE_AND_PRIVACY.md">Mined block + SHA3 opening privacy</a></li><li><a href="docs/TESTNET_PUBLIC_RPC_RUNBOOK.md">Testnet public-read RPC (systemd)</a></li></ul>
-<p>Older docs may still say “mainnet”. Treat those as historical. This tree is a research testnet.</p>
+<ul><li><a href="docs/ARCHITECTURE.md">Architecture notes</a></li><li><a href="docs/FINAL_COMMANDS.md">Command reference</a></li><li><a href="docs/WALLET.md">Local testnet wallet</a></li><li><a href="docs/POUW_PHASE1_SPEC.md">PoUW phase 1 spec</a></li><li><a href="docs/TWO_NODE_TESTNET.md">Two-node local testnet</a></li><li><a href="docs/REAL_TESTNET_MINE_AND_PRIVACY.md">Mined block + SHA3 opening privacy</a></li><li><a href="docs/TESTNET_PUBLIC_RPC_RUNBOOK.md">Testnet public-read RPC (systemd)</a></li><li><a href="docs/MAINNET_RUNBOOK.md">Mainnet node (separate chain, not live)</a></li></ul>
+<p>The public site and <code>rpc.additionblockchain.com</code> are the testnet. <code>--mainnet</code> does not change that.</p>
 <hr>
 <h2>Contributing</h2>
 <p>1. Fork the repository</p>

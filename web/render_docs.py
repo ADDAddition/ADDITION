@@ -158,9 +158,9 @@ def main() -> None:
     write_doc(
         "docs/MAINNET_RUNBOOK.md",
         OUT / "docs" / "runbook" / "index.html",
-        "ADDITION experimental profile runbook",
-        "Experimental runbook",
-        "From <code>docs/MAINNET_RUNBOOK.md</code>. Default remains <code>additiond --network testnet</code>.",
+        "ADDITION mainnet node runbook (not live)",
+        "Mainnet node runbook",
+        "From <code>docs/MAINNET_RUNBOOK.md</code>. Separate chain. Default remains <code>additiond --network testnet</code>. Not a live public network.",
     )
     write_doc(
         "docs/TWO_NODE_TESTNET.md",
