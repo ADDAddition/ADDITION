@@ -134,6 +134,7 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertNotIn("/swap/", index)
         self.assertNotIn("/evm/", index)
         self.assertNotIn("/contracts/", index)
+        self.assertNotIn("DEX", index)
         self.assertNotIn("CoinMarketCap", index)
         self.assertNotIn("token sale", index.lower())
         self.assertNotIn("market cap", index.lower())
@@ -205,6 +206,10 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertNotIn("0.0.0.0:9545", evm)
         self.assertNotIn("wallet-connect", evm.lower())
         self.assertIn("cannot list", evm.lower())
+        self.assertIn('id="add-mm"', evm)
+        self.assertIn("disabled", evm)
+        self.assertIn("Button stays disabled until http://127.0.0.1:9545 answers chain 424242.", evm)
+        self.assertNotIn("DEX", evm)
 
     def test_wallet_stays_loopback_only(self) -> None:
         wallet = read("wallet/index.html")
