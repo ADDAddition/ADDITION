@@ -84,6 +84,10 @@ if(ADDITION_BUILD_TESTS)
     target_link_libraries(test_btc_hygiene PRIVATE addition_core)
     add_test(NAME test_btc_hygiene COMMAND test_btc_hygiene)
 
+    add_executable(test_confirmations tests/test_confirmations.cpp)
+    target_link_libraries(test_confirmations PRIVATE addition_core)
+    add_test(NAME test_confirmations COMMAND test_confirmations)
+
     find_package(Python3 COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
         add_test(
