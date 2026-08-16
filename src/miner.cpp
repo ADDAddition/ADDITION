@@ -12,11 +12,22 @@ bool Miner::mine_next_block(const std::string& reward_address,
                             std::string& mined_hash,
                             std::string& error) {
     const auto t0 = std::chrono::steady_clock::now();
-    auto txs = mempool_.fetch_for_block(max_txs);
-    auto txs_for_restore = txs;
-    const auto tx_count = txs.size();
-    if (!chain_.mine_and_add_block(reward_address, std::move(txs), threads, mined_hash, error)) {
-        for (const auto& tx : txs_for_restore) {
+    auto fetched = mempool_.fetch_for_block(max_txs);
+    std::vector<Transaction> valid;
+    valid.reserve(fetched.size());
+    last_dropped_junk_ = 0;
+    for (const auto& tx : fetched) {
+        std::string verr;
+        if (chain_.validate_transaction(tx, verr)) {
+            valid.push_back(tx);
+        } else {
+            ++last_dropped_junk_;
+        }
+    }
+
+    const auto tx_count = valid.size();
+    if (!chain_.mine_and_add_block(reward_address, valid, threads, mined_hash, error)) {
+        for (const auto& tx : valid) {
             mempool_.submit(tx);
         }
         return false;
@@ -40,6 +51,10 @@ std::uint64_t Miner::last_mine_ms() const {
 
 std::size_t Miner::last_mined_txs() const {
     return last_mined_txs_;
+}
+
+std::size_t Miner::last_dropped_junk() const {
+    return last_dropped_junk_;
 }
 
 } // namespace addition

@@ -359,6 +359,10 @@ bool Chain::build_transaction(const std::string& from,
 }
 
 bool Chain::validate_transaction(const Transaction& tx, std::string& error) const {
+    return validate_transaction(tx, error, true);
+}
+
+bool Chain::validate_transaction(const Transaction& tx, std::string& error, bool check_signature) const {
     if (tx.outputs.empty()) {
         error = "transaction has no outputs";
         return false;
@@ -398,7 +402,7 @@ bool Chain::validate_transaction(const Transaction& tx, std::string& error) cons
         return false;
     }
 
-    if (!validate_transaction_signature(tx, error)) {
+    if (!validate_transaction_signature(tx, error, check_signature)) {
         return false;
     }
 
@@ -541,6 +545,10 @@ bool Chain::mine_and_add_block(const std::string& reward_address,
 }
 
 bool Chain::validate_transaction_signature(const Transaction& tx, std::string& error) const {
+    return validate_transaction_signature(tx, error, true);
+}
+
+bool Chain::validate_transaction_signature(const Transaction& tx, std::string& error, bool check_crypto) const {
     if (cfg_.require_pq_signatures && tx.signature.rfind("pq=", 0) != 0) {
         error = "non-PQ signature rejected in strict mode";
         return false;
@@ -579,6 +587,10 @@ bool Chain::validate_transaction_signature(const Transaction& tx, std::string& e
         return false;
     }
 
+    if (!check_crypto) {
+        return true;
+    }
+
     Transaction unsigned_tx = tx;
     unsigned_tx.signature.clear();
     const auto msg = hash_transaction(unsigned_tx);
@@ -590,7 +602,14 @@ bool Chain::validate_transaction_signature(const Transaction& tx, std::string& e
 }
 
 bool Chain::apply_transaction(const Transaction& tx, const std::string& txid, std::string& error) {
-    if (!validate_transaction(tx, error)) {
+    return apply_transaction(tx, txid, error, true);
+}
+
+bool Chain::apply_transaction(const Transaction& tx,
+                              const std::string& txid,
+                              std::string& error,
+                              bool check_signature) {
+    if (!validate_transaction(tx, error, check_signature)) {
         return false;
     }
 
@@ -697,6 +716,10 @@ bool Chain::validate_block_transactions(const Block& candidate, std::string& err
     }
     std::uint64_t fees = 0;
     for (std::size_t i = 1; i < candidate.transactions.size(); ++i) {
+        if (candidate.transactions[i].inputs.empty()) {
+            error = "non-coinbase tx must have inputs";
+            return false;
+        }
         if (fees > (std::numeric_limits<std::uint64_t>::max() - candidate.transactions[i].fee)) {
             error = "fees overflow";
             return false;
@@ -784,7 +807,53 @@ bool Chain::validate_block_transactions(const Block& candidate, std::string& err
         }
     }
 
+    std::vector<PqVerifyItem> jobs;
+    jobs.reserve(candidate.transactions.size() > 0 ? candidate.transactions.size() - 1 : 0);
+    for (std::size_t i = 1; i < candidate.transactions.size(); ++i) {
+        const auto& tx = candidate.transactions[i];
+        if (tx.signer.empty() || tx.signer_pubkey.empty() || tx.signature.rfind("pq=", 0) != 0) {
+            error = "non-coinbase tx missing PQ signature";
+            return false;
+        }
+        if (derive_address_from_pubkey(tx.signer_pubkey) != tx.signer) {
+            error = "signer/pubkey mismatch";
+            return false;
+        }
+        Transaction unsigned_tx = tx;
+        unsigned_tx.signature.clear();
+        jobs.push_back(PqVerifyItem{tx.signer_pubkey, hash_transaction(unsigned_tx), tx.signature});
+    }
+    if (!jobs.empty()) {
+        std::size_t accepted = 0;
+        std::uint64_t verify_ms = 0;
+        std::string verr;
+        const auto hw = std::thread::hardware_concurrency();
+        const std::size_t threads = hw > 0 ? static_cast<std::size_t>(hw) : 1;
+        if (!pq_verify_messages_parallel(jobs, threads, accepted, verify_ms, verr)) {
+            error = verr.empty() ? "batch pq verify failed" : verr;
+            return false;
+        }
+        last_batch_verify_ms_ = verify_ms;
+        last_batch_verify_count_ = accepted;
+    }
+
     return true;
+}
+
+std::uint64_t Chain::last_batch_verify_ms() const {
+    return last_batch_verify_ms_;
+}
+
+std::size_t Chain::last_batch_verify_count() const {
+    return last_batch_verify_count_;
+}
+
+double Chain::last_batch_verify_per_sec() const {
+    if (last_batch_verify_count_ == 0) {
+        return 0.0;
+    }
+    const double sec = static_cast<double>(last_batch_verify_ms_ > 0 ? last_batch_verify_ms_ : 1) / 1000.0;
+    return static_cast<double>(last_batch_verify_count_) / sec;
 }
 
 bool Chain::add_block(const Block& block, std::string& error) {
@@ -807,7 +876,7 @@ bool Chain::add_block(const Block& block, std::string& error) {
 
     for (const auto& tx : block.transactions) {
         const auto txid = hash_transaction(tx);
-        if (!apply_transaction(tx, txid, error)) {
+        if (!apply_transaction(tx, txid, error, false)) {
             utxo_set_ = std::move(utxo_snapshot);
             address_index_ = std::move(index_snapshot);
             seen_transactions_ = std::move(seen_snapshot);

@@ -19,11 +19,15 @@ public:
 
 private:
     std::string signer_nonce_key(const Transaction& tx) const;
+    bool looks_spendable(const Transaction& tx) const;
+    void index_inputs(const Transaction& tx);
+    void unindex_inputs(const Transaction& tx);
 
     mutable std::mutex mu_;
     std::vector<Transaction> pending_;
     std::unordered_set<std::string> txids_;
     std::unordered_set<std::string> signer_nonces_;
+    std::unordered_set<std::string> reserved_outpoints_;
 };
 
 } // namespace addition

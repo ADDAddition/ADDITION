@@ -26,6 +26,10 @@ public:
     std::uint64_t height() const;
 
     bool validate_transaction(const Transaction& tx, std::string& error) const;
+    bool validate_transaction(const Transaction& tx, std::string& error, bool check_signature) const;
+    std::uint64_t last_batch_verify_ms() const;
+    std::size_t last_batch_verify_count() const;
+    double last_batch_verify_per_sec() const;
     bool add_block(const Block& block, std::string& error);
     bool mine_and_add_block(const std::string& reward_address,
                             std::vector<Transaction> txs,
@@ -57,6 +61,10 @@ public:
     bool apply_transaction(const Transaction& tx,
                            const std::string& txid,
                            std::string& error);
+    bool apply_transaction(const Transaction& tx,
+                           const std::string& txid,
+                           std::string& error,
+                           bool check_signature);
 
     std::string outpoint_key(const std::string& txid, std::uint32_t output_index) const;
     std::uint64_t current_difficulty_target() const;
@@ -92,6 +100,8 @@ private:
     std::uint64_t cumulative_work_{0};
     std::function<void()> on_commit_;
     int suppress_commit_{0};
+    mutable std::uint64_t last_batch_verify_ms_{0};
+    mutable std::size_t last_batch_verify_count_{0};
 
     void notify_commit();
     Block make_genesis() const;
@@ -101,6 +111,7 @@ private:
     bool validate_block_header(const Block& candidate, std::string& error) const;
     bool validate_block_transactions(const Block& candidate, std::string& error) const;
     bool validate_transaction_signature(const Transaction& tx, std::string& error) const;
+    bool validate_transaction_signature(const Transaction& tx, std::string& error, bool check_crypto) const;
     std::uint64_t compute_next_difficulty_target() const;
     std::uint64_t clamp_difficulty_target(std::uint64_t target) const;
     std::uint64_t compute_block_reward(std::uint64_t height) const;

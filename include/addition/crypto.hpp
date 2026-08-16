@@ -36,6 +36,20 @@ bool pq_verify_message(const std::vector<std::uint8_t>& public_key,
 					   const std::vector<std::uint8_t>& signature,
 					   std::string& error);
 
+struct PqVerifyItem {
+	std::string public_key_hex;
+	std::string message;
+	std::string signature;
+};
+
+// Parallel ML-DSA-87 verify. Each worker reuses a thread-local OQS_SIG.
+// This is ADDITION's own batch path (not a copied runtime).
+bool pq_verify_messages_parallel(const std::vector<PqVerifyItem>& items,
+								 std::size_t threads,
+								 std::size_t& accepted,
+								 std::uint64_t& elapsed_ms,
+								 std::string& error);
+
 bool random_hex(std::size_t nbytes, std::string& out, std::string& error);
 
 bool crypto_selftest(std::string& report);
