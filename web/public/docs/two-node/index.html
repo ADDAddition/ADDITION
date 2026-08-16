@@ -11,7 +11,7 @@
   <main class="prose">
     <div class="banner">From <code>docs/TWO_NODE_TESTNET.md</code>. Two local <code>additiond</code> processes. Live join: <a href="/join/">/join/</a> — bootstrap <code>34.27.30.115:28545</code>, then <code>sync</code>.</div>
     <h2>Two-node local testnet runbook</h2>
-<p>This starts <strong>two <code>additiond</code> processes</strong> on one machine. It is not a public</p>
+<p>This starts <strong>two local <code>additiond</code> processes</strong> on one machine. It is not a public</p>
 <p>mainnet, not a token sale, and it does not invent peer counts or hashrate.</p>
 <p>Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
 <h2>Ports</h2>
@@ -56,12 +56,14 @@ printf &#x27;createwallet\n&#x27; | nc 127.0.0.1 38545</pre>
 <p>Writes (<code>mine</code>, <code>sendtx*</code>, <code>createwallet</code>, <code>wallet_*</code>, identity rotation) return</p>
 <p>exactly:</p>
 <pre>error: command disabled on public RPC</pre>
-<p>HTTP responses include <code>Access-Control-Allow-Origin: *</code>, <code>OPTIONS</code> → <code>204</code>, and</p>
-<p><code>Cache-Control: no-store</code> so a static site can call the port without caching.</p>
+<p>HTTP responses include <code>Access-Control-Allow-Origin: *</code> (credential-less public</p>
+<p>read allowlist; writes stay 403), <code>Access-Control-Allow-Methods: GET, OPTIONS</code>,</p>
+<p><code>OPTIONS</code> → <code>204</code>, and <code>Cache-Control: no-store</code>. <code>curl /rpc?cmd=getinfo</code> is</p>
+<p>unchanged. CORS <code>*</code> is not a wallet-connect surface.</p>
 <h2>Point the website at a real public RPC</h2>
 <p><code>web/public/wrangler.toml</code> ships with:</p>
 <pre>PUBLIC_RPC_HTTP = &quot;&quot;</pre>
-<p>Leave it empty. The worker and static pages show <strong>RPC offline</strong>.</p>
+<p>Leave it empty. The worker and static pages show <strong>RPC offline</strong> when the node is down.</p>
 <p>They do not invent blocks, peers, or hashrate.</p>
 <p>When an operator has a <strong>real</strong> public-rpc HTTP URL (this machine, a VPS, or a</p>
 <p>tunnel the operator created), set the worker variable to that URL:</p>
@@ -76,7 +78,13 @@ printf &#x27;createwallet\n&#x27; | nc 127.0.0.1 38545</pre>
 <ul><li>P2P transport is off unless <code>ADDITION_ENABLE_P2P_RPC=1</code>.</li><li>The live operator node sets that env and allows inbound TCP <strong>28545</strong></li></ul>
 <p>  (GCP rule <code>allow-addition-p2p</code>). Allow 28545 only while P2P is enabled.</p>
 <p>  Never open <strong>8545</strong> or <strong>18545</strong>.</p>
-<ul><li>Endpoints are IPv4 <code>ip:port</code> only (<code>inet_pton</code>). Docker DNS names do not work.</li><li><code>bootstrap_peers</code> / <code>--bootstrap</code> skip this process’s own P2P port.</li><li>IPv4 only. The operator’s current public P2P is <code>34.27.30.115:28545</code></li></ul>
+<ul><li>Endpoints are IPv4 <code>ip:port</code> only (<code>inet_pton</code>). Docker DNS names do not work.</li><li><code>bootstrap_peers</code> / <code>--bootstrap</code> skip this process’s own P2P port, <code>self</code> /</li></ul>
+<p>  <code>probe-self</code>, and <code>ADDITION_ADVERTISED_P2P</code> when set (seed must set that to</p>
+<p>  its public <code>ip:port</code> so it does not add itself).</p>
+<ul><li><code>getinfo.peers</code> / <code>peers</code> list only non-loopback IPv4 endpoints. Loopback</li></ul>
+<p>  two-node peers stay in the internal set for <code>sync</code> and appear as</p>
+<p>  <code>local=127.0.0.1:…</code>. Node ids and <code>self</code> are not an external peer count.</p>
+<ul><li>IPv4 only. The operator’s current public P2P is <code>34.27.30.115:28545</code></li></ul>
 <p>  (<code>--bootstrap 34.27.30.115:28545</code>). Do not invent extra peers. Write RPC</p>
 <p>  stays <code>127.0.0.1:8545</code>.</p>
 <ul><li><code>sync</code> pulls the public chain over HTTP: <code>:80</code> first (<code>getblockraw</code>), then</li></ul>

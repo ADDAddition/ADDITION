@@ -305,6 +305,15 @@ def main() -> int:
         )
         if "command disabled on public RPC" not in str(js_write.get("error", {})):
             return fail("jsonrpc mine: %s" % js_write)
+        for blocked in ("wallet_send", "stake", "unstake", "swap_exact_in", "add_liquidity"):
+            js_blocked = http_json(
+                "127.0.0.1",
+                ports["pub"],
+                "/jsonrpc",
+                {"jsonrpc": "2.0", "id": 10, "method": blocked, "params": []},
+            )
+            if "command disabled on public RPC" not in str(js_blocked.get("error", {})):
+                return fail("jsonrpc %s: %s" % (blocked, js_blocked))
 
         evm_env = os.environ.copy()
         evm_env["ADDITION_EVM_BIND"] = "127.0.0.1"

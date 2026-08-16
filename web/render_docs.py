@@ -167,7 +167,7 @@ def main() -> None:
         OUT / "docs" / "two-node" / "index.html",
         "ADDITION two-node local testnet",
         "Two-node testnet",
-        "From <code>docs/TWO_NODE_TESTNET.md</code>. Two local <code>additiond</code> processes.",
+        "From <code>docs/TWO_NODE_TESTNET.md</code>. Two local <code>additiond</code> processes. Live join: <a href=\"/join/\">/join/</a> — bootstrap <code>34.27.30.115:28545</code>, then <code>sync</code>.",
     )
     write_doc(
         "README.md",

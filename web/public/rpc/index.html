@@ -46,7 +46,7 @@ printf 'getinfo\n' | nc 34.27.30.115 38545</pre>
         <li><code>getblockhash &lt;height&gt;</code></li>
         <li><code>getblockraw &lt;height&gt;</code> (<code>ok:BLKDATA</code>)</li>
       </ul>
-      <p>Everything else, including <code>mine</code>, <code>sendtx*</code>, <code>createwallet</code>, <code>wallet_*</code>, and identity rotation, returns <code>error: command disabled on public RPC</code>.</p>
+      <p>Everything else, including <code>mine</code>, <code>sendtx*</code>, <code>createwallet</code>, <code>wallet_*</code>, <code>stake</code>/<code>unstake</code>, <code>swap_*</code>, and identity rotation, returns <code>error: command disabled on public RPC</code>.</p>
       <p>Wallet create/send lives on localhost: <a href="/wallet/">/wallet/</a> or <code>python3 web/addition_wallet_gui.py</code>.</p>
     </section>
     <section class="panel">
@@ -54,7 +54,7 @@ printf 'getinfo\n' | nc 34.27.30.115 38545</pre>
       <p>Bootstrap P2P: <code>34.27.30.115:28545</code>. Write RPC stays <code>127.0.0.1:8545</code>.</p>
       <pre>./build/additiond --network testnet --bootstrap 34.27.30.115:28545
 printf 'sync\n' | nc 127.0.0.1 8545</pre>
-      <p><code>sync</code> reads the public chain over HTTP: <code>:80</code> first (<code>getblockraw</code>), then <code>:38545</code>. Public RPC still rejects <code>mine</code> / <code>createwallet</code> / <code>wallet_*</code>.</p>
+      <p><code>sync</code> reads the public chain over HTTP: <code>:80</code> first (<code>getblockraw</code>), then <code>:38545</code>. Public RPC still rejects <code>mine</code> / <code>createwallet</code> / <code>wallet_*</code> / <code>stake</code> / <code>swap_*</code>.</p>
     </section>
     <section class="panel">
       <h2>Public-read JSON API</h2>

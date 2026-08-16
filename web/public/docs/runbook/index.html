@@ -11,7 +11,7 @@
   <main class="prose">
     <div class="banner">From <code>docs/MAINNET_RUNBOOK.md</code>. Default remains <code>additiond --network testnet</code>.</div>
     <h2>Addition (ADD) experimental profile runbook</h2>
-<p class='note'>This repository ships a <strong>testnet</strong>. There is no live public mainnet.</p>
+<p class='note'>This repository ships a research <strong>testnet</strong>. There is no live public mainnet.</p>
 <p class='note'>Default launch is <code>additiond --network testnet</code>. Do not set <code>ADDITION_MAINNET_MODE=1</code> unless you are explicitly testing the mainnet *profile*.</p>
 <h2>1) Pre-flight checklist</h2>
 <ul><li>Build must succeed:</li><li><code>cmake -S . -B build</code></li><li><code>cmake --build build</code></li><li><code>additiond.exe</code> exists in <code>build/</code></li><li>liboqs/OpenSSL available on host</li><li>Firewall rules configured for:</li><li>TCP 18545 (LAN RPC, optional public)</li><li>TCP 28545 (P2P transport)</li><li>Data backup path ready (<code>./data</code> snapshot)</li></ul>
