@@ -4,6 +4,7 @@ const PAGE_ROUTES = {
   "/status": "/status/index.html",
   "/rpc": "/rpc/index.html",
   "/join": "/join/index.html",
+  "/download": "/download/index.html",
   "/wallet": "/wallet/index.html",
   "/docs": "/docs/index.html",
   "/docs/getting-started": "/docs/getting-started/index.html",

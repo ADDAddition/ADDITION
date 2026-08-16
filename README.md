@@ -148,6 +148,7 @@ Local UI:
 
 * Page: `/wallet/` via `python3 web/serve.py` (loopback `/local-rpc` only)
 * Desktop: `python3 web/addition_wallet_gui.py` or `--cli getinfo`
+* Packaged binary: `./scripts/build_wallet.sh` then `/download/` (`addition-wallet-testnet --cli getinfo`)
 
 A fresh wallet balance is `0` until a block is mined to that address (testnet PoW is SHA3-512 of the header, 30s deadline, reward 50 on a fresh testnet) or a UTXO arrives. `mine <address>` is trusted local RPC only. Optional in-process auto-mine (`--auto-mine`, off by default, testnet only) mines one block every N seconds and writes `blocks.dat` the same way as a manual mine. Public RPC cannot mine, create wallets, or send. See [docs/REAL_TESTNET_MINE_AND_PRIVACY.md](docs/REAL_TESTNET_MINE_AND_PRIVACY.md).
 
@@ -216,6 +217,7 @@ python3 web/serve.py
 | `/rpc/` | Public read `/rpc?cmd=getinfo` on :80 and :38545 |
 | `/docs/` | Architecture, commands, PoUW spec, getting started, runbook, SHA3 opening notes |
 | `/wallet/` | Local createwallet / UTXO send via `/local-rpc` (loopback) |
+| `/download/` | Testnet / local wallet binary + run steps |
 | `/contracts/` `/swap/` `/evm/` | Local node methods only; EVM is bootstrap |
 | `/whitepaper/` `/legal/` | Research copy. No fake ticker or live mainnet |
 

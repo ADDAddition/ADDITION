@@ -54,6 +54,11 @@ a:hover { color: #0d3b7a; }
   flex: 0 0 28px;
   display: block;
 }
+.brand-logo {
+  height: 28px;
+  width: auto;
+  display: block;
+}
 .brand-text { display: flex; flex-direction: column; line-height: 1.15; }
 .brand-name {
   font-size: 0.92rem;

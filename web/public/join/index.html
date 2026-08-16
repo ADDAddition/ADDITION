@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Join the ADDITION testnet</title>
+  <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/common.css">
 </head>
 <body data-title="Join" data-sub="live testnet">
@@ -58,6 +61,7 @@ curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'</pre>
       <h2>Local write RPC</h2>
       <p>There is no public wallet UI. <code>createwallet</code>, balances, and swap commands exist on localhost write RPC only.</p>
       <p>Pages under <code>/wallet/</code> and <code>/swap/</code> talk to <code>/local-rpc</code> → <code>127.0.0.1:8545</code>. On this host they stay <strong>RPC offline</strong>.</p>
+      <p>Local desktop helper: <a href="/download/">/download/</a> (testnet / local binary, loopback RPC only).</p>
     </section>
   </main>
   <footer id="site-footer"></footer>

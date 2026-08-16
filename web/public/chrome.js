@@ -36,13 +36,17 @@
     }
     el.className = "site-chrome";
     el.innerHTML =
-      '<div class="site-chrome-inner"><nav id="site-nav">' + parts.join("") + "</nav></div>";
+      '<div class="site-chrome-inner">' +
+      '<a class="brand" href="/' + q + '">' +
+      '<img class="brand-logo" src="/logo-transparent.png" alt="ADDITION">' +
+      "</a>" +
+      '<nav id="site-nav">' + parts.join("") + "</nav></div>";
   }
 
   function fillFooter(el) {
     el.className = "site-footer-wrap";
     el.innerHTML =
-      '<p>testnet · <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>';
+      '<p>testnet · <a href="/download/">download</a> · <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>';
   }
 
   const header = document.getElementById("site-header");

@@ -45,6 +45,7 @@ __pycache__/
 .venv/
 venv/
 env/
+packaging/pyi-build/
 
 # Node / frontend tooling
 node_modules/

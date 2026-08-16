@@ -113,10 +113,22 @@ sendtx_signed_hash <from> <pub> <to> <amount> <fee> <nonce> <sig_hex>
 
 The client refuses to emit `sendtx`, `sendtx_hash`, or `sign_message`.
 
+## Packaged desktop binary (testnet / local)
+
+```bash
+./scripts/build_wallet.sh
+./web/public/download/addition-wallet-testnet --cli getinfo
+```
+
+Windows: `powershell -File scripts\build_wallet.ps1`. Details in
+[`packaging/README.md`](../packaging/README.md). The public `/download/` page
+links those files. RPC stays loopback-only.
+
 ### Tests without a running daemon
 
 ```bash
 python3 tests/test_wallet_client.py
+python3 tests/test_wallet_packaging.py
 ```
 
 These tests mock the TEXT RPC and fail if a private key appears on the wire.

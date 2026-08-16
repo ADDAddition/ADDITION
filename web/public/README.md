@@ -4,7 +4,9 @@ Pages root for additionblockchain.com.
 
 White explorer: search + latest `getblock` rows from live public read RPC. Header is Explorer | Status | Join. Footer is `testnet · contact@additionblockchain.com`. Down node → **RPC offline** and an empty table.
 
-- `/` is the explorer. Pretty URLs are folders with `index.html` (`/join/`, `/status/`, `/wallet/`, `/docs/commands/`, …).
+- `/` is the explorer. Pretty URLs are folders with `index.html` (`/join/`, `/status/`, `/wallet/`, `/download/`, `/docs/commands/`, …).
+- Brand files are the existing wordmark: `logo-transparent.png`, `favicon.ico`, `apple-touch-icon.png`, `og.png`.
+- `/download/` is the testnet / local wallet binary page. No hosted web wallet.
 - Join path: build `additiond` from repo `main`, `--bootstrap 34.27.30.115:28545`, then `sync`. Public HTTP `:80` first; `38545` and `28545` are optional/filtered.
 - Explorer calls `/api/rpc?cmd=…` for `getinfo` / `getblock` / `getblockhash` only. No invented height, hash, tx_count, or time.
 - Optional `?rpc=https://HOST:38545/rpc`.

@@ -152,6 +152,11 @@ if(ADDITION_BUILD_TESTS)
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         )
         add_test(
+            NAME test_wallet_packaging
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_wallet_packaging.py
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        )
+        add_test(
             NAME test_runtime_live
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_runtime_live.py
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}

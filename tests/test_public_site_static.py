@@ -219,6 +219,54 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("Button stays disabled until http://127.0.0.1:9545 answers chain 424242.", evm)
         self.assertNotIn("DEX", evm)
 
+    def test_site_brand_assets_exist_and_are_referenced(self) -> None:
+        required = (
+            "logo-transparent.png",
+            "favicon.ico",
+            "favicon-32.png",
+            "apple-touch-icon.png",
+            "og.png",
+            "twitter.png",
+        )
+        for name in required:
+            path = PUBLIC / name
+            self.assertTrue(path.is_file(), name)
+            self.assertGreater(path.stat().st_size, 32, name)
+        logo = (PUBLIC / "logo-transparent.png").read_bytes()
+        source = (ROOT / "docs" / "assets" / "logo-transparent.png").read_bytes()
+        self.assertEqual(logo, source)
+        self.assertTrue(logo.startswith(b"\x89PNG"))
+        chrome = read("chrome.js")
+        self.assertIn("/logo-transparent.png", chrome)
+        self.assertIn("/download/", chrome)
+        index = read("index.html")
+        self.assertIn("/favicon.ico", index)
+        self.assertIn("/apple-touch-icon.png", index)
+        self.assertIn("/og.png", index)
+        self.assertIn("twitter:card", index)
+        self.assertLess(len(index.splitlines()), 50)
+
+    def test_download_page_is_testnet_local_only(self) -> None:
+        page = read("download/index.html")
+        worker = read("worker.js")
+        self.assertIn("testnet / local", page.lower())
+        self.assertIn("addition-wallet-testnet", page)
+        self.assertIn("127.0.0.1:8545", page)
+        self.assertIn("./scripts/build_wallet.sh", page)
+        self.assertIn("RPC offline", page)
+        self.assertIn("contact@additionblockchain.com", page)
+        self.assertIn('"/download": "/download/index.html"', worker)
+        self.assertNotIn("wallet-connect", page.lower())
+        self.assertNotIn("walletconnect", page.lower())
+        self.assertNotIn("token sale", page.lower())
+        self.assertNotIn("tokenomics", page.lower())
+        self.assertNotIn("market cap", page.lower())
+        self.assertNotIn("coinmarketcap", page.lower())
+        self.assertIn("not a hosted web wallet", page.lower())
+        self.assertNotIn("mainnet is live", page.lower())
+        self.assertNotIn("live mainnet", page.lower())
+        self.assertNotRegex(page.lower(), r"\bhonest\b")
+
     def test_wallet_stays_loopback_only(self) -> None:
         wallet = read("wallet/index.html")
         self.assertIn("/local-rpc", wallet)
@@ -396,6 +444,11 @@ S.rpcCommand("getinfo").then((offline) => {
             self.assertIn("Explorer", chrome)
             self.assertIn("Status", chrome)
             self.assertIn("Join", chrome)
+            logo = urllib.request.urlopen(f"http://{host}:{port}/logo-transparent.png").read()
+            self.assertTrue(logo.startswith(b"\x89PNG"))
+            download = urllib.request.urlopen(f"http://{host}:{port}/download/index.html").read().decode("utf-8")
+            self.assertIn("addition-wallet-testnet", download)
+            self.assertIn("testnet", download.lower())
             try:
                 urllib.request.urlopen(f"http://{host}:{port}/api/rpc?cmd=getinfo")
                 self.fail("offline RPC must not return HTTP 200")

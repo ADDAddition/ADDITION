@@ -1,0 +1,37 @@
+name: wallet-packaging
+
+on:
+  pull_request:
+  push:
+    paths:
+      - "web/addition_wallet.py"
+      - "web/addition_wallet_gui.py"
+      - "scripts/build_wallet.sh"
+      - "scripts/build_wallet.ps1"
+      - "scripts/smoke_wallet_binary.py"
+      - "packaging/**"
+      - "tests/test_wallet_packaging.py"
+      - ".github/workflows/wallet-packaging.yml"
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build and smoke the testnet/local wallet binary
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk
+          chmod +x scripts/build_wallet.sh
+          ./scripts/build_wallet.sh
+      - name: Source tests
+        run: python3 -m unittest tests.test_wallet_packaging tests.test_wallet_client
+      - uses: actions/upload-artifact@v4
+        with:
+          name: addition-wallet-testnet-linux
+          path: |
+            web/public/download/addition-wallet-testnet
+            web/public/download/addition-wallet-cli-testnet
