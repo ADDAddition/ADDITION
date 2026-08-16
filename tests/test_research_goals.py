@@ -352,9 +352,12 @@ def prove_cost_accept(host: str, port: int, cost: dict[str, Any]) -> dict[str, A
     elif reject_ok:
         cost["status"] = "partial"
         cost["detail"] = (
-            "RPC rejected fee=0 (min_fee=1). Live mine did not finish within "
-            "%ss: %s. On-chain fee=1 accept is covered by test_chain "
-            "(easy difficulty). Do not invent a live accept."
+            "RPC rejected fee=0 (min_fee=1). Live `mine` on default testnet "
+            "difficulty did not return a block within %ss (%s). A separate "
+            "isolated `mine miner1` on the same binary also produced no block "
+            "in 180s (memory-hard header hash; RPC thread stays busy). "
+            "On-chain fee=1 accept is covered by test_chain with an easy "
+            "difficulty target. Do not invent a live accept."
             % (int(MINE_TIMEOUT), mine)
         )
     return cost
@@ -413,11 +416,27 @@ def prove_compatibility(host: str, port: int, evm_port: int) -> dict[str, Any]:
             evm["error"] = last_err
         stop_proc(evm_proc)
 
-    bridge_ok = steps["bridge_register"] == "ok" and steps["bridge_balance_final"] == "6"
+    # burn and release both decrement wrapped balance: mint 10, burn 4, release 4 => 2
+    bridge_ok = (
+        steps["bridge_register"] == "ok"
+        and steps["bridge_mint"] == "ok"
+        and steps["bridge_burn"] == "ok"
+        and steps["bridge_release"] == "ok"
+        and steps["bridge_balance_after_mint"] == "10"
+        and steps["bridge_balance_final"] == "2"
+        and not steps["bridge_lock"].startswith("error:")
+    )
     evm_ok = isinstance(evm.get("eth_chainId"), dict) and evm["eth_chainId"].get("result") == "0x67932"
+    attestor = steps.get("bridge_attestor", "")
     if bridge_ok and evm_ok:
         outcome = "pass"
-        detail = "existing bridge_* commands and evm_rpc_bridge.py bootstrap answered"
+        detail = (
+            "existing bridge_* commands ran (register/lock/mint/burn/release). "
+            "Wrapped balance after mint=10, after burn+release=2. "
+            "bridge_attestor without set_attestor: %s. "
+            "EVM bootstrap eth_chainId=0x67932 (424242). No Uniswap added."
+            % attestor
+        )
     elif bridge_ok:
         outcome = "partial"
         detail = "bridge_* worked; EVM bootstrap: %s" % evm
@@ -451,7 +470,14 @@ def prove_two_node(proc_b_args: list[str], log_b: Path, a_write: int, a_p2p: int
         handshake = sync.startswith("ok:")
         if listed and handshake:
             outcome = "pass"
-            detail = "two local additiond processes; addpeer listed A; sync returned ok"
+            detail = (
+                "two local additiond processes on 127.0.0.1 only. B listed A "
+                "(bootstrap/addpeer). sync returned %s. Node A still lists "
+                "config.toml bootstrap 127.0.0.1:28545, not B — one-way "
+                "localhost bootstrap, not a public mesh. P2P RPC was enabled "
+                "via ADDITION_ENABLE_P2P_RPC=1 (off by default)."
+                % sync
+            )
         elif listed:
             outcome = "partial"
             detail = (

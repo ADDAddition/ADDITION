@@ -30,9 +30,19 @@ def status_label(status: str) -> str:
     return mapping.get(status, status)
 
 
+def _redact(value):
+    if isinstance(value, dict):
+        return {k: _redact(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_redact(v) for v in value]
+    if isinstance(value, str) and len(value) > 240:
+        return value[:96] + "...<%d chars redacted>..." % (len(value) - 192) + value[-96:]
+    return value
+
+
 def fmt_evidence(evidence: dict) -> str:
     lines = ["", "```text"]
-    blob = json.dumps(evidence, indent=2, sort_keys=False)
+    blob = json.dumps(_redact(evidence), indent=2, sort_keys=False)
     if len(blob) > 8000:
         blob = blob[:8000] + "\n... truncated for readability ..."
     lines.append(blob)
@@ -97,8 +107,6 @@ harness set that variable. They do not invent a public mesh.
 %s
 %s
 %s
-## Two-node localhost
-
 %s
 
 ## What this does **not** claim
