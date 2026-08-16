@@ -1,6 +1,6 @@
 # Two-node local testnet runbook
 
-This starts **two honest `additiond` processes** on one machine. It is not a public
+This starts **two `additiond` processes** on one machine. It is not a public
 mainnet, not a token sale, and it does not invent peer counts or hashrate.
 
 Contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com)
@@ -118,7 +118,7 @@ Do **not** commit trycloudflare or other ephemeral tunnel URLs.
 Local site proxy (`python3 web/serve.py`) talks to `127.0.0.1:38545` when the
 public port is up. If the daemon is down, pages show **RPC offline**.
 
-## Honest P2P limits
+## P2P limits
 
 - P2P transport is off unless `ADDITION_ENABLE_P2P_RPC=1`.
 - The live operator node sets that env and allows inbound TCP **28545**
@@ -129,6 +129,8 @@ public port is up. If the daemon is down, pages show **RPC offline**.
 - IPv4 only. The operator’s current public P2P is `34.27.30.115:28545`
   (`--bootstrap 34.27.30.115:28545`). Do not invent extra peers. Write RPC
   stays `127.0.0.1:8545`.
+- `sync` pulls the public chain over HTTP: `:80` first (`getblockraw`), then
+  `:38545`. Public RPC still rejects `mine` / `createwallet` / `wallet_*`.
 - `addpeer` is a trusted-write command. Public RPC can only `peers`.
 - `sync` on two fresh nodes at height 0 has nothing to fetch. That is not a
   live network and not a peer-count claim.

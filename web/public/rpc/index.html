@@ -31,8 +31,10 @@ ADDITION_ENABLE_PUBLIC_RPC=1 ./build/additiond --network testnet</pre>
       <pre>curl 'https://rpc.additionblockchain.com/rpc?cmd=getinfo'
 curl 'http://34.27.30.115/rpc?cmd=getinfo'
 curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'
+curl 'http://34.27.30.115:38545/jsonrpc?method=getinfo'
+curl 'http://34.27.30.115:38545/jsonrpc?method=getblockraw&params=0'
 printf 'getinfo\n' | nc 34.27.30.115 38545</pre>
-      <p><code>:80</code> (nginx) works when <code>38545</code> is filtered. Path is <code>/rpc?cmd=getinfo</code>, not <code>/getinfo</code>.</p>
+      <p><code>:80</code> (nginx) works when <code>38545</code> is filtered. Path is <code>/rpc?cmd=getinfo</code> or <code>/jsonrpc?method=getinfo</code>, not <code>/getinfo</code>.</p>
       <p>Allowlist:</p>
       <ul>
         <li><code>getinfo</code></li>
@@ -46,6 +48,28 @@ printf 'getinfo\n' | nc 34.27.30.115 38545</pre>
       </ul>
       <p>Everything else, including <code>mine</code>, <code>sendtx*</code>, <code>createwallet</code>, <code>wallet_*</code>, and identity rotation, returns <code>error: command disabled on public RPC</code>.</p>
       <p>Wallet create/send lives on localhost: <a href="/wallet/">/wallet/</a> or <code>python3 web/addition_wallet_gui.py</code>.</p>
+    </section>
+    <section class="panel">
+      <h2>Join the public testnet</h2>
+      <p>Bootstrap P2P: <code>34.27.30.115:28545</code>. Write RPC stays <code>127.0.0.1:8545</code>.</p>
+      <pre>./build/additiond --network testnet --bootstrap 34.27.30.115:28545
+printf 'sync\n' | nc 127.0.0.1 8545</pre>
+      <p><code>sync</code> reads the public chain over HTTP: <code>:80</code> first (<code>getblockraw</code>), then <code>:38545</code>. Public RPC still rejects <code>mine</code> / <code>createwallet</code> / <code>wallet_*</code>.</p>
+    </section>
+    <section class="panel">
+      <h2>Public-read JSON API</h2>
+      <p>Same allowlist. No write commands. Not Ethereum JSON-RPC. Not a third-party dRPC vendor.</p>
+      <p>On the public-rpc port:</p>
+      <pre>GET  http://HOST:38545/jsonrpc?method=getinfo
+GET  http://HOST:38545/jsonrpc?method=getblock&amp;params=0
+GET  http://HOST:38545/jsonrpc?method=getblockraw&amp;params=0
+POST http://HOST:38545/jsonrpc
+{"jsonrpc":"2.0","id":1,"method":"getinfo","params":[]}</pre>
+      <p>Local site proxy (<code>python3 web/serve.py</code>): <code>GET /jsonrpc?method=getinfo</code> and <code>POST /jsonrpc</code>.</p>
+      <p>Standalone adapter (public-read, no writes):</p>
+      <pre>python3 tools/addition_jsonrpc_adapter.py --public-read --rpc-port 38545 --port 8645
+curl -s 'http://127.0.0.1:8645/jsonrpc?method=getinfo'
+curl -s -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"peers","params":[]}' http://127.0.0.1:8645/jsonrpc</pre>
     </section>
     <section class="panel">
       <h2>What stays private</h2>

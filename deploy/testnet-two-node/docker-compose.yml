@@ -1,4 +1,4 @@
-# Two honest local testnet processes. Not a public mainnet.
+# Two local testnet processes. Not a public mainnet.
 # Host networking so P2P can use 127.0.0.1 (IPv4 literals only; no DNS names).
 # Write RPC stays bound to 127.0.0.1 inside the daemon.
 

@@ -17,7 +17,7 @@ commands:
 | `token_create <symbol> <owner> <max_supply> <initial_mint>` | write | returns `ok` |
 | `token_create_ex <symbol> <name> <owner> <max_supply> <initial_mint> <decimals> <burnable_0_1> <dev_wallet_or_dash> <dev_allocation>` | write | name has no spaces |
 | `token_mint <symbol> <caller> <to> <amount>` | write | caller must be the token owner |
-| `token_transfer <symbol> <from> <to> <amount>` | write | unsigned; see honesty notes |
+| `token_transfer <symbol> <from> <to> <amount>` | write | unsigned; local TEXT RPC only |
 | `token_balance <symbol> <owner>` | read | decimal string, `0` if missing |
 | `token_info <symbol>` | read | `key=value` fields |
 | `token_burn <symbol> <from> <amount>` | write | only if the token was created burnable |

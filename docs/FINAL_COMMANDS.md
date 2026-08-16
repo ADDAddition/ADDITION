@@ -35,9 +35,22 @@ TCP and a tiny HTTP adapter share the same port:
 curl 'https://rpc.additionblockchain.com/rpc?cmd=getinfo'
 curl 'http://34.27.30.115/rpc?cmd=getinfo'
 curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'
+curl 'http://34.27.30.115:38545/jsonrpc?method=getinfo'
 ```
 
-Path is `/rpc?cmd=getinfo`, not `/getinfo`. `:80` works when `38545` is filtered.
+Path is `/rpc?cmd=getinfo` or `/jsonrpc?method=getinfo`, not `/getinfo`. `:80` works when `38545` is filtered.
+
+Public-read JSON API (same allowlist, no writes). Not Ethereum JSON-RPC.
+
+```bash
+GET  http://HOST:38545/jsonrpc?method=getinfo
+GET  http://HOST:38545/jsonrpc?method=getblock&params=0
+GET  http://HOST:38545/jsonrpc?method=getblockraw&params=0
+POST http://HOST:38545/jsonrpc
+{"jsonrpc":"2.0","id":1,"method":"monetary_info","params":[]}
+```
+
+Join the operator testnet: `--bootstrap 34.27.30.115:28545`. `sync` uses HTTP `:80` then `:38545` (`getblockraw`). Write RPC stays `127.0.0.1`.
 
 Override bind/port with `--public-rpc-bind`, `--public-rpc-port`, `ADDITION_PUBLIC_RPC_BIND`, or `ADDITION_PUBLIC_RPC_PORT`. HTTP replies send `Access-Control-Allow-Origin: *`, `OPTIONS` 204, and `Cache-Control: no-store`.
 
@@ -158,7 +171,7 @@ Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so the worke
 - `privacy_mint_zk <owner> <amount> <commitment_hex> <nullifier_hex> <proof_hex> <vk_hex>`
 - `privacy_spend_zk <owner> <note_id> <recipient> <amount> <nullifier_hex> <proof_hex> <vk_hex>`
 
-Honest verifier notes:
+Verifier notes:
 - The real proving path in this tree is **SHA3-512 commitment + nullifier opening**. The verifier recomputes `SHA3-512("cm|"+amount+"|"+trapdoor)` and `SHA3-512("nf|"+trapdoor)`. A garbage trapdoor is rejected. The node sees the opening. This is **not** zero-knowledge, not Groth16, not Bulletproofs, not ZK-Shield.
 - `privacy_mint_zk` / `privacy_spend_zk` still verify an ML-DSA-87 signature of `mint|...` / `spend|...`. That is a signature wrap, not a circuit. Keep those commands only for compatibility.
 - Note storage hardening: `owner` and `amount` are not persisted in plaintext (`ADDITION_PRIVACY_MASTER_KEY`, minimum 32 chars).
@@ -199,9 +212,19 @@ Notes:
 - `token_mint <symbol> <caller> <to> <amount>`
 - `token_transfer <symbol> <from> <to> <amount>`
 - `token_balance <symbol> <owner>`
-- `nft_mint <collection> <token_id> <owner> <metadata>`
+- `token_info <symbol>`
+- `nft_mint <collection> <token_id> <owner> <metadata>` — metadata may be a URL or hash
 - `nft_transfer <collection> <token_id> <from> <to>`
 - `nft_owner <collection> <token_id>`
+- `nft_info <collection> <token_id>` — `owner=` plus stored `metadata=`
+
+## Swap (in-process pool math)
+- `swap_pool_create <token_a> <token_b> <fee_bps>`
+- `add_liquidity` / `swap_add_liquidity <token_a> <token_b> <provider> <amount_a> <amount_b>`
+- `swap_quote <token_in> <token_out> <amount_in>`
+- `swap_exact_in <token_in> <token_out> <trader> <amount_in> <min_out>`
+- `swap_pool_info <token_a> <token_b>`
+- `swap_tvl` — sum of live pool reserves from `swap_pool_info`. `0` if no pools. Not a made-up TVL.
 
 ## Bridge runtime
 - `bridge_register <chain>`
@@ -241,7 +264,7 @@ Notes:
 
 ## Wallet (local / testnet only)
 - File: `web/addition_wallet_gui.py` (Tk GUI, or `--cli` without a display)
-- Honest page: `/wallet/` via loopback `/local-rpc` → `127.0.0.1:8545`
+- Wallet page: `/wallet/` via loopback `/local-rpc` → `127.0.0.1:8545`
 - Uses TCP RPC on `127.0.0.1:8545` only (refuses non-loopback hosts)
 - Supports:
 	- Wallet creation (`createwallet [name]`, ML-DSA-87, key stays in `data/wallets/`)
@@ -254,7 +277,7 @@ Notes:
 - Not shipped in this tree: `web/addition_wallet_pro.py`, `web/portal/` (no `/api/getinfo` portal backend)
 - MetaMask EVM bridge (bootstrap): `web/evm/evm_rpc_bridge.py`
 
-## Honest website (fail-closed)
+## Website (fail-closed)
 - Static Pages root: `web/public/` (`/`, `/explorer/`, `/status/`, `/rpc/`, `/wallet/`, `/docs/`, `/contracts/`, `/swap/`, `/evm/`, `/whitepaper/`, `/legal/`)
 - Local server: `python3 web/serve.py` (default `127.0.0.1:8080`)
 - `/api/rpc` (and `/rpc?cmd=`) proxy the public allowlist to port `38545`
