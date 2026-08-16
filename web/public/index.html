@@ -3,39 +3,41 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ADDITION testnet</title>
+  <title>ADDITION explorer</title>
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="ADDITION" data-sub="testnet">
+<body>
   <header id="site-header"></header>
   <main>
-    <section class="hero">
-      <h1 data-i18n="heroTitle">ADDITION testnet</h1>
-      <p class="lede" data-i18n="heroLede">Public read: /rpc?cmd=getinfo on :80 and :38545. Write RPC on 127.0.0.1:8545.</p>
-      <p data-i18n="heroBody">Build additiond from this repo (main). Bootstrap 34.27.30.115:28545, then type sync. Height should move.</p>
-      <pre>additiond --network testnet --data-dir &lt;dir&gt; --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545</pre>
-      <p><a class="github" href="https://github.com/ADDAddition/ADDITION">github.com/ADDAddition/ADDITION</a></p>
+    <form id="search-form" class="search-form" action="/" method="get">
+      <input id="q" name="q" type="search" autocomplete="off"
+        placeholder="block height, block hash, tx hash, address">
+      <button type="submit">Search</button>
+    </form>
+    <p id="search-status" hidden></p>
+    <section id="block-result" hidden>
+      <h2>Block</h2>
+      <div id="block-fields"></div>
     </section>
-
-    <div class="cards">
-      <a href="/join/"><strong>Join</strong><span data-i18n="cardJoin">Node start + sync</span></a>
-      <a href="/explorer/"><strong>Explorer</strong><span data-i18n="cardExplorer">getblock, tx_status</span></a>
-      <a href="/status/"><strong>Status</strong><span data-i18n="cardStatus">getinfo, monetary_info, crypto_selftest, peers</span></a>
-      <a href="/rpc/"><strong>RPC</strong><span data-i18n="cardRpc">Public read /rpc?cmd=getinfo</span></a>
-      <a href="/docs/"><strong>Docs</strong><span data-i18n="cardDocs">Build, commands, architecture</span></a>
-      <a href="/wallet/"><strong>Wallet</strong><span data-i18n="cardWallet">Write RPC 127.0.0.1:8545</span></a>
-      <a href="/legal/"><strong>Legal</strong><span data-i18n="cardLegal">MIT</span></a>
-    </div>
-
-    <ul class="facts">
-      <li data-i18n="factQuantum">ML-DSA-87. pq_mode from getinfo.</li>
-      <li data-i18n="factPrivacy">SHA3-512 opening (privacy_mint_open / privacy_spend_open).</li>
-      <li data-i18n="factCompat">:80 works when 38545 is filtered. addpeer after bootstrap is invalid/duplicate.</li>
-      <li data-i18n="factWrite">Write RPC 127.0.0.1:8545. Public mine / createwallet disabled.</li>
-    </ul>
+    <section>
+      <h2>Latest Blocks</h2>
+      <p id="rpc-state"></p>
+      <table class="blocks-table">
+        <thead>
+          <tr>
+            <th>height</th>
+            <th>hash</th>
+            <th>tx_count</th>
+            <th>time</th>
+          </tr>
+        </thead>
+        <tbody id="latest-blocks"></tbody>
+      </table>
+    </section>
   </main>
   <footer id="site-footer"></footer>
   <script src="/common.js"></script>
   <script src="/chrome.js"></script>
+  <script src="/explorer.js"></script>
 </body>
 </html>

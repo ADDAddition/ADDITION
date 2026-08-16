@@ -15,6 +15,17 @@
     </div>
 
     <section class="panel">
+      <h2>Ports</h2>
+      <p>Research testnet. Not a production L1.</p>
+      <table>
+        <tr><th>port</th><th>role</th></tr>
+        <tr><td>80</td><td>public HTTP. Sync uses :80 first.</td></tr>
+        <tr><td>38545</td><td>public RPC, optional/filtered</td></tr>
+        <tr><td>28545</td><td>P2P, optional/filtered</td></tr>
+      </table>
+    </section>
+
+    <section class="panel">
       <h2>Start a node</h2>
       <p>Build <code>additiond</code> from <code>main</code>, then:</p>
       <pre>additiond --network testnet --data-dir &lt;dir&gt; --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545</pre>
@@ -38,8 +49,8 @@ curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'</pre>
     </section>
 
     <section class="panel">
-      <h2>Wallet / tokens</h2>
-      <p>There is no public wallet, token, or NFT UI. <code>createwallet</code>, balances, and swap commands exist on localhost write RPC only.</p>
+      <h2>Local write RPC</h2>
+      <p>There is no public wallet UI. <code>createwallet</code>, balances, and swap commands exist on localhost write RPC only.</p>
       <p>Pages under <code>/wallet/</code> and <code>/swap/</code> talk to <code>/local-rpc</code> → <code>127.0.0.1:8545</code>. On this host they stay <strong>RPC offline</strong>.</p>
     </section>
   </main>
