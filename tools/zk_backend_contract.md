@@ -1,43 +1,20 @@
-# Addition ZK Verifier Backend Contract
+# SHA3 opening notes (not a ZK circuit)
 
-The wrapper `tools/zk_verify_wrapper.py` now expects a **real external verifier backend**.
+This file used to describe an external `ADDITION_ZK_VERIFY_CMD` wrapper. That path is
+**not** a Groth16 / SNARK / Bulletproofs / STARK verifier. This repository does not
+ship a ZK circuit.
 
-## Environment Variable
-Set:
-- `ADDITION_ZK_VERIFY_CMD`
+The privacy path that exists is **SHA3-512 commitment + nullifier opening**:
 
-Value example:
-- `python C:/path/to/your_real_verifier.py`
-- `C:/path/to/native_verifier.exe`
+- `privacy_note_prepare`
+- `privacy_mint_open`
+- `privacy_spend_open`
 
-## Invocation Contract
-Wrapper calls backend as:
+`getinfo` reports `privacy_mode=sha3_opening`, `privacy_ok=true`, and
+`privacy_verifier=sha3_opening`.
 
-`<ADDITION_ZK_VERIFY_CMD> <request_json_path> <result_json_path>`
+`privacy_mint_zk` / `privacy_spend_zk` remain an ML-DSA-87 signature wrap of a
+mint/spend string. A garbage proof returns `error:`. They are not a circuit.
 
-## Input File (`request_json_path`)
-JSON format:
-```json
-{
-  "public_input": "string",
-  "proof_hex": "hex string",
-  "vk_hex": "hex string"
-}
-```
-
-## Output File (`result_json_path`)
-JSON format:
-```json
-{
-  "ok": true,
-  "error": "optional error message"
-}
-```
-
-- If `ok: true` => wrapper returns `OK` and exit code `0`.
-- Any other output is treated as rejection.
-
-## Strictness
-- Wrapper validates that `proof_hex` and `vk_hex` are even-length valid hex before backend call.
-- Wrapper fails if backend exits non-zero, times out, or returns invalid output.
-- No internal fake verification remains.
+`tools/zk_verify_wrapper.py` exits with an error if invoked. Do not set
+`ADDITION_ZK_VERIFY_CMD` and do not advertise a ZK backend.

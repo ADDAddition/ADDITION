@@ -201,10 +201,19 @@ def main() -> int:
         info = tcp_rpc("127.0.0.1", ports["a_pub"], "getinfo")
         if "network=testnet" not in info:
             return fail("public TCP getinfo: " + info)
+        if "127.0.0.1" in info or "localhost" in info or "self" in info:
+            return fail("public TCP getinfo leaked loopback/self: " + info)
+        if "privacy_mode=sha3_opening" not in info or "privacy_ok=true" not in info:
+            return fail("public TCP getinfo privacy fields: " + info)
+        pub_peers = tcp_rpc("127.0.0.1", ports["a_pub"], "peers")
+        if "127.0.0.1" in pub_peers or "localhost" in pub_peers or "self" in pub_peers:
+            return fail("public peers leaked loopback/self: " + pub_peers)
 
         status, headers, body = http_request(ports["a_pub"], "GET", "/rpc?cmd=getinfo")
         if status != 200 or "network=testnet" not in body:
             return fail("public HTTP getinfo status=%s body=%s" % (status, body))
+        if "127.0.0.1" in body:
+            return fail("public HTTP getinfo leaked 127.0.0.1: " + body)
         if headers.get("access-control-allow-origin") != "*":
             return fail("missing CORS header")
         if "no-store" not in headers.get("cache-control", ""):

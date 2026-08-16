@@ -109,7 +109,9 @@ bool ContractEngine::call(const std::string& contract_id,
         std::ostringstream status;
         status << "verifier_configured=" << (privacy_->verifier_configured() ? "true" : "false")
                << " native_verifier_mode=" << privacy_->native_verifier_mode()
-               << " strict_zk_mode=" << (privacy_->strict_zk_mode() ? "true" : "false")
+               << " privacy_mode=sha3_opening"
+               << " privacy_ok=true"
+               << " privacy_verifier=sha3_opening"
                << " notes=" << privacy_->note_count()
                << " used_nullifiers=" << privacy_->used_nullifier_count();
         out = status.str();

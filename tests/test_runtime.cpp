@@ -291,7 +291,21 @@ int main() {
         return 1;
     }
     const auto pstatus = rpc.handle_command("privacy_status");
-    if (!expect_contains(pstatus, "opening_verifier=sha3_opening", "privacy_status verifier")) {
+    if (!expect_contains(pstatus, "opening_verifier=sha3_opening", "privacy_status verifier") ||
+        !expect_contains(pstatus, "privacy_mode=sha3_opening", "privacy_status mode") ||
+        !expect_contains(pstatus, "privacy_ok=true", "privacy_status ok")) {
+        return 1;
+    }
+    if (pstatus.find("strict_zk_mode") != std::string::npos ||
+        pstatus.find("SNARK") != std::string::npos ||
+        pstatus.find("bulletproof") != std::string::npos) {
+        std::cerr << "test failed: privacy_status must not claim ZK: " << pstatus << '\n';
+        return 1;
+    }
+    std::string zk_mode_err;
+    if (privacy.set_native_verifier_mode("groth16", zk_mode_err) ||
+        zk_mode_err.find("SHA3 opening") == std::string::npos) {
+        std::cerr << "test failed: groth16 mode must fail as SHA3 opening: " << zk_mode_err << '\n';
         return 1;
     }
     const auto zk_bad = rpc.handle_command("privacy_mint_zk alice 1 aa bb cc dd");
@@ -312,11 +326,53 @@ int main() {
         return 1;
     }
 
+    if (!peers.add_peer("127.0.0.1:28545") || !peers.add_peer("34.27.30.115:28545") ||
+        !peers.add_peer("self")) {
+        std::cerr << "test failed: add loopback/public/self peers\n";
+        return 1;
+    }
+    const auto trusted_info = rpc.handle_command("getinfo", true);
+    const auto public_info = rpc.handle_command("getinfo", false);
+    if (!expect_contains(trusted_info, "privacy_mode=sha3_opening", "trusted getinfo mode") ||
+        !expect_contains(trusted_info, "privacy_ok=true", "trusted getinfo privacy_ok") ||
+        !expect_contains(trusted_info, "privacy_verifier=sha3_opening", "trusted getinfo verifier") ||
+        !expect_contains(public_info, "privacy_mode=sha3_opening", "public getinfo mode") ||
+        !expect_contains(public_info, "privacy_ok=true", "public getinfo privacy_ok") ||
+        !expect_contains(public_info, "privacy_verifier=sha3_opening", "public getinfo verifier")) {
+        return 1;
+    }
+    if (trusted_info.find("127.0.0.1:28545") == std::string::npos) {
+        std::cerr << "test failed: trusted getinfo must keep loopback for sync: " << trusted_info << '\n';
+        return 1;
+    }
+    if (public_info.find("127.0.0.1") != std::string::npos ||
+        public_info.find("self") != std::string::npos ||
+        public_info.find("localhost") != std::string::npos) {
+        std::cerr << "test failed: public getinfo leaked loopback/self: " << public_info << '\n';
+        return 1;
+    }
+    if (!expect_contains(public_info, "peers=1", "public getinfo counts only public IPv4")) {
+        return 1;
+    }
+    const auto trusted_peers = rpc.handle_command("peers", true);
+    const auto public_peers = rpc.handle_command("peers", false);
+    if (trusted_peers.find("127.0.0.1:28545") == std::string::npos) {
+        std::cerr << "test failed: trusted peers must keep loopback: " << trusted_peers << '\n';
+        return 1;
+    }
+    if (public_peers.find("127.0.0.1") != std::string::npos ||
+        public_peers.find("self") != std::string::npos ||
+        public_peers.find("34.27.30.115:28545") == std::string::npos) {
+        std::cerr << "test failed: public peers must be non-loopback IPv4 only: " << public_peers << '\n';
+        return 1;
+    }
+
     const auto json_get = addition::dispatch_public_read_rpc(
         rpc, "GET /jsonrpc?method=getinfo HTTP/1.1\r\n\r\n");
     if (json_get.find("\"jsonrpc\":\"2.0\"") == std::string::npos ||
         json_get.find("network=testnet") == std::string::npos ||
-        json_get.find("application/json") == std::string::npos) {
+        json_get.find("application/json") == std::string::npos ||
+        json_get.find("127.0.0.1") != std::string::npos) {
         std::cerr << "test failed: public JSON getinfo: " << json_get << '\n';
         return 1;
     }

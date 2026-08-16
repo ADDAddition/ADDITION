@@ -179,9 +179,9 @@ def main() -> None:
     write_doc(
         "tools/zk_backend_contract.md",
         OUT / "docs" / "zk" / "index.html",
-        "ADDITION ZK verifier backend contract",
-        "ZK verifier contract",
-        "From <code>tools/zk_backend_contract.md</code>. In-process verify is ML-DSA-87.",
+        "ADDITION SHA3 opening notes",
+        "SHA3 opening notes",
+        "From <code>tools/zk_backend_contract.md</code>. Privacy is SHA3-512 opening, not a ZK circuit.",
     )
     print("rendered docs into", OUT / "docs")
 

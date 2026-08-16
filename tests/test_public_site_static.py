@@ -24,6 +24,11 @@ FAKE_CLAIMS = (
     "1,248,500",
     "ZK-STARK",
     "native ZK path",
+    "ZK verifier contract",
+    "live L1",
+    "privacy ZK",
+    "Range Proofs",
+    "Roadmap to Production",
     "labjay69",
     "labreche_jeremy@outlook",
     "Addison Electronics",
@@ -397,6 +402,17 @@ S.rpcCommand("getinfo").then((offline) => {
         finally:
             server.shutdown()
             server.server_close()
+
+    def test_root_license_is_mit(self) -> None:
+        license_text = (ROOT / "LICENSE").read_text(encoding="utf-8")
+        self.assertIn("MIT License", license_text)
+        self.assertIn("Permission is hereby granted, free of charge", license_text)
+        legal = read("legal/index.html")
+        self.assertIn("LICENSE", legal)
+        self.assertIn("MIT", legal)
+        docs = read("docs/index.html")
+        self.assertIn("SHA3 opening notes", docs)
+        self.assertNotIn("ZK verifier contract", docs)
 
 
 if __name__ == "__main__":

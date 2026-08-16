@@ -31,7 +31,7 @@ and reloaded on the next start.
 These commands are **not** signed chain transactions. Anyone who can talk to
 the trusted local TEXT RPC can create, mint, or transfer by naming addresses.
 There is no private key on the wire, and no PQ signature check on
-`token_transfer`. Treat this as a local research ledger, not production token
+`token_transfer`. Treat this as a local research ledger, not a public token
 security.
 
 LAN / untrusted RPC (when enabled) already filters writes: `token_balance`,

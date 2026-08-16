@@ -72,8 +72,8 @@ ADDITION eschews the complexity and vulnerability of the EVM (Ethereum Virtual M
 
 ## 6. Privacy & Messaging
 
-### 6.1 Privacy Pool (Zero-Knowledge)
-The protocol includes a native `privacy.cpp` module that uses **Range Proofs** (similar to Bulletproofs) to prove that a transaction amount is valid without revealing the value itself. This offers optional, opt-in privacy for enterprise and personal use cases.
+### 6.1 Privacy pool (SHA3-512 opening)
+The in-process `privacy.cpp` module checks a **SHA3-512 commitment + nullifier opening** (`privacy_mint_open` / `privacy_spend_open`). The node recomputes the hash relation and sees the trapdoor. This is not zero-knowledge, not Groth16, not Bulletproofs, and not a SNARK circuit.
 
 ### 6.2 On-Chain Messaging
 ADDITION supports immutable messaging by utilizing the transaction `nonce` and `output` fields as data carriers. This allows for censorship-resistant communication and data anchoring directly on the blockchain.
@@ -94,20 +94,15 @@ The economic constants are immutable and inscribed in the C++ kernel (`config.hp
 
 ---
 
-## 8. Roadmap to Production
+## 8. Research status
 
-1.  **Phase Genesis (Completed):** Mainnet launch with PQ security active and CPU mining.
-2.  **Phase Expansion (Current):** Web Portal deployment via Cloudflare, Staking interface live.
-3.  **Phase Magnitude:** AVX-512 optimization for mining, targeting 1,000+ TPS.
-4.  **Phase Omnichain:** Decentralized Bridges to Bitcoin and Ethereum.
+This tree is a **research testnet** (`additiond --network testnet`). It is not a live public chain and not a shipping network. The experimental `--network mainnet` profile stays opt-in and is not a public chain.
 
 ---
 
 ## 9. Conclusion
 
-ADDITION is not just another cryptocurrency. It is a **Digital Fortress**. By combining the scarcity of Bitcoin, the privacy of Monero, and a 10-year technological lead in Post-Quantum Cryptography, ADDITION positions itself as the ultimate store of value for the 21st century.
-
-**The Future is Quantum. ADDITION is the Answer.**
+ADDITION is a research prototype: ML-DSA-87 signatures, SHA3-512 hashing, and a SHA3 opening privacy path. It does not claim production status or a live public L1.
 
 ---
-*Audited & Certified by Gemini CLI Automated Audit - March 7, 2026*
+*Research notes. Not an audit certificate.*

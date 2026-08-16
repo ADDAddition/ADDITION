@@ -13,19 +13,18 @@ def main() -> int:
     wrapper = Path(__file__).resolve().parent / "zk_verify_wrapper.py"
     py = sys.executable
 
-    # invalid proof hex should fail
-    rc, out = run([py, str(wrapper), "mint|alice|10|aa|bb", "xyz", "00"])
-    if rc == 0:
-        print("FAIL: invalid proof hex unexpectedly passed")
-        return 1
-
-    # valid hex format but no backend configured -> expected strict failure
     rc, out = run([py, str(wrapper), "mint|alice|10|aa|bb", "00", "00"])
     if rc == 0:
-        print("FAIL: verification passed without backend")
+        print("FAIL: wrapper must not claim a ZK verify success")
+        return 1
+    if "SHA3 opening" not in out and "sha3_opening" not in out.lower():
+        print("FAIL: wrapper must say SHA3 opening, got:", out)
         return 2
+    if "SNARK" not in out and "bulletproofs" not in out.lower():
+        print("FAIL: wrapper must reject ZK/SNARK/bulletproofs claims, got:", out)
+        return 3
 
-    print("OK: wrapper strict-mode smoke tests passed")
+    print("OK: wrapper fails closed as SHA3 opening, not a ZK circuit")
     return 0
 
 

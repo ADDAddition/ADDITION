@@ -8,7 +8,7 @@ Status: Phase 1 (specification only)
 
 ## 1. Objectives
 
-Define a production-oriented architecture for:
+Define a research testnet architecture for:
 
 1. **PoUW Storage Layer** (decentralized cloud)
 2. **PoUW Compute Layer** (AI/compute jobs)

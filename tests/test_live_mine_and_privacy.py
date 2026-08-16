@@ -143,6 +143,8 @@ def main() -> int:
             return fail("expected pow_algorithm=sha3_512: " + info0)
         if "privacy_verifier=sha3_opening" not in info0:
             return fail("expected privacy_verifier=sha3_opening: " + info0)
+        if "privacy_mode=sha3_opening" not in info0 or "privacy_ok=true" not in info0:
+            return fail("expected privacy_mode/privacy_ok SHA3 opening: " + info0)
         if field(info0, "height") != "0":
             return fail("fresh node height must be 0: " + info0)
         if field(info0, "auto_mine") != "off":
