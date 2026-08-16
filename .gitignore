@@ -70,5 +70,6 @@ desktop.ini
 !wrangler.toml
 !genesis.json
 !genesis-mainnet.json
+!fixtures/btc_hygiene_samples.json
 !**/manifest.json
 !**/Contents.json

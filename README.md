@@ -144,6 +144,15 @@ printf 'wallet_send alice <to> 10 1\n' | nc 127.0.0.1 8545
 
 `wallet_send` signs on the node from the local file. The explicit path is `tx_build` + `wallet_sign` + `sendtx_signed` (still no raw privkey on the wire). Legacy `sendtx` needs `ADDITION_ALLOW_INSECURE_TX_COMMANDS=1`.
 
+### Bitcoin UTXO hygiene rehearsal
+
+Trusted write RPC only (`127.0.0.1`). Classify operator-supplied Bitcoin address samples (public examples or `fixtures/btc_hygiene_samples.json`) and sign an ADDITION receipt. This is an attestation rehearsal: it does not move Bitcoin and is not BIP-360. Label: `ADDITION-HYGIENE-REHEARSAL|…|moves_bitcoin=0|claim=attestation_not_bip360`. See [docs/BTC_HYGIENE.md](docs/BTC_HYGIENE.md).
+
+```bash
+printf 'hygiene_classify fixtures/btc_hygiene_samples.json\n' | nc 127.0.0.1 8545
+printf 'hygiene_attest alice 1BoatSLRHtKNngkdXEeobR76b53LETtpyT 170 p2pkh 0 0\n' | nc 127.0.0.1 8545
+```
+
 Local UI:
 
 * Page: `/wallet/` via `python3 web/serve.py` (loopback `/local-rpc` only)

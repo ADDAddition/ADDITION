@@ -46,6 +46,7 @@ add_library(addition_core
     src/ai_optimizer.cpp
     src/wallet.cpp
     src/auto_mine.cpp
+    src/btc_hygiene.cpp
 )
 
 target_include_directories(addition_core PUBLIC include)
@@ -80,6 +81,13 @@ if(ADDITION_BUILD_TESTS)
     add_executable(test_hash_address tests/test_hash_address.cpp)
     target_link_libraries(test_hash_address PRIVATE addition_core)
     add_test(NAME test_hash_address COMMAND test_hash_address)
+
+    add_executable(test_btc_hygiene tests/test_btc_hygiene.cpp)
+    target_link_libraries(test_btc_hygiene PRIVATE addition_core)
+    add_test(NAME test_btc_hygiene COMMAND test_btc_hygiene)
+    set_tests_properties(test_btc_hygiene PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        TIMEOUT 180)
 
     add_executable(test_slh_dsa tests/test_slh_dsa.cpp)
     target_link_libraries(test_slh_dsa PRIVATE addition_core)

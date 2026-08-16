@@ -1,6 +1,7 @@
 #include "addition/rpc_server.hpp"
 
 #include "addition/block.hpp"
+#include "addition/btc_hygiene.hpp"
 #include "addition/config.hpp"
 #include "addition/crypto.hpp"
 #include "addition/rpc_access.hpp"
@@ -301,6 +302,104 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         std::string report;
         const auto ok = crypto_selftest(report);
         return ok ? std::string("ok:") + report : std::string("error:") + report;
+    }
+
+    if (cmd == "hygiene_classify") {
+        std::string path;
+        iss >> path;
+        if (path.empty()) {
+            path = "fixtures/btc_hygiene_samples.json";
+        }
+        std::vector<BtcScriptSample> samples;
+        std::string error;
+        if (!load_btc_hygiene_fixtures(path, samples, error)) {
+            return "error: " + error;
+        }
+        const auto reports = classify_btc_samples(samples);
+        std::ostringstream out;
+        out << "ok:hygiene_rehearsal samples=" << reports.size()
+            << " moves_bitcoin=0 claim=attestation_not_bip360";
+        for (const auto& r : reports) {
+            out << " | " << format_hygiene_report(r);
+        }
+        return out.str();
+    }
+
+    if (cmd == "hygiene_verify") {
+        std::string note;
+        std::getline(iss, note);
+        const auto first = note.find_first_not_of(" \t");
+        if (first == std::string::npos) {
+            return "error: usage hygiene_verify <receipt_note>";
+        }
+        note = note.substr(first);
+        const auto sig_pos = note.rfind("|attest_sig=");
+        const auto pub_pos = note.rfind("|attest_pub=");
+        if (sig_pos == std::string::npos || pub_pos == std::string::npos || pub_pos > sig_pos) {
+            return "error: receipt missing attestation fields";
+        }
+        const auto body = note.substr(0, pub_pos);
+        const auto pub = note.substr(pub_pos + 12, sig_pos - (pub_pos + 12));
+        const auto sig = note.substr(sig_pos + 12);
+        BtcHygieneReport parsed{};
+        std::string error;
+        if (!parse_hygiene_receipt_body(body, parsed, error)) {
+            return "error: " + error;
+        }
+        if (!verify_message_signature_hybrid(pub, body, sig)) {
+            return "error: garbage hygiene receipt rejected";
+        }
+        const auto scheme = infer_sig_scheme_from_pubkey_hex(pub);
+        if (scheme == SigScheme::Unknown) {
+            return "error: garbage hygiene receipt rejected";
+        }
+        return std::string("ok:hygiene_receipt ") + format_hygiene_report(parsed) +
+               " attestor=" + hash_committed_address_hex(scheme, pub);
+    }
+
+    if (cmd == "hygiene_attest") {
+        std::string name;
+        std::string btc_addr;
+        std::uint64_t height = 0;
+        std::string class_name;
+        int reuse = 0;
+        int pubkey_on_chain = 0;
+        iss >> name >> btc_addr >> height >> class_name >> reuse >> pubkey_on_chain;
+        if (name.empty() || btc_addr.empty() || class_name.empty()) {
+            return "error: usage hygiene_attest <wallet> <btc_addr> <height> <class> [reuse] [pubkey_on_chain]";
+        }
+        BtcScriptClass script_class = BtcScriptClass::Unknown;
+        if (!parse_btc_script_class(class_name, script_class)) {
+            return "error: unknown script class";
+        }
+        StoredWallet stored{};
+        std::string error;
+        if (!wallets_.load(name, stored, error, true)) {
+            return "error: " + error;
+        }
+        BtcHygieneReport report{};
+        report.address = btc_addr;
+        report.height = height;
+        report.script_class = script_class;
+        report.class_name = btc_script_class_name(script_class);
+        report.address_reuse = reuse != 0;
+        report.pubkey_already_on_chain = pubkey_on_chain != 0;
+        const auto body = hygiene_receipt_body(report);
+        std::string sig;
+        try {
+            sig = sign_message_hybrid(stored.private_key, body);
+        } catch (const std::exception& e) {
+            return std::string("error: hygiene sign failed: ") + e.what();
+        }
+        const auto note = body + "|attest_pub=" + stored.public_key + "|attest_sig=" + sig;
+        std::ostringstream out;
+        out << "ok:hygiene_receipt"
+            << " " << format_hygiene_report(report)
+            << " attestor=" << stored.address
+            << " moves_bitcoin=0"
+            << " claim=" << kHygieneClaim
+            << " note=" << note;
+        return out.str();
     }
 
     if (cmd == "sign_message") {

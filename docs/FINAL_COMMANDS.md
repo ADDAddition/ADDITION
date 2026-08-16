@@ -27,7 +27,7 @@ Allowlist (everything else returns `error: command disabled on public RPC`):
 - `getblockhash <height>`
 - `getblockraw <height>`
 
-Not on the public port: `mine`, `sendtx*`, `createwallet`, `wallet_*`, identity rotation, admin, contract/token writes.
+Not on the public port: `mine`, `sendtx*`, `createwallet`, `wallet_*`, `hygiene_*`, identity rotation, admin, contract/token writes.
 
 TCP and a tiny HTTP adapter share the same port:
 
@@ -77,6 +77,9 @@ Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so a down no
 - `wallet_balance <name>`
 - `wallet_send <name> <to_addr> <amount> [fee]` — signs from the local file; no privkey on the wire
 - `wallet_sign <name> <message_hex_utf8>` — same as `sign_message` without sending the key
+- `hygiene_classify [fixture_json]` — offline Bitcoin script hygiene over operator fixtures (default `fixtures/btc_hygiene_samples.json`). Trusted write RPC only. Does not move Bitcoin. Not BIP-360. See [BTC_HYGIENE.md](BTC_HYGIENE.md).
+- `hygiene_attest <wallet> <btc_addr> <height> <class> [reuse] [pubkey_on_chain]` — signs an ADDITION rehearsal receipt (`moves_bitcoin=0`, `claim=attestation_not_bip360`). `note=` is last. Trusted write RPC only.
+- `hygiene_verify <receipt_note>` — verifies the ML-DSA (or allowed scheme) attestation; mutated notes are rejected
 - `getbalance <address>`
 - `getbalance_instant <address>`
 - `tx_build <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce>`
