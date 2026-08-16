@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <string>
+#include <vector>
 
 int main() {
     if (!addition::is_public_read_command("getinfo") ||
@@ -80,6 +81,32 @@ int main() {
         cmd != "getblock 0") {
         std::cerr << "test failed: parse POST body: [" << cmd << "] " << error << '\n';
         return 1;
+    }
+
+    {
+        std::string method;
+        std::vector<std::string> params;
+        std::string id_json;
+        std::string jerr;
+        if (!addition::parse_jsonrpc_request(
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getblockraw\",\"params\":[0]}",
+                method,
+                params,
+                id_json,
+                jerr) ||
+            method != "getblockraw" ||
+            params.size() != 1 ||
+            params[0] != "0" ||
+            id_json != "1") {
+            std::cerr << "test failed: parse JSON-RPC getblockraw: " << jerr << '\n';
+            return 1;
+        }
+        const auto body = addition::jsonrpc_result_body("1", "ok:BLKDATA|x");
+        if (body.find("\"jsonrpc\":\"2.0\"") == std::string::npos ||
+            body.find("ok:BLKDATA|x") == std::string::npos) {
+            std::cerr << "test failed: jsonrpc_result_body\n";
+            return 1;
+        }
     }
 
     const auto resp = addition::http_rpc_response(200, "network=testnet");

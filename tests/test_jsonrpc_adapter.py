@@ -59,6 +59,10 @@ class AdapterUnitTests(unittest.TestCase):
         self.assertEqual(classify_method("sendtx"), "refused")
         self.assertEqual(classify_method("swap_quote"), "unknown")
         self.assertEqual(classify_method("invented_foo"), "unknown")
+        self.assertEqual(classify_method("getinfo", public_read=True), "read")
+        self.assertEqual(classify_method("getblockraw", public_read=True), "read")
+        self.assertEqual(classify_method("token_create", public_read=True), "refused")
+        self.assertEqual(classify_method("mine", public_read=True), "refused")
 
     def test_format_joins_params(self) -> None:
         self.assertEqual(

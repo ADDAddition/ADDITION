@@ -86,6 +86,11 @@ if(ADDITION_BUILD_TESTS)
     add_test(NAME test_p2p_sync COMMAND test_p2p_sync)
     set_tests_properties(test_p2p_sync PROPERTIES TIMEOUT 120)
 
+    add_executable(test_runtime tests/test_runtime.cpp)
+    target_link_libraries(test_runtime PRIVATE addition_core)
+    add_test(NAME test_runtime COMMAND test_runtime)
+    set_tests_properties(test_runtime PROPERTIES TIMEOUT 180)
+
     find_package(Python3 COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
         add_test(
@@ -125,5 +130,18 @@ if(ADDITION_BUILD_TESTS)
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_public_site_static.py
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         )
+        add_test(
+            NAME test_jsonrpc_adapter
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_jsonrpc_adapter.py
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        )
+        add_test(
+            NAME test_benchmark_mempool
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_benchmark_mempool.py
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        )
+        set_tests_properties(test_benchmark_mempool PROPERTIES
+            ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
+            TIMEOUT 120)
     endif()
 endif()
