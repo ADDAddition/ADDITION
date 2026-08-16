@@ -8,9 +8,11 @@
 #include "addition/wallet_keys.hpp"
 
 #include <chrono>
+#include <exception>
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <vector>
 
 int main() {
     if (addition::default_config().network_name != "addition-testnet" ||
@@ -145,6 +147,63 @@ int main() {
     if (chain.balance_of(miner_keys.address) < 79) {
         std::cerr << "test failed: sender balance too low after spend\n";
         return 1;
+    }
+    if (chain.last_batch_verify_count() == 0) {
+        std::cerr << "test failed: block path must batch-verify at least one PQ sig\n";
+        return 1;
+    }
+
+    {
+        addition::Transaction junk{};
+        junk.signer = "bench_signer";
+        junk.signer_pubkey = "bench_pub";
+        junk.signature = "pq=bench|privacy";
+        junk.outputs.push_back(addition::TxOutput{"bench_to", 1});
+        if (mempool.submit(junk)) {
+            std::cerr << "test failed: mempool must reject unsigned junk\n";
+            return 1;
+        }
+        addition::Mempool leftover;
+        leftover.replace({junk});
+        if (leftover.size() != 0) {
+            std::cerr << "test failed: replace must drop junk\n";
+            return 1;
+        }
+        addition::Miner leftover_miner(chain, leftover);
+        leftover.replace({pay});
+        leftover.replace({junk, pay});
+        if (!leftover_miner.mine_next_block("miner1", 200, 1, mined_hash, error)) {
+            std::cerr << "test failed: mine must succeed after leftover junk: " << error << '\n';
+            return 1;
+        }
+    }
+
+    {
+        std::vector<addition::PqVerifyItem> jobs;
+        for (int i = 0; i < 4; ++i) {
+            addition::WalletKeys keys{};
+            try {
+                keys = addition::generate_wallet_keys();
+            } catch (const std::exception& e) {
+                std::cerr << "test failed: batch keygen: " << e.what() << '\n';
+                return 1;
+            }
+            const auto msg = std::string("addition-batch-verify|") + std::to_string(i);
+            jobs.push_back(addition::PqVerifyItem{keys.public_key, msg,
+                                                  addition::sign_message_hybrid(keys.private_key, msg)});
+        }
+        std::size_t accepted = 0;
+        std::uint64_t verify_ms = 0;
+        std::string verr;
+        if (!addition::pq_verify_messages_parallel(jobs, 2, accepted, verify_ms, verr) || accepted != jobs.size()) {
+            std::cerr << "test failed: parallel pq verify: " << verr << '\n';
+            return 1;
+        }
+        jobs[0].signature = "pq=00";
+        if (addition::pq_verify_messages_parallel(jobs, 2, accepted, verify_ms, verr)) {
+            std::cerr << "test failed: parallel pq verify must reject junk sig\n";
+            return 1;
+        }
     }
 
     {

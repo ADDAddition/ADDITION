@@ -57,8 +57,8 @@ Refused on `--network mainnet`. Not a public RPC command. `getinfo` reports
 Smallest real proving path that fits this slice:
 
 ```text
-commitment = SHA3-512("cm|" || amount || "|" || trapdoor)
-nullifier  = SHA3-512("nf|" || trapdoor)
+commitment = SHA3-512("cm|v1|" || amount || "|" || trapdoor)
+nullifier  = SHA3-512("nf|v1|" || commitment || "|" || trapdoor)
 ```
 
 The verifier **recomputes both hashes** and rejects a mismatched trapdoor.

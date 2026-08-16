@@ -308,6 +308,50 @@ int main() {
         std::cerr << "test failed: groth16 mode must fail as SHA3 opening: " << zk_mode_err << '\n';
         return 1;
     }
+    addition::Transaction junk{};
+    junk.signer = "bench_signer";
+    junk.signer_pubkey = "bench_pub";
+    junk.signature = "pq=bench|privacy";
+    junk.outputs.push_back(addition::TxOutput{"bench_to", 1});
+    if (mempool.submit(junk)) {
+        std::cerr << "test failed: mempool accepted unspendable junk\n";
+        return 1;
+    }
+    const auto bench = rpc.handle_command("benchmark_objective 1 2");
+    if (!expect_contains(bench, "bench_submitted=0", "bench submitted") ||
+        !expect_contains(bench, "bench_verify_ok=2", "bench verify") ||
+        !expect_contains(bench, "bench_mined_txs=0", "bench mined txs") ||
+        !expect_contains(bench, "privacy_claim=opening_not_zk", "bench claim") ||
+        !expect_contains(bench, "research_goal_is_not_a_measurement=true", "bench goal label")) {
+        return 1;
+    }
+    if (bench.find("objective_tps_ok") != std::string::npos) {
+        std::cerr << "test failed: benchmark must not treat 100000 TPS as a fact: " << bench << '\n';
+        return 1;
+    }
+    const auto mine_after_bench = rpc.handle_command("mine " + miner_addr);
+    if (mine_after_bench.rfind("mined block", 0) != 0) {
+        std::cerr << "test failed: mine after benchmark: " << mine_after_bench << '\n';
+        return 1;
+    }
+    const auto pstat = rpc.handle_command("protocol_status");
+    if (!expect_contains(pstat, "measured_last_mine_ms=", "protocol measured mine") ||
+        !expect_contains(pstat, "privacy_claim=opening_not_zk", "protocol claim") ||
+        !expect_contains(pstat, "pouw_storage_check=first_nibble_parity", "protocol pouw") ||
+        !expect_contains(pstat, "research_goal_is_not_a_measurement=true", "protocol goal")) {
+        return 1;
+    }
+    if (pstat.find("objective_tps_ok") != std::string::npos ||
+        pstat.find("objective_100_ok") != std::string::npos) {
+        std::cerr << "test failed: protocol_status overclaim: " << pstat << '\n';
+        return 1;
+    }
+    const auto sync_none = rpc.handle_command("sync");
+    if (sync_none.find("error: no peer") == std::string::npos) {
+        std::cerr << "test failed: sync without peer: " << sync_none << '\n';
+        return 1;
+    }
+
     const auto zk_bad = rpc.handle_command("privacy_mint_zk alice 1 aa bb cc dd");
     if (zk_bad.rfind("error:", 0) != 0) {
         std::cerr << "test failed: privacy_mint_zk stub/garbage must error, got " << zk_bad << '\n';
@@ -335,6 +379,7 @@ int main() {
     const auto public_info = rpc.handle_command("getinfo", false);
     if (!expect_contains(trusted_info, "privacy_mode=sha3_opening", "trusted getinfo mode") ||
         !expect_contains(trusted_info, "privacy_ok=true", "trusted getinfo privacy_ok") ||
+        !expect_contains(trusted_info, "privacy_claim=opening_not_zk", "trusted getinfo claim") ||
         !expect_contains(trusted_info, "privacy_verifier=sha3_opening", "trusted getinfo verifier") ||
         !expect_contains(public_info, "privacy_mode=sha3_opening", "public getinfo mode") ||
         !expect_contains(public_info, "privacy_ok=true", "public getinfo privacy_ok") ||

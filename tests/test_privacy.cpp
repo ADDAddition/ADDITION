@@ -131,6 +131,24 @@ int main() {
         return 1;
     }
 
+    std::string cm_amt;
+    std::string nf_amt;
+    addition::PrivacyPool::compute_opening_relation(26, prepared.trapdoor, cm_amt, nf_amt);
+    if (cm_amt == prepared.commitment || nf_amt == prepared.nullifier) {
+        std::cerr << "test failed: v1 opening must bind amount into commitment and nullifier\n";
+        return 1;
+    }
+
+    const auto remint = pool.mint_open("alice", 25, prepared.commitment, prepared.nullifier, prepared.trapdoor, error);
+    if (!remint.empty() || (error != "nullifier already used" && error != "commitment already spent")) {
+        std::cerr << "test failed: remint spent opening: " << error << '\n';
+        return 1;
+    }
+    if (pool.spent_commitment_count() == 0) {
+        std::cerr << "test failed: spent commitment must be recorded\n";
+        return 1;
+    }
+
     std::cout << "all privacy opening tests passed\n";
     return 0;
 }

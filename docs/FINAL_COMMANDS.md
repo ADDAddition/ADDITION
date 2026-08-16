@@ -98,7 +98,9 @@ Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so a down no
 - `quorum <height> <block_hash>`
 - `peer_inbound <peer> <payload>`
 - `gossip_flush`
-- `sync`
+- `sync` — requires at least one peer; returns `error: no peer` if the set is empty. Success is `ok:height=<n>` only after a handshake or public-rpc ingest with a listed peer.
+- `protocol_status` — local measured mine/verify fields plus `privacy_claim=opening_not_zk`. `research_goal_tps=100000` is labeled `research_goal_is_not_a_measurement=true`.
+- `benchmark_objective <blocks> <verify_samples>` — parallel ML-DSA-87 verify plus empty-header mines. Does not inject mempool junk. A later `mine` must still succeed.
 - `node_pubkey`
 - `identity_rotate_propose <new_pubkey_hex> <new_privkey_hex> <grace_seconds>`
 - `identity_rotate_vote <peer_id>`
@@ -172,7 +174,7 @@ Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so a down no
 - `privacy_spend_zk <owner> <note_id> <recipient> <amount> <nullifier_hex> <proof_hex> <vk_hex>`
 
 Verifier notes:
-- The real proving path in this tree is **SHA3-512 commitment + nullifier opening**. The verifier recomputes `SHA3-512("cm|"+amount+"|"+trapdoor)` and `SHA3-512("nf|"+trapdoor)`. A garbage trapdoor is rejected. The node sees the opening. This is **not** zero-knowledge, not Groth16, not Bulletproofs, not ZK-Shield.
+- The real proving path in this tree is **SHA3-512 commitment + nullifier opening**. The verifier recomputes `SHA3-512("cm|v1|"+amount+"|"+trapdoor)` and `SHA3-512("nf|v1|"+commitment+"|"+trapdoor)`. A spent commitment cannot be reminted. A garbage trapdoor is rejected. The node sees the opening. This is **not** zero-knowledge, not Groth16, not Bulletproofs, not ZK-Shield.
 - `privacy_mint_zk` / `privacy_spend_zk` still verify an ML-DSA-87 signature of `mint|...` / `spend|...`. That is a signature wrap, not a circuit. Keep those commands only for compatibility.
 - Note storage hardening: `owner` and `amount` are not persisted in plaintext (`ADDITION_PRIVACY_MASTER_KEY`, minimum 32 chars).
 - `owner_tag` derivation is keyed with `ADDITION_PRIVACY_MASTER_KEY`.
@@ -201,7 +203,7 @@ Verifier notes:
 - `zk_privacy_status`
 	- key format: any non-empty token (for example `status`)
 	- value: ignored (set `0`)
-	- return: `privacy_mode=sha3_opening`, `privacy_ok=true`, `privacy_verifier=sha3_opening`, notes and nullifier stats
+	- return: `privacy_mode=sha3_opening`, `privacy_ok=true`, `privacy_verifier=sha3_opening`, `claim=opening_not_zk`, notes and nullifier stats
 
 Notes:
 - The real path is SHA3-512 opening (`privacy_mint_open` / `privacy_spend_open`).
