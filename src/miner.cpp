@@ -1,6 +1,8 @@
 #include "addition/miner.hpp"
 
 #include <chrono>
+#include <unordered_set>
+#include <vector>
 
 namespace addition {
 
@@ -12,10 +14,36 @@ bool Miner::mine_next_block(const std::string& reward_address,
                             std::string& mined_hash,
                             std::string& error) {
     const auto t0 = std::chrono::steady_clock::now();
-    auto txs = mempool_.fetch_for_block(max_txs);
-    auto txs_for_restore = txs;
-    const auto tx_count = txs.size();
-    if (!chain_.mine_and_add_block(reward_address, std::move(txs), threads, mined_hash, error)) {
+    auto fetched = mempool_.fetch_for_block(max_txs);
+    std::vector<Transaction> valid;
+    valid.reserve(fetched.size());
+    std::unordered_set<std::string> used_outpoints;
+    for (const auto& tx : fetched) {
+        std::string tx_error;
+        if (!chain_.validate_transaction(tx, tx_error)) {
+            continue;
+        }
+        bool conflict = false;
+        std::vector<std::string> keys;
+        keys.reserve(tx.inputs.size());
+        for (const auto& in : tx.inputs) {
+            const auto key = chain_.outpoint_key(in.previous_txid, in.output_index);
+            if (used_outpoints.count(key) != 0) {
+                conflict = true;
+                break;
+            }
+            keys.push_back(key);
+        }
+        if (conflict) {
+            continue;
+        }
+        used_outpoints.insert(keys.begin(), keys.end());
+        valid.push_back(tx);
+    }
+
+    auto txs_for_restore = valid;
+    const auto tx_count = valid.size();
+    if (!chain_.mine_and_add_block(reward_address, std::move(valid), threads, mined_hash, error)) {
         for (const auto& tx : txs_for_restore) {
             mempool_.submit(tx);
         }
