@@ -164,6 +164,11 @@ if(ADDITION_BUILD_TESTS)
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         )
         add_test(
+            NAME test_bridge_spec
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_bridge_spec.py
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        )
+        add_test(
             NAME test_wallet_packaging
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_wallet_packaging.py
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
