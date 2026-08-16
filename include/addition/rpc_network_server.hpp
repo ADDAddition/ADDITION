@@ -3,8 +3,10 @@
 #include <atomic>
 #include <cstdint>
 #include <functional>
+#include <mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
 namespace addition {
 
@@ -20,6 +22,8 @@ public:
 
 private:
     void run_loop();
+    void serve_client(std::uintptr_t client_raw);
+    void join_client_threads();
 
     std::string bind_ip_;
     std::uint16_t port_;
@@ -27,6 +31,8 @@ private:
 
     std::atomic<bool> running_{false};
     std::thread worker_;
+    std::mutex clients_mu_;
+    std::vector<std::thread> client_threads_;
 #ifdef _WIN32
     uintptr_t listen_socket_{static_cast<uintptr_t>(-1)};
 #else

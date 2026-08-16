@@ -36,6 +36,8 @@ bool pq_verify_message(const std::vector<std::uint8_t>& public_key,
 					   const std::vector<std::uint8_t>& signature,
 					   std::string& error);
 
+bool random_hex(std::size_t nbytes, std::string& out, std::string& error);
+
 bool crypto_selftest(std::string& report);
 
 } // namespace addition

@@ -27,7 +27,7 @@ Relevant commands (see [FINAL_COMMANDS.md](FINAL_COMMANDS.md)):
 | `fee_info` | `recommended_min_fee` (minimum `1`) |
 | `tx_build <from> <pubkey_hex> <to> <amount> <fee> <nonce>` | Builds the unsigned spend and returns `sign_hash=...` |
 | `sendtx_signed_hash ... <sig_hex_without_pq_prefix>` | Submits a PQ signature. No private key argument. |
-| `mine <address>` | Optional local demo: mine one block to an address |
+| `mine <address>` | Local testnet: SHA3-512 header PoW, 30s deadline, coinbase 50 |
 | `getinfo` | `network=testnet`, `height`, `peers`, `pq_mode=strict`, `max_supply=50000000` |
 
 Legacy `sendtx` / `sendtx_hash` (private key on the RPC line) stay **disabled**

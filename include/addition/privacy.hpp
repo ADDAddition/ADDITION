@@ -17,11 +17,45 @@ struct PrivateNote {
     bool spent{false};
 };
 
+struct OpeningNote {
+    std::string trapdoor;
+    std::string commitment;
+    std::string nullifier;
+};
+
 class PrivacyPool {
 public:
     bool set_native_verifier_mode(const std::string& mode, std::string& error);
     std::string native_verifier_mode() const;
     bool strict_zk_mode() const;
+
+    static void compute_opening_relation(std::uint64_t amount,
+                                         const std::string& trapdoor,
+                                         std::string& commitment,
+                                         std::string& nullifier);
+    static bool verify_opening(std::uint64_t amount,
+                               const std::string& trapdoor,
+                               const std::string& commitment,
+                               const std::string& nullifier,
+                               std::string& error);
+    static bool prepare_opening(std::uint64_t amount, OpeningNote& out, std::string& error);
+
+    std::string mint_open(const std::string& owner,
+                          std::uint64_t amount,
+                          const std::string& commitment,
+                          const std::string& nullifier,
+                          const std::string& trapdoor,
+                          std::string& error);
+    bool spend_open(const std::string& owner,
+                    const std::string& note_id,
+                    const std::string& recipient,
+                    std::uint64_t amount,
+                    const std::string& trapdoor,
+                    std::string& new_note_id,
+                    OpeningNote& recipient_opening,
+                    std::string& change_note_id,
+                    OpeningNote& change_opening,
+                    std::string& error);
 
     std::string mint_zk(const std::string& owner,
                         std::uint64_t amount,

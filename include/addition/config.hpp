@@ -11,6 +11,11 @@ enum class NetworkMode {
     Mainnet,
 };
 
+enum class PowAlgorithm {
+    Sha3_512,
+    MemoryHard,
+};
+
 struct ChainConfig {
     std::string network_mode{"testnet"};
     std::string network_name{"addition-testnet"};
@@ -21,6 +26,7 @@ struct ChainConfig {
     std::uint64_t tail_emission_reward{1ULL};
     std::uint32_t target_block_time_sec{60U};
     std::uint32_t difficulty_window{120U};
+    PowAlgorithm pow_algorithm{PowAlgorithm::Sha3_512};
     std::uint64_t initial_difficulty_target{0x0000FFFFFFFFFFFFULL};
     std::uint64_t min_difficulty_target{0x0000FFFFFFFFFFFFULL};
     std::uint64_t max_difficulty_target{0x00FFFFFFFFFFFFFFULL};
@@ -58,6 +64,8 @@ NetworkMode runtime_network_mode();
 bool is_mainnet_runtime();
 const char* network_mode_label(NetworkMode mode);
 NetworkMode parse_network_mode(const std::string& value, bool& ok);
+const char* pow_algorithm_label(PowAlgorithm algorithm);
+PowAlgorithm parse_pow_algorithm(const std::string& value, bool& ok);
 
 bool load_toml_config(const std::string& path, NodeConfig& cfg, std::string& error);
 bool load_genesis_json(const std::string& path, ChainConfig& chain, std::string& error);

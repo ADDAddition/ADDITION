@@ -16,7 +16,7 @@ Contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com)
 These are aims of the testnet / research prototype, not proof of a live public network:
 
 1. **Quantum** — ML-DSA-87 (FIPS 204) signatures, `pq_mode=strict` when `getinfo` answers
-2. **Privacy** — native ZK path (`pq_mldsa87`); notes do not persist plaintext owner/amount
+2. **Privacy** — SHA3-512 commitment + nullifier **opening** (`privacy_mint_open` / `privacy_spend_open`). This is a real hash relation, not a circuit. `privacy_*_zk` remains an ML-DSA wrap of a mint/spend string. Not Groth16, not Bulletproofs, not ZK-Shield.
 3. **Speed** — local testnet RPC; publish only real `getinfo` fields from a running node
 4. **Cost of transaction** — spec `min_fee=1`; no invented USD fees or gas market
 5. **Compatibility** — in-process `bridge_*` commands and the EVM bootstrap (`web/evm/evm_rpc_bridge.py`). Bootstrap / not a full EVM, not live Uniswap, not “connected to every chain today”
@@ -123,7 +123,7 @@ Honest UI:
 * Page: `/wallet/` via `python3 web/serve.py` (loopback `/local-rpc` only)
 * Desktop: `python3 web/addition_wallet_gui.py` or `--cli getinfo`
 
-A fresh wallet balance is `0` until you `mine <address>` on local RPC (memory-hard; reward 50 on a fresh testnet) or receive a UTXO. Public RPC cannot create wallets or send.
+A fresh wallet balance is `0` until you `mine <address>` on local RPC (testnet PoW is SHA3-512 of the header, 30s deadline, reward 50 on a fresh testnet) or receive a UTXO. Public RPC cannot create wallets or send. See [docs/REAL_TESTNET_MINE_AND_PRIVACY.md](docs/REAL_TESTNET_MINE_AND_PRIVACY.md).
 
 Standalone CLI that keeps keys on the **caller** disk (not `data/wallets/`) and signs ML-DSA-87 locally before `sendtx_signed_hash`:
 
@@ -224,6 +224,7 @@ Two local processes: `./scripts/start_two_node_testnet.sh` (A: write `8545` / pu
 * [Local testnet wallet](docs/WALLET.md)
 * [PoUW phase 1 spec](docs/POUW_PHASE1_SPEC.md)
 * [Two-node local testnet](docs/TWO_NODE_TESTNET.md)
+* [Mined block + SHA3 opening privacy](docs/REAL_TESTNET_MINE_AND_PRIVACY.md)
 
 Older docs may still say “mainnet”. Treat those as historical. This tree is a research testnet.
 

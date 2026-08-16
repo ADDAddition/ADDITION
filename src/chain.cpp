@@ -147,7 +147,19 @@ std::string Chain::outpoint_key(const std::string& txid, std::uint32_t output_in
 }
 
 bool Chain::hash_meets_target(const std::string& hex_hash, std::uint64_t target) const {
-    return memory_hard_head64(hex_hash) <= target;
+    switch (cfg_.pow_algorithm) {
+    case PowAlgorithm::Sha3_512:
+        return parse_hash_head64(hex_hash) <= target;
+    case PowAlgorithm::MemoryHard:
+        return memory_hard_head64(hex_hash) <= target;
+    }
+    const PowAlgorithm missing = cfg_.pow_algorithm;
+    switch (missing) {
+    case PowAlgorithm::Sha3_512:
+    case PowAlgorithm::MemoryHard:
+        break;
+    }
+    return parse_hash_head64(hex_hash) <= target;
 }
 
 std::uint64_t Chain::compute_block_reward(std::uint64_t h) const {
@@ -442,11 +454,13 @@ bool Chain::mine_and_add_block(const std::string& reward_address,
     }
 
     std::atomic<bool> found{false};
+    std::atomic<bool> deadline_hit{false};
     std::atomic<std::uint64_t> winning_nonce{0};
     std::string winning_hash;
     std::mutex win_mu;
     std::vector<std::thread> workers;
     workers.reserve(threads);
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
 
     for (std::size_t tid = 0; tid < threads; ++tid) {
         workers.emplace_back([&, tid]() {
@@ -455,6 +469,10 @@ bool Chain::mine_and_add_block(const std::string& reward_address,
             for (std::uint64_t nonce = static_cast<std::uint64_t>(tid);
                  nonce < std::numeric_limits<std::uint64_t>::max() && !found.load(std::memory_order_relaxed);
                  nonce += step) {
+                if (std::chrono::steady_clock::now() >= deadline) {
+                    deadline_hit.store(true, std::memory_order_relaxed);
+                    return;
+                }
                 local.header.nonce = nonce;
                 const auto h = hash_block_header(local.header);
                 if (hash_meets_target(h, local.header.difficulty_target)) {
@@ -483,6 +501,11 @@ bool Chain::mine_and_add_block(const std::string& reward_address,
         }
         mined_hash = winning_hash;
         return true;
+    }
+
+    if (deadline_hit.load(std::memory_order_relaxed)) {
+        error = "mining deadline exceeded (30s); testnet uses sha3_512 header PoW";
+        return false;
     }
 
     error = "mining search exhausted";

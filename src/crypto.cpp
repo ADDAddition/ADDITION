@@ -1,6 +1,7 @@
 #include "addition/crypto.hpp"
 
 #include <openssl/evp.h>
+#include <openssl/rand.h>
 
 #include <oqs/oqs.h>
 
@@ -276,6 +277,21 @@ bool pq_verify_message(const std::vector<std::uint8_t>& public_key,
         return false;
     }
 
+    return true;
+}
+
+bool random_hex(std::size_t nbytes, std::string& out, std::string& error) {
+    out.clear();
+    if (nbytes == 0 || nbytes > 1024) {
+        error = "invalid random length";
+        return false;
+    }
+    std::vector<std::uint8_t> buf(nbytes, 0);
+    if (RAND_bytes(buf.data(), static_cast<int>(nbytes)) != 1) {
+        error = "RAND_bytes failed";
+        return false;
+    }
+    out = bytes_to_hex(buf);
     return true;
 }
 

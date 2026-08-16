@@ -138,6 +138,7 @@ void apply_network_mode(NodeConfig& cfg, NetworkMode mode) {
         if (cfg.chain.network_id.empty() || cfg.chain.network_id == "ADDITION_MAINNET_V1") {
             cfg.chain.network_id = "ADDITION_TESTNET_V1";
         }
+        cfg.chain.pow_algorithm = PowAlgorithm::Sha3_512;
         return;
     }
     cfg.chain.network_mode = "mainnet";
@@ -147,6 +148,7 @@ void apply_network_mode(NodeConfig& cfg, NetworkMode mode) {
     if (cfg.chain.network_id.empty() || cfg.chain.network_id == "ADDITION_TESTNET_V1") {
         cfg.chain.network_id = "ADDITION_MAINNET_V1";
     }
+    cfg.chain.pow_algorithm = PowAlgorithm::MemoryHard;
 }
 
 bool apply_kv(NodeConfig& cfg, const std::string& table, const std::string& key, const std::string& raw, std::string& error) {
@@ -244,6 +246,15 @@ bool apply_kv(NodeConfig& cfg, const std::string& table, const std::string& key,
     if (full == "chain.require_pq_signatures") {
         return parse_bool(value, cfg.chain.require_pq_signatures);
     }
+    if (full == "chain.pow_algorithm" || full == "pow_algorithm") {
+        bool ok = false;
+        cfg.chain.pow_algorithm = parse_pow_algorithm(value, ok);
+        if (!ok) {
+            error = "invalid pow_algorithm (use sha3_512 or memory_hard)";
+            return false;
+        }
+        return true;
+    }
     if (full == "comment" || full == "chain.comment") {
         return true;
     }
@@ -318,6 +329,7 @@ ChainConfig mainnet_chain_config() {
     cfg.network_mode = "mainnet";
     cfg.network_name = "mainnet";
     cfg.network_id = "ADDITION_MAINNET_V1";
+    cfg.pow_algorithm = PowAlgorithm::MemoryHard;
     return cfg;
 }
 
@@ -364,6 +376,36 @@ const char* network_mode_label(NetworkMode mode) {
         return "mainnet";
     }
     return "testnet";
+}
+
+const char* pow_algorithm_label(PowAlgorithm algorithm) {
+    switch (algorithm) {
+    case PowAlgorithm::Sha3_512:
+        return "sha3_512";
+    case PowAlgorithm::MemoryHard:
+        return "memory_hard";
+    }
+    const PowAlgorithm missing = algorithm;
+    switch (missing) {
+    case PowAlgorithm::Sha3_512:
+    case PowAlgorithm::MemoryHard:
+        break;
+    }
+    return "sha3_512";
+}
+
+PowAlgorithm parse_pow_algorithm(const std::string& value, bool& ok) {
+    const auto v = trim_copy(value);
+    if (v == "sha3_512" || v == "sha3-512" || v == "sha3") {
+        ok = true;
+        return PowAlgorithm::Sha3_512;
+    }
+    if (v == "memory_hard" || v == "memory-hard") {
+        ok = true;
+        return PowAlgorithm::MemoryHard;
+    }
+    ok = false;
+    return PowAlgorithm::Sha3_512;
 }
 
 NetworkMode parse_network_mode(const std::string& value, bool& ok) {
@@ -488,6 +530,11 @@ bool load_genesis_json(const std::string& path, ChainConfig& chain, std::string&
         }
         if (k == "bootstrap_peers") {
             return parse_string_array(v, chain.bootstrap_peers);
+        }
+        if (k == "pow_algorithm") {
+            bool ok = false;
+            chain.pow_algorithm = parse_pow_algorithm(v, ok);
+            return ok;
         }
         error = "unknown genesis key: " + k;
         return false;

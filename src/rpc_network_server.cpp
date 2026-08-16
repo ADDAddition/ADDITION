@@ -1,5 +1,6 @@
 #include "addition/rpc_network_server.hpp"
 
+#include <cstdint>
 #include <cstring>
 #include <iostream>
 
@@ -22,7 +23,8 @@ namespace addition {
 namespace {
 
 constexpr std::size_t kMaxRpcLineBytes = 32768;
-constexpr int kSocketTimeoutMs = 4000;
+constexpr int kRecvTimeoutMs = 4000;
+constexpr int kSendTimeoutMs = 60000;
 
 #ifdef _WIN32
 using SocketT = SOCKET;
@@ -98,6 +100,7 @@ void RpcNetworkServer::stop() {
     if (worker_.joinable()) {
         worker_.join();
     }
+    join_client_threads();
 
 #ifdef _WIN32
     WSACleanup();
@@ -162,71 +165,12 @@ void RpcNetworkServer::run_loop() {
             continue;
         }
 
-#ifdef _WIN32
-        DWORD timeout_ms = static_cast<DWORD>(kSocketTimeoutMs);
-        setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout_ms), sizeof(timeout_ms));
-        setsockopt(client, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&timeout_ms), sizeof(timeout_ms));
-#else
-        timeval tv{};
-        tv.tv_sec = kSocketTimeoutMs / 1000;
-        tv.tv_usec = (kSocketTimeoutMs % 1000) * 1000;
-        setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-        setsockopt(client, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-#endif
-
-        char buffer[kMaxRpcLineBytes + 1]{};
-#ifdef _WIN32
-        const int received = recv(client, buffer, sizeof(buffer) - 1, 0);
-#else
-        const int received = static_cast<int>(recv(client, buffer, sizeof(buffer) - 1, 0));
-#endif
-        if (received > 0) {
-            if (static_cast<std::size_t>(received) > kMaxRpcLineBytes) {
-                const std::string resp = "error: request too large\n";
-#ifdef _WIN32
-                send(client, resp.c_str(), static_cast<int>(resp.size()), 0);
-#else
-                send(client, resp.c_str(), resp.size(), 0);
-#endif
-                close_socket(client);
-                continue;
-            }
-
-            std::string req(buffer, buffer + received);
-            req = trim_eol(req);
-            if (req.size() > kMaxRpcLineBytes) {
-                const std::string resp = "error: request too large\n";
-#ifdef _WIN32
-                send(client, resp.c_str(), static_cast<int>(resp.size()), 0);
-#else
-                send(client, resp.c_str(), resp.size(), 0);
-#endif
-                close_socket(client);
-                continue;
-            }
-
-            std::string resp = handler_(req);
-            if (resp.rfind("HTTP/1.", 0) != 0 && (resp.empty() || resp.back() != '\n')) {
-                resp.push_back('\n');
-            }
-#ifdef _WIN32
-            if (resp.size() > kMaxRpcLineBytes) {
-                const std::string too_big = "error: response too large\n";
-                send(client, too_big.c_str(), static_cast<int>(too_big.size()), 0);
-            } else {
-                send(client, resp.c_str(), static_cast<int>(resp.size()), 0);
-            }
-#else
-            if (resp.size() > kMaxRpcLineBytes) {
-                const std::string too_big = "error: response too large\n";
-                send(client, too_big.c_str(), too_big.size(), 0);
-            } else {
-                send(client, resp.c_str(), resp.size(), 0);
-            }
-#endif
+        {
+            std::lock_guard<std::mutex> lk(clients_mu_);
+            client_threads_.emplace_back([this, client]() {
+                this->serve_client(static_cast<std::uintptr_t>(client));
+            });
         }
-
-        close_socket(client);
     }
 
     close_socket(server);
@@ -235,6 +179,93 @@ void RpcNetworkServer::run_loop() {
 #else
     listen_socket_ = -1;
 #endif
+}
+
+void RpcNetworkServer::join_client_threads() {
+    std::vector<std::thread> local;
+    {
+        std::lock_guard<std::mutex> lk(clients_mu_);
+        local.swap(client_threads_);
+    }
+    for (auto& th : local) {
+        if (th.joinable()) {
+            th.join();
+        }
+    }
+}
+
+void RpcNetworkServer::serve_client(std::uintptr_t client_raw) {
+    const SocketT client = static_cast<SocketT>(client_raw);
+
+#ifdef _WIN32
+    DWORD recv_ms = static_cast<DWORD>(kRecvTimeoutMs);
+    DWORD send_ms = static_cast<DWORD>(kSendTimeoutMs);
+    setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&recv_ms), sizeof(recv_ms));
+    setsockopt(client, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&send_ms), sizeof(send_ms));
+#else
+    timeval recv_tv{};
+    recv_tv.tv_sec = kRecvTimeoutMs / 1000;
+    recv_tv.tv_usec = (kRecvTimeoutMs % 1000) * 1000;
+    timeval send_tv{};
+    send_tv.tv_sec = kSendTimeoutMs / 1000;
+    send_tv.tv_usec = (kSendTimeoutMs % 1000) * 1000;
+    setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &recv_tv, sizeof(recv_tv));
+    setsockopt(client, SOL_SOCKET, SO_SNDTIMEO, &send_tv, sizeof(send_tv));
+#endif
+
+    char buffer[kMaxRpcLineBytes + 1]{};
+#ifdef _WIN32
+    const int received = recv(client, buffer, sizeof(buffer) - 1, 0);
+#else
+    const int received = static_cast<int>(recv(client, buffer, sizeof(buffer) - 1, 0));
+#endif
+    if (received > 0) {
+        if (static_cast<std::size_t>(received) > kMaxRpcLineBytes) {
+            const std::string resp = "error: request too large\n";
+#ifdef _WIN32
+            send(client, resp.c_str(), static_cast<int>(resp.size()), 0);
+#else
+            send(client, resp.c_str(), resp.size(), 0);
+#endif
+            close_socket(client);
+            return;
+        }
+
+        std::string req(buffer, buffer + received);
+        req = trim_eol(req);
+        if (req.size() > kMaxRpcLineBytes) {
+            const std::string resp = "error: request too large\n";
+#ifdef _WIN32
+            send(client, resp.c_str(), static_cast<int>(resp.size()), 0);
+#else
+            send(client, resp.c_str(), resp.size(), 0);
+#endif
+            close_socket(client);
+            return;
+        }
+
+        std::string resp = handler_(req);
+        if (resp.rfind("HTTP/1.", 0) != 0 && (resp.empty() || resp.back() != '\n')) {
+            resp.push_back('\n');
+        }
+#ifdef _WIN32
+        if (resp.size() > kMaxRpcLineBytes) {
+            const std::string too_big = "error: response too large\n";
+            send(client, too_big.c_str(), static_cast<int>(too_big.size()), 0);
+        } else {
+            send(client, resp.c_str(), static_cast<int>(resp.size()), 0);
+        }
+#else
+        if (resp.size() > kMaxRpcLineBytes) {
+            const std::string too_big = "error: response too large\n";
+            send(client, too_big.c_str(), too_big.size(), 0);
+        } else {
+            send(client, resp.c_str(), resp.size(), 0);
+        }
+#endif
+    }
+
+    close_socket(client);
 }
 
 } // namespace addition

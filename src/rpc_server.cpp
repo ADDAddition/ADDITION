@@ -1,6 +1,7 @@
 #include "addition/rpc_server.hpp"
 
 #include "addition/block.hpp"
+#include "addition/config.hpp"
 #include "addition/crypto.hpp"
 #include "addition/rpc_access.hpp"
 #include "addition/wallet.hpp"
@@ -158,6 +159,7 @@ RpcServer::RpcServer(Chain& chain,
             wallets_(std::move(wallet_dir)) {}
 
 std::string RpcServer::handle_command(const std::string& line, bool trusted) {
+    std::lock_guard<std::mutex> lock(mu_);
     std::istringstream iss(line);
     std::string cmd;
     iss >> cmd;
@@ -203,6 +205,8 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " last_mined_txs=" << miner_.last_mined_txs()
             << " last_tps=" << std::fixed << std::setprecision(2) << miner_.last_tps()
             << " pq_mode=strict"
+            << " pow_algorithm=" << pow_algorithm_label(net.pow_algorithm)
+            << " privacy_verifier=sha3_opening"
             << " privacy_mode=enabled";
         return out.str();
     }
@@ -1803,6 +1807,95 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         return owner.empty() ? std::string("error: nft not found") : owner;
     }
 
+    if (cmd == "privacy_note_prepare") {
+        std::uint64_t amount = 0;
+        iss >> amount;
+        if (amount == 0) {
+            return "error: usage privacy_note_prepare <amount>";
+        }
+        OpeningNote note{};
+        std::string error;
+        if (!PrivacyPool::prepare_opening(amount, note, error)) {
+            return "error: " + error;
+        }
+        std::ostringstream out;
+        out << "ok:verifier=sha3_opening"
+            << " amount=" << amount
+            << " trapdoor=" << note.trapdoor
+            << " commitment=" << note.commitment
+            << " nullifier=" << note.nullifier
+            << " claim=opening_not_zk";
+        return out.str();
+    }
+
+    if (cmd == "privacy_mint_open") {
+        std::string owner;
+        std::uint64_t amount = 0;
+        std::string commitment;
+        std::string nullifier;
+        std::string trapdoor;
+        iss >> owner >> amount >> commitment >> nullifier >> trapdoor;
+        if (owner.empty() || amount == 0 || commitment.empty() || nullifier.empty() || trapdoor.empty()) {
+            return "error: usage privacy_mint_open <owner> <amount> <commitment_hex> <nullifier_hex> <trapdoor_hex>";
+        }
+        std::string error;
+        const auto note_id = privacy_.mint_open(owner, amount, commitment, nullifier, trapdoor, error);
+        if (!error.empty() || note_id.empty()) {
+            return "error: " + error;
+        }
+        std::ostringstream out;
+        out << "ok:note_id=" << note_id
+            << " verifier=sha3_opening"
+            << " commitment=" << commitment
+            << " nullifier=" << nullifier
+            << " claim=opening_not_zk";
+        return out.str();
+    }
+
+    if (cmd == "privacy_spend_open") {
+        std::string owner;
+        std::string note_id;
+        std::string recipient;
+        std::uint64_t amount = 0;
+        std::string trapdoor;
+        iss >> owner >> note_id >> recipient >> amount >> trapdoor;
+        if (owner.empty() || note_id.empty() || recipient.empty() || amount == 0 || trapdoor.empty()) {
+            return "error: usage privacy_spend_open <owner> <note_id> <recipient> <amount> <trapdoor_hex>";
+        }
+        std::string new_note;
+        OpeningNote recipient_opening{};
+        std::string change_note;
+        OpeningNote change_opening{};
+        std::string error;
+        if (!privacy_.spend_open(owner,
+                                 note_id,
+                                 recipient,
+                                 amount,
+                                 trapdoor,
+                                 new_note,
+                                 recipient_opening,
+                                 change_note,
+                                 change_opening,
+                                 error)) {
+            return "error: " + error;
+        }
+        std::ostringstream out;
+        out << "ok:spent"
+            << " verifier=sha3_opening"
+            << " new_note_id=" << new_note
+            << " new_commitment=" << recipient_opening.commitment
+            << " new_nullifier=" << recipient_opening.nullifier
+            << " new_trapdoor=" << recipient_opening.trapdoor
+            << " claim=opening_not_zk";
+        if (!change_note.empty()) {
+            out << " change_note_id=" << change_note
+                << " change_commitment=" << change_opening.commitment
+                << " change_nullifier=" << change_opening.nullifier
+                << " change_trapdoor=" << change_opening.trapdoor;
+        }
+        return out.str();
+    }
+
     if (cmd == "privacy_native_verifier") {
         std::string mode;
         iss >> mode;
@@ -1857,7 +1950,10 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
 
     if (cmd == "privacy_status") {
         std::ostringstream out;
-        out << "verifier_configured=" << (privacy_.verifier_configured() ? "true" : "false")
+        out << "opening_verifier=sha3_opening"
+            << " claim=opening_not_zk"
+            << " legacy_mldsa_wrap=" << privacy_.native_verifier_mode()
+            << " verifier_configured=" << (privacy_.verifier_configured() ? "true" : "false")
             << " native_verifier_mode=" << privacy_.native_verifier_mode()
             << " strict_zk_mode=" << (privacy_.strict_zk_mode() ? "true" : "false")
             << " notes=" << privacy_.note_count()
