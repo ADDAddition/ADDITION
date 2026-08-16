@@ -100,5 +100,10 @@ if(ADDITION_BUILD_TESTS)
         set_tests_properties(test_chain_persist_restart PROPERTIES
             ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
             TIMEOUT 90)
+        add_test(
+            NAME test_public_site_static
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_public_site_static.py
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        )
     endif()
 endif()
