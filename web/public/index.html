@@ -11,15 +11,17 @@
   <main>
     <section class="hero">
       <h1 data-i18n="heroTitle">ADDITION testnet</h1>
-      <p class="lede" data-i18n="heroLede">Public read on :38545. Write RPC on 127.0.0.1:8545.</p>
-      <p data-i18n="heroBody">getinfo, getblock, monetary_info, peers. mine and createwallet stay on localhost.</p>
+      <p class="lede" data-i18n="heroLede">Public read: /rpc?cmd=getinfo on :80 and :38545. Write RPC on 127.0.0.1:8545.</p>
+      <p data-i18n="heroBody">Build additiond from this repo (main). Bootstrap 34.27.30.115:28545, then type sync. Height should move.</p>
+      <pre>additiond --network testnet --data-dir &lt;dir&gt; --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545</pre>
       <p><a class="github" href="https://github.com/ADDAddition/ADDITION">github.com/ADDAddition/ADDITION</a></p>
     </section>
 
     <div class="cards">
+      <a href="/join/"><strong>Join</strong><span data-i18n="cardJoin">Node start + sync</span></a>
       <a href="/explorer/"><strong>Explorer</strong><span data-i18n="cardExplorer">getblock, tx_status</span></a>
       <a href="/status/"><strong>Status</strong><span data-i18n="cardStatus">getinfo, monetary_info, crypto_selftest, peers</span></a>
-      <a href="/rpc/"><strong>RPC</strong><span data-i18n="cardRpc">Public read :38545</span></a>
+      <a href="/rpc/"><strong>RPC</strong><span data-i18n="cardRpc">Public read /rpc?cmd=getinfo</span></a>
       <a href="/docs/"><strong>Docs</strong><span data-i18n="cardDocs">Build, commands, architecture</span></a>
       <a href="/wallet/"><strong>Wallet</strong><span data-i18n="cardWallet">Write RPC 127.0.0.1:8545</span></a>
       <a href="/legal/"><strong>Legal</strong><span data-i18n="cardLegal">MIT</span></a>
@@ -28,7 +30,7 @@
     <ul class="facts">
       <li data-i18n="factQuantum">ML-DSA-87. pq_mode from getinfo.</li>
       <li data-i18n="factPrivacy">SHA3-512 opening (privacy_mint_open / privacy_spend_open).</li>
-      <li data-i18n="factCompat">bridge_* and a localhost EVM bootstrap.</li>
+      <li data-i18n="factCompat">:80 works when 38545 is filtered. addpeer after bootstrap is invalid/duplicate.</li>
       <li data-i18n="factWrite">Write RPC 127.0.0.1:8545. Public mine / createwallet disabled.</li>
     </ul>
   </main>

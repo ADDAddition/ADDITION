@@ -22,7 +22,7 @@
       <input id="tout" value="BBB">
       <label for="amt">amount_in</label>
       <input id="amt" value="1">
-      <button id="quote-btn" type="button">Quote</button>
+      <button id="quote-btn" type="button" disabled>Quote</button>
       <pre id="quote-raw" class="raw"></pre>
     </section>
     <section class="panel">
@@ -31,7 +31,7 @@
       <input id="pa" value="AAA">
       <label for="pb">token_b</label>
       <input id="pb" value="BBB">
-      <button id="pool-btn" type="button">Pool info</button>
+      <button id="pool-btn" type="button" disabled>Pool info</button>
       <div id="pool-fields"></div>
       <pre id="pool-raw" class="raw"></pre>
     </section>
@@ -56,12 +56,22 @@
     async function ping() {
       const r = await localCmd("getinfo");
       const el = document.getElementById("rpc-state");
+      const buttons = document.querySelectorAll("main button");
       if (r.offline) {
         el.className = "offline";
         el.textContent = "RPC offline";
-      } else {
-        el.className = "ok";
-        el.textContent = "Local trusted RPC answered";
+        for (let i = 0; i < buttons.length; i += 1) {
+          buttons[i].disabled = true;
+        }
+        document.getElementById("quote-raw").textContent = "RPC offline";
+        document.getElementById("pool-raw").textContent = "RPC offline";
+        document.getElementById("pool-fields").textContent = "";
+        return;
+      }
+      el.className = "ok";
+      el.textContent = "Local trusted RPC answered";
+      for (let i = 0; i < buttons.length; i += 1) {
+        buttons[i].disabled = false;
       }
     }
     document.getElementById("quote-btn").addEventListener("click", async function () {

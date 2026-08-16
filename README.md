@@ -3,11 +3,35 @@
 ![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)
 ![C++](https://img.shields.io/badge/C%2B%2B-20-blue?style=for-the-badge)
 
-**ADDITION** is a research prototype for a post-quantum Layer 1 experiment (Dilithium / ML-DSA + SHA3-512). It ships an **honest testnet**, not a live mainnet.
+**ADDITION** is a research prototype for a post-quantum Layer 1 experiment (Dilithium / ML-DSA + SHA3-512). Default network: `additiond --network testnet`.
 
 This repository does **not** claim production status, public node counts, a token sale, CoinMarketCap listing, or a live chain. CI badges are omitted until a green pipeline exists.
 
 Contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com)
+
+---
+
+## Join the live testnet
+
+Build `additiond` from this repository (`main`), then:
+
+```bash
+additiond --network testnet --data-dir <dir> --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545
+```
+
+Type `sync` on the daemon stdin (or send it to write RPC on `127.0.0.1`). Height should move. `addpeer` after `--bootstrap` is `invalid/duplicate`.
+
+`sync` tries public-read HTTP `:80` first, then `:38545`, then P2P `HELLO`. `:80` works when `38545` is filtered.
+
+Public read is `/rpc?cmd=getinfo` (not `/getinfo`):
+
+```bash
+curl 'https://rpc.additionblockchain.com/rpc?cmd=getinfo'
+curl 'http://34.27.30.115/rpc?cmd=getinfo'
+curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'
+```
+
+`getblockraw` is on the public allowlist (`ok:BLKDATA`). Public `mine` / `createwallet` return `error: command disabled on public RPC`. Write RPC stays `127.0.0.1`. There is no public wallet, token, or NFT UI.
 
 ---
 
@@ -120,7 +144,7 @@ printf 'wallet_send alice <to> 10 1\n' | nc 127.0.0.1 8545
 
 `wallet_send` signs on the node from the local file. The explicit path is `tx_build` + `wallet_sign` + `sendtx_signed` (still no raw privkey on the wire). Legacy `sendtx` needs `ADDITION_ALLOW_INSECURE_TX_COMMANDS=1`.
 
-Honest UI:
+UI:
 
 * Page: `/wallet/` via `python3 web/serve.py` (loopback `/local-rpc` only)
 * Desktop: `python3 web/addition_wallet_gui.py` or `--cli getinfo`
@@ -172,7 +196,7 @@ The chain only grows when something mines. That can be a human/`mine` on localho
 
 Auto-mine is refused on `--network mainnet`. It is not a public RPC command (`mine` stays rejected on port 38545). Each accepted block is persisted to `--data-dir/blocks.dat` as today.
 
-### Honest website (static Pages)
+### Website (static Pages)
 
 `web/public/` is a complete static site (explorer, RPC how-to, mirrored docs, white paper, legal notice). Publish that folder as the Pages root (for example additionblockchain.com). GitHub: [ADDAddition/ADDITION](https://github.com/ADDAddition/ADDITION).
 
@@ -182,14 +206,15 @@ python3 web/serve.py
 
 | Path | Content |
 |------|---------|
-| `/` | Research testnet home + live `getinfo` or **RPC offline** |
+| `/` | Testnet home + live `getinfo` or **RPC offline** |
+| `/join/` | Run `additiond` from `main`, bootstrap `34.27.30.115:28545`, then `sync` |
 | `/explorer/` | Height + last few real `getblock` results from the read RPC, or **RPC offline** |
 | `/status/` | getinfo, recent `getblock`, monetary_info, selftest, peers |
-| `/rpc/` | How to talk to the public allowlist |
+| `/rpc/` | Public read `/rpc?cmd=getinfo` on :80 and :38545 |
 | `/docs/` | Architecture, commands, PoUW spec, getting started, runbook, ZK contract |
 | `/wallet/` | Local createwallet / UTXO send via `/local-rpc` (loopback) |
-| `/contracts/` `/swap/` `/evm/` | Only methods verified on a local node; EVM is bootstrap |
-| `/whitepaper/` `/legal/` | Honest research copy. No fake ticker or mainnet live |
+| `/contracts/` `/swap/` `/evm/` | Local node methods only; EVM is bootstrap |
+| `/whitepaper/` `/legal/` | Research copy. No fake ticker or live mainnet |
 
 Explorer/status call `/api/rpc`. On a static host without a backend they fail closed. Optional `?rpc=http://HOST:38545/rpc`.
 

@@ -4,7 +4,8 @@ Pages root for additionblockchain.com.
 
 Dark console: logo, short nav, EN/FR, live getinfo strip (`height`, `peers`, `network`, `pq_mode`). Down node → **RPC offline**, empty cells.
 
-- Pretty URLs are folders with `index.html` (`/explorer/`, `/wallet/`, `/docs/commands/`, …).
+- Pretty URLs are folders with `index.html` (`/join/`, `/explorer/`, `/wallet/`, `/docs/commands/`, …).
+- Join path: build `additiond` from repo `main`, `--bootstrap 34.27.30.115:28545`, then `sync`. Public read is `/rpc?cmd=getinfo` on :80 and :38545.
 - Explorer and status call `/api/rpc?cmd=…`. When the read RPC answers they show `getinfo` height and the last few `getblock` results. Down node → **RPC offline**, empty cells.
 - Optional `?rpc=https://HOST:38545/rpc`.
 - Worker var `PUBLIC_RPC_HTTP` is empty by default. Set it to the real `--public-rpc` HTTP URL. Do not commit trycloudflare URLs.
