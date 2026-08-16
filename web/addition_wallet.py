@@ -22,6 +22,7 @@ from typing import Callable, Dict, List, Optional
 DEFAULT_RPC_HOST = "127.0.0.1"
 DEFAULT_RPC_PORT = 8545
 DEFAULT_WALLET_PATH = Path("data") / "addition.wallet"
+LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 ML_DSA_87 = "ml-dsa-87"
 ML_DSA_87_PK_BYTES = 2592
 ML_DSA_87_SK_BYTES = 4896
@@ -245,6 +246,11 @@ class WalletStore:
             os.close(fd)
 
 
+def assert_loopback_host(host: str) -> None:
+    if host not in LOOPBACK_HOSTS:
+        raise WalletError("wallet client refuses non-loopback RPC hosts")
+
+
 class TextRpcClient:
     """One-line TEXT RPC client. Not JSON-RPC."""
 
@@ -256,6 +262,7 @@ class TextRpcClient:
         timeout: float = 8.0,
         transport: Optional[Callable[[str], str]] = None,
     ) -> None:
+        assert_loopback_host(host)
         self.host = host
         self.port = port
         self.token = token

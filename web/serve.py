@@ -79,6 +79,14 @@ def content_type(path: Path) -> str:
         return "text/html; charset=utf-8"
     if path.suffix == ".md":
         return "text/markdown; charset=utf-8"
+    if path.suffix == ".png":
+        return "image/png"
+    if path.suffix == ".ico":
+        return "image/x-icon"
+    if path.suffix == ".svg":
+        return "image/svg+xml"
+    if path.suffix == ".exe" or path.name.startswith("addition-wallet"):
+        return "application/octet-stream"
     return "text/plain; charset=utf-8"
 
 

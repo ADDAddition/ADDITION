@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ADDITION wallet</title>
+  <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/common.css">
 </head>
 <body data-title="Wallet" data-sub="127.0.0.1:8545">
@@ -26,7 +29,7 @@
         <li>Default send: <code>wallet_send</code> (node signs from the local file; no raw privkey on the wire)</li>
         <li>Explicit send: <code>tx_build</code> + <code>wallet_sign</code> + <code>sendtx_signed</code></li>
         <li>Fees: spec <code>min_fee=1</code>, plus the node’s <code>fee_info</code> floor. Cap: 50,000,000</li>
-        <li>Desktop helper: <code>python3 web/addition_wallet_gui.py</code> (same local RPC)</li>
+        <li>Desktop helper: <a href="/download/">/download/</a> (same local RPC; testnet / local binary)</li>
       </ul>
       <p class="note">“Like Bitcoin” here means the user model. This tree does not implement BIP-32/39/44 or Bitcoin P2P/script.</p>
     </section>

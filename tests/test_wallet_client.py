@@ -20,6 +20,7 @@ from addition_wallet import (  # noqa: E402
     WalletStore,
     TextRpcClient,
     derive_address,
+    assert_loopback_host,
 )
 
 
@@ -147,6 +148,15 @@ class WalletClientTests(unittest.TestCase):
         self.assertTrue(build_cmds[-1].endswith(" 2"))
         for command in self.rpc.sent:
             self.assertNotIn(SECRET, command)
+
+    def test_refuses_non_loopback_rpc_host(self) -> None:
+        with self.assertRaises(WalletError):
+            assert_loopback_host("8.8.8.8")
+        with self.assertRaises(WalletError):
+            TextRpcClient(host="203.0.113.9")
+        assert_loopback_host("127.0.0.1")
+        assert_loopback_host("localhost")
+        assert_loopback_host("::1")
 
     def test_getinfo_is_testnet(self) -> None:
         info = self.client.getinfo()
