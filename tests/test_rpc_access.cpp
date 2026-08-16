@@ -105,6 +105,13 @@ int main() {
         return 1;
     }
 
+    if (addition::public_rpc_banner_text("testnet") != "addition-public-rpc read-only testnet" ||
+        addition::public_rpc_banner_text("mainnet") != "addition-public-rpc read-only mainnet" ||
+        addition::public_rpc_banner_text("regtest") != "addition-public-rpc read-only regtest") {
+        std::cerr << "test failed: public banner must follow the live network_mode\n";
+        return 1;
+    }
+
     {
         std::string method;
         std::vector<std::string> params;
