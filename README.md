@@ -273,6 +273,7 @@ Two local processes: `./scripts/start_two_node_testnet.sh` (A: write `8545` / pu
 * [Mined block + SHA3 opening privacy](docs/REAL_TESTNET_MINE_AND_PRIVACY.md)
 * [Testnet public-read RPC (systemd)](docs/TESTNET_PUBLIC_RPC_RUNBOOK.md)
 * [Mainnet node (separate chain, not live)](docs/MAINNET_RUNBOOK.md)
+* Public raw markdown (no HTML scrape): [`/join.md`](web/public/join.md), [`/docs/testnet-rpc-runbook.md`](docs/TESTNET_PUBLIC_RPC_RUNBOOK.md), [`/docs/wallet.md`](docs/WALLET.md)
 
 The public site and `rpc.additionblockchain.com` are the testnet. `--mainnet` does not change that.
 

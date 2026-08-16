@@ -53,6 +53,17 @@ export default {
     if (mapped) {
       url.pathname = mapped;
     }
-    return env.ASSETS.fetch(new Request(url.toString(), request));
+    const asset = await env.ASSETS.fetch(new Request(url.toString(), request));
+    if (url.pathname.endsWith(".md") && asset.ok) {
+      return new Response(asset.body, {
+        status: asset.status,
+        statusText: asset.statusText,
+        headers: {
+          "content-type": "text/markdown; charset=utf-8",
+          "cache-control": asset.headers.get("cache-control") || "no-store",
+        },
+      });
+    }
+    return asset;
   },
 };
