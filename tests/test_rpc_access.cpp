@@ -127,6 +127,26 @@ int main() {
         bool help = false;
         std::string err;
         char arg0[] = "additiond";
+        char arg1[] = "--regtest";
+        char* argv[] = {arg0, arg1};
+        if (!addition::apply_cli_args(2, argv, ncfg, help, err)) {
+            std::cerr << "test failed: cli --regtest parse: " << err << '\n';
+            return 1;
+        }
+        if (ncfg.mode != addition::NetworkMode::Regtest ||
+            ncfg.chain.network_mode != "regtest" ||
+            ncfg.chain.pow_profile != "regtest" ||
+            ncfg.chain.network_id != "ADDITION_REGTEST_V1") {
+            std::cerr << "test failed: --regtest profile not applied\n";
+            return 1;
+        }
+    }
+
+    {
+        addition::NodeConfig ncfg;
+        bool help = false;
+        std::string err;
+        char arg0[] = "additiond";
         char arg1[] = "--network";
         char arg2[] = "testnet";
         char arg3[] = "--public-rpc";
