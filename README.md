@@ -67,12 +67,20 @@ Whole integers. No 8-decimal subunit. Block reward `50`, `max_supply` `50000000`
 
 ---
 
+## Cashiers / Windows
+
+Cashiers and Windows users download the live testnet / local wallet from [https://additionblockchain.com/download/](https://additionblockchain.com/download/) only (`addition-wallet-testnet` and `addition-wallet-cli-testnet`). Do not compile liboqs. There is no Windows compile path in this README. This host does not publish a `.exe`.
+
+The helper talks to write RPC on `127.0.0.1:8545` on the machine that already runs `additiond --network testnet`. additionblockchain.com has no public write RPC.
+
+---
+
 ## Join the testnet
 
-Build `additiond` from this repository on `main`, then:
+Build `additiond` on Linux from this repository on `main`, then:
 
 ```bash
-additiond --network testnet --data-dir <dir> --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545
+additiond --network testnet --data-dir $HOME/addition-testnet --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545
 ```
 
 Type `sync` on the daemon stdin, or send it to write RPC on `127.0.0.1`. Height should move. Write RPC stays loopback.
@@ -85,11 +93,16 @@ Desktop wallet (loopback RPC): [additionblockchain.com/download/](https://additi
 
 ---
 
-## Build
+## Build on Linux (Ubuntu EliteDesk)
 
-CMake 3.20+, a C++20 compiler, OpenSSL, and [liboqs](https://github.com/open-quantum-safe/liboqs).
+Compile path is **Linux only** (Ubuntu on the EliteDesk). `chmod`, `sudo`, `apt`, and `cmake` are Linux commands. Do not paste them into PowerShell. There is no Windows compile path and no MSVC recipe.
+
+Cashiers and Windows users skip this section and use [https://additionblockchain.com/download/](https://additionblockchain.com/download/).
+
+CMake 3.20+, `g++` on Ubuntu, OpenSSL (`libssl-dev`), and [liboqs](https://github.com/open-quantum-safe/liboqs).
 
 ```bash
+sudo apt-get update
 sudo apt-get install -y cmake g++ ninja-build libssl-dev git
 git clone --depth 1 https://github.com/open-quantum-safe/liboqs.git
 cmake -S liboqs -B liboqs/build -GNinja -DOQS_USE_OPENSSL=ON -DBUILD_SHARED_LIBS=ON
@@ -98,7 +111,7 @@ sudo ldconfig
 
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --target additiond
-./build/additiond --network testnet
+./build/additiond --network testnet --data-dir $HOME/addition-testnet
 ```
 
 ```bash
@@ -115,6 +128,7 @@ ctest --test-dir build --output-on-failure
 | :--- | :--- |
 | Join (HTML) | [additionblockchain.com/join/](https://additionblockchain.com/join/) |
 | Join (raw) | [additionblockchain.com/join.md](https://additionblockchain.com/join.md) |
+| Join (raw copy) | [additionblockchain.com/docs/join.md](https://additionblockchain.com/docs/join.md) |
 | Wallet download | [additionblockchain.com/download/](https://additionblockchain.com/download/) |
 | Site docs | [additionblockchain.com/docs/](https://additionblockchain.com/docs/) |
 | Architecture | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |

@@ -31,7 +31,7 @@
     <section class="panel">
       <h2>Start a node</h2>
       <p>Build <code>additiond</code> from <code>main</code>, then:</p>
-      <pre>additiond --network testnet --data-dir &lt;dir&gt; --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545</pre>
+      <pre>additiond --network testnet --data-dir $HOME/addition-testnet --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545</pre>
       <p>Type <code>sync</code> on the daemon stdin (or send it to write RPC on <code>127.0.0.1</code>). Height should move.</p>
       <p><code>addpeer</code> after <code>--bootstrap</code> is <code>invalid/duplicate</code> (the seed is already listed).</p>
     </section>

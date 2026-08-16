@@ -190,6 +190,7 @@ def main() -> None:
     )
     publish_raw("docs/TESTNET_PUBLIC_RPC_RUNBOOK.md", OUT / "docs" / "testnet-rpc-runbook.md")
     publish_raw("docs/WALLET.md", OUT / "docs" / "wallet.md")
+    publish_raw("web/public/join.md", OUT / "docs" / "join.md")
     print("rendered docs into", OUT / "docs")
 
 
