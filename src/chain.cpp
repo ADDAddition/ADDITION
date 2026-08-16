@@ -15,7 +15,12 @@ namespace addition {
 namespace {
 
 bool signer_binds_pubkey(const Transaction& tx, std::string& error) {
-    return address_binds_pubkey(tx.signer, kMlDsa87SchemeId, tx.signer_pubkey, error);
+    const auto scheme = infer_sig_scheme_from_pubkey_hex(tx.signer_pubkey);
+    if (scheme == SigScheme::Unknown || !sig_scheme_allowed_strict(scheme)) {
+        error = "unknown scheme rejected in strict mode";
+        return false;
+    }
+    return address_binds_pubkey(tx.signer, scheme, tx.signer_pubkey, error);
 }
 
 std::uint64_t now_seconds() {

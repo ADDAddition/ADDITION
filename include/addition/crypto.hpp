@@ -10,6 +10,12 @@ namespace addition {
 
 using Hash512 = std::array<std::uint8_t, 64>;
 
+enum class SigScheme {
+	Unknown = 0,
+	MlDsa87 = 1,
+	SlhDsaShake256s = 2,
+};
+
 Hash512 sha3_512_bytes(const std::vector<std::uint8_t>& data);
 Hash512 sha3_512_bytes(const std::string& data);
 std::string to_hex(const Hash512& hash);
@@ -19,16 +25,33 @@ bool hex_to_bytes(const std::string& hex,
 				  std::string& error);
 
 // Address = SHA3-512(scheme_id || 0x00 || pubkey_bytes), full 128-hex digest.
-// scheme_id is in the preimage so a later SLH-DSA key can coexist with ML-DSA-87.
+// scheme_id is in the preimage so ML-DSA-87 and SLH-DSA addresses differ.
 inline constexpr const char* kMlDsa87SchemeId = "ml-dsa-87";
+inline constexpr const char* kSlhDsaShake256sSchemeId = "slh-dsa-shake-256s";
 inline constexpr std::size_t kHashCommittedAddressHexLen = 128;
+
+const char* sig_scheme_id(SigScheme scheme);
+const char* sig_scheme_oqs_alg(SigScheme scheme);
+bool parse_sig_scheme(const std::string& name, SigScheme& out);
+bool sig_scheme_available(SigScheme scheme);
+bool sig_scheme_allowed_strict(SigScheme scheme);
+std::string allowed_sig_algs_list();
+SigScheme infer_sig_scheme_from_pubkey_hex(const std::string& pubkey_hex);
 
 std::string hash_committed_address(const std::string& scheme_id,
 								   const std::vector<std::uint8_t>& pubkey);
+std::string hash_committed_address(SigScheme scheme,
+								   const std::vector<std::uint8_t>& pubkey);
 std::string hash_committed_address_hex(const std::string& scheme_id,
+									   const std::string& pubkey_hex);
+std::string hash_committed_address_hex(SigScheme scheme,
 									   const std::string& pubkey_hex);
 bool address_binds_pubkey(const std::string& address,
 						  const std::string& scheme_id,
+						  const std::string& pubkey_hex,
+						  std::string& error);
+bool address_binds_pubkey(const std::string& address,
+						  SigScheme scheme,
 						  const std::string& pubkey_hex,
 						  std::string& error);
 

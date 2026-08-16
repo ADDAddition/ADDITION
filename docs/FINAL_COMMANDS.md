@@ -71,7 +71,7 @@ Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so a down no
 - `getinfo`
 - `monetary_info`
 - `crypto_selftest`
-- `createwallet [name]` — ML-DSA-87; writes `data/wallets/<name>.wal` (0600); returns address/pub/name/path; `priv_printed=0`
+- `createwallet [name] [scheme]` — default ML-DSA-87; optional `slh-dsa-shake-256s` only if this liboqs can `OQS_SIG_sign_with_ctx_str` with a non-empty context (otherwise rejected in strict mode). Unknown schemes rejected. Writes `data/wallets/<name>.wal` (0600); returns address/pub/name/path; `priv_printed=0`
 - `wallet_list`
 - `wallet_info <name>`
 - `wallet_balance <name>`
@@ -239,7 +239,7 @@ Notes:
 ## Notes
 - Build defaults to release-oriented mode with tests disabled unless explicitly enabled.
 - Build fails if liboqs is missing (fallback mode removed).
-- Wallet key generation uses ML-DSA-87 via liboqs (`createwallet` returns `algo=ml-dsa-87` and stores the secret in `data/wallets/<name>.wal`).
+- Wallet key generation defaults to ML-DSA-87 via liboqs (`createwallet` returns `algo=ml-dsa-87` and stores the secret in `data/wallets/<name>.wal`). `slh-dsa-shake-256s` is opt-in and stays disabled unless this liboqs build can sign and verify with a non-empty context. This does not make the chain hash-based and is not a FIPS 140-3 claim.
 - User model is Bitcoin-like (keys, UTXOs, send/receive, fee). This is not BIP-32/39/44 and not a Bitcoin fork.
 - Monetary cap is enforced on-chain: `max_supply = 50,000,000`.
 - Runtime strict gates enabled:
@@ -269,7 +269,7 @@ Notes:
 - Wallet page: `/wallet/` via loopback `/local-rpc` → `127.0.0.1:8545`
 - Uses TCP RPC on `127.0.0.1:8545` only (refuses non-loopback hosts)
 - Supports:
-	- Wallet creation (`createwallet [name]`, ML-DSA-87, key stays in `data/wallets/`)
+	- Wallet creation (`createwallet [name] [scheme]`, default ML-DSA-87, key stays in `data/wallets/`)
 	- Balance (`wallet_balance` / `getbalance`)
 	- Default send: `wallet_send` (no raw privkey on the wire)
 	- Explicit send: `tx_build` + `wallet_sign` + `sendtx_signed` / `sendtx_signed_hash`

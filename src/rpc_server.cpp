@@ -240,6 +240,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " last_verify_per_sec=" << std::fixed << std::setprecision(2) << chain_.last_batch_verify_per_sec()
             << " last_dropped_mempool_txs=" << miner_.last_dropped_junk()
             << " pq_mode=strict"
+            << " allowed_sig_algs=" << allowed_sig_algs_list()
             << " pow_algorithm=" << pow_algorithm_label(net.pow_algorithm)
             << " privacy_verifier=sha3_opening"
             << " privacy_mode=sha3_opening"
@@ -495,16 +496,20 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
 
     if (cmd == "createwallet") {
         std::string name;
-        iss >> name;
+        std::string scheme;
+        iss >> name >> scheme;
         if (name.empty()) {
             name = "default";
+        }
+        if (scheme.empty()) {
+            scheme = kMlDsa87SchemeId;
         }
         if (!wallets_.configured()) {
             return "error: wallet store not configured";
         }
         WalletKeys keys{};
         try {
-            keys = generate_wallet_keys();
+            keys = generate_wallet_keys(scheme);
         } catch (const std::exception& e) {
             return std::string("error: wallet generation failed: ") + e.what();
         }

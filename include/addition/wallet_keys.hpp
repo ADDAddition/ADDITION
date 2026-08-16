@@ -11,6 +11,6 @@ struct WalletKeys {
     std::string algorithm;
 };
 
-WalletKeys generate_wallet_keys();
+WalletKeys generate_wallet_keys(const std::string& scheme = "ml-dsa-87");
 
 } // namespace addition
