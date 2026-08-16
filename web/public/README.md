@@ -2,6 +2,8 @@
 
 Publish the contents of this directory as the site root for a Pages project (for example additionblockchain.com).
 
+The chrome is a short dark Control Center (logo, nav, EN/FR, live getinfo strip). The strip shows only `height`, `peers`, `network`, `pq_mode` from a live `getinfo`. If RPC is down it prints **RPC offline** and leaves those cells empty.
+
 - Pretty URLs are folders with `index.html` (`/explorer/`, `/wallet/`, `/docs/commands/`, …).
 - Explorer and status call `/api/rpc?cmd=…`. When the read RPC answers they show `getinfo` height and the last few real `getblock` results. On a static host that path is absent unless you attach a real read RPC, so the UI shows **RPC offline** and stays empty.
 - Optional query: `?rpc=https://HOST:38545/rpc` to point the browser at a public read HTTP adapter.
