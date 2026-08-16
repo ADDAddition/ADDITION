@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Honest ADDITION testnet site + RPC HTTP proxy (stdlib only)."""
+"""ADDITION testnet site + RPC HTTP proxy (stdlib only)."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ PUBLIC_ALLOWLIST = {
     "peers",
     "getblock",
     "getblockhash",
+    "getblockraw",
 }
 
 

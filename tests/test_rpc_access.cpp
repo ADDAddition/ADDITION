@@ -11,7 +11,8 @@ int main() {
         !addition::is_public_read_command("tx_status") ||
         !addition::is_public_read_command("peers") ||
         !addition::is_public_read_command("getblock") ||
-        !addition::is_public_read_command("getblockhash")) {
+        !addition::is_public_read_command("getblockhash") ||
+        !addition::is_public_read_command("getblockraw")) {
         std::cerr << "test failed: public read allowlist missing a required command\n";
         return 1;
     }

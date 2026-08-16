@@ -981,7 +981,7 @@ std::string daemon_help_text() {
            "  or ADDITION_ENABLE_PUBLIC_RPC=1\n"
            "  bind 0.0.0.0:38545 by default (ADDITION_PUBLIC_RPC_PORT / ADDITION_PUBLIC_RPC_BIND)\n"
            "  use --public-rpc-bind 127.0.0.1 for a local tunnel\n"
-           "  allowlist: getinfo monetary_info crypto_selftest tx_status peers getblock getblockhash\n"
+           "  allowlist: getinfo monetary_info crypto_selftest tx_status peers getblock getblockhash getblockraw\n"
            "  TCP:  printf 'getinfo\\n' | nc HOST 38545\n"
            "  HTTP: curl 'http://HOST:38545/rpc?cmd=getinfo'\n"
            "LAN RPC stays token-gated (ADDITION_ENABLE_LAN_RPC=1 + ADDITION_LAN_RPC_TOKEN).\n"

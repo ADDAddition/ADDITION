@@ -12,6 +12,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <exception>
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -27,6 +28,7 @@
 #else
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #endif
@@ -501,13 +503,293 @@ int test_persist_wan_truncation() {
     if (synced) {
         return fail("WAN persist one-recv must not report sync success at height 0");
     }
-    if (err.find("truncated HELLO") == std::string::npos &&
-        err.find("HELLO_ACK") == std::string::npos &&
-        err.find("invalid hello") == std::string::npos) {
+    if (err.find("HELLO") == std::string::npos &&
+        err.find("handshake") == std::string::npos &&
+        err.find("public-rpc") == std::string::npos) {
         return fail("WAN persist error was not a handshake failure: " + err);
     }
     if (node_b.chain.height() != 0) {
         return fail("WAN persist must leave the home node at height 0");
+    }
+    return 0;
+}
+
+void poke_port(std::uint16_t port) {
+    const int poke = static_cast<int>(::socket(AF_INET, SOCK_STREAM, 0));
+    if (poke >= 0) {
+        sockaddr_in addr{};
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(port);
+        inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+        ::connect(poke, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+        close(poke);
+    }
+}
+
+int bind_listen(int listen_fd, std::uint16_t& port, const std::uint16_t* candidates, int n) {
+    int opt = 1;
+    setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    for (int i = 0; i < n; ++i) {
+        sockaddr_in addr{};
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(candidates[i]);
+        inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+        if (::bind(listen_fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0 &&
+            ::listen(listen_fd, 16) == 0) {
+            port = candidates[i];
+            return 0;
+        }
+    }
+    return -1;
+}
+
+int test_home_like_wan_hello() {
+    std::cerr << "test_p2p_sync: home-like WAN paced HELLO\n";
+    NodeKit node_a(addition::testnet_chain_config());
+    NodeKit node_b(addition::testnet_chain_config());
+    std::string err;
+    for (int i = 0; i < 3; ++i) {
+        std::string mined;
+        if (!node_a.miner.mine_next_block("miner1", 8, 2, mined, err)) {
+            return fail("home-like mine: " + err);
+        }
+    }
+
+    int listen_fd = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (listen_fd < 0) {
+        return fail("home-like listen");
+    }
+    std::uint16_t port = 0;
+    const std::uint16_t candidates[] = {29447, 29448, 29449};
+    if (bind_listen(listen_fd, port, candidates, 3) != 0) {
+        close(listen_fd);
+        return fail("home-like bind");
+    }
+
+    std::atomic<bool> running{true};
+    std::thread worker([&]() {
+        while (running.load()) {
+            sockaddr_in client_addr{};
+            socklen_t client_len = sizeof(client_addr);
+            const int client = ::accept(listen_fd, reinterpret_cast<sockaddr*>(&client_addr), &client_len);
+            if (client < 0) {
+                continue;
+            }
+            std::string req;
+            char buffer[1400];
+            bool burst = false;
+            while (req.find('\n') == std::string::npos && req.size() < 262144) {
+                const int n = static_cast<int>(::recv(client, buffer, sizeof(buffer), 0));
+                if (n <= 0) {
+                    break;
+                }
+                if (req.empty() && n == static_cast<int>(sizeof(buffer))) {
+                    int avail = 0;
+                    ioctl(client, FIONREAD, &avail);
+                    if (avail > 4000) {
+                        burst = true;
+                        break;
+                    }
+                }
+                req.append(buffer, buffer + n);
+            }
+            if (burst) {
+                close(client);
+                continue;
+            }
+            while (!req.empty() && (req.back() == '\n' || req.back() == '\r')) {
+                req.pop_back();
+            }
+            std::string resp = node_a.node.handle_p2p_line(req);
+            if (resp.empty() || resp.back() != '\n') {
+                resp.push_back('\n');
+            }
+            ::send(client, resp.data(), resp.size(), 0);
+            close(client);
+        }
+    });
+
+    if (!node_b.peers.add_peer("127.0.0.1:" + std::to_string(port))) {
+        running = false;
+        poke_port(port);
+        close(listen_fd);
+        worker.join();
+        return fail("home-like addpeer");
+    }
+    if (!node_b.node.sync_once(err)) {
+        running = false;
+        poke_port(port);
+        close(listen_fd);
+        worker.join();
+        return fail("home-like sync_once: " + err);
+    }
+    running = false;
+    poke_port(port);
+    close(listen_fd);
+    worker.join();
+
+    if (node_b.chain.height() != node_a.chain.height()) {
+        return fail("home-like height " + std::to_string(node_b.chain.height()) +
+                    " != " + std::to_string(node_a.chain.height()));
+    }
+    return 0;
+}
+
+int test_public_rpc_ingest() {
+    std::cerr << "test_p2p_sync: public-rpc getblockraw ingest\n";
+    NodeKit node_a(addition::testnet_chain_config());
+    NodeKit node_b(addition::testnet_chain_config());
+    std::string err;
+    for (int i = 0; i < 3; ++i) {
+        std::string mined;
+        if (!node_a.miner.mine_next_block("miner1", 8, 2, mined, err)) {
+            return fail("public-rpc mine: " + err);
+        }
+    }
+
+    int p2p_fd = ::socket(AF_INET, SOCK_STREAM, 0);
+    int pub_fd = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (p2p_fd < 0 || pub_fd < 0) {
+        if (p2p_fd >= 0) {
+            close(p2p_fd);
+        }
+        if (pub_fd >= 0) {
+            close(pub_fd);
+        }
+        return fail("public-rpc sockets");
+    }
+    std::uint16_t p2p_port = 0;
+    const std::uint16_t p2p_candidates[] = {29547, 29548, 29549};
+    if (bind_listen(p2p_fd, p2p_port, p2p_candidates, 3) != 0) {
+        close(p2p_fd);
+        close(pub_fd);
+        return fail("public-rpc p2p bind");
+    }
+    const std::uint16_t pub_port = static_cast<std::uint16_t>(p2p_port + 10000);
+    sockaddr_in pub_addr{};
+    pub_addr.sin_family = AF_INET;
+    pub_addr.sin_port = htons(pub_port);
+    inet_pton(AF_INET, "127.0.0.1", &pub_addr.sin_addr);
+    int opt = 1;
+    setsockopt(pub_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    if (::bind(pub_fd, reinterpret_cast<sockaddr*>(&pub_addr), sizeof(pub_addr)) != 0 ||
+        ::listen(pub_fd, 16) != 0) {
+        close(p2p_fd);
+        close(pub_fd);
+        return fail("public-rpc pub bind");
+    }
+
+    std::atomic<bool> running{true};
+    std::thread p2p_worker([&]() {
+        while (running.load()) {
+            sockaddr_in client_addr{};
+            socklen_t client_len = sizeof(client_addr);
+            const int client = ::accept(p2p_fd, reinterpret_cast<sockaddr*>(&client_addr), &client_len);
+            if (client >= 0) {
+                close(client);
+            }
+        }
+    });
+    std::thread pub_worker([&]() {
+        while (running.load()) {
+            sockaddr_in client_addr{};
+            socklen_t client_len = sizeof(client_addr);
+            const int client = ::accept(pub_fd, reinterpret_cast<sockaddr*>(&client_addr), &client_len);
+            if (client < 0) {
+                continue;
+            }
+            std::string req;
+            char buffer[4096];
+            while (req.find('\n') == std::string::npos && req.size() < 65536) {
+                const int n = static_cast<int>(::recv(client, buffer, sizeof(buffer), 0));
+                if (n <= 0) {
+                    break;
+                }
+                req.append(buffer, buffer + n);
+            }
+            while (!req.empty() && (req.back() == '\n' || req.back() == '\r')) {
+                req.pop_back();
+            }
+            std::string cmd = req;
+            if (cmd.rfind("GET ", 0) == 0) {
+                const auto q = cmd.find("cmd=");
+                if (q != std::string::npos) {
+                    auto rest = cmd.substr(q + 4);
+                    const auto sp = rest.find(' ');
+                    if (sp != std::string::npos) {
+                        rest.resize(sp);
+                    }
+                    for (char& c : rest) {
+                        if (c == '+') {
+                            c = ' ';
+                        }
+                    }
+                    const auto pct = rest.find("%20");
+                    if (pct != std::string::npos) {
+                        rest.replace(pct, 3, " ");
+                    }
+                    cmd = rest;
+                }
+            }
+            std::string resp = "error: command disabled on public RPC";
+            if (cmd.rfind("getinfo", 0) == 0) {
+                resp = "network=testnet height=" + std::to_string(node_a.chain.height());
+            } else if (cmd.rfind("getblockraw ", 0) == 0) {
+                try {
+                    const auto h = std::stoull(cmd.substr(12));
+                    std::string payload;
+                    std::string perr;
+                    if (node_a.node.get_block_payload(h, payload, perr)) {
+                        resp = "ok:BLKDATA|" + payload;
+                    } else {
+                        resp = "error: " + perr;
+                    }
+                } catch (const std::exception&) {
+                    resp = "error: invalid block height";
+                }
+            }
+            if (req.rfind("GET ", 0) == 0) {
+                resp = "HTTP/1.0 200 OK\r\nContent-Length: " + std::to_string(resp.size()) +
+                       "\r\nConnection: close\r\n\r\n" + resp;
+            } else if (resp.empty() || resp.back() != '\n') {
+                resp.push_back('\n');
+            }
+            ::send(client, resp.data(), resp.size(), 0);
+            close(client);
+        }
+    });
+
+    if (!node_b.peers.add_peer("127.0.0.1:" + std::to_string(p2p_port))) {
+        running = false;
+        poke_port(p2p_port);
+        poke_port(pub_port);
+        close(p2p_fd);
+        close(pub_fd);
+        p2p_worker.join();
+        pub_worker.join();
+        return fail("public-rpc addpeer");
+    }
+    if (!node_b.node.sync_once(err)) {
+        running = false;
+        poke_port(p2p_port);
+        poke_port(pub_port);
+        close(p2p_fd);
+        close(pub_fd);
+        p2p_worker.join();
+        pub_worker.join();
+        return fail("public-rpc sync_once: " + err);
+    }
+    running = false;
+    poke_port(p2p_port);
+    poke_port(pub_port);
+    close(p2p_fd);
+    close(pub_fd);
+    p2p_worker.join();
+    pub_worker.join();
+
+    if (node_b.chain.height() != node_a.chain.height()) {
+        return fail("public-rpc height " + std::to_string(node_b.chain.height()) +
+                    " != " + std::to_string(node_a.chain.height()));
     }
     return 0;
 }
@@ -528,6 +810,12 @@ int main() {
         return rc;
     }
     if (int rc = test_persist_wan_truncation()) {
+        return rc;
+    }
+    if (int rc = test_home_like_wan_hello()) {
+        return rc;
+    }
+    if (int rc = test_public_rpc_ingest()) {
         return rc;
     }
     std::cout << "test_p2p_sync ok\n";

@@ -99,6 +99,7 @@ private:
     std::string encode_block_payload(const Block& block) const;
     bool handshake_with_peer(const std::string& peer, std::string& wire_id, std::string& error);
     bool fetch_blocks_from_peer(const std::string& peer, const std::string& wire_id, std::string& error);
+    bool ingest_from_public_rpc(const std::string& p2p_peer, std::string& error);
     std::string encode_tx_gossip(const Transaction& tx) const;
     std::string encode_block_announce(const Block& block) const;
     bool decode_tx_gossip(const std::string& payload, Transaction& tx, std::string& error) const;

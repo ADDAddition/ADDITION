@@ -105,7 +105,8 @@ bool is_public_read_command(const std::string& cmd) {
            eq_cmd(cmd, "tx_status") ||
            eq_cmd(cmd, "peers") ||
            eq_cmd(cmd, "getblock") ||
-           eq_cmd(cmd, "getblockhash");
+           eq_cmd(cmd, "getblockhash") ||
+           eq_cmd(cmd, "getblockraw");
 }
 
 bool is_remote_allowed_command(const std::string& cmd) {

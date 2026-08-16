@@ -233,6 +233,12 @@ def main() -> int:
             return fail("genesis must have tx_count=0: " + genesis)
         if "timestamp=1763000000" not in genesis:
             return fail("genesis timestamp: " + genesis)
+        raw0 = tcp_rpc("127.0.0.1", ports["a_pub"], "getblockraw 0")
+        if not raw0.startswith("ok:BLKDATA|"):
+            return fail("public getblockraw 0: " + raw0)
+        _, _, http_raw0 = http_request(ports["a_pub"], "GET", "/rpc?cmd=getblockraw%200")
+        if "ok:BLKDATA|" not in http_raw0:
+            return fail("public HTTP getblockraw 0: " + http_raw0)
 
         for i in range(3):
             mined = tcp_rpc("127.0.0.1", ports["a_write"], "mine miner1", timeout=35.0)

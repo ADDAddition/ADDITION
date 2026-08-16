@@ -9,8 +9,12 @@
 #define NOMINMAX
 #endif
 #include <winsock2.h>
+#include <ws2tcpip.h>
 #else
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <sys/socket.h>
+#include <unistd.h>
 #endif
 
 namespace addition {
@@ -89,6 +93,26 @@ int recv_chunk(SocketT sock, char* buf, std::size_t cap) {
 
 } // namespace
 
+void socket_apply_wan_opts(std::uintptr_t sock_raw) {
+    const SocketT sock = static_cast<SocketT>(sock_raw);
+    int one = 1;
+#ifdef _WIN32
+    setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&one), sizeof(one));
+    int buf = static_cast<int>(kMaxLineBytes);
+    setsockopt(sock, SOL_SOCKET, SO_SNDBUF, reinterpret_cast<const char*>(&buf), sizeof(buf));
+    setsockopt(sock, SOL_SOCKET, SO_RCVBUF, reinterpret_cast<const char*>(&buf), sizeof(buf));
+#else
+    setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
+#ifdef TCP_MAXSEG
+    int mss = kWanMss;
+    setsockopt(sock, IPPROTO_TCP, TCP_MAXSEG, &mss, sizeof(mss));
+#endif
+    int buf = static_cast<int>(kMaxLineBytes);
+    setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &buf, sizeof(buf));
+    setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &buf, sizeof(buf));
+#endif
+}
+
 bool socket_send_all(std::uintptr_t sock_raw, const char* data, std::size_t n) {
     const SocketT sock = static_cast<SocketT>(sock_raw);
     std::size_t sent_total = 0;
@@ -102,6 +126,28 @@ bool socket_send_all(std::uintptr_t sock_raw, const char* data, std::size_t n) {
             return false;
         }
         sent_total += static_cast<std::size_t>(sent);
+    }
+    return true;
+}
+
+bool socket_send_paced(std::uintptr_t sock_raw, const char* data, std::size_t n) {
+    if (data == nullptr && n != 0) {
+        return false;
+    }
+    std::size_t off = 0;
+    while (off < n) {
+        const std::size_t chunk = std::min(kWanSendChunk, n - off);
+        if (!socket_send_all(sock_raw, data + off, chunk)) {
+            return false;
+        }
+        off += chunk;
+        if (off < n) {
+#ifdef _WIN32
+            Sleep(12);
+#else
+            usleep(12000);
+#endif
+        }
     }
     return true;
 }

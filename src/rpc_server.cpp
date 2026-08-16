@@ -978,6 +978,25 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         return format_block(*found);
     }
 
+    if (cmd == "getblockraw") {
+        std::string id;
+        iss >> id;
+        if (id.empty() || !is_all_digits(id)) {
+            return "error: usage getblockraw <height>";
+        }
+        try {
+            const auto height = static_cast<std::uint64_t>(std::stoull(id));
+            std::string payload;
+            std::string err;
+            if (!node_.get_block_payload(height, payload, err)) {
+                return "error: " + err;
+            }
+            return "ok:BLKDATA|" + payload;
+        } catch (const std::exception&) {
+            return "error: invalid block height";
+        }
+    }
+
     if (cmd == "getblockhash") {
         std::string id;
         iss >> id;

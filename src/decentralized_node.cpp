@@ -32,7 +32,7 @@ namespace {
 
 constexpr const char* kProtoVersion = "2";
 constexpr std::uint64_t kMsgSkewSec = 90;
-constexpr int kSocketTimeoutMs = 15000;
+constexpr int kSocketTimeoutMs = 20000;
 constexpr std::size_t kMaxPeerIdLen = 128;
 constexpr std::size_t kMaxNonceLen = 128;
 constexpr std::size_t kMaxPubKeyHexLen = 12000;
@@ -116,6 +116,8 @@ bool send_p2p_request(const std::string& endpoint, const std::string& request, s
         return false;
     }
 
+    socket_apply_wan_opts(static_cast<std::uintptr_t>(sock));
+
 #ifdef _WIN32
     DWORD timeout_ms = static_cast<DWORD>(kSocketTimeoutMs);
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout_ms), sizeof(timeout_ms));
@@ -155,10 +157,11 @@ bool send_p2p_request(const std::string& endpoint, const std::string& request, s
 #endif
         return false;
     }
-    // Persist-era peers RST after one recv (~1.4 KiB on WAN) while we still
-    // have ~15 KiB of HELLO to write. Read any reply that already landed.
+    // Pace ~1 KiB writes. A residential first-burst of the ~15 KiB ML-DSA
+    // HELLO often dies even when the peer loop-reads. Still read a reply if
+    // the peer RSTs after a partial write.
     const bool sent_ok =
-        socket_send_all(static_cast<std::uintptr_t>(sock), payload.c_str(), payload.size());
+        socket_send_paced(static_cast<std::uintptr_t>(sock), payload.c_str(), payload.size());
     const bool recv_ok =
         socket_recv_line(static_cast<std::uintptr_t>(sock), response, kMaxLineBytes);
     if (!recv_ok) {
@@ -315,6 +318,145 @@ bool persist_leftover_reply(const std::string& resp) {
 bool persist_truncated_hello(const std::string& resp) {
     // Last-field (sig) cuts still parse as six '|' fields, then fail verify.
     return resp == "error: invalid hello" || resp == "error: invalid hello signature";
+}
+
+bool parse_info_u64(const std::string& text, const char* key, std::uint64_t& out) {
+    const std::string needle = std::string(key) + "=";
+    const auto pos = text.find(needle);
+    if (pos == std::string::npos) {
+        return false;
+    }
+    try {
+        out = std::stoull(text.substr(pos + needle.size()));
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+std::string url_encode_cmd(const std::string& cmd) {
+    static const char* hexd = "0123456789ABCDEF";
+    std::string out;
+    out.reserve(cmd.size() * 3);
+    for (unsigned char c : cmd) {
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' ||
+            c == '-') {
+            out.push_back(static_cast<char>(c));
+        } else if (c == ' ') {
+            out += "%20";
+        } else {
+            out.push_back('%');
+            out.push_back(hexd[c >> 4]);
+            out.push_back(hexd[c & 15]);
+        }
+    }
+    return out;
+}
+
+std::string http_response_body(const std::string& raw) {
+    auto pos = raw.find("\r\n\r\n");
+    if (pos != std::string::npos) {
+        return raw.substr(pos + 4);
+    }
+    pos = raw.find("\n\n");
+    if (pos != std::string::npos) {
+        return raw.substr(pos + 2);
+    }
+    return raw;
+}
+
+std::vector<std::string> public_rpc_endpoints(const std::string& p2p_peer) {
+    std::string ip;
+    std::uint16_t port = 0;
+    std::vector<std::string> out;
+    if (!parse_endpoint(p2p_peer, ip, port)) {
+        return out;
+    }
+    if (port <= 55535) {
+        out.push_back(ip + ":" + std::to_string(static_cast<unsigned>(port) + 10000U));
+    }
+    return out;
+}
+
+bool send_http_rpc(const std::string& endpoint, const std::string& cmd, std::string& response) {
+    std::string ip;
+    std::uint16_t port = 0;
+    if (!parse_endpoint(endpoint, ip, port)) {
+        return false;
+    }
+#ifdef _WIN32
+    WSADATA wsa_data{};
+    if (WSAStartup(MAKEWORD(2, 2), &wsa_data) != 0) {
+        return false;
+    }
+#endif
+    SocketT sock = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (sock == kInvalidSocket) {
+#ifdef _WIN32
+        WSACleanup();
+#endif
+        return false;
+    }
+    socket_apply_wan_opts(static_cast<std::uintptr_t>(sock));
+#ifdef _WIN32
+    DWORD timeout_ms = static_cast<DWORD>(kSocketTimeoutMs);
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout_ms), sizeof(timeout_ms));
+    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&timeout_ms), sizeof(timeout_ms));
+#else
+    timeval tv{};
+    tv.tv_sec = kSocketTimeoutMs / 1000;
+    tv.tv_usec = (kSocketTimeoutMs % 1000) * 1000;
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+#endif
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    if (inet_pton(AF_INET, ip.c_str(), &addr.sin_addr) != 1 ||
+        ::connect(sock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
+        close_socket(sock);
+#ifdef _WIN32
+        WSACleanup();
+#endif
+        return false;
+    }
+    std::ostringstream req;
+    req << "GET /rpc?cmd=" << url_encode_cmd(cmd) << " HTTP/1.0\r\n"
+        << "Host: " << ip << "\r\n"
+        << "Connection: close\r\n\r\n";
+    const auto raw = req.str();
+    if (!socket_send_paced(static_cast<std::uintptr_t>(sock), raw.c_str(), raw.size())) {
+        close_socket(sock);
+#ifdef _WIN32
+        WSACleanup();
+#endif
+        return false;
+    }
+    std::string http;
+    if (!socket_recv_request(static_cast<std::uintptr_t>(sock), http, kMaxLineBytes) || http.empty()) {
+        close_socket(sock);
+#ifdef _WIN32
+        WSACleanup();
+#endif
+        return false;
+    }
+    close_socket(sock);
+#ifdef _WIN32
+    WSACleanup();
+#endif
+    response = http_response_body(http);
+    while (!response.empty() && (response.back() == '\n' || response.back() == '\r')) {
+        response.pop_back();
+    }
+    return !response.empty();
+}
+
+bool send_public_rpc(const std::string& endpoint, const std::string& cmd, std::string& response) {
+    if (send_p2p_request(endpoint, cmd, response) && !response.empty() &&
+        response.rfind("error: usage <peer>", 0) != 0) {
+        return true;
+    }
+    return send_http_rpc(endpoint, cmd, response);
 }
 
 } // namespace
@@ -768,6 +910,7 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
     handshake_ok_[peer] = false;
     wire_id.clear();
 
+    int transport_fails = 0;
     for (int attempt = 0; attempt < 8; ++attempt) {
         const auto hello_ts = now_seconds();
         const std::string hello_nonce = "s" + std::to_string(attempt) + "-" + std::to_string(hello_ts % 1000000ULL);
@@ -790,7 +933,11 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
         std::string hello_resp;
         if (!send_p2p_request(peer, hello_req.str(), hello_resp)) {
             error = "HELLO transport failed to " + peer +
-                    " (persist one-recv often RSTs a ~15KiB WAN HELLO; seed must loop-read until newline)";
+                    " (paced WAN write/read of ML-DSA HELLO failed)";
+            ++transport_fails;
+            if (transport_fails >= 2) {
+                return false;
+            }
             continue;
         }
 
@@ -854,7 +1001,7 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
         }
 
         if (persist_truncated_hello(hello_resp)) {
-            error = "persist one-recv truncated HELLO (seed must loop-read until newline)";
+            error = "HELLO rejected as invalid or bad signature";
             continue;
         }
 
@@ -874,9 +1021,67 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
 
     if (error.empty()) {
         error = "handshake failed";
-    } else if (error.find("truncated HELLO") != std::string::npos) {
-        error += "; seed reply must be ok:HELLO_ACK|2|<network_id>|<unix_ts>|<nonce>|<ml-dsa-87-pubkey-hex>|<sig>";
     }
+    return false;
+}
+
+bool DecentralizedNode::ingest_from_public_rpc(const std::string& p2p_peer, std::string& error) {
+    error.clear();
+    const auto endpoints = public_rpc_endpoints(p2p_peer);
+    if (endpoints.empty()) {
+        error = "no public-rpc endpoint for " + p2p_peer;
+        return false;
+    }
+
+    std::string last;
+    for (const auto& ep : endpoints) {
+        std::string info;
+        if (!send_public_rpc(ep, "getinfo", info)) {
+            last = "public-rpc getinfo transport failed at " + ep;
+            continue;
+        }
+        if (info.rfind("error:", 0) == 0) {
+            last = "public-rpc getinfo: " + info;
+            continue;
+        }
+        std::uint64_t remote_h = 0;
+        if (!parse_info_u64(info, "height", remote_h)) {
+            last = "public-rpc getinfo missing height at " + ep;
+            continue;
+        }
+        if (remote_h <= chain_.height()) {
+            return true;
+        }
+
+        for (std::uint64_t h = chain_.height() + 1; h <= remote_h; ++h) {
+            std::string raw;
+            const std::string cmd = "getblockraw " + std::to_string(h);
+            if (!send_public_rpc(ep, cmd, raw)) {
+                error = "public-rpc getblockraw transport failed at height " + std::to_string(h);
+                return false;
+            }
+            std::string payload = raw;
+            if (payload.rfind("ok:BLKDATA|", 0) == 0) {
+                payload = payload.substr(11);
+            } else if (payload.rfind("error:", 0) == 0) {
+                error = "public-rpc getblockraw " + std::to_string(h) + ": " + raw;
+                return false;
+            }
+            std::string ingest_err;
+            if (!ingest_block_payload(payload, ingest_err)) {
+                error = "public-rpc ingest height " + std::to_string(h) + ": " + ingest_err;
+                return false;
+            }
+        }
+        if (chain_.height() < remote_h) {
+            error = "public-rpc ingest stalled at height " + std::to_string(chain_.height()) +
+                    " peer_height=" + std::to_string(remote_h);
+            return false;
+        }
+        return true;
+    }
+
+    error = last.empty() ? ("public-rpc ingest failed for " + p2p_peer) : last;
     return false;
 }
 
@@ -898,11 +1103,21 @@ bool DecentralizedNode::sync_once(std::string& error) {
             continue;
         }
 
+        std::string rpc_err;
+        if (ingest_from_public_rpc(peer, rpc_err)) {
+            any_handshake = true;
+            if (chain_.height() > max_remote_h) {
+                max_remote_h = chain_.height();
+            }
+            continue;
+        }
+
         std::string hs_err;
         std::string wire_id;
         if (!handshake_with_peer(peer, wire_id, hs_err)) {
-            last_error = hs_err.empty() ? "handshake failed" : hs_err;
             handshake_ok_[peer] = false;
+            last_error = (hs_err.empty() ? std::string("handshake failed") : hs_err) + "; " +
+                         (rpc_err.empty() ? std::string("public-rpc ingest failed") : rpc_err);
             continue;
         }
         if (wire_id.empty()) {
