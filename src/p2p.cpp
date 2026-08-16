@@ -1,5 +1,9 @@
 #include "addition/p2p.hpp"
 
+#include "addition/config.hpp"
+
+#include <algorithm>
+
 namespace addition {
 
 bool PeerNetwork::add_peer(const std::string& endpoint) {
@@ -62,6 +66,52 @@ std::vector<std::string> PeerNetwork::peers() const {
 std::size_t PeerNetwork::peer_count() const {
     std::lock_guard<std::mutex> lk(mu_);
     return peers_.size();
+}
+
+std::vector<std::string> PeerNetwork::advertised_peers() const {
+    std::lock_guard<std::mutex> lk(mu_);
+    std::vector<std::string> out;
+    for (const auto& p : peers_) {
+        if (is_external_advertised_peer(p)) {
+            out.push_back(p);
+        }
+    }
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
+std::vector<std::string> PeerNetwork::loopback_peers() const {
+    std::lock_guard<std::mutex> lk(mu_);
+    std::vector<std::string> out;
+    for (const auto& p : peers_) {
+        if (is_loopback_endpoint(p)) {
+            out.push_back(p);
+        }
+    }
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
+std::size_t PeerNetwork::advertised_peer_count() const {
+    std::lock_guard<std::mutex> lk(mu_);
+    std::size_t n = 0;
+    for (const auto& p : peers_) {
+        if (is_external_advertised_peer(p)) {
+            ++n;
+        }
+    }
+    return n;
+}
+
+std::size_t PeerNetwork::loopback_peer_count() const {
+    std::lock_guard<std::mutex> lk(mu_);
+    std::size_t n = 0;
+    for (const auto& p : peers_) {
+        if (is_loopback_endpoint(p)) {
+            ++n;
+        }
+    }
+    return n;
 }
 
 } // namespace addition

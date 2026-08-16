@@ -19,6 +19,10 @@ public:
     bool is_banned(const std::string& endpoint) const;
     std::vector<std::string> peers() const;
     std::size_t peer_count() const;
+    std::vector<std::string> advertised_peers() const;
+    std::vector<std::string> loopback_peers() const;
+    std::size_t advertised_peer_count() const;
+    std::size_t loopback_peer_count() const;
 
 private:
     mutable std::mutex mu_;

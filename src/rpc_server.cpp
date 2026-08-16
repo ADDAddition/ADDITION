@@ -199,7 +199,8 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " height=" << chain_.height()
             << " mempool=" << mempool_.size()
             << " total_staked=" << staking_.total_staked()
-            << " peers=" << peers_.peer_count()
+            << " peers=" << peers_.advertised_peer_count()
+            << " local_peers=" << peers_.loopback_peer_count()
             << " bootstrap_peers=";
         for (std::size_t i = 0; i < net.bootstrap_peers.size(); ++i) {
             if (i > 0) {
@@ -427,12 +428,25 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
     }
 
     if (cmd == "peers") {
-        auto all = peers_.peers();
+        const auto remote = peers_.advertised_peers();
+        const auto local = peers_.loopback_peers();
         std::ostringstream out;
-        for (std::size_t i = 0; i < all.size(); ++i) {
-            out << all[i];
-            if (i + 1 < all.size()) {
+        for (std::size_t i = 0; i < remote.size(); ++i) {
+            if (i > 0) {
                 out << ',';
+            }
+            out << remote[i];
+        }
+        if (!local.empty()) {
+            if (!remote.empty()) {
+                out << ' ';
+            }
+            out << "local=";
+            for (std::size_t i = 0; i < local.size(); ++i) {
+                if (i > 0) {
+                    out << ',';
+                }
+                out << local[i];
             }
         }
         return out.str();

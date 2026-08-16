@@ -93,6 +93,8 @@ Optional write-RPC token (loopback only):
 ADDITION_RPC_TOKEN=<strong_token>
 # Live operator public node (34.27.30.115): P2P on, write RPC stays loopback.
 ADDITION_ENABLE_P2P_RPC=1
+# Seed only: do not count this process as an external peer.
+ADDITION_ADVERTISED_P2P=34.27.30.115:28545
 ```
 
 Do not set `ADDITION_MAINNET_MODE`. This unit is testnet only.
