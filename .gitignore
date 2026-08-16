@@ -16,6 +16,7 @@ compile_commands.json
 
 # Runtime data (CRITICAL: Do not commit chain state or identity)
 /data/
+/data-mainnet/
 data_backup_*/
 **/node_identity.dat
 **/*wallet*.dat
@@ -68,5 +69,6 @@ desktop.ini
 !tsconfig.json
 !wrangler.toml
 !genesis.json
+!genesis-mainnet.json
 !**/manifest.json
 !**/Contents.json

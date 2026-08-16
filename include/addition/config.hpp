@@ -21,6 +21,17 @@ enum class PowAlgorithm {
 inline constexpr std::uint64_t kTestnetEasyDifficultyTarget = 0x0000FFFFFFFFFFFFULL;
 inline constexpr std::uint64_t kTestnetHardDifficultyTarget = 0x000000FFFFFFFFFFULL;
 
+inline constexpr const char* kTestnetNetworkId = "ADDITION_TESTNET_V1";
+inline constexpr const char* kMainnetNetworkId = "ADDITION_MAINNET_V1";
+inline constexpr const char* kTestnetNetworkName = "addition-testnet";
+inline constexpr const char* kMainnetNetworkName = "addition-mainnet";
+inline constexpr std::uint64_t kTestnetGenesisTimestamp = 1'763'000'000ULL;
+inline constexpr std::uint64_t kMainnetGenesisTimestamp = 1'770'000'000ULL;
+// Mainnet stays at the existing testnet *hard* floor and cannot retarget to the
+// ~4ms easy target. PoW is memory_hard (1 MiB x 16 rounds per attempt).
+inline constexpr std::uint64_t kMainnetDifficultyTarget = kTestnetHardDifficultyTarget;
+inline constexpr std::uint64_t kMainnetMaxDifficultyTarget = kTestnetHardDifficultyTarget;
+
 struct ChainConfig {
     std::string network_mode{"testnet"};
     std::string network_name{"addition-testnet"};
@@ -86,6 +97,8 @@ const ChainConfig& default_config();
 ChainConfig testnet_chain_config();
 ChainConfig mainnet_chain_config();
 NodeConfig default_node_config();
+NodeConfig mainnet_node_config();
+bool validate_network_profile(const NodeConfig& cfg, std::string& error);
 
 void set_runtime_network_mode(NetworkMode mode);
 NetworkMode runtime_network_mode();

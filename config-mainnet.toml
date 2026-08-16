@@ -1,0 +1,48 @@
+# ADDITION mainnet chain configuration.
+# This starts ADDITION_MAINNET_V1 from genesis-mainnet.json.
+# It is not a live public network. Do not point additionblockchain.com at it.
+# Do not bootstrap the public testnet seed 34.27.30.115:28545.
+
+network = "mainnet"
+network_name = "addition-mainnet"
+network_id = "ADDITION_MAINNET_V1"
+data_dir = "data-mainnet"
+genesis_file = "genesis-mainnet.json"
+
+# Local-only default. Replace with your own mainnet peers if you operate some.
+# P2P stays off unless ADDITION_ENABLE_P2P_RPC=1.
+bootstrap_peers = [
+  "127.0.0.1:28546"
+]
+
+# Public read RPC is off unless --public-rpc or ADDITION_ENABLE_PUBLIC_RPC=1.
+enable_public_rpc = false
+
+# Auto-mine is refused on mainnet even if this is set.
+enable_auto_mine = false
+auto_mine_interval_sec = 60
+auto_mine_reward = "miner1"
+
+[ports]
+# Write RPC is always 127.0.0.1. Default 8546 so a local testnet on 8545 can coexist.
+local_rpc = 8546
+lan_rpc = 18546
+p2p = 28546
+public_rpc = 38546
+public_rpc_bind = "0.0.0.0"
+
+[chain]
+block_reward = 50
+max_supply = 50000000
+target_block_time_sec = 60
+halving_interval = 210000
+tail_emission_reward = 1
+min_fee = 1
+genesis_timestamp = 1770000000
+pow_algorithm = "memory_hard"
+# Same numeric floor as the existing testnet *hard* target. Cannot retarget to the
+# ~4ms easy target (0x0000FFFFFFFFFFFF). See docs/MAINNET_RUNBOOK.md.
+initial_difficulty_target = 0x000000FFFFFFFFFF
+min_difficulty_target = 0x000000FFFFFFFFFF
+max_difficulty_target = 0x000000FFFFFFFFFF
+retarget_window = 30

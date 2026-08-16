@@ -117,6 +117,7 @@ bool parse_tx_lines(std::istringstream& iss, Transaction& tx, std::string& error
 
 StateStore::StateStore(std::string data_dir) : data_dir_(std::move(data_dir)) {}
 
+std::string StateStore::network_path() const { return data_dir_ + "/network.dat"; }
 std::string StateStore::blocks_path() const { return data_dir_ + "/blocks.dat"; }
 std::string StateStore::mempool_path() const { return data_dir_ + "/mempool.dat"; }
 std::string StateStore::staking_path() const { return data_dir_ + "/staking.dat"; }
@@ -135,9 +136,55 @@ bool StateStore::chain_file_exists() const {
     return std::filesystem::exists(blocks_path());
 }
 
+bool StateStore::write_network_marker(const Chain& chain, std::string& error) const {
+    std::filesystem::create_directories(data_dir_);
+    const auto& c = chain.config();
+    std::ostringstream out;
+    out << "network_id=" << c.network_id << '\n'
+        << "network_mode=" << c.network_mode << '\n'
+        << "genesis_timestamp=" << c.genesis_timestamp << '\n'
+        << "genesis_hash=" << hash_block_header(chain.genesis_block().header) << '\n';
+    return write_text(network_path(), out.str(), error);
+}
+
+bool StateStore::check_network_marker(const Chain& chain, std::string& error) const {
+    std::string content;
+    if (!read_text(network_path(), content, error)) {
+        error = "network marker: " + error;
+        return false;
+    }
+    std::string stored_id;
+    std::string stored_mode;
+    std::istringstream iss(content);
+    for (std::string line; std::getline(iss, line);) {
+        if (line.rfind("network_id=", 0) == 0) {
+            stored_id = line.substr(11);
+        } else if (line.rfind("network_mode=", 0) == 0) {
+            stored_mode = line.substr(13);
+        }
+    }
+    if (stored_id != chain.config().network_id || stored_mode != chain.config().network_mode) {
+        error = "data-dir network marker mismatch: stored " + stored_id + "/" + stored_mode +
+                " vs running " + chain.config().network_id + "/" + chain.config().network_mode;
+        return false;
+    }
+    return true;
+}
+
+bool StateStore::ensure_network_marker(const Chain& chain, std::string& error) const {
+    if (std::filesystem::exists(network_path())) {
+        return check_network_marker(chain, error);
+    }
+    return write_network_marker(chain, error);
+}
+
 bool StateStore::save_chain(const Chain& chain, std::string& error) const {
     std::filesystem::create_directories(data_dir_);
     std::ostringstream blocks;
+    if (chain.config().network_id == kMainnetNetworkId) {
+        blocks << "N|" << chain.config().network_id << '|' << chain.config().network_mode
+               << '|' << hash_block_header(chain.genesis_block().header) << '\n';
+    }
     for (const auto& b : chain.blocks()) {
         if (b.header.height == 0) {
             continue;
@@ -168,6 +215,17 @@ bool StateStore::load_chain(Chain& chain, std::string& error) const {
     std::istringstream iss(content);
     for (std::string line; std::getline(iss, line);) {
         if (line.empty()) {
+            continue;
+        }
+        if (line.rfind("N|", 0) == 0) {
+            std::istringstream ns(line.substr(2));
+            std::string nid;
+            std::getline(ns, nid, '|');
+            if (nid != chain.config().network_id) {
+                error = "chain load failed: blocks.dat network_id=" + nid +
+                        " does not match " + chain.config().network_id;
+                return false;
+            }
             continue;
         }
         if (line.rfind("B|", 0) != 0) {
@@ -244,6 +302,9 @@ bool StateStore::save_all(const Chain& chain,
     std::filesystem::create_directories(data_dir_);
 
     if (!save_chain(chain, error)) {
+        return false;
+    }
+    if (!write_network_marker(chain, error)) {
         return false;
     }
 

@@ -55,9 +55,15 @@ public:
     bool load_chain(Chain& chain, std::string& error) const;
     bool chain_file_exists() const;
 
+    // Sidecar so a height-0 data dir cannot be reused across networks.
+    bool ensure_network_marker(const Chain& chain, std::string& error) const;
+    bool write_network_marker(const Chain& chain, std::string& error) const;
+    bool check_network_marker(const Chain& chain, std::string& error) const;
+
 private:
     std::string data_dir_;
 
+    std::string network_path() const;
     std::string blocks_path() const;
     std::string mempool_path() const;
     std::string staking_path() const;
