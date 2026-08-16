@@ -45,11 +45,12 @@ Current `additiond` on the home client:
 - up to 8 HELLO attempts with `n-<hash>xN` on retry
 - leftover `ok:BLK|` counts as handshake-accepted only if `REQWORK`
   then returns `HAVEWORK`
-- if P2P HELLO transport still fails, `sync` pulls via public-read RPC
-  on `<seed-ip>:<p2p+10000>` and `<seed-ip>:38545` (`getinfo` +
-  `getblockraw <height>` over TCP or HTTP `/rpc?cmd=`)
+- `sync` pulls via public-read HTTP first: `<seed-ip>:80` (nginx), then
+  `<seed-ip>:38545`. Home ISPs that blackhole 28545/38545 still reach
+  `getinfo` + `getblockraw <height>` on port 80 (`GET /rpc?cmd=`).
+  Host header is the IPv4 address. No TLS in this client.
 - `sync` returns `error: …` when both paths fail or the peer is still
-  longer
+  longer; it must not print `ok:height=0` in those cases
 
 ```text
 client: <peer_id> HELLO|2|ADDITION_TESTNET_V1|<unix_ts>|<nonce>|<ml-dsa-87-pubkey-hex>|<sig-hex>\n

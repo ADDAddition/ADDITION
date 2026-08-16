@@ -12,6 +12,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <exception>
 #include <iostream>
 #include <memory>
@@ -800,6 +801,143 @@ int test_public_rpc_ingest() {
     return 0;
 }
 
+int test_http_port80_ingest() {
+    std::cerr << "test_p2p_sync: HTTP :80 ingest when :38545 is closed\n";
+    NodeKit node_a(addition::testnet_chain_config());
+    NodeKit node_b(addition::testnet_chain_config());
+    std::string err;
+    for (int i = 0; i < 3; ++i) {
+        std::string mined;
+        if (!node_a.miner.mine_next_block("miner1", 8, 2, mined, err)) {
+            return fail("http80 mine: " + err);
+        }
+    }
+
+    int p2p_fd = ::socket(AF_INET, SOCK_STREAM, 0);
+    int http_fd = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (p2p_fd < 0 || http_fd < 0) {
+        if (p2p_fd >= 0) {
+            close(p2p_fd);
+        }
+        if (http_fd >= 0) {
+            close(http_fd);
+        }
+        return fail("http80 sockets");
+    }
+    std::uint16_t p2p_port = 0;
+    const std::uint16_t p2p_candidates[] = {29647, 29648, 29649};
+    if (bind_listen(p2p_fd, p2p_port, p2p_candidates, 3) != 0) {
+        close(p2p_fd);
+        close(http_fd);
+        return fail("http80 p2p bind");
+    }
+    std::uint16_t http_port = 0;
+    const std::uint16_t http_candidates[] = {18080, 18081, 18082};
+    if (bind_listen(http_fd, http_port, http_candidates, 3) != 0) {
+        close(p2p_fd);
+        close(http_fd);
+        return fail("http80 bind (unprivileged stand-in for :80)");
+    }
+    if (setenv("ADDITION_PUBLIC_HTTP_PORT", std::to_string(http_port).c_str(), 1) != 0) {
+        close(p2p_fd);
+        close(http_fd);
+        return fail("http80 setenv");
+    }
+
+    std::atomic<bool> running{true};
+    std::thread p2p_worker([&]() {
+        while (running.load()) {
+            sockaddr_in client_addr{};
+            socklen_t client_len = sizeof(client_addr);
+            const int client = ::accept(p2p_fd, reinterpret_cast<sockaddr*>(&client_addr), &client_len);
+            if (client >= 0) {
+                close(client);
+            }
+        }
+    });
+    std::thread http_worker([&]() {
+        while (running.load()) {
+            sockaddr_in client_addr{};
+            socklen_t client_len = sizeof(client_addr);
+            const int client = ::accept(http_fd, reinterpret_cast<sockaddr*>(&client_addr), &client_len);
+            if (client < 0) {
+                continue;
+            }
+            std::string req;
+            char buffer[4096];
+            while (req.find("\r\n\r\n") == std::string::npos && req.find("\n\n") == std::string::npos &&
+                   req.size() < 65536) {
+                const int n = static_cast<int>(::recv(client, buffer, sizeof(buffer), 0));
+                if (n <= 0) {
+                    break;
+                }
+                req.append(buffer, buffer + n);
+            }
+            std::string cmd;
+            const auto q = req.find("cmd=");
+            if (q != std::string::npos) {
+                auto rest = req.substr(q + 4);
+                const auto end = rest.find_first_of(" \r\n&");
+                if (end != std::string::npos) {
+                    rest.resize(end);
+                }
+                const auto pct = rest.find("%20");
+                if (pct != std::string::npos) {
+                    rest.replace(pct, 3, " ");
+                }
+                cmd = rest;
+            }
+            std::string body = "error: command disabled on public RPC";
+            if (cmd.rfind("getinfo", 0) == 0) {
+                body = "network=testnet height=" + std::to_string(node_a.chain.height());
+            } else if (cmd.rfind("getblockraw ", 0) == 0) {
+                try {
+                    const auto h = std::stoull(cmd.substr(12));
+                    std::string payload;
+                    std::string perr;
+                    if (node_a.node.get_block_payload(h, payload, perr)) {
+                        body = "ok:BLKDATA|" + payload;
+                    } else {
+                        body = "error: " + perr;
+                    }
+                } catch (const std::exception&) {
+                    body = "error: invalid block height";
+                }
+            }
+            std::string resp = "HTTP/1.0 200 OK\r\nContent-Length: " + std::to_string(body.size()) +
+                               "\r\nConnection: close\r\n\r\n" + body;
+            ::send(client, resp.data(), resp.size(), 0);
+            close(client);
+        }
+    });
+
+    const bool added = node_b.peers.add_peer("127.0.0.1:" + std::to_string(p2p_port));
+    bool synced = false;
+    if (added) {
+        synced = node_b.node.sync_once(err);
+    }
+    running = false;
+    poke_port(p2p_port);
+    poke_port(http_port);
+    close(p2p_fd);
+    close(http_fd);
+    p2p_worker.join();
+    http_worker.join();
+    unsetenv("ADDITION_PUBLIC_HTTP_PORT");
+
+    if (!added) {
+        return fail("http80 addpeer");
+    }
+    if (!synced) {
+        return fail("http80 sync_once: " + err);
+    }
+    if (node_b.chain.height() != node_a.chain.height() || node_b.chain.height() == 0) {
+        return fail("http80 height " + std::to_string(node_b.chain.height()) +
+                    " != " + std::to_string(node_a.chain.height()));
+    }
+    return 0;
+}
+
 } // namespace
 
 int main() {
@@ -822,6 +960,9 @@ int main() {
         return rc;
     }
     if (int rc = test_public_rpc_ingest()) {
+        return rc;
+    }
+    if (int rc = test_http_port80_ingest()) {
         return rc;
     }
     std::cout << "test_p2p_sync ok\n";

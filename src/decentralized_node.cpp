@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <exception>
 #include <cctype>
 #include <chrono>
@@ -366,6 +367,26 @@ std::string http_response_body(const std::string& raw) {
     return raw;
 }
 
+std::uint16_t configured_public_http_port() {
+    if (const char* raw = std::getenv("ADDITION_PUBLIC_HTTP_PORT")) {
+        try {
+            const auto parsed = std::stoul(raw);
+            if (parsed > 0 && parsed <= 65535) {
+                return static_cast<std::uint16_t>(parsed);
+            }
+        } catch (const std::exception&) {
+        }
+    }
+    return 80;
+}
+
+void push_unique_endpoint(std::vector<std::string>& out, const std::string& ip, std::uint16_t port) {
+    const std::string ep = ip + ":" + std::to_string(port);
+    if (std::find(out.begin(), out.end(), ep) == out.end()) {
+        out.push_back(ep);
+    }
+}
+
 std::vector<std::string> public_rpc_endpoints(const std::string& p2p_peer) {
     std::string ip;
     std::uint16_t port = 0;
@@ -373,8 +394,11 @@ std::vector<std::string> public_rpc_endpoints(const std::string& p2p_peer) {
     if (!parse_endpoint(p2p_peer, ip, port)) {
         return out;
     }
+    // Home ISPs often blackhole 28545/38545. nginx :80 is the working path.
+    push_unique_endpoint(out, ip, configured_public_http_port());
+    push_unique_endpoint(out, ip, 38545);
     if (port <= 55535) {
-        out.push_back(ip + ":" + std::to_string(static_cast<unsigned>(port) + 10000U));
+        push_unique_endpoint(out, ip, static_cast<std::uint16_t>(port + 10000U));
     }
     return out;
 }
@@ -453,6 +477,12 @@ bool send_http_rpc(const std::string& endpoint, const std::string& cmd, std::str
 }
 
 bool send_public_rpc(const std::string& endpoint, const std::string& cmd, std::string& response) {
+    std::string ip;
+    std::uint16_t port = 0;
+    if (parse_endpoint(endpoint, ip, port) &&
+        (port == 80 || port == configured_public_http_port())) {
+        return send_http_rpc(endpoint, cmd, response);
+    }
     if (send_p2p_request(endpoint, cmd, response) && !response.empty() &&
         response.rfind("error: usage <peer>", 0) != 0) {
         return true;
