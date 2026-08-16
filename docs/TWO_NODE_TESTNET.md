@@ -121,6 +121,9 @@ public port is up. If the daemon is down, pages show **RPC offline**.
 ## Honest P2P limits
 
 - P2P transport is off unless `ADDITION_ENABLE_P2P_RPC=1`.
+- The live operator node sets that env and allows inbound TCP **28545**
+  (GCP rule `allow-addition-p2p`). Allow 28545 only while P2P is enabled.
+  Never open **8545** or **18545**.
 - Endpoints are IPv4 `ip:port` only (`inet_pton`). Docker DNS names do not work.
 - `bootstrap_peers` / `--bootstrap` skip this process’s own P2P port.
 - IPv4 only. The operator’s current public P2P is `34.27.30.115:28545`
