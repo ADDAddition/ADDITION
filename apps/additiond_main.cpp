@@ -325,6 +325,8 @@ int main(int argc, char** argv) {
     }
     parse_env_u16("ADDITION_LOCAL_RPC_PORT", node_cfg.local_rpc_port);
     parse_env_u16("ADDITION_P2P_PORT", node_cfg.p2p_port);
+    addition::apply_advertised_p2p_env(node_cfg);
+    rpc.set_advertised_p2p(node_cfg.advertised_p2p);
     if (!addition::apply_auto_mine_env(node_cfg)) {
         std::cerr << "fatal: invalid ADDITION_AUTO_MINE_INTERVAL (use 1-86400)\n";
         return 1;
@@ -332,6 +334,9 @@ int main(int argc, char** argv) {
 
     for (const auto& peer : node_cfg.bootstrap_peers) {
         if (is_self_p2p_endpoint(peer, node_cfg.p2p_port)) {
+            continue;
+        }
+        if (!node_cfg.advertised_p2p.empty() && peer == node_cfg.advertised_p2p) {
             continue;
         }
         if (peers.add_peer(peer)) {
@@ -443,6 +448,11 @@ int main(int argc, char** argv) {
         std::cout << ' ' << peer;
     }
     std::cout << '\n';
+    if (!node_cfg.advertised_p2p.empty()) {
+        std::cout << "advertised_p2p=" << node_cfg.advertised_p2p
+                  << " (public getinfo/peers; not self). Public TCP 28545 can timeout/filter; "
+                  << "HTTP :80 sync is the reliable join path.\n";
+    }
 
     const bool auto_mine_requested = node_cfg.enable_auto_mine;
     if (auto_mine_requested && mainnet_mode) {

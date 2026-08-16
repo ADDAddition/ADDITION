@@ -35,17 +35,6 @@ std::string join_csv(const std::vector<std::string>& items) {
     return out.str();
 }
 
-std::vector<std::string> public_ipv4_endpoints(const std::vector<std::string>& endpoints) {
-    std::vector<std::string> out;
-    out.reserve(endpoints.size());
-    for (const auto& endpoint : endpoints) {
-        if (is_external_advertised_peer(endpoint)) {
-            out.push_back(endpoint);
-        }
-    }
-    return out;
-}
-
 std::uint64_t recommended_min_fee(std::size_t mempool_size, std::uint64_t last_block_fees) {
     std::uint64_t base = 1;
     if (mempool_size > 1000) {
@@ -141,6 +130,17 @@ bool requires_admin_signature_command(const std::string& cmd) {
            cmd == "bridge_set_attestor";
 }
 
+std::string join_csv(const std::vector<std::string>& items) {
+    std::ostringstream out;
+    for (std::size_t i = 0; i < items.size(); ++i) {
+        if (i > 0) {
+            out << ',';
+        }
+        out << items[i];
+    }
+    return out.str();
+}
+
 } // namespace
 
 RpcServer::RpcServer(Chain& chain,
@@ -185,6 +185,10 @@ void RpcServer::set_auto_mine_status(bool enabled, std::uint32_t interval_sec) {
     auto_mine_interval_sec_ = interval_sec == 0 ? 60 : interval_sec;
 }
 
+void RpcServer::set_advertised_p2p(std::string endpoint) {
+    advertised_p2p_ = std::move(endpoint);
+}
+
 std::uint64_t RpcServer::unlocked_balance(const std::string& address) const {
     const auto confirmed = chain_.balance_of(address);
     const auto staked = staking_.staked_of(address);
@@ -215,8 +219,10 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         const auto dyn_fee = recommended_min_fee(mempool_.size(), chain_.total_fees_last_block());
         const auto& net = chain_.config();
         const auto all_peers = peers_.peers();
-        const auto listed_peers = trusted ? all_peers : public_ipv4_endpoints(all_peers);
-        const auto listed_bootstrap = trusted ? net.bootstrap_peers : public_ipv4_endpoints(net.bootstrap_peers);
+        const auto public_peers = public_advertised_peers(all_peers, advertised_p2p_);
+        const auto listed_peers = trusted ? all_peers : public_peers;
+        const auto listed_bootstrap = trusted ? net.bootstrap_peers
+                                              : public_advertised_peers(net.bootstrap_peers, {});
         std::ostringstream out;
         out << "network=" << net.network_mode
             << " network_name=" << net.network_name
@@ -228,6 +234,9 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " bootstrap_peers=" << join_csv(listed_bootstrap);
         if (trusted) {
             out << " local_peers=" << peers_.loopback_peer_count();
+        }
+        if (!advertised_p2p_.empty()) {
+            out << " advertised_p2p=" << advertised_p2p_;
         }
         out << " difficulty_target=" << chain_.current_difficulty_target()
             << " next_reward=" << chain_.current_block_reward()
@@ -452,17 +461,18 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
     }
 
     if (cmd == "peers") {
-        const auto remote = peers_.advertised_peers();
+        const auto public_peers = public_advertised_peers(peers_.peers(), advertised_p2p_);
+        if (!trusted) {
+            return join_csv(public_peers);
+        }
         std::ostringstream out;
-        out << join_csv(remote);
-        if (trusted) {
-            const auto local = peers_.loopback_peers();
-            if (!local.empty()) {
-                if (!remote.empty()) {
-                    out << ' ';
-                }
-                out << "local=" << join_csv(local);
+        out << join_csv(public_peers);
+        const auto local = peers_.loopback_peers();
+        if (!local.empty()) {
+            if (!public_peers.empty()) {
+                out << ' ';
             }
+            out << "local=" << join_csv(local);
         }
         return out.str();
     }

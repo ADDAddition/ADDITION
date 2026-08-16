@@ -19,9 +19,9 @@
       <p>Research testnet. Not a production L1.</p>
       <table>
         <tr><th>port</th><th>role</th></tr>
-        <tr><td>80</td><td>public HTTP. Sync uses :80 first.</td></tr>
+        <tr><td>80</td><td>public HTTP. Reliable join path. Sync uses :80 first.</td></tr>
         <tr><td>38545</td><td>public RPC, optional/filtered</td></tr>
-        <tr><td>28545</td><td>P2P, optional/filtered</td></tr>
+        <tr><td>28545</td><td>P2P, optional/filtered. Can timeout. Do not assume it always works.</td></tr>
       </table>
     </section>
 
@@ -36,7 +36,7 @@
     <section class="panel">
       <h2>What <code>sync</code> does</h2>
       <p>Current <code>main</code> tries public-read HTTP <code>:80</code> first, then <code>:38545</code>, then P2P <code>HELLO</code>.</p>
-      <p><code>:80</code> works when <code>38545</code> is filtered. Ingest uses <code>getinfo</code> plus <code>getblockraw</code> (<code>ok:BLKDATA</code>).</p>
+      <p><code>:80</code> is the reliable join path when <code>38545</code> or <code>28545</code> is filtered or times out. Ingest uses <code>getinfo</code> plus <code>getblockraw</code> (<code>ok:BLKDATA</code>). Do not claim public P2P 28545 always works.</p>
     </section>
 
     <section class="panel">
@@ -46,6 +46,12 @@ curl 'http://34.27.30.115/rpc?cmd=getinfo'
 curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'</pre>
       <p>Allowlist includes <code>getblockraw</code>. Public <code>mine</code> / <code>createwallet</code> return <code>error: command disabled on public RPC</code>.</p>
       <p>Write RPC stays <code>127.0.0.1</code>. Do not publish port <code>8545</code>.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Seed operator</h2>
+      <p>On the public seed, set <code>ADDITION_ADVERTISED_P2P=34.27.30.115:28545</code> so public <code>getinfo</code> / <code>peers</code> list that IPv4 endpoint and do not list <code>self</code>.</p>
+      <p>That env is advertisement only. Public TCP 28545 can still timeout or be filtered. Joiners should <code>sync</code> over HTTP <code>:80</code>.</p>
     </section>
 
     <section class="panel">

@@ -87,6 +87,7 @@ printf &#x27;createwallet\n&#x27; | nc 127.0.0.1 38545</pre>
 <ul><li>IPv4 only. The operator’s current public P2P is <code>34.27.30.115:28545</code></li></ul>
 <p>  (<code>--bootstrap 34.27.30.115:28545</code>). Do not invent extra peers. Write RPC</p>
 <p>  stays <code>127.0.0.1:8545</code>.</p>
+<ul><li>Seed operators set <code>ADDITION_ADVERTISED_P2P=34.27.30.115:28545</code> so public <code>getinfo</code> / <code>peers</code> do not list <code>self</code>. Public TCP 28545 can timeout or be filtered; HTTP <code>:80</code> sync is the reliable join path. This local runbook does not claim public 28545 works.</li></ul>
 <ul><li><code>sync</code> pulls the public chain over HTTP: <code>:80</code> first (<code>getblockraw</code>), then</li></ul>
 <p>  <code>:38545</code>. Public RPC still rejects <code>mine</code> / <code>createwallet</code> / <code>wallet_*</code>.</p>
 <ul><li><code>addpeer</code> is a trusted-write command. Public RPC can only <code>peers</code>.</li><li><code>sync</code> on two fresh nodes at height 0 has nothing to fetch. That is not a</li></ul>
@@ -98,6 +99,7 @@ printf &#x27;createwallet\n&#x27; | nc 127.0.0.1 38545</pre>
 <ul><li><code>enable_public_rpc</code></li><li><code>ports.public_rpc</code> / <code>ports.public_rpc_bind</code></li><li><code>ports.local_rpc</code> / <code>ports.p2p</code></li><li><code>bootstrap_peers</code> (IPv4 <code>ip:port</code> only; repo <code>config.toml</code> lists <code>34.27.30.115:28545</code>)</li><li><code>enable_auto_mine</code> / <code>auto_mine_interval_sec</code> / <code>auto_mine_reward</code> (off by default)</li></ul>
 <p>Env: <code>ADDITION_ENABLE_PUBLIC_RPC=1</code>, <code>ADDITION_PUBLIC_RPC_PORT</code>,</p>
 <p><code>ADDITION_PUBLIC_RPC_BIND</code>, <code>ADDITION_LOCAL_RPC_PORT</code>, <code>ADDITION_P2P_PORT</code>,</p>
+<p><code>ADDITION_ADVERTISED_P2P</code> (seed public IPv4 only),</p>
 <p><code>ADDITION_AUTO_MINE=1</code>, <code>ADDITION_AUTO_MINE_INTERVAL</code>, <code>ADDITION_AUTO_MINE_REWARD</code>.</p>
 <p>Auto-mine is testnet only, off unless <code>--auto-mine</code> / <code>ADDITION_AUTO_MINE=1</code>.</p>
 <p>It is not a public RPC command. Each mined block is written to <code>blocks.dat</code>.</p>

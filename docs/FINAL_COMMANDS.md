@@ -50,7 +50,7 @@ POST http://HOST:38545/jsonrpc
 {"jsonrpc":"2.0","id":1,"method":"monetary_info","params":[]}
 ```
 
-Join the operator testnet: `--bootstrap 34.27.30.115:28545`. `sync` uses HTTP `:80` then `:38545` (`getblockraw`). Write RPC stays `127.0.0.1`.
+Join the operator testnet: `--bootstrap 34.27.30.115:28545`. `sync` uses HTTP `:80` then `:38545` (`getblockraw`). HTTP `:80` is the reliable path; public TCP 28545 can timeout or be filtered. Seed operators set `ADDITION_ADVERTISED_P2P=34.27.30.115:28545` so public `getinfo` / `peers` do not list `self`. Write RPC stays `127.0.0.1`.
 
 Override bind/port with `--public-rpc-bind`, `--public-rpc-port`, `ADDITION_PUBLIC_RPC_BIND`, or `ADDITION_PUBLIC_RPC_PORT`. HTTP replies send `Access-Control-Allow-Origin: *` (read-only allowlist, no cookies), `Access-Control-Allow-Methods: GET, OPTIONS`, `OPTIONS` 204, and `Cache-Control: no-store`. `curl /rpc?cmd=getinfo` is unchanged.
 

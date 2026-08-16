@@ -136,6 +136,10 @@ public port is up. If the daemon is down, pages show **RPC offline**.
 - IPv4 only. The operator’s current public P2P is `34.27.30.115:28545`
   (`--bootstrap 34.27.30.115:28545`). Do not invent extra peers. Write RPC
   stays `127.0.0.1:8545`.
+- Seed operators set `ADDITION_ADVERTISED_P2P=34.27.30.115:28545` so public
+  `getinfo` / `peers` do not list `self`. Public TCP 28545 can timeout or
+  be filtered; HTTP `:80` sync is the reliable join path. This local
+  runbook does not claim public 28545 works.
 - `sync` pulls the public chain over HTTP: `:80` first (`getblockraw`), then
   `:38545`. Public RPC still rejects `mine` / `createwallet` / `wallet_*`.
 - `addpeer` is a trusted-write command. Public RPC can only `peers`.
@@ -156,7 +160,29 @@ Same meaning as CLI / env:
 
 Env: `ADDITION_ENABLE_PUBLIC_RPC=1`, `ADDITION_PUBLIC_RPC_PORT`,
 `ADDITION_PUBLIC_RPC_BIND`, `ADDITION_LOCAL_RPC_PORT`, `ADDITION_P2P_PORT`,
+`ADDITION_ADVERTISED_P2P` (seed public IPv4 only),
 `ADDITION_AUTO_MINE=1`, `ADDITION_AUTO_MINE_INTERVAL`, `ADDITION_AUTO_MINE_REWARD`.
+
+## Local two-node HTTP ingest + HELLO test
+
+This is a **local** check. It does not claim public P2P 28545 works.
+Write RPC stays `127.0.0.1`.
+
+```bash
+cmake -S . -B build -DADDITION_BUILD_TESTS=ON
+cmake --build build --target additiond
+python3 tests/test_two_node_http_ingest.py
+# or: ctest --test-dir build -R test_two_node_http_ingest --output-on-failure
+```
+
+The script starts two `additiond` processes. Node A mines on trusted write
+RPC, advertises `ADDITION_ADVERTISED_P2P=34.27.30.115:28545` so public
+`getinfo` / `peers` omit `self`, then node B:
+
+1. pulls A's chain over **HTTP ingest** (`getinfo` + `getblockraw` on A's
+   public-read port via `ADDITION_PUBLIC_HTTP_PORT`)
+2. on a fresh data-dir, pulls again via local **HELLO** when HTTP ports
+   are closed (localhost P2P only; not a public-28545 claim)
 
 Auto-mine is testnet only, off unless `--auto-mine` / `ADDITION_AUTO_MINE=1`.
 It is not a public RPC command. Each mined block is written to `blocks.dat`.

@@ -21,7 +21,7 @@ additiond --network testnet --data-dir <dir> --local-rpc-port 8545 --p2p-port 28
 
 Type `sync` on the daemon stdin (or send it to write RPC on `127.0.0.1`). Height should move. `addpeer` after `--bootstrap` is `invalid/duplicate`.
 
-`sync` tries public-read HTTP `:80` first, then `:38545`, then P2P `HELLO`. `:80` works when `38545` is filtered.
+`sync` tries public-read HTTP `:80` first, then `:38545`, then P2P `HELLO`. `:80` is the reliable join path when `38545` or `28545` is filtered or times out. Do not claim public P2P 28545 always works. The seed operator sets `ADDITION_ADVERTISED_P2P=34.27.30.115:28545` so public `getinfo` / `peers` do not list `self`.
 
 Public read is `/rpc?cmd=getinfo` (not `/getinfo`):
 

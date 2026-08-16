@@ -2,6 +2,7 @@
 #include "addition/p2p.hpp"
 #include "addition/rpc_access.hpp"
 
+#include <cstdlib>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -219,6 +220,45 @@ int main() {
             std::cerr << "test failed: advertised peer list\n";
             return 1;
         }
+        const auto pub = addition::public_advertised_peers(net.peers(), addition::kOperatorPublicP2p);
+        if (pub.size() != 1 || pub[0] != addition::kOperatorPublicP2p) {
+            std::cerr << "test failed: public_advertised_peers injects seed address once\n";
+            return 1;
+        }
+    }
+
+    {
+        std::string parsed;
+        std::string err;
+        if (addition::parse_advertised_p2p("self", parsed, err) ||
+            addition::parse_advertised_p2p("127.0.0.1:28545", parsed, err) ||
+            !addition::parse_advertised_p2p("34.27.30.115:28545", parsed, err) ||
+            parsed != addition::kOperatorPublicP2p) {
+            std::cerr << "test failed: parse_advertised_p2p: " << err << '\n';
+            return 1;
+        }
+    }
+
+    {
+        ::setenv("ADDITION_ADVERTISED_P2P", "34.27.30.115:28545", 1);
+        addition::NodeConfig ncfg;
+        bool help = false;
+        std::string err;
+        char arg0[] = "additiond";
+        char arg1[] = "--network";
+        char arg2[] = "testnet";
+        char* argv[] = {arg0, arg1, arg2};
+        if (!addition::apply_cli_args(3, argv, ncfg, help, err)) {
+            std::cerr << "test failed: advertised env parse: " << err << '\n';
+            ::unsetenv("ADDITION_ADVERTISED_P2P");
+            return 1;
+        }
+        if (ncfg.advertised_p2p != addition::kOperatorPublicP2p) {
+            std::cerr << "test failed: ADDITION_ADVERTISED_P2P not applied\n";
+            ::unsetenv("ADDITION_ADVERTISED_P2P");
+            return 1;
+        }
+        ::unsetenv("ADDITION_ADVERTISED_P2P");
     }
 
     std::cout << "all rpc access tests passed\n";

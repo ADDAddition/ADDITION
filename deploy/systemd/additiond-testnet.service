@@ -27,6 +27,9 @@ EnvironmentFile=-/etc/addition/testnet.env
 # Leave LAN RPC off (do not set ADDITION_ENABLE_LAN_RPC). Never open 8545/18545.
 # Live operator public node: ADDITION_ENABLE_P2P_RPC=1 in the env file, and
 # GCP allow-addition-p2p tcp:28545. Bootstrap is 34.27.30.115:28545 (IPv4 only).
+# Seed: ADDITION_ADVERTISED_P2P=34.27.30.115:28545 so public getinfo/peers
+# do not list self. Public TCP 28545 can timeout/filter; HTTP :80 is the
+# reliable join path. Write RPC stays 127.0.0.1. Never open 8545/18545.
 # Auto-mine stays off unless ADDITION_AUTO_MINE=1 (testnet timer; not public RPC).
 NoNewPrivileges=true
 PrivateTmp=true

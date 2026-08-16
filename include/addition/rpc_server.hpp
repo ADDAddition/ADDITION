@@ -46,6 +46,7 @@ public:
 
     std::string handle_command(const std::string& line, bool trusted = true);
     void set_auto_mine_status(bool enabled, std::uint32_t interval_sec);
+    void set_advertised_p2p(std::string endpoint);
     std::uint64_t unlocked_balance(const std::string& address) const;
 
 private:
@@ -68,6 +69,7 @@ private:
     bool strict_admin_mode_{true};
     bool auto_mine_enabled_{false};
     std::uint32_t auto_mine_interval_sec_{60};
+    std::string advertised_p2p_{};
     WalletStore wallets_;
     mutable std::mutex mu_;
 };

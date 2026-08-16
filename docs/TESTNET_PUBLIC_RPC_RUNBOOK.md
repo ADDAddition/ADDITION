@@ -30,6 +30,25 @@ outsiders can `--bootstrap 34.27.30.115:28545`. Do not invent extra peers.
 The binary still leaves P2P off until that env is set; the public GCP
 node sets it.
 
+### Seed operator: advertise the public P2P, not `self`
+
+On the seed, set:
+
+```bash
+# /etc/addition/testnet.env
+ADDITION_ENABLE_P2P_RPC=1
+ADDITION_ADVERTISED_P2P=34.27.30.115:28545
+```
+
+or `advertised_p2p = "34.27.30.115:28545"` in the seed `config.toml`.
+Public `getinfo` / `peers` then list that IPv4 endpoint and omit `self`,
+loopback, and node-id strings. The value is advertisement only; the seed
+does not add it to its internal peer set (no self-sync).
+
+Do **not** claim public TCP **28545** always works. Home ISPs can timeout
+or filter 28545/38545. The reliable join path is HTTP `:80` (`getinfo` +
+`getblockraw`). Write RPC stays `127.0.0.1`.
+
 ## Live seed P2P + public-read ingest
 
 The operator seed at **34.27.30.115:28545** loop-reads until `\n`. A
