@@ -11,8 +11,11 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #else
+#include <cerrno>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <poll.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #endif
@@ -110,6 +113,66 @@ void socket_apply_wan_opts(std::uintptr_t sock_raw) {
     int buf = static_cast<int>(kMaxLineBytes);
     setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &buf, sizeof(buf));
     setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &buf, sizeof(buf));
+#endif
+}
+
+bool socket_connect(std::uintptr_t sock_raw, const void* addr, std::size_t addr_len, int timeout_ms) {
+    const SocketT sock = static_cast<SocketT>(sock_raw);
+    if (addr == nullptr || addr_len == 0) {
+        return false;
+    }
+#ifdef _WIN32
+    u_long nonblock = 1;
+    if (ioctlsocket(sock, FIONBIO, &nonblock) != 0) {
+        return false;
+    }
+    const int rc = ::connect(sock, static_cast<const sockaddr*>(addr), static_cast<int>(addr_len));
+    if (rc == 0) {
+        nonblock = 0;
+        ioctlsocket(sock, FIONBIO, &nonblock);
+        return true;
+    }
+    if (WSAGetLastError() != WSAEWOULDBLOCK) {
+        nonblock = 0;
+        ioctlsocket(sock, FIONBIO, &nonblock);
+        return false;
+    }
+    fd_set writers;
+    FD_ZERO(&writers);
+    FD_SET(sock, &writers);
+    timeval tv{};
+    tv.tv_sec = timeout_ms / 1000;
+    tv.tv_usec = (timeout_ms % 1000) * 1000;
+    const int sel = select(0, nullptr, &writers, nullptr, &tv);
+    int so_err = 0;
+    int so_len = sizeof(so_err);
+    getsockopt(sock, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&so_err), &so_len);
+    nonblock = 0;
+    ioctlsocket(sock, FIONBIO, &nonblock);
+    return sel > 0 && so_err == 0;
+#else
+    const int flags = fcntl(sock, F_GETFL, 0);
+    if (flags < 0 || fcntl(sock, F_SETFL, flags | O_NONBLOCK) != 0) {
+        return false;
+    }
+    const int rc = ::connect(sock, static_cast<const sockaddr*>(addr), static_cast<socklen_t>(addr_len));
+    if (rc == 0) {
+        fcntl(sock, F_SETFL, flags);
+        return true;
+    }
+    if (errno != EINPROGRESS) {
+        fcntl(sock, F_SETFL, flags);
+        return false;
+    }
+    pollfd pfd{};
+    pfd.fd = sock;
+    pfd.events = POLLOUT;
+    const int pr = poll(&pfd, 1, timeout_ms);
+    int so_err = 0;
+    socklen_t so_len = sizeof(so_err);
+    getsockopt(sock, SOL_SOCKET, SO_ERROR, &so_err, &so_len);
+    fcntl(sock, F_SETFL, flags);
+    return pr > 0 && so_err == 0;
 #endif
 }
 

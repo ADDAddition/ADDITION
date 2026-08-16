@@ -16,6 +16,7 @@ constexpr std::size_t kWanSendChunk = 1024;
 constexpr int kWanMss = 1200;
 
 void socket_apply_wan_opts(std::uintptr_t sock);
+bool socket_connect(std::uintptr_t sock, const void* addr, std::size_t addr_len, int timeout_ms);
 bool socket_send_all(std::uintptr_t sock, const char* data, std::size_t n);
 bool socket_send_paced(std::uintptr_t sock, const char* data, std::size_t n);
 bool socket_recv_line(std::uintptr_t sock, std::string& line, std::size_t max_bytes);

@@ -33,6 +33,7 @@ namespace {
 constexpr const char* kProtoVersion = "2";
 constexpr std::uint64_t kMsgSkewSec = 90;
 constexpr int kSocketTimeoutMs = 20000;
+constexpr int kConnectTimeoutMs = 3000;
 constexpr std::size_t kMaxPeerIdLen = 128;
 constexpr std::size_t kMaxNonceLen = 128;
 constexpr std::size_t kMaxPubKeyHexLen = 12000;
@@ -141,7 +142,7 @@ bool send_p2p_request(const std::string& endpoint, const std::string& request, s
         return false;
     }
 
-    if (::connect(sock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
+    if (!socket_connect(static_cast<std::uintptr_t>(sock), &addr, sizeof(addr), kConnectTimeoutMs)) {
         close_socket(sock);
 #ifdef _WIN32
         WSACleanup();
@@ -413,7 +414,7 @@ bool send_http_rpc(const std::string& endpoint, const std::string& cmd, std::str
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
     if (inet_pton(AF_INET, ip.c_str(), &addr.sin_addr) != 1 ||
-        ::connect(sock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
+        !socket_connect(static_cast<std::uintptr_t>(sock), &addr, sizeof(addr), kConnectTimeoutMs)) {
         close_socket(sock);
 #ifdef _WIN32
         WSACleanup();

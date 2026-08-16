@@ -365,10 +365,16 @@ int test_persist_seed_dialect() {
             if (client < 0) {
                 continue;
             }
-            char buffer[32768];
-            const int n = static_cast<int>(::recv(client, buffer, sizeof(buffer), 0));
-            if (n > 0) {
-                std::string req(buffer, buffer + n);
+            std::string req;
+            char buffer[4096];
+            while (req.find('\n') == std::string::npos && req.size() < 262144) {
+                const int n = static_cast<int>(::recv(client, buffer, sizeof(buffer), 0));
+                if (n <= 0) {
+                    break;
+                }
+                req.append(buffer, buffer + n);
+            }
+            if (!req.empty()) {
                 while (!req.empty() && (req.back() == '\n' || req.back() == '\r')) {
                     req.pop_back();
                 }
