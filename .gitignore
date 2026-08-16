@@ -60,6 +60,15 @@ Thumbs.db
 .DS_Store
 desktop.ini
 
+# iOS / Xcode (source stays; no placeholder binaries)
+ios/**/xcuserdata/
+ios/**/DerivedData/
+ios/**/*.xcuserstate
+ios/**/*.ipa
+ios/**/*.dSYM
+ios/**/*.dSYM.zip
+*.ipa
+
 # Secrets & Keys (SAFETY FIRST)
 *.pem
 *.key

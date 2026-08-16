@@ -1,0 +1,466 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		01ADD3000000000000000001 /* AdditionWalletApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD4000000000000000001 /* AdditionWalletApp.swift */; };
+		01ADD3000000000000000002 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD4000000000000000002 /* Theme.swift */; };
+		01ADD3000000000000000003 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD4000000000000000003 /* RootView.swift */; };
+		01ADD3000000000000000004 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD4000000000000000004 /* HomeView.swift */; };
+		01ADD3000000000000000005 /* ReceiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD4000000000000000005 /* ReceiveView.swift */; };
+		01ADD3000000000000000006 /* SendView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD4000000000000000006 /* SendView.swift */; };
+		01ADD3000000000000000007 /* NodeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD4000000000000000007 /* NodeView.swift */; };
+		01ADD3000000000000000008 /* WalletSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD4000000000000000008 /* WalletSession.swift */; };
+		01ADD3000000000000000009 /* SHA3_512.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD4000000000000000009 /* SHA3_512.swift */; };
+		01ADD300000000000000000A /* AdditionError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD400000000000000000A /* AdditionError.swift */; };
+		01ADD300000000000000000B /* KVParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD400000000000000000B /* KVParser.swift */; };
+		01ADD300000000000000000C /* Amount.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD400000000000000000C /* Amount.swift */; };
+		01ADD300000000000000000D /* Address.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD400000000000000000D /* Address.swift */; };
+		01ADD300000000000000000E /* WriteRPCPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD400000000000000000E /* WriteRPCPolicy.swift */; };
+		01ADD300000000000000000F /* WalletCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD400000000000000000F /* WalletCommands.swift */; };
+		01ADD3000000000000000010 /* TextRPCClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD4000000000000000010 /* TextRPCClient.swift */; };
+		01ADD3000000000000000011 /* WalletRPCClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD4000000000000000011 /* WalletRPCClient.swift */; };
+		01ADD3000000000000000012 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 01ADD4000000000000000012 /* Assets.xcassets */; };
+		01ADD3000000000000000013 /* AmountTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD4000000000000000013 /* AmountTests.swift */; };
+		01ADD3000000000000000014 /* AddressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD4000000000000000014 /* AddressTests.swift */; };
+		01ADD3000000000000000015 /* SHA3Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD4000000000000000015 /* SHA3Tests.swift */; };
+		01ADD3000000000000000016 /* WriteRPCPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD4000000000000000016 /* WriteRPCPolicyTests.swift */; };
+		01ADD3000000000000000017 /* FailClosedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD4000000000000000017 /* FailClosedTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		01ADD5000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 01ADD1000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 01ADD1000000000000000002;
+			remoteInfo = AdditionWallet;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		01ADD4000000000000000001 /* AdditionWalletApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdditionWalletApp.swift; sourceTree = "<group>"; };
+		01ADD4000000000000000002 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		01ADD4000000000000000003 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		01ADD4000000000000000004 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		01ADD4000000000000000005 /* ReceiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiveView.swift; sourceTree = "<group>"; };
+		01ADD4000000000000000006 /* SendView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SendView.swift; sourceTree = "<group>"; };
+		01ADD4000000000000000007 /* NodeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodeView.swift; sourceTree = "<group>"; };
+		01ADD4000000000000000008 /* WalletSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletSession.swift; sourceTree = "<group>"; };
+		01ADD4000000000000000009 /* SHA3_512.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SHA3_512.swift; sourceTree = "<group>"; };
+		01ADD400000000000000000A /* AdditionError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdditionError.swift; sourceTree = "<group>"; };
+		01ADD400000000000000000B /* KVParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KVParser.swift; sourceTree = "<group>"; };
+		01ADD400000000000000000C /* Amount.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Amount.swift; sourceTree = "<group>"; };
+		01ADD400000000000000000D /* Address.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Address.swift; sourceTree = "<group>"; };
+		01ADD400000000000000000E /* WriteRPCPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WriteRPCPolicy.swift; sourceTree = "<group>"; };
+		01ADD400000000000000000F /* WalletCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletCommands.swift; sourceTree = "<group>"; };
+		01ADD4000000000000000010 /* TextRPCClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextRPCClient.swift; sourceTree = "<group>"; };
+		01ADD4000000000000000011 /* WalletRPCClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletRPCClient.swift; sourceTree = "<group>"; };
+		01ADD4000000000000000012 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		01ADD4000000000000000013 /* AmountTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmountTests.swift; sourceTree = "<group>"; };
+		01ADD4000000000000000014 /* AddressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddressTests.swift; sourceTree = "<group>"; };
+		01ADD4000000000000000015 /* SHA3Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SHA3Tests.swift; sourceTree = "<group>"; };
+		01ADD4000000000000000016 /* WriteRPCPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WriteRPCPolicyTests.swift; sourceTree = "<group>"; };
+		01ADD4000000000000000017 /* FailClosedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FailClosedTests.swift; sourceTree = "<group>"; };
+		01ADD4000000000000000018 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		01ADD6000000000000000001 /* AdditionWallet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AdditionWallet.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		01ADD6000000000000000002 /* AdditionWalletTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AdditionWalletTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		01ADD7000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		01ADD7000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		01ADD2000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				01ADD2000000000000000002 /* AdditionWallet */,
+				01ADD2000000000000000004 /* AdditionWalletTests */,
+				01ADD2000000000000000005 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		01ADD2000000000000000002 /* AdditionWallet */ = {
+			isa = PBXGroup;
+			children = (
+				01ADD4000000000000000001 /* AdditionWalletApp.swift */,
+				01ADD4000000000000000002 /* Theme.swift */,
+				01ADD4000000000000000003 /* RootView.swift */,
+				01ADD4000000000000000004 /* HomeView.swift */,
+				01ADD4000000000000000005 /* ReceiveView.swift */,
+				01ADD4000000000000000006 /* SendView.swift */,
+				01ADD4000000000000000007 /* NodeView.swift */,
+				01ADD4000000000000000008 /* WalletSession.swift */,
+				01ADD2000000000000000003 /* Client */,
+				01ADD4000000000000000012 /* Assets.xcassets */,
+				01ADD4000000000000000018 /* Info.plist */,
+			);
+			path = AdditionWallet;
+			sourceTree = "<group>";
+		};
+		01ADD2000000000000000003 /* Client */ = {
+			isa = PBXGroup;
+			children = (
+				01ADD4000000000000000009 /* SHA3_512.swift */,
+				01ADD400000000000000000A /* AdditionError.swift */,
+				01ADD400000000000000000B /* KVParser.swift */,
+				01ADD400000000000000000C /* Amount.swift */,
+				01ADD400000000000000000D /* Address.swift */,
+				01ADD400000000000000000E /* WriteRPCPolicy.swift */,
+				01ADD400000000000000000F /* WalletCommands.swift */,
+				01ADD4000000000000000010 /* TextRPCClient.swift */,
+				01ADD4000000000000000011 /* WalletRPCClient.swift */,
+			);
+			path = Client;
+			sourceTree = "<group>";
+		};
+		01ADD2000000000000000004 /* AdditionWalletTests */ = {
+			isa = PBXGroup;
+			children = (
+				01ADD4000000000000000013 /* AmountTests.swift */,
+				01ADD4000000000000000014 /* AddressTests.swift */,
+				01ADD4000000000000000015 /* SHA3Tests.swift */,
+				01ADD4000000000000000016 /* WriteRPCPolicyTests.swift */,
+				01ADD4000000000000000017 /* FailClosedTests.swift */,
+			);
+			path = AdditionWalletTests;
+			sourceTree = "<group>";
+		};
+		01ADD2000000000000000005 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				01ADD6000000000000000001 /* AdditionWallet.app */,
+				01ADD6000000000000000002 /* AdditionWalletTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		01ADD1000000000000000002 /* AdditionWallet */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 01ADD8000000000000000003 /* Build configuration list for PBXNativeTarget "AdditionWallet" */;
+			buildPhases = (
+				01ADD9000000000000000001 /* Sources */,
+				01ADD7000000000000000001 /* Frameworks */,
+				01ADDA000000000000000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = AdditionWallet;
+			productName = AdditionWallet;
+			productReference = 01ADD6000000000000000001 /* AdditionWallet.app */;
+			productType = "com.apple.product-type.application";
+		};
+		01ADD1000000000000000003 /* AdditionWalletTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 01ADD8000000000000000004 /* Build configuration list for PBXNativeTarget "AdditionWalletTests" */;
+			buildPhases = (
+				01ADD9000000000000000002 /* Sources */,
+				01ADD7000000000000000002 /* Frameworks */,
+				01ADDA000000000000000002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				01ADDB000000000000000001 /* PBXTargetDependency */,
+			);
+			name = AdditionWalletTests;
+			productName = AdditionWalletTests;
+			productReference = 01ADD6000000000000000002 /* AdditionWalletTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		01ADD1000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					01ADD1000000000000000002 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					01ADD1000000000000000003 = {
+						CreatedOnToolsVersion = 15.0;
+						TestTargetID = 01ADD1000000000000000002;
+					};
+				};
+			};
+			buildConfigurationList = 01ADD8000000000000000001 /* Build configuration list for PBXProject "AdditionWallet" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 01ADD2000000000000000001;
+			productRefGroup = 01ADD2000000000000000005 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				01ADD1000000000000000002 /* AdditionWallet */,
+				01ADD1000000000000000003 /* AdditionWalletTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		01ADDA000000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				01ADD3000000000000000012 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		01ADDA000000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		01ADD9000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				01ADD3000000000000000001 /* AdditionWalletApp.swift in Sources */,
+				01ADD3000000000000000002 /* Theme.swift in Sources */,
+				01ADD3000000000000000003 /* RootView.swift in Sources */,
+				01ADD3000000000000000004 /* HomeView.swift in Sources */,
+				01ADD3000000000000000005 /* ReceiveView.swift in Sources */,
+				01ADD3000000000000000006 /* SendView.swift in Sources */,
+				01ADD3000000000000000007 /* NodeView.swift in Sources */,
+				01ADD3000000000000000008 /* WalletSession.swift in Sources */,
+				01ADD3000000000000000009 /* SHA3_512.swift in Sources */,
+				01ADD300000000000000000A /* AdditionError.swift in Sources */,
+				01ADD300000000000000000B /* KVParser.swift in Sources */,
+				01ADD300000000000000000C /* Amount.swift in Sources */,
+				01ADD300000000000000000D /* Address.swift in Sources */,
+				01ADD300000000000000000E /* WriteRPCPolicy.swift in Sources */,
+				01ADD300000000000000000F /* WalletCommands.swift in Sources */,
+				01ADD3000000000000000010 /* TextRPCClient.swift in Sources */,
+				01ADD3000000000000000011 /* WalletRPCClient.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		01ADD9000000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				01ADD3000000000000000013 /* AmountTests.swift in Sources */,
+				01ADD3000000000000000014 /* AddressTests.swift in Sources */,
+				01ADD3000000000000000015 /* SHA3Tests.swift in Sources */,
+				01ADD3000000000000000016 /* WriteRPCPolicyTests.swift in Sources */,
+				01ADD3000000000000000017 /* FailClosedTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		01ADDB000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 01ADD1000000000000000002 /* AdditionWallet */;
+			targetProxy = 01ADD5000000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		01ADD8000000000000000011 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		01ADD8000000000000000012 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		01ADD8000000000000000021 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = AdditionWallet/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ADDITION;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.additionblockchain.wallet;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		01ADD8000000000000000022 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = AdditionWallet/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ADDITION;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.additionblockchain.wallet;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		01ADD8000000000000000031 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.additionblockchain.wallet.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AdditionWallet.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/AdditionWallet";
+			};
+			name = Debug;
+		};
+		01ADD8000000000000000032 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.additionblockchain.wallet.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AdditionWallet.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/AdditionWallet";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		01ADD8000000000000000001 /* Build configuration list for PBXProject "AdditionWallet" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				01ADD8000000000000000011 /* Debug */,
+				01ADD8000000000000000012 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		01ADD8000000000000000003 /* Build configuration list for PBXNativeTarget "AdditionWallet" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				01ADD8000000000000000021 /* Debug */,
+				01ADD8000000000000000022 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		01ADD8000000000000000004 /* Build configuration list for PBXNativeTarget "AdditionWalletTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				01ADD8000000000000000031 /* Debug */,
+				01ADD8000000000000000032 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 01ADD1000000000000000001 /* Project object */;
+}
