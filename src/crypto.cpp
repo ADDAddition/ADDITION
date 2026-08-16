@@ -513,7 +513,7 @@ bool verify_message_signature_hybrid(const std::string& public_key,
         return false;
     }
 
-    return pq_verify_message(pk_bytes, message, sig_bytes, used_ctx, parsed, err);
+    return pq_verify_message(pk_bytes, message, sig_bytes, ctx, parsed, err);
 }
 
 bool pq_sign_message(const std::vector<std::uint8_t>& secret_key,
