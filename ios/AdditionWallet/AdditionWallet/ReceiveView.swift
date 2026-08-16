@@ -6,33 +6,45 @@ struct ReceiveView: View {
     @State private var copied = false
 
     var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
+        ScreenBackground {
+            VStack(spacing: 20) {
+                BrandWordmark(height: 24)
                 Text("Receive ADD")
-                    .font(.title.bold())
+                    .font(.title2.weight(.semibold))
                     .foregroundStyle(AdditionTheme.cream)
-                Text("Show this 128-hex hash-committed address. Whole ADD units only.")
-                    .foregroundStyle(AdditionTheme.mute)
-                Text(session.address.isEmpty ? "Load or create a wallet first." : session.address)
-                    .font(.body.monospaced())
-                    .foregroundStyle(AdditionTheme.cream)
-                    .textSelection(.enabled)
-                    .padding(16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(AdditionTheme.panel)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                Button(copied ? "Copied" : "Copy address") {
-                    guard !session.address.isEmpty else { return }
-                    UIPasteboard.general.string = session.address
-                    copied = true
+                QRCodeView(payload: session.address)
+                if session.address.isEmpty {
+                    Text("Create or load a wallet on a node you control.")
+                        .font(.footnote)
+                        .foregroundStyle(AdditionTheme.mute)
+                        .multilineTextAlignment(.center)
+                } else {
+                    Card {
+                        HStack(alignment: .top, spacing: 12) {
+                            BrandMark(size: 36)
+                            Text(session.address)
+                                .font(.footnote.monospaced())
+                                .foregroundStyle(AdditionTheme.cream)
+                                .textSelection(.enabled)
+                        }
+                    }
+                    PrimaryButton(title: copied ? "Copied" : "Copy address", enabled: true) {
+                        UIPasteboard.general.string = session.address
+                        copied = true
+                    }
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(AdditionTheme.red)
-                .disabled(session.address.isEmpty)
+                Text("128-hex hash-committed address. Whole ADD units only.")
+                    .font(.caption)
+                    .foregroundStyle(AdditionTheme.mute)
+                    .multilineTextAlignment(.center)
                 Spacer()
             }
             .padding(20)
-            .background(AdditionTheme.ink.ignoresSafeArea())
         }
     }
+}
+
+#Preview("Receive") {
+    ReceiveView()
+        .environmentObject(WalletSession())
 }

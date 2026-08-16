@@ -30,6 +30,10 @@
 		01ADD3000000000000000015 /* SHA3Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD4000000000000000015 /* SHA3Tests.swift */; };
 		01ADD3000000000000000016 /* WriteRPCPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD4000000000000000016 /* WriteRPCPolicyTests.swift */; };
 		01ADD3000000000000000017 /* FailClosedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD4000000000000000017 /* FailClosedTests.swift */; };
+		01ADD3000000000000000018 /* ActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD4000000000000000019 /* ActivityView.swift */; };
+		01ADD3000000000000000019 /* ActivityItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD400000000000000001A /* ActivityItem.swift */; };
+		01ADD300000000000000001A /* QRCodeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD400000000000000001B /* QRCodeView.swift */; };
+		01ADD300000000000000001B /* SharedChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ADD400000000000000001C /* SharedChrome.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -67,6 +71,10 @@
 		01ADD4000000000000000016 /* WriteRPCPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WriteRPCPolicyTests.swift; sourceTree = "<group>"; };
 		01ADD4000000000000000017 /* FailClosedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FailClosedTests.swift; sourceTree = "<group>"; };
 		01ADD4000000000000000018 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		01ADD4000000000000000019 /* ActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityView.swift; sourceTree = "<group>"; };
+		01ADD400000000000000001A /* ActivityItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityItem.swift; sourceTree = "<group>"; };
+		01ADD400000000000000001B /* QRCodeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRCodeView.swift; sourceTree = "<group>"; };
+		01ADD400000000000000001C /* SharedChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedChrome.swift; sourceTree = "<group>"; };
 		01ADD6000000000000000001 /* AdditionWallet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AdditionWallet.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		01ADD6000000000000000002 /* AdditionWalletTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AdditionWalletTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -107,6 +115,10 @@
 				01ADD4000000000000000004 /* HomeView.swift */,
 				01ADD4000000000000000005 /* ReceiveView.swift */,
 				01ADD4000000000000000006 /* SendView.swift */,
+				01ADD4000000000000000019 /* ActivityView.swift */,
+				01ADD400000000000000001A /* ActivityItem.swift */,
+				01ADD400000000000000001B /* QRCodeView.swift */,
+				01ADD400000000000000001C /* SharedChrome.swift */,
 				01ADD4000000000000000007 /* NodeView.swift */,
 				01ADD4000000000000000008 /* WalletSession.swift */,
 				01ADD2000000000000000003 /* Client */,
@@ -258,6 +270,10 @@
 				01ADD3000000000000000004 /* HomeView.swift in Sources */,
 				01ADD3000000000000000005 /* ReceiveView.swift in Sources */,
 				01ADD3000000000000000006 /* SendView.swift in Sources */,
+				01ADD3000000000000000018 /* ActivityView.swift in Sources */,
+				01ADD3000000000000000019 /* ActivityItem.swift in Sources */,
+				01ADD300000000000000001A /* QRCodeView.swift in Sources */,
+				01ADD300000000000000001B /* SharedChrome.swift in Sources */,
 				01ADD3000000000000000007 /* NodeView.swift in Sources */,
 				01ADD3000000000000000008 /* WalletSession.swift in Sources */,
 				01ADD3000000000000000009 /* SHA3_512.swift in Sources */,

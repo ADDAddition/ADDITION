@@ -1,10 +1,18 @@
 import SwiftUI
 
 enum AdditionTheme {
-    static let ink = Color(red: 0.06, green: 0.06, blue: 0.07)
-    static let panel = Color(red: 0.12, green: 0.12, blue: 0.13)
-    static let line = Color(red: 0.28, green: 0.28, blue: 0.30)
-    static let red = Color(red: 0.86, green: 0.10, blue: 0.13)
-    static let cream = Color(red: 0.96, green: 0.95, blue: 0.93)
-    static let mute = Color(red: 0.70, green: 0.70, blue: 0.72)
+    static let ink = Color(red: 0.00, green: 0.00, blue: 0.00)
+    static let panel = Color(red: 0.09, green: 0.09, blue: 0.10)
+    static let panelLift = Color(red: 0.13, green: 0.13, blue: 0.14)
+    static let line = Color(red: 0.22, green: 0.22, blue: 0.23)
+    static let red = Color(red: 0.89, green: 0.11, blue: 0.14)
+    static let cream = Color.white
+    static let mute = Color(red: 0.63, green: 0.63, blue: 0.65)
+}
+
+enum BrandImage {
+    static let logo = "Logo"
+    static let mark = "Mark"
+    static let openGraph = "OpenGraph"
+    static let favicon = "Favicon"
 }
