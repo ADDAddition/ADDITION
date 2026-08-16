@@ -24,6 +24,28 @@ namespace {
 
 constexpr double kObjectiveTps = 100000.0;
 
+std::string join_csv(const std::vector<std::string>& items) {
+    std::ostringstream out;
+    for (std::size_t i = 0; i < items.size(); ++i) {
+        if (i > 0) {
+            out << ',';
+        }
+        out << items[i];
+    }
+    return out.str();
+}
+
+std::vector<std::string> public_ipv4_endpoints(const std::vector<std::string>& endpoints) {
+    std::vector<std::string> out;
+    out.reserve(endpoints.size());
+    for (const auto& endpoint : endpoints) {
+        if (is_public_ipv4_endpoint(endpoint)) {
+            out.push_back(endpoint);
+        }
+    }
+    return out;
+}
+
 std::uint64_t recommended_min_fee(std::size_t mempool_size, std::uint64_t last_block_fees) {
     std::uint64_t base = 1;
     if (mempool_size > 1000) {
@@ -192,6 +214,10 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
     if (cmd == "getinfo") {
         const auto dyn_fee = recommended_min_fee(mempool_.size(), chain_.total_fees_last_block());
         const auto& net = chain_.config();
+        const auto all_peers = peers_.peers();
+        const auto listed_peers = trusted ? all_peers : public_listed_peers(all_peers);
+        const auto listed_bootstrap = trusted ? net.bootstrap_peers : public_ipv4_endpoints(net.bootstrap_peers);
+        const auto advertised = advertised_p2p_from_env();
         std::ostringstream out;
         out << "network=" << net.network_mode
             << " network_name=" << net.network_name
@@ -199,13 +225,10 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " height=" << chain_.height()
             << " mempool=" << mempool_.size()
             << " total_staked=" << staking_.total_staked()
-            << " peers=" << peers_.peer_count()
-            << " bootstrap_peers=";
-        for (std::size_t i = 0; i < net.bootstrap_peers.size(); ++i) {
-            if (i > 0) {
-                out << ',';
-            }
-            out << net.bootstrap_peers[i];
+            << " peers=" << listed_peers.size()
+            << " bootstrap_peers=" << join_csv(listed_bootstrap);
+        if (!advertised.empty()) {
+            out << " advertised_p2p=" << advertised;
         }
         out << " difficulty_target=" << chain_.current_difficulty_target()
             << " next_reward=" << chain_.current_block_reward()
@@ -427,15 +450,9 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
     }
 
     if (cmd == "peers") {
-        auto all = peers_.peers();
-        std::ostringstream out;
-        for (std::size_t i = 0; i < all.size(); ++i) {
-            out << all[i];
-            if (i + 1 < all.size()) {
-                out << ',';
-            }
-        }
-        return out.str();
+        const auto all = peers_.peers();
+        const auto listed = trusted ? all : public_listed_peers(all);
+        return join_csv(listed);
     }
 
     if (cmd == "vote") {

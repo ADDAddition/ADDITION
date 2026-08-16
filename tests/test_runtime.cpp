@@ -312,11 +312,55 @@ int main() {
         return 1;
     }
 
+    if (!peers.add_peer("127.0.0.1:28545") || !peers.add_peer("self")) {
+        std::cerr << "test failed: add loopback/self peers\n";
+        return 1;
+    }
+#ifdef _WIN32
+    _putenv_s("ADDITION_ADVERTISED_P2P", "34.27.30.115:28545");
+#else
+    setenv("ADDITION_ADVERTISED_P2P", "34.27.30.115:28545", 1);
+#endif
+    const auto trusted_info = rpc.handle_command("getinfo", true);
+    const auto public_info = rpc.handle_command("getinfo", false);
+    if (trusted_info.find("127.0.0.1:28545") == std::string::npos) {
+        std::cerr << "test failed: trusted getinfo must keep loopback for sync: " << trusted_info << '\n';
+        return 1;
+    }
+    if (public_info.find("127.0.0.1") != std::string::npos ||
+        public_info.find("self") != std::string::npos ||
+        public_info.find("localhost") != std::string::npos) {
+        std::cerr << "test failed: public getinfo leaked loopback/self: " << public_info << '\n';
+        return 1;
+    }
+    if (!expect_contains(public_info, "advertised_p2p=34.27.30.115:28545", "public getinfo advertised_p2p") ||
+        !expect_contains(public_info, "peers=1", "public getinfo counts advertised P2P")) {
+        return 1;
+    }
+    const auto trusted_peers = rpc.handle_command("peers", true);
+    const auto public_peers = rpc.handle_command("peers", false);
+    if (trusted_peers.find("127.0.0.1:28545") == std::string::npos) {
+        std::cerr << "test failed: trusted peers must keep loopback: " << trusted_peers << '\n';
+        return 1;
+    }
+    if (public_peers.find("127.0.0.1") != std::string::npos ||
+        public_peers.find("self") != std::string::npos ||
+        public_peers.find("34.27.30.115:28545") == std::string::npos) {
+        std::cerr << "test failed: public peers must list advertised P2P only: " << public_peers << '\n';
+        return 1;
+    }
+#ifdef _WIN32
+    _putenv_s("ADDITION_ADVERTISED_P2P", "");
+#else
+    unsetenv("ADDITION_ADVERTISED_P2P");
+#endif
+
     const auto json_get = addition::dispatch_public_read_rpc(
         rpc, "GET /jsonrpc?method=getinfo HTTP/1.1\r\n\r\n");
     if (json_get.find("\"jsonrpc\":\"2.0\"") == std::string::npos ||
         json_get.find("network=testnet") == std::string::npos ||
-        json_get.find("application/json") == std::string::npos) {
+        json_get.find("application/json") == std::string::npos ||
+        json_get.find("127.0.0.1") != std::string::npos) {
         std::cerr << "test failed: public JSON getinfo: " << json_get << '\n';
         return 1;
     }

@@ -1,9 +1,14 @@
 #include "addition/config.hpp"
 #include "addition/rpc_access.hpp"
 
+#include <cstdlib>
 #include <iostream>
 #include <string>
 #include <vector>
+
+#ifdef _WIN32
+#include <stdlib.h>
+#endif
 
 int main() {
     if (!addition::is_public_read_command("getinfo") ||
@@ -176,6 +181,50 @@ int main() {
             std::cerr << "test failed: two-node CLI flags not applied\n";
             return 1;
         }
+    }
+
+    if (!addition::is_loopback_host("127.0.0.1") ||
+        !addition::is_loopback_host("127.1.2.3") ||
+        !addition::is_loopback_endpoint("127.0.0.1:28546") ||
+        addition::is_public_ipv4_endpoint("127.0.0.1:28546") ||
+        addition::is_public_ipv4_endpoint("self") ||
+        addition::is_public_ipv4_endpoint("probe-self") ||
+        addition::is_public_ipv4_endpoint("n-deadbeef") ||
+        !addition::is_self_peer_label("probe-self") ||
+        !addition::is_public_ipv4_endpoint("34.27.30.115:28545")) {
+        std::cerr << "test failed: loopback/self must not count as public peers\n";
+        return 1;
+    }
+
+    {
+#ifdef _WIN32
+        _putenv_s("ADDITION_ADVERTISED_P2P", "34.27.30.115:28545");
+#else
+        setenv("ADDITION_ADVERTISED_P2P", "34.27.30.115:28545", 1);
+#endif
+        if (addition::advertised_p2p_from_env() != "34.27.30.115:28545") {
+            std::cerr << "test failed: advertised_p2p_from_env public IPv4\n";
+            return 1;
+        }
+        const auto listed = addition::public_listed_peers({"self", "127.0.0.1:28545", "probe-self"});
+        if (listed.size() != 1 || listed[0] != "34.27.30.115:28545") {
+            std::cerr << "test failed: public_listed_peers must inject advertised P2P\n";
+            return 1;
+        }
+#ifdef _WIN32
+        _putenv_s("ADDITION_ADVERTISED_P2P", "127.0.0.1:28545");
+#else
+        setenv("ADDITION_ADVERTISED_P2P", "127.0.0.1:28545", 1);
+#endif
+        if (!addition::advertised_p2p_from_env().empty()) {
+            std::cerr << "test failed: loopback ADDITION_ADVERTISED_P2P must be rejected\n";
+            return 1;
+        }
+#ifdef _WIN32
+        _putenv_s("ADDITION_ADVERTISED_P2P", "");
+#else
+        unsetenv("ADDITION_ADVERTISED_P2P");
+#endif
     }
 
     std::cout << "all rpc access tests passed\n";

@@ -1,5 +1,6 @@
 #include "addition/config.hpp"
 
+#include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <exception>
@@ -380,6 +381,68 @@ bool is_ipv4_endpoint(const std::string& endpoint) {
         octet.push_back(c);
     }
     return dots == 3 && flush_octet();
+}
+
+bool is_loopback_host(const std::string& host) {
+    if (host == "127.0.0.1" || host == "0.0.0.0" || host == "localhost" || host == "::1") {
+        return true;
+    }
+    // 127.0.0.0/8
+    return host.rfind("127.", 0) == 0;
+}
+
+bool is_loopback_endpoint(const std::string& endpoint) {
+    const auto colon = endpoint.rfind(':');
+    if (colon == std::string::npos || colon == 0) {
+        return false;
+    }
+    return is_loopback_host(endpoint.substr(0, colon));
+}
+
+bool is_self_peer_label(const std::string& endpoint) {
+    if (endpoint == "self" || endpoint == "probe-self") {
+        return true;
+    }
+    if (endpoint.rfind("self", 0) == 0 && !is_ipv4_endpoint(endpoint)) {
+        return true;
+    }
+    if (endpoint.rfind("probe-self", 0) == 0) {
+        return true;
+    }
+    return false;
+}
+
+bool is_public_ipv4_endpoint(const std::string& endpoint) {
+    return is_ipv4_endpoint(endpoint) && !is_loopback_endpoint(endpoint) && !is_self_peer_label(endpoint);
+}
+
+std::string advertised_p2p_from_env() {
+    const char* raw = std::getenv("ADDITION_ADVERTISED_P2P");
+    if (raw == nullptr) {
+        return {};
+    }
+    std::string value = trim_copy(raw);
+    if (!is_public_ipv4_endpoint(value)) {
+        return {};
+    }
+    return value;
+}
+
+std::vector<std::string> public_listed_peers(const std::vector<std::string>& peers) {
+    std::vector<std::string> out;
+    out.reserve(peers.size() + 1);
+    for (const auto& peer : peers) {
+        if (is_public_ipv4_endpoint(peer) &&
+            std::find(out.begin(), out.end(), peer) == out.end()) {
+            out.push_back(peer);
+        }
+    }
+    const auto advertised = advertised_p2p_from_env();
+    if (!advertised.empty() && std::find(out.begin(), out.end(), advertised) == out.end()) {
+        out.push_back(advertised);
+    }
+    std::sort(out.begin(), out.end());
+    return out;
 }
 
 const ChainConfig& default_config() {
@@ -988,6 +1051,8 @@ std::string daemon_help_text() {
            "P2P stays off unless ADDITION_ENABLE_P2P_RPC=1. --p2p-port / ADDITION_P2P_PORT (second node: 28546).\n"
            "--bootstrap IP:PORT replaces bootstrap_peers (IPv4 only; hostnames are not resolved).\n"
            "  Operator public P2P (current): 34.27.30.115:28545 — one IPv4 peer, not a peer list.\n"
+           "  Seed operators: ADDITION_ADVERTISED_P2P=34.27.30.115:28545 so public getinfo/peers\n"
+           "  list that IPv4 endpoint instead of self/loopback. Public listings never include 127.0.0.1.\n"
            "Auto-mine (testnet only, off by default, never on public RPC):\n"
            "  --auto-mine or ADDITION_AUTO_MINE=1\n"
            "  --auto-mine-interval SEC or ADDITION_AUTO_MINE_INTERVAL (default 60)\n"

@@ -185,6 +185,13 @@ int main() {
         std::cerr << "test failed: IPv4 endpoint validation\n";
         return 1;
     }
+    if (!addition::is_loopback_host("127.0.0.1") ||
+        addition::is_public_ipv4_endpoint("127.0.0.1:28545") ||
+        addition::is_public_ipv4_endpoint("self") ||
+        !addition::is_public_ipv4_endpoint("34.27.30.115:28545")) {
+        std::cerr << "test failed: public IPv4 endpoint filter\n";
+        return 1;
+    }
 
     std::cout << "all auto-mine tests passed\n";
     return 0;

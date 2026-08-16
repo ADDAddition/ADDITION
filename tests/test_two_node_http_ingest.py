@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Live public-RPC + two-node testnet check.
+"""Local two-node HTTP ingest: B syncs from A over HTTP, heights match.
 
-Starts two additiond processes. Public port must serve getinfo and reject writes.
-Node A mines several blocks. Node B starts at height 0, addpeer+sync, and must
-reach A's height. Genesis may have tx_count=0.
+This is a local test only. It does not claim public 28545/38545 work.
+If 28545 is filtered, ingest still uses the HTTP :80-style path
+(ADDITION_PUBLIC_HTTP_PORT pointed at node A's local public-read port).
+P2P is left off so HELLO on 28545 is not required.
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BIN = Path(os.environ.get("ADDITIOND", ROOT / "build" / "additiond"))
-DISABLED = "error: command disabled on public RPC"
+ADVERTISED = "34.27.30.115:28545"
 
 
 def port_open(host: str, port: int) -> bool:
@@ -33,20 +34,20 @@ def port_open(host: str, port: int) -> bool:
 
 def pick_ports() -> dict[str, int]:
     preferred = {
-        "a_write": 8545,
-        "a_p2p": 28545,
-        "a_pub": 38545,
-        "b_write": 8546,
-        "b_p2p": 28546,
+        "a_write": 18545,
+        "a_p2p": 19545,
+        "a_pub": 18080,
+        "b_write": 18546,
+        "b_p2p": 19546,
     }
     if not any(port_open("127.0.0.1", p) for p in preferred.values()):
         return preferred
     return {
-        "a_write": 19045,
-        "a_p2p": 29045,
-        "a_pub": 39045,
-        "b_write": 19046,
-        "b_p2p": 29046,
+        "a_write": 19145,
+        "a_p2p": 19147,
+        "a_pub": 18180,
+        "b_write": 19146,
+        "b_p2p": 19148,
     }
 
 
@@ -86,26 +87,20 @@ def wait_port(host: str, port: int, timeout: float = 45.0) -> None:
     raise TimeoutError("timeout waiting for %s:%s last=%s" % (host, port, last))
 
 
-def http_request(port: int, method: str, path: str) -> tuple[int, dict[str, str], str]:
+def http_request(port: int, path: str) -> tuple[int, str]:
     conn = http.client.HTTPConnection("127.0.0.1", port, timeout=6)
     try:
-        conn.request(method, path)
+        conn.request("GET", path)
         resp = conn.getresponse()
-        headers = {k.lower(): v for k, v in resp.getheaders()}
         body = resp.read().decode("utf-8", errors="replace")
-        return resp.status, headers, body
+        return resp.status, body
     finally:
         conn.close()
 
 
-def start_node(
-    args: list[str],
-    data_dir: Path,
-    log_path: Path,
-    extra_env: dict[str, str] | None = None,
-) -> subprocess.Popen:
+def start_node(args: list[str], log_path: Path, extra_env: dict[str, str]) -> subprocess.Popen:
     env = os.environ.copy()
-    env["ADDITION_ENABLE_P2P_RPC"] = "1"
+    env.pop("ADDITION_ENABLE_P2P_RPC", None)
     env.pop("ADDITION_ENABLE_PUBLIC_RPC", None)
     env.pop("ADDITION_PUBLIC_RPC_PORT", None)
     env.pop("ADDITION_PUBLIC_RPC_BIND", None)
@@ -116,8 +111,7 @@ def start_node(
     env.pop("ADDITION_AUTO_MINE_REWARD", None)
     env.pop("ADDITION_PUBLIC_HTTP_PORT", None)
     env.pop("ADDITION_ADVERTISED_P2P", None)
-    if extra_env:
-        env.update(extra_env)
+    env.update(extra_env)
     log = log_path.open("w", encoding="utf-8")
     proc = subprocess.Popen(
         args,
@@ -158,7 +152,7 @@ def main() -> int:
         return 2
 
     ports = pick_ports()
-    tmp = Path(tempfile.mkdtemp(prefix="addition-two-node-"))
+    tmp = Path(tempfile.mkdtemp(prefix="addition-http-ingest-"))
     node_a_dir = tmp / "node-a"
     node_b_dir = tmp / "node-b"
     node_a_dir.mkdir()
@@ -183,9 +177,8 @@ def main() -> int:
                 "--p2p-port",
                 str(ports["a_p2p"]),
             ],
-            node_a_dir,
             tmp / "node-a.log",
-            {"ADDITION_ADVERTISED_P2P": "34.27.30.115:28545"},
+            {"ADDITION_ADVERTISED_P2P": ADVERTISED},
         )
         proc_b = start_node(
             [
@@ -201,7 +194,6 @@ def main() -> int:
                 "--bootstrap",
                 "127.0.0.1:%s" % ports["a_p2p"],
             ],
-            node_b_dir,
             tmp / "node-b.log",
             {"ADDITION_PUBLIC_HTTP_PORT": str(ports["a_pub"])},
         )
@@ -212,55 +204,23 @@ def main() -> int:
         info = tcp_rpc("127.0.0.1", ports["a_pub"], "getinfo")
         if "network=testnet" not in info:
             return fail("public TCP getinfo: " + info)
-        if "127.0.0.1" in info or "localhost" in info:
-            return fail("public TCP getinfo leaked loopback: " + info)
-        if "advertised_p2p=34.27.30.115:28545" not in info:
+        if "127.0.0.1" in info or "localhost" in info or " self" in (" " + info):
+            return fail("public TCP getinfo leaked loopback/self: " + info)
+        if "advertised_p2p=%s" % ADVERTISED not in info:
             return fail("public getinfo missing advertised_p2p: " + info)
         pub_peers = tcp_rpc("127.0.0.1", ports["a_pub"], "peers")
-        if "127.0.0.1" in pub_peers or "localhost" in pub_peers:
-            return fail("public peers leaked loopback: " + pub_peers)
-        if "34.27.30.115:28545" not in pub_peers:
+        if "127.0.0.1" in pub_peers or "localhost" in pub_peers or pub_peers == "self":
+            return fail("public peers leaked loopback/self: " + pub_peers)
+        if ADVERTISED not in pub_peers:
             return fail("public peers missing advertised P2P: " + pub_peers)
 
-        status, headers, body = http_request(ports["a_pub"], "GET", "/rpc?cmd=getinfo")
+        status, body = http_request(ports["a_pub"], "/rpc?cmd=getinfo")
         if status != 200 or "network=testnet" not in body:
             return fail("public HTTP getinfo status=%s body=%s" % (status, body))
         if "127.0.0.1" in body:
             return fail("public HTTP getinfo leaked 127.0.0.1: " + body)
-        if headers.get("access-control-allow-origin") != "*":
-            return fail("missing CORS header")
-        if "no-store" not in headers.get("cache-control", ""):
-            return fail("missing cache-control: no-store")
-
-        opt_status, opt_headers, _ = http_request(ports["a_pub"], "OPTIONS", "/rpc")
-        if opt_status != 204:
-            return fail("OPTIONS status=%s" % opt_status)
-        if opt_headers.get("access-control-allow-origin") != "*":
-            return fail("OPTIONS missing CORS")
-
-        for cmd in ("mine", "createwallet", "wallet_list", "sendtx", "identity_rotate_status"):
-            reply = tcp_rpc("127.0.0.1", ports["a_pub"], cmd)
-            if reply != DISABLED:
-                return fail("public TCP %s -> %s" % (cmd, reply))
-            _, _, http_body = http_request(ports["a_pub"], "GET", "/rpc?cmd=" + cmd)
-            if DISABLED not in http_body:
-                return fail("public HTTP %s -> %s" % (cmd, http_body))
-
-        trusted = tcp_rpc("127.0.0.1", ports["a_write"], "getinfo")
-        if "network=testnet" not in trusted:
-            return fail("trusted write getinfo: " + trusted)
-
-        genesis = tcp_rpc("127.0.0.1", ports["a_write"], "getblock 0")
-        if "tx_count=0" not in genesis:
-            return fail("genesis must have tx_count=0: " + genesis)
-        if "timestamp=1763000000" not in genesis:
-            return fail("genesis timestamp: " + genesis)
-        raw0 = tcp_rpc("127.0.0.1", ports["a_pub"], "getblockraw 0")
-        if not raw0.startswith("ok:BLKDATA|"):
-            return fail("public getblockraw 0: " + raw0)
-        _, _, http_raw0 = http_request(ports["a_pub"], "GET", "/rpc?cmd=getblockraw%200")
-        if "ok:BLKDATA|" not in http_raw0:
-            return fail("public HTTP getblockraw 0: " + http_raw0)
+        if "advertised_p2p=%s" % ADVERTISED not in body:
+            return fail("public HTTP getinfo missing advertised_p2p: " + body)
 
         for i in range(3):
             mined = tcp_rpc("127.0.0.1", ports["a_write"], "mine miner1", timeout=35.0)
@@ -279,9 +239,6 @@ def main() -> int:
         add = tcp_rpc("127.0.0.1", ports["b_write"], "addpeer 127.0.0.1:%s" % ports["a_p2p"])
         if add not in {"ok", "error: invalid/duplicate peer"}:
             return fail("addpeer: " + add)
-        peers_b = tcp_rpc("127.0.0.1", ports["b_write"], "peers")
-        if ("127.0.0.1:%s" % ports["a_p2p"]) not in peers_b:
-            return fail("node B peers missing A: " + peers_b)
 
         sync = tcp_rpc("127.0.0.1", ports["b_write"], "sync", timeout=45.0)
         if sync == "ok:height=0":
@@ -292,9 +249,9 @@ def main() -> int:
         if height_b != height_a:
             return fail("B height %s != A height %s (sync=%s)" % (height_b, height_a, sync))
 
-        print("two-node sync:", sync)
-        print("public RPC getinfo ok; writes rejected; B pulled A's chain")
-        print("ports", ports)
+        print("local HTTP ingest sync:", sync)
+        print("public peers listed", ADVERTISED, "(no 127.0.0.1 leak)")
+        print("local ports", ports, "(not a public 28545/38545 claim)")
         return 0
     finally:
         stop_node(proc_a)

@@ -182,7 +182,7 @@ curl 'http://127.0.0.1:38545/jsonrpc?method=getinfo'
 printf 'mine\n' | nc 127.0.0.1 38545   # error: command disabled on public RPC
 ```
 
-Public-read JSON API (same allowlist, no writes): `GET /jsonrpc?method=getinfo` and `POST /jsonrpc` with JSON-RPC 2.0. Join path: `--bootstrap 34.27.30.115:28545`; `sync` uses HTTP `:80` then `:38545`.
+Public-read JSON API (same allowlist, no writes): `GET /jsonrpc?method=getinfo` and `POST /jsonrpc` with JSON-RPC 2.0. Join path: `--bootstrap 34.27.30.115:28545`; `sync` uses HTTP `:80` then `:38545`. Seed operators set `ADDITION_ADVERTISED_P2P=34.27.30.115:28545` so public `getinfo` / `peers` list that IPv4 endpoint instead of `self` / loopback. Public listings never include `127.0.0.1`.
 
 LAN RPC (`18545`) still requires `ADDITION_ENABLE_LAN_RPC=1` and `ADDITION_LAN_RPC_TOKEN`. P2P stays off unless `ADDITION_ENABLE_P2P_RPC=1`. Do not open unauthenticated write RPC to the world.
 

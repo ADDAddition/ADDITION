@@ -125,7 +125,13 @@ public port is up. If the daemon is down, pages show **RPC offline**.
   (GCP rule `allow-addition-p2p`). Allow 28545 only while P2P is enabled.
   Never open **8545** or **18545**.
 - Endpoints are IPv4 `ip:port` only (`inet_pton`). Docker DNS names do not work.
-- `bootstrap_peers` / `--bootstrap` skip this process’s own P2P port.
+- `bootstrap_peers` / `--bootstrap` skip this process’s own P2P port, `self` /
+  `probe-self`, and `ADDITION_ADVERTISED_P2P` when set (seed must set that to
+  its public `ip:port` so it does not add itself).
+- Public `getinfo` / `peers` list only non-loopback IPv4 endpoints, plus
+  `ADDITION_ADVERTISED_P2P` when it is a public IPv4 `ip:port`. They never
+  print `127.0.0.1`, `localhost`, or `self`. Trusted write RPC may still
+  list `127.0.0.1:…` for local two-node sync.
 - IPv4 only. The operator’s current public P2P is `34.27.30.115:28545`
   (`--bootstrap 34.27.30.115:28545`). Do not invent extra peers. Write RPC
   stays `127.0.0.1:8545`.
@@ -149,7 +155,23 @@ Same meaning as CLI / env:
 
 Env: `ADDITION_ENABLE_PUBLIC_RPC=1`, `ADDITION_PUBLIC_RPC_PORT`,
 `ADDITION_PUBLIC_RPC_BIND`, `ADDITION_LOCAL_RPC_PORT`, `ADDITION_P2P_PORT`,
-`ADDITION_AUTO_MINE=1`, `ADDITION_AUTO_MINE_INTERVAL`, `ADDITION_AUTO_MINE_REWARD`.
+`ADDITION_AUTO_MINE=1`, `ADDITION_AUTO_MINE_INTERVAL`, `ADDITION_AUTO_MINE_REWARD`,
+`ADDITION_ADVERTISED_P2P` (seed: `34.27.30.115:28545`),
+`ADDITION_PUBLIC_HTTP_PORT` (local HTTP ingest stand-in for `:80`).
+
+## Local HTTP ingest test
+
+This is a **local** test only. It does not claim public `28545` / `38545` work.
+Node B sets `ADDITION_PUBLIC_HTTP_PORT` to node A’s local public-read port
+(the `:80`-style path). If `28545` is filtered, ingest still uses HTTP.
+
+```bash
+cmake -S . -B build -DADDITION_BUILD_TESTS=ON
+cmake --build build --target additiond
+python3 tests/test_two_node_http_ingest.py
+```
+
+Or via ctest: `ctest --test-dir build -R test_two_node_http_ingest --output-on-failure`.
 
 Auto-mine is testnet only, off unless `--auto-mine` / `ADDITION_AUTO_MINE=1`.
 It is not a public RPC command. Each mined block is written to `blocks.dat`.

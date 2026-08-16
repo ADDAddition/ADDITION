@@ -61,6 +61,14 @@ struct NodeConfig {
 inline constexpr const char* kOperatorPublicP2p = "34.27.30.115:28545";
 
 bool is_ipv4_endpoint(const std::string& endpoint);
+bool is_loopback_host(const std::string& host);
+bool is_loopback_endpoint(const std::string& endpoint);
+bool is_self_peer_label(const std::string& endpoint);
+bool is_public_ipv4_endpoint(const std::string& endpoint);
+// Seed operator env ADDITION_ADVERTISED_P2P=ip:port. Empty if unset or not public IPv4.
+std::string advertised_p2p_from_env();
+// Public getinfo/peers listing: non-loopback IPv4 only, plus advertised_p2p when set.
+std::vector<std::string> public_listed_peers(const std::vector<std::string>& peers);
 
 const ChainConfig& default_config();
 ChainConfig testnet_chain_config();

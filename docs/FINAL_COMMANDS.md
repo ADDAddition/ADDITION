@@ -63,6 +63,7 @@ Two-node local testnet (write RPC stays loopback):
 Node A: `--public-rpc` on `38545`, P2P `28545`, write `127.0.0.1:8545`.
 Node B: `--data-dir` second tree, write `8546`, P2P `28546`, `--bootstrap 127.0.0.1:28545`.
 Operator public P2P (IPv4 only): `--bootstrap 34.27.30.115:28545`. Write RPC stays loopback.
+Seed operators set `ADDITION_ADVERTISED_P2P=34.27.30.115:28545` so public `getinfo` / `peers` list that endpoint instead of `self` / loopback. Public listings never include `127.0.0.1`.
 See [TWO_NODE_TESTNET.md](TWO_NODE_TESTNET.md).
 
 Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so the worker shows `RPC offline`. Set it only to a real public-rpc HTTP URL you operate. Do not commit trycloudflare URLs.

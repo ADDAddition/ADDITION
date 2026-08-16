@@ -27,6 +27,13 @@ advertises one IPv4 bootstrap: **34.27.30.115:28545**. That is the current
 public P2P of this testnet, not a peer-count claim and not a mainnet.
 `config.toml` / `getinfo.bootstrap_peers` list that single endpoint so
 outsiders can `--bootstrap 34.27.30.115:28545`. Do not invent extra peers.
+
+Seed operators must also set `ADDITION_ADVERTISED_P2P=34.27.30.115:28545`.
+Public `getinfo` / `peers` then list that endpoint (and `advertised_p2p=`)
+instead of `self` or loopback. The seed does not add that address as a
+bootstrap peer to itself. Public listings never include `127.0.0.1`.
+Trusted write RPC on `127.0.0.1` may still show loopback peers for a
+local two-node sync.
 The binary still leaves P2P off until that env is set; the public GCP
 node sets it.
 
@@ -93,6 +100,9 @@ Optional write-RPC token (loopback only):
 ADDITION_RPC_TOKEN=<strong_token>
 # Live operator public node (34.27.30.115): P2P on, write RPC stays loopback.
 ADDITION_ENABLE_P2P_RPC=1
+# Seed only: public getinfo/peers list this IPv4 endpoint instead of self/loopback.
+# Must be a non-loopback IPv4 host:port. Public RPC never prints 127.0.0.1.
+ADDITION_ADVERTISED_P2P=34.27.30.115:28545
 ```
 
 Do not set `ADDITION_MAINNET_MODE`. This unit is testnet only.

@@ -41,6 +41,7 @@ POST http://HOST:38545/jsonrpc
 <p>Node A: <code>--public-rpc</code> on <code>38545</code>, P2P <code>28545</code>, write <code>127.0.0.1:8545</code>.</p>
 <p>Node B: <code>--data-dir</code> second tree, write <code>8546</code>, P2P <code>28546</code>, <code>--bootstrap 127.0.0.1:28545</code>.</p>
 <p>Operator public P2P (IPv4 only): <code>--bootstrap 34.27.30.115:28545</code>. Write RPC stays loopback.</p>
+<p>Seed operators set <code>ADDITION_ADVERTISED_P2P=34.27.30.115:28545</code> so public <code>getinfo</code> / <code>peers</code> list that endpoint instead of <code>self</code> / loopback. Public listings never include <code>127.0.0.1</code>.</p>
 <p>See <a href="TWO_NODE_TESTNET.md">TWO_NODE_TESTNET.md</a>.</p>
 <p>Website <code>PUBLIC_RPC_HTTP</code> stays empty in <code>web/public/wrangler.toml</code> so the worker shows <code>RPC offline</code>. Set it only to a real public-rpc HTTP URL you operate. Do not commit trycloudflare URLs.</p>
 <h2>Core chain</h2>

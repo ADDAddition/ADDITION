@@ -117,6 +117,13 @@ bool parse_env_u16(const char* name, std::uint16_t& out) {
 }
 
 bool is_self_p2p_endpoint(const std::string& endpoint, std::uint16_t p2p_port) {
+    if (addition::is_self_peer_label(endpoint)) {
+        return true;
+    }
+    const auto advertised = addition::advertised_p2p_from_env();
+    if (!advertised.empty() && endpoint == advertised) {
+        return true;
+    }
     const std::string suffix = ":" + std::to_string(p2p_port);
     if (endpoint.size() <= suffix.size()) {
         return false;
@@ -125,7 +132,7 @@ bool is_self_p2p_endpoint(const std::string& endpoint, std::uint16_t p2p_port) {
         return false;
     }
     const std::string host = endpoint.substr(0, endpoint.size() - suffix.size());
-    return host == "127.0.0.1" || host == "0.0.0.0" || host == "localhost" || host == "::1";
+    return addition::is_loopback_host(host);
 }
 
 } // namespace

@@ -9,7 +9,7 @@
 <body data-title="Two-node testnet" data-sub="from the repo">
   <header id="site-header"></header>
   <main class="prose">
-    <div class="banner">From <code>docs/TWO_NODE_TESTNET.md</code>. Two local <code>additiond</code> processes. Live join: <a href="/join/">/join/</a> — bootstrap <code>34.27.30.115:28545</code>, then <code>sync</code>.</div>
+    <div class="banner">From <code>docs/TWO_NODE_TESTNET.md</code>. Two local <code>additiond</code> processes.</div>
     <h2>Two-node local testnet runbook</h2>
 <p>This starts <strong>two <code>additiond</code> processes</strong> on one machine. It is not a public</p>
 <p>mainnet, not a token sale, and it does not invent peer counts or hashrate.</p>
@@ -76,7 +76,14 @@ printf &#x27;createwallet\n&#x27; | nc 127.0.0.1 38545</pre>
 <ul><li>P2P transport is off unless <code>ADDITION_ENABLE_P2P_RPC=1</code>.</li><li>The live operator node sets that env and allows inbound TCP <strong>28545</strong></li></ul>
 <p>  (GCP rule <code>allow-addition-p2p</code>). Allow 28545 only while P2P is enabled.</p>
 <p>  Never open <strong>8545</strong> or <strong>18545</strong>.</p>
-<ul><li>Endpoints are IPv4 <code>ip:port</code> only (<code>inet_pton</code>). Docker DNS names do not work.</li><li><code>bootstrap_peers</code> / <code>--bootstrap</code> skip this process’s own P2P port.</li><li>IPv4 only. The operator’s current public P2P is <code>34.27.30.115:28545</code></li></ul>
+<ul><li>Endpoints are IPv4 <code>ip:port</code> only (<code>inet_pton</code>). Docker DNS names do not work.</li><li><code>bootstrap_peers</code> / <code>--bootstrap</code> skip this process’s own P2P port, <code>self</code> /</li></ul>
+<p>  <code>probe-self</code>, and <code>ADDITION_ADVERTISED_P2P</code> when set (seed must set that to</p>
+<p>  its public <code>ip:port</code> so it does not add itself).</p>
+<ul><li>Public <code>getinfo</code> / <code>peers</code> list only non-loopback IPv4 endpoints, plus</li></ul>
+<p>  <code>ADDITION_ADVERTISED_P2P</code> when it is a public IPv4 <code>ip:port</code>. They never</p>
+<p>  print <code>127.0.0.1</code>, <code>localhost</code>, or <code>self</code>. Trusted write RPC may still</p>
+<p>  list <code>127.0.0.1:…</code> for local two-node sync.</p>
+<ul><li>IPv4 only. The operator’s current public P2P is <code>34.27.30.115:28545</code></li></ul>
 <p>  (<code>--bootstrap 34.27.30.115:28545</code>). Do not invent extra peers. Write RPC</p>
 <p>  stays <code>127.0.0.1:8545</code>.</p>
 <ul><li><code>sync</code> pulls the public chain over HTTP: <code>:80</code> first (<code>getblockraw</code>), then</li></ul>
@@ -90,7 +97,17 @@ printf &#x27;createwallet\n&#x27; | nc 127.0.0.1 38545</pre>
 <ul><li><code>enable_public_rpc</code></li><li><code>ports.public_rpc</code> / <code>ports.public_rpc_bind</code></li><li><code>ports.local_rpc</code> / <code>ports.p2p</code></li><li><code>bootstrap_peers</code> (IPv4 <code>ip:port</code> only; repo <code>config.toml</code> lists <code>34.27.30.115:28545</code>)</li><li><code>enable_auto_mine</code> / <code>auto_mine_interval_sec</code> / <code>auto_mine_reward</code> (off by default)</li></ul>
 <p>Env: <code>ADDITION_ENABLE_PUBLIC_RPC=1</code>, <code>ADDITION_PUBLIC_RPC_PORT</code>,</p>
 <p><code>ADDITION_PUBLIC_RPC_BIND</code>, <code>ADDITION_LOCAL_RPC_PORT</code>, <code>ADDITION_P2P_PORT</code>,</p>
-<p><code>ADDITION_AUTO_MINE=1</code>, <code>ADDITION_AUTO_MINE_INTERVAL</code>, <code>ADDITION_AUTO_MINE_REWARD</code>.</p>
+<p><code>ADDITION_AUTO_MINE=1</code>, <code>ADDITION_AUTO_MINE_INTERVAL</code>, <code>ADDITION_AUTO_MINE_REWARD</code>,</p>
+<p><code>ADDITION_ADVERTISED_P2P</code> (seed: <code>34.27.30.115:28545</code>),</p>
+<p><code>ADDITION_PUBLIC_HTTP_PORT</code> (local HTTP ingest stand-in for <code>:80</code>).</p>
+<h2>Local HTTP ingest test</h2>
+<p>This is a <strong>local</strong> test only. It does not claim public <code>28545</code> / <code>38545</code> work.</p>
+<p>Node B sets <code>ADDITION_PUBLIC_HTTP_PORT</code> to node A’s local public-read port</p>
+<p>(the <code>:80</code>-style path). If <code>28545</code> is filtered, ingest still uses HTTP.</p>
+<pre>cmake -S . -B build -DADDITION_BUILD_TESTS=ON
+cmake --build build --target additiond
+python3 tests/test_two_node_http_ingest.py</pre>
+<p>Or via ctest: <code>ctest --test-dir build -R test_two_node_http_ingest --output-on-failure</code>.</p>
 <p>Auto-mine is testnet only, off unless <code>--auto-mine</code> / <code>ADDITION_AUTO_MINE=1</code>.</p>
 <p>It is not a public RPC command. Each mined block is written to <code>blocks.dat</code>.</p>
     <p class="note">Source file in the repository: <a href="https://github.com/ADDAddition/ADDITION/blob/main/docs/TWO_NODE_TESTNET.md">docs/TWO_NODE_TESTNET.md</a></p>
