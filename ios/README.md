@@ -6,7 +6,7 @@ This is not a hosted web wallet. It is not a multi-chain browser. It talks to AD
 
 Contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com)
 
-Screens: Home (balance, then Receive / Send), Receive (QR + address), Send (available / amount / to / fee), Activity. Node settings sit behind the gear on Home. Brand images are the website files (`logo-transparent.png`, `apple-touch-icon.png`, `og.png`, `favicon-32.png`) copied into the asset catalog.
+Screens: Home (balance, then Receive / Send), Receive (QR + address), Send (available / amount / to / fee), Activity. Node settings sit behind the gear on Home. Brand images are the website files (`logo-transparent.png`, `apple-touch-icon.png`, `og.png`, `favicon-32.png`) copied into the asset catalog. Accents, buttons, and tab chrome use the wordmark red sampled from `logo-transparent.png` (`#E61D16`).
 
 ## What it does
 

@@ -102,13 +102,16 @@ struct CircleAction: View {
                     Circle()
                         .fill(AdditionTheme.panelLift)
                         .frame(width: 56, height: 56)
+                        .overlay(
+                            Circle().stroke(enabled ? AdditionTheme.red : AdditionTheme.line, lineWidth: 1)
+                        )
                     Image(systemName: systemImage)
                         .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(enabled ? AdditionTheme.cream : AdditionTheme.mute)
+                        .foregroundStyle(enabled ? AdditionTheme.red : AdditionTheme.mute)
                 }
                 Text(title)
                     .font(.footnote.weight(.medium))
-                    .foregroundStyle(AdditionTheme.mute)
+                    .foregroundStyle(enabled ? AdditionTheme.cream : AdditionTheme.mute)
             }
         }
         .buttonStyle(.plain)
