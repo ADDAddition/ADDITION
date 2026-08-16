@@ -1207,7 +1207,7 @@ std::string daemon_help_text() {
            "  Refused on --network mainnet even if the flag is set.\n"
            "Do not expose write RPC to the world.\n"
            "\n"
-           "Local wallet (trusted RPC only): createwallet [name], wallet_list, wallet_info,\n"
+           "Local wallet (trusted RPC only): createwallet [name] [scheme], wallet_list, wallet_info,\n"
            "  wallet_balance, wallet_send, wallet_sign. Keys stay in <data-dir>/wallets/*.wal.\n"
            "  Bitcoin-like user model (keys, UTXOs, send/receive, fee). Not BIP-compatible.\n"
            "\n"
