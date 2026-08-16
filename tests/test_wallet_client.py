@@ -144,7 +144,7 @@ class WalletClientTests(unittest.TestCase):
         for command in self.rpc.sent:
             self.assertNotIn(SECRET, command)
 
-    def test_getinfo_is_honest_testnet(self) -> None:
+    def test_getinfo_is_testnet(self) -> None:
         info = self.client.getinfo()
         self.assertIn("network=testnet", info)
         self.assertIn("pq_mode=strict", info)

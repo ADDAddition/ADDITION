@@ -13,6 +13,7 @@ if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
 
 from addition_jsonrpc_adapter import (
+    PUBLIC_READ_METHODS,
     AdapterError,
     classify_method,
     dispatch,
@@ -59,6 +60,12 @@ class AdapterUnitTests(unittest.TestCase):
         self.assertEqual(classify_method("sendtx"), "refused")
         self.assertEqual(classify_method("swap_quote"), "unknown")
         self.assertEqual(classify_method("invented_foo"), "unknown")
+        self.assertEqual(classify_method("getblockraw"), "read")
+        self.assertEqual(classify_method("getblockraw", public_read=True), "read")
+        self.assertEqual(classify_method("token_create", public_read=True), "refused")
+        self.assertEqual(classify_method("token_balance", public_read=True), "unknown")
+        self.assertTrue({"getinfo", "getblock", "getblockhash", "getblockraw",
+                         "monetary_info", "peers", "tx_status", "crypto_selftest"} <= PUBLIC_READ_METHODS)
 
     def test_format_joins_params(self) -> None:
         self.assertEqual(
@@ -85,6 +92,8 @@ class AdapterUnitTests(unittest.TestCase):
             dispatch(self.rpc, "eth_chainId", [], True)
         with self.assertRaises(AdapterError):
             dispatch(self.rpc, "swap_quote", ["A", "B", 1], True)
+        with self.assertRaises(AdapterError):
+            dispatch(self.rpc, "token_create", ["DEMO", "alice", 1000, 10], True, True)
 
     def test_jsonrpc_payload(self) -> None:
         reply = handle_payload(
