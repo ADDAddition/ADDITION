@@ -326,6 +326,22 @@ int main() {
         std::cerr << "test failed: public JSON must reject mine: " << json_write << '\n';
         return 1;
     }
+    const char* public_json_blocked[] = {
+        "wallet_send",
+        "stake",
+        "unstake",
+        "swap_exact_in",
+        "add_liquidity",
+    };
+    for (const char* write_method : public_json_blocked) {
+        const auto json_blocked = addition::dispatch_public_read_rpc(
+            rpc, std::string("GET /jsonrpc?method=") + write_method + " HTTP/1.1\r\n\r\n");
+        if (json_blocked.find("command disabled on public RPC") == std::string::npos) {
+            std::cerr << "test failed: public JSON must reject " << write_method
+                      << ": " << json_blocked << '\n';
+            return 1;
+        }
+    }
     const auto json_raw = addition::dispatch_public_read_rpc(
         rpc, "GET /jsonrpc?method=getblockraw&params=1 HTTP/1.1\r\n\r\n");
     if (json_raw.find("ok:BLKDATA|") == std::string::npos &&
