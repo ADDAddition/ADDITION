@@ -92,5 +92,13 @@ if(ADDITION_BUILD_TESTS)
         set_tests_properties(test_live_mine_and_privacy PROPERTIES
             ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
             TIMEOUT 90)
+        add_test(
+            NAME test_chain_persist_restart
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_chain_persist_restart.py
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        )
+        set_tests_properties(test_chain_persist_restart PROPERTIES
+            ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
+            TIMEOUT 90)
     endif()
 endif()

@@ -105,6 +105,8 @@ printf 'getinfo\n' | nc 127.0.0.1 8545
 
 `getinfo` reports `network=testnet` and `network_name=addition-testnet`.
 
+`--data-dir` (default `data/`) holds the chain, not just identity and wallets. After each accepted block the node writes `blocks.dat` (text block index: headers + transactions). UTXOs are rebuilt by replaying that file on startup. A clean process restart with the same `--data-dir` keeps `getinfo` height and `getblock` hashes. Wallets stay in `data-dir/wallets/`.
+
 ### Local wallet (Bitcoin-like user model)
 
 Trusted RPC only (`127.0.0.1:8545`). `createwallet` generates ML-DSA-87 keys and writes them to `data/wallets/<name>.wal` (owner-only). The reply has `priv_printed=0`. This is keys / UTXOs / send / receive / fee — not BIP compatibility and not a Bitcoin fork.

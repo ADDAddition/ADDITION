@@ -4,6 +4,7 @@
 #include "addition/config.hpp"
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -33,6 +34,10 @@ public:
                             std::string& error);
     bool replace_with_chain(const std::vector<Block>& candidate,
                             std::string& error);
+
+    // Invoked after a block is committed (add_block) or a heavier chain is
+    // accepted (replace_with_chain). Not called during a failed reorg replay.
+    void set_on_commit(std::function<void()> hook);
 
     bool build_transaction(const std::string& from,
                            const std::string& to,
@@ -85,7 +90,10 @@ private:
     std::uint64_t total_emitted_{0};
     std::uint64_t total_fees_last_block_{0};
     std::uint64_t cumulative_work_{0};
+    std::function<void()> on_commit_;
+    int suppress_commit_{0};
 
+    void notify_commit();
     Block make_genesis() const;
     Block make_block_template(const std::string& reward_address,
                               std::vector<Transaction> txs,

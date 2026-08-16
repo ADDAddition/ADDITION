@@ -1,10 +1,14 @@
+#include "addition/block.hpp"
 #include "addition/chain.hpp"
 #include "addition/config.hpp"
 #include "addition/crypto.hpp"
 #include "addition/mempool.hpp"
 #include "addition/miner.hpp"
+#include "addition/state_store.hpp"
 #include "addition/wallet_keys.hpp"
 
+#include <chrono>
+#include <filesystem>
 #include <iostream>
 #include <string>
 
@@ -127,6 +131,73 @@ int main() {
     if (chain.balance_of(miner_keys.address) < 79) {
         std::cerr << "test failed: sender balance too low after spend\n";
         return 1;
+    }
+
+    {
+        // Persist only on-chain blocks. credit_balance above is in-memory only
+        // and cannot be replayed from blocks.dat.
+        addition::Chain persist_chain(live);
+        addition::Mempool persist_mempool;
+        addition::Miner persist_miner(persist_chain, persist_mempool);
+        std::string persist_hash;
+        if (!persist_miner.mine_next_block("persist_miner", 200, 1, persist_hash, error)) {
+            std::cerr << "test failed: persist mine b1: " << error << '\n';
+            return 1;
+        }
+        if (!persist_miner.mine_next_block("persist_miner", 200, 1, persist_hash, error)) {
+            std::cerr << "test failed: persist mine b2: " << error << '\n';
+            return 1;
+        }
+
+        const auto persist_dir = std::filesystem::temp_directory_path() /
+            ("addition-chain-persist-" +
+             std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        std::filesystem::create_directories(persist_dir);
+        addition::StateStore store(persist_dir.string());
+        if (!store.save_chain(persist_chain, error)) {
+            std::cerr << "test failed: save_chain: " << error << '\n';
+            std::filesystem::remove_all(persist_dir);
+            return 1;
+        }
+        if (!store.chain_file_exists()) {
+            std::cerr << "test failed: blocks.dat missing after save_chain\n";
+            std::filesystem::remove_all(persist_dir);
+            return 1;
+        }
+
+        const auto height_before = persist_chain.height();
+        const auto tip_hash = addition::hash_block_header(persist_chain.tip().header);
+        const auto miner_bal = persist_chain.balance_of("persist_miner");
+        if (height_before != 2 || miner_bal != 100) {
+            std::cerr << "test failed: persist source height/balance\n";
+            std::filesystem::remove_all(persist_dir);
+            return 1;
+        }
+
+        addition::Chain restored(live);
+        if (!store.load_chain(restored, error)) {
+            std::cerr << "test failed: load_chain: " << error << '\n';
+            std::filesystem::remove_all(persist_dir);
+            return 1;
+        }
+        if (restored.height() != height_before) {
+            std::cerr << "test failed: restored height " << restored.height()
+                      << " != " << height_before << '\n';
+            std::filesystem::remove_all(persist_dir);
+            return 1;
+        }
+        const auto restored_hash = addition::hash_block_header(restored.tip().header);
+        if (restored_hash != tip_hash) {
+            std::cerr << "test failed: restored tip hash mismatch\n";
+            std::filesystem::remove_all(persist_dir);
+            return 1;
+        }
+        if (restored.balance_of("persist_miner") != miner_bal) {
+            std::cerr << "test failed: restored UTXO balances mismatch\n";
+            std::filesystem::remove_all(persist_dir);
+            return 1;
+        }
+        std::filesystem::remove_all(persist_dir);
     }
 
     std::cout << "all tests passed\n";

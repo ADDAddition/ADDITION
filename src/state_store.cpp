@@ -6,17 +6,37 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <system_error>
 
 namespace addition {
 namespace {
 
 bool write_text(const std::string& path, const std::string& content, std::string& error) {
-    std::ofstream out(path, std::ios::binary | std::ios::trunc);
-    if (!out) {
-        error = "cannot open for write: " + path;
+    const std::string tmp = path + ".tmp";
+    {
+        std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
+        if (!out) {
+            error = "cannot open for write: " + tmp;
+            return false;
+        }
+        out << content;
+        out.flush();
+        if (!out) {
+            error = "write failed: " + tmp;
+            return false;
+        }
+    }
+    std::error_code ec;
+    std::filesystem::rename(tmp, path, ec);
+    if (ec) {
+        std::error_code rm_ec;
+        std::filesystem::remove(path, rm_ec);
+        std::filesystem::rename(tmp, path, ec);
+    }
+    if (ec) {
+        error = "rename failed: " + path + ": " + ec.message();
         return false;
     }
-    out << content;
     return true;
 }
 
@@ -111,6 +131,103 @@ std::string StateStore::pouw_storage_path() const { return data_dir_ + "/pouw_st
 std::string StateStore::pouw_compute_path() const { return data_dir_ + "/pouw_compute.dat"; }
 std::string StateStore::private_messages_path() const { return data_dir_ + "/private_messages.dat"; }
 
+bool StateStore::chain_file_exists() const {
+    return std::filesystem::exists(blocks_path());
+}
+
+bool StateStore::save_chain(const Chain& chain, std::string& error) const {
+    std::filesystem::create_directories(data_dir_);
+    std::ostringstream blocks;
+    for (const auto& b : chain.blocks()) {
+        if (b.header.height == 0) {
+            continue;
+        }
+        blocks << "B|" << b.header.height << '|' << b.header.previous_hash << '|' << b.header.timestamp
+               << '|' << b.header.nonce << '|' << b.header.difficulty_target << '|' << b.header.merkle_root
+               << '\n';
+        for (const auto& tx : b.transactions) {
+            blocks << tx_to_line(tx);
+        }
+        blocks << "Z\n";
+    }
+    return write_text(blocks_path(), blocks.str(), error);
+}
+
+bool StateStore::load_chain(Chain& chain, std::string& error) const {
+    try {
+    if (!std::filesystem::exists(blocks_path())) {
+        return true;
+    }
+
+    std::string content;
+    if (!read_text(blocks_path(), content, error)) {
+        error = "chain load failed: " + error;
+        return false;
+    }
+
+    std::istringstream iss(content);
+    for (std::string line; std::getline(iss, line);) {
+        if (line.empty()) {
+            continue;
+        }
+        if (line.rfind("B|", 0) != 0) {
+            continue;
+        }
+
+        Block b{};
+        {
+            std::istringstream hs(line.substr(2));
+            std::string h;
+            std::getline(hs, h, '|'); b.header.height = std::stoull(h);
+            std::getline(hs, b.header.previous_hash, '|');
+            std::getline(hs, h, '|'); b.header.timestamp = std::stoull(h);
+            std::getline(hs, h, '|'); b.header.nonce = std::stoull(h);
+            std::getline(hs, h, '|'); b.header.difficulty_target = std::stoull(h);
+            std::getline(hs, b.header.merkle_root);
+        }
+
+        for (std::string tline; std::getline(iss, tline);) {
+            if (tline == "Z") {
+                break;
+            }
+            if (tline.rfind("T|", 0) == 0) {
+                Transaction tx{};
+                std::ostringstream tx_block;
+                tx_block << tline << '\n';
+
+                std::string follow;
+                while (std::getline(iss, follow)) {
+                    tx_block << follow << '\n';
+                    if (follow == "E") {
+                        break;
+                    }
+                }
+
+                std::istringstream tx_iss(tx_block.str());
+                if (!parse_tx_lines(tx_iss, tx, error)) {
+                    error = "chain load failed: " + error;
+                    return false;
+                }
+                b.transactions.push_back(tx);
+            }
+        }
+
+        std::string add_err;
+        if (!chain.add_block(b, add_err)) {
+            error = "chain load failed: failed to replay block: " + add_err;
+            return false;
+        }
+    }
+    return true;
+    } catch (const std::exception& e) {
+        error = std::string("chain load failed: state parse exception: ") + e.what();
+        return false;
+    } catch (...) {
+        error = "chain load failed: state parse exception: unknown";
+        return false;
+    }
+}
+
 bool StateStore::save_all(const Chain& chain,
                           const Mempool& mempool,
                           const StakingEngine& staking,
@@ -126,23 +243,8 @@ bool StateStore::save_all(const Chain& chain,
                           std::string& error) const {
     std::filesystem::create_directories(data_dir_);
 
-    {
-        std::ostringstream blocks;
-        for (const auto& b : chain.blocks()) {
-            if (b.header.height == 0) {
-                continue;
-            }
-            blocks << "B|" << b.header.height << '|' << b.header.previous_hash << '|' << b.header.timestamp
-                   << '|' << b.header.nonce << '|' << b.header.difficulty_target << '|' << b.header.merkle_root
-                   << '\n';
-            for (const auto& tx : b.transactions) {
-                blocks << tx_to_line(tx);
-            }
-            blocks << "Z\n";
-        }
-        if (!write_text(blocks_path(), blocks.str(), error)) {
-            return false;
-        }
+    if (!save_chain(chain, error)) {
+        return false;
     }
 
     {
@@ -261,62 +363,8 @@ bool StateStore::load_all(Chain& chain,
 
     chain.reset();
 
-    {
-        std::string content;
-        if (std::filesystem::exists(blocks_path()) && read_text(blocks_path(), content, error)) {
-            std::istringstream iss(content);
-            for (std::string line; std::getline(iss, line);) {
-                if (line.empty()) {
-                    continue;
-                }
-                if (line.rfind("B|", 0) != 0) {
-                    continue;
-                }
-
-                Block b{};
-                {
-                    std::istringstream hs(line.substr(2));
-                    std::string h;
-                    std::getline(hs, h, '|'); b.header.height = std::stoull(h);
-                    std::getline(hs, b.header.previous_hash, '|');
-                    std::getline(hs, h, '|'); b.header.timestamp = std::stoull(h);
-                    std::getline(hs, h, '|'); b.header.nonce = std::stoull(h);
-                    std::getline(hs, h, '|'); b.header.difficulty_target = std::stoull(h);
-                    std::getline(hs, b.header.merkle_root);
-                }
-
-                for (std::string tline; std::getline(iss, tline);) {
-                    if (tline == "Z") {
-                        break;
-                    }
-                    if (tline.rfind("T|", 0) == 0) {
-                        Transaction tx{};
-                        std::ostringstream tx_block;
-                        tx_block << tline << '\n';
-
-                        std::string follow;
-                        while (std::getline(iss, follow)) {
-                            tx_block << follow << '\n';
-                            if (follow == "E") {
-                                break;
-                            }
-                        }
-
-                        std::istringstream tx_iss(tx_block.str());
-                        if (!parse_tx_lines(tx_iss, tx, error)) {
-                            return false;
-                        }
-                        b.transactions.push_back(tx);
-                    }
-                }
-
-                std::string add_err;
-                if (!chain.add_block(b, add_err)) {
-                    error = "failed to replay block: " + add_err;
-                    return false;
-                }
-            }
-        }
+    if (!load_chain(chain, error)) {
+        return false;
     }
 
     {

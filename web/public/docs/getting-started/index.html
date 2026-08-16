@@ -20,7 +20,7 @@
 <h2>Research goals (design targets)</h2>
 <p>These are aims of the testnet / research prototype, not proof of a live public network:</p>
 <p>1. <strong>Quantum</strong> — ML-DSA-87 (FIPS 204) signatures, <code>pq_mode=strict</code> when <code>getinfo</code> answers</p>
-<p>2. <strong>Privacy</strong> — native ZK path (<code>pq_mldsa87</code>); notes do not persist plaintext owner/amount</p>
+<p>2. <strong>Privacy</strong> — SHA3-512 commitment + nullifier <strong>opening</strong> (<code>privacy_mint_open</code> / <code>privacy_spend_open</code>). This is a real hash relation, not a circuit. <code>privacy_*_zk</code> remains an ML-DSA wrap of a mint/spend string. Not Groth16, not Bulletproofs, not ZK-Shield.</p>
 <p>3. <strong>Speed</strong> — local testnet RPC; publish only real <code>getinfo</code> fields from a running node</p>
 <p>4. <strong>Cost of transaction</strong> — spec <code>min_fee=1</code>; no invented USD fees or gas market</p>
 <p>5. <strong>Compatibility</strong> — in-process <code>bridge_*</code> commands and the EVM bootstrap (<code>web/evm/evm_rpc_bridge.py</code>). Bootstrap / not a full EVM, not live Uniswap, not “connected to every chain today”</p>
@@ -61,6 +61,7 @@ ctest --test-dir build --output-on-failure</pre>
 <p>The daemon reads commands on stdin. In another terminal:</p>
 <pre>printf &#x27;getinfo\n&#x27; | nc 127.0.0.1 8545</pre>
 <p><code>getinfo</code> reports <code>network=testnet</code> and <code>network_name=addition-testnet</code>.</p>
+<p><code>--data-dir</code> (default <code>data/</code>) holds the chain, not just identity and wallets. After each accepted block the node writes <code>blocks.dat</code> (text block index: headers + transactions). UTXOs are rebuilt by replaying that file on startup. A clean process restart with the same <code>--data-dir</code> keeps <code>getinfo</code> height and <code>getblock</code> hashes. Wallets stay in <code>data-dir/wallets/</code>.</p>
 <h3>Local wallet (Bitcoin-like user model)</h3>
 <p>Trusted RPC only (<code>127.0.0.1:8545</code>). <code>createwallet</code> generates ML-DSA-87 keys and writes them to <code>data/wallets/&lt;name&gt;.wal</code> (owner-only). The reply has <code>priv_printed=0</code>. This is keys / UTXOs / send / receive / fee — not BIP compatibility and not a Bitcoin fork.</p>
 <pre>printf &#x27;createwallet alice\n&#x27; | nc 127.0.0.1 8545
@@ -70,7 +71,7 @@ printf &#x27;wallet_send alice &lt;to&gt; 10 1\n&#x27; | nc 127.0.0.1 8545</pre>
 <p><code>wallet_send</code> signs on the node from the local file. The explicit path is <code>tx_build</code> + <code>wallet_sign</code> + <code>sendtx_signed</code> (still no raw privkey on the wire). Legacy <code>sendtx</code> needs <code>ADDITION_ALLOW_INSECURE_TX_COMMANDS=1</code>.</p>
 <p>Honest UI:</p>
 <ul><li>Page: <code>/wallet/</code> via <code>python3 web/serve.py</code> (loopback <code>/local-rpc</code> only)</li><li>Desktop: <code>python3 web/addition_wallet_gui.py</code> or <code>--cli getinfo</code></li></ul>
-<p>A fresh wallet balance is <code>0</code> until you <code>mine &lt;address&gt;</code> on local RPC (memory-hard; reward 50 on a fresh testnet) or receive a UTXO. Public RPC cannot create wallets or send.</p>
+<p>A fresh wallet balance is <code>0</code> until you <code>mine &lt;address&gt;</code> on local RPC (testnet PoW is SHA3-512 of the header, 30s deadline, reward 50 on a fresh testnet) or receive a UTXO. Public RPC cannot create wallets or send. See <a href="docs/REAL_TESTNET_MINE_AND_PRIVACY.md">docs/REAL_TESTNET_MINE_AND_PRIVACY.md</a>.</p>
 <p>Standalone CLI that keeps keys on the <strong>caller</strong> disk (not <code>data/wallets/</code>) and signs ML-DSA-87 locally before <code>sendtx_signed_hash</code>:</p>
 <pre>python3 web/addition_wallet.py createwallet
 python3 web/addition_wallet.py mine
@@ -108,7 +109,7 @@ printf &#x27;mine\n&#x27; | nc 127.0.0.1 38545   # error: command disabled on pu
 <p>Two local processes: <code>./scripts/start_two_node_testnet.sh</code> (A: write <code>8545</code> / public <code>38545</code> / P2P <code>28545</code>; B: write <code>8546</code> / P2P <code>28546</code>). Details in <a href="docs/TWO_NODE_TESTNET.md">docs/TWO_NODE_TESTNET.md</a>.</p>
 <hr>
 <h2>Documentation</h2>
-<ul><li><a href="docs/ARCHITECTURE.md">Architecture notes</a></li><li><a href="docs/FINAL_COMMANDS.md">Command reference</a></li><li><a href="docs/WALLET.md">Local testnet wallet</a></li><li><a href="docs/POUW_PHASE1_SPEC.md">PoUW phase 1 spec</a></li><li><a href="docs/TWO_NODE_TESTNET.md">Two-node local testnet</a></li></ul>
+<ul><li><a href="docs/ARCHITECTURE.md">Architecture notes</a></li><li><a href="docs/FINAL_COMMANDS.md">Command reference</a></li><li><a href="docs/WALLET.md">Local testnet wallet</a></li><li><a href="docs/POUW_PHASE1_SPEC.md">PoUW phase 1 spec</a></li><li><a href="docs/TWO_NODE_TESTNET.md">Two-node local testnet</a></li><li><a href="docs/REAL_TESTNET_MINE_AND_PRIVACY.md">Mined block + SHA3 opening privacy</a></li><li><a href="docs/TESTNET_PUBLIC_RPC_RUNBOOK.md">Testnet public-read RPC (systemd)</a></li></ul>
 <p>Older docs may still say “mainnet”. Treat those as historical. This tree is a research testnet.</p>
 <hr>
 <h2>Contributing</h2>

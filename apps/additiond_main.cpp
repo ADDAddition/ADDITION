@@ -246,10 +246,26 @@ int main(int argc, char** argv) {
 
     std::string load_error;
     if (!store.load_all(chain, mempool, staking, contracts, tokens, bridge, peers, node, pouw_storage, pouw_compute, private_messaging, privacy, load_error)) {
+        if (load_error.rfind("chain load failed:", 0) == 0) {
+            std::cerr << "fatal: " << load_error << '\n';
+            return 4;
+        }
         std::cout << "warning: state load failed: " << load_error << '\n';
     } else {
-        std::cout << "state loaded from " << node_cfg.data_dir << '\n';
+        std::cout << "state loaded from " << node_cfg.data_dir
+                  << " height=" << chain.height() << '\n';
     }
+
+    chain.set_on_commit([&]() {
+        std::string persist_error;
+        if (!store.save_chain(chain, persist_error)) {
+            std::cout << "warning: chain persist failed: " << persist_error << '\n';
+        } else {
+            std::cout << "chain persisted height=" << chain.height()
+                      << " path=" << (std::filesystem::path(node_cfg.data_dir) / "blocks.dat").string()
+                      << '\n';
+        }
+    });
 
     addition::RpcNetworkServer p2p_rpc("0.0.0.0", node_cfg.p2p_port, [&](const std::string& cmd) {
         std::istringstream iss(cmd);

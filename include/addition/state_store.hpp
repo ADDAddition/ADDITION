@@ -50,6 +50,11 @@ public:
                   PrivacyPool& privacy,
                   std::string& error) const;
 
+    // Text block index under data-dir/blocks.dat. UTXOs are rebuilt by replay.
+    bool save_chain(const Chain& chain, std::string& error) const;
+    bool load_chain(Chain& chain, std::string& error) const;
+    bool chain_file_exists() const;
+
 private:
     std::string data_dir_;
 

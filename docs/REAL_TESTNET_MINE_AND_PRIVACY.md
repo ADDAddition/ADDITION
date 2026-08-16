@@ -90,5 +90,9 @@ ctest --test-dir build --output-on-failure
 ≤30s, confirms an ML-DSA-87 `wallet_send` in a second block, then mint/spend
 through `sha3_opening`.
 
+`test_chain_persist_restart` mines N blocks, SIGKILLs `additiond`, restarts
+with the same `--data-dir`, and checks that height and block hashes survive.
+`--data-dir/blocks.dat` is the chain file; a restart does not wipe height.
+
 `test_privacy` checks the hash relation in-process (good opening, garbage
 trapdoor, double-spend).

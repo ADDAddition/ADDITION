@@ -20,10 +20,12 @@
 <p>2. UTXO transaction model integrated (<code>TxInput</code>/<code>TxOutput</code> + <code>utxo_set_</code>)</p>
 <p>3. Wallet/RPC now build spends from available UTXOs</p>
 <p>4. Non-coinbase transactions now require signer + signature validation</p>
+<p>5. Chain persistence: <code>--data-dir/blocks.dat</code> (text headers + txs). UTXOs are</p>
+<p>   rebuilt by replay. Not LevelDB/RocksDB.</p>
 <h2>Next hardening phases</h2>
 <p>1. Replace temporary deterministic signatures with real asymmetric keys</p>
 <p>2. Add p2p networking layer and peer sync</p>
-<p>3. Add persistent storage (LevelDB/RocksDB)</p>
+<p>3. Optional stronger on-disk format (LevelDB/RocksDB) — text <code>blocks.dat</code> already persists height across restart</p>
 <p>4. Add authenticated JSON-RPC server</p>
 <p>5. Add reproducible release pipeline</p>
     <p class="note">Source file in the repository: <a href="https://github.com/ADDAddition/ADDITION/blob/main/docs/ARCHITECTURE.md">docs/ARCHITECTURE.md</a></p>
