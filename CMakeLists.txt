@@ -80,6 +80,10 @@ if(ADDITION_BUILD_TESTS)
     target_link_libraries(test_hash_address PRIVATE addition_core)
     add_test(NAME test_hash_address COMMAND test_hash_address)
 
+    add_executable(test_btc_hygiene tests/test_btc_hygiene.cpp)
+    target_link_libraries(test_btc_hygiene PRIVATE addition_core)
+    add_test(NAME test_btc_hygiene COMMAND test_btc_hygiene)
+
     find_package(Python3 COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
         add_test(

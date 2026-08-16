@@ -68,5 +68,6 @@ desktop.ini
 !tsconfig.json
 !wrangler.toml
 !genesis.json
+!fixtures/btc_hygiene_samples.json
 !**/manifest.json
 !**/Contents.json
