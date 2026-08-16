@@ -2,7 +2,9 @@
 
 #include "addition/rpc_server.hpp"
 
+#include <cstdio>
 #include <sstream>
+#include <vector>
 
 namespace addition {
 namespace {
@@ -127,6 +129,7 @@ bool is_remote_allowed_command(const std::string& cmd) {
            eq_cmd(cmd, "swap_quote_route") ||
            eq_cmd(cmd, "swap_best_route") ||
            eq_cmd(cmd, "nft_owner") ||
+           eq_cmd(cmd, "nft_info") ||
            eq_cmd(cmd, "privacy_status") ||
            eq_cmd(cmd, "bridge_balance") ||
            eq_cmd(cmd, "bridge_attestor") ||
@@ -188,6 +191,10 @@ bool parse_http_rpc_command(const std::string& raw, std::string& cmd, std::strin
 }
 
 std::string http_rpc_response(int status, const std::string& body) {
+    return http_rpc_response(status, body, "text/plain; charset=utf-8");
+}
+
+std::string http_rpc_response(int status, const std::string& body, const std::string& content_type) {
     const char* reason = "OK";
     switch (status) {
     case 200:
@@ -215,7 +222,7 @@ std::string http_rpc_response(int status, const std::string& body) {
 
     std::ostringstream out;
     out << "HTTP/1.1 " << status << ' ' << reason << "\r\n"
-        << "Content-Type: text/plain; charset=utf-8\r\n"
+        << "Content-Type: " << content_type << "\r\n"
         << "Content-Length: " << body.size() << "\r\n"
         << "Access-Control-Allow-Origin: *\r\n"
         << "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
@@ -226,6 +233,311 @@ std::string http_rpc_response(int status, const std::string& body) {
         << body;
     return out.str();
 }
+
+std::string json_escape(const std::string& in) {
+    std::string out;
+    out.reserve(in.size() + 8);
+    for (unsigned char c : in) {
+        switch (c) {
+        case '"':
+            out += "\\\"";
+            break;
+        case '\\':
+            out += "\\\\";
+            break;
+        case '\n':
+            out += "\\n";
+            break;
+        case '\r':
+            out += "\\r";
+            break;
+        case '\t':
+            out += "\\t";
+            break;
+        default:
+            if (c < 0x20) {
+                char buf[8];
+                std::snprintf(buf, sizeof(buf), "\\u%04x", c);
+                out += buf;
+            } else {
+                out.push_back(static_cast<char>(c));
+            }
+            break;
+        }
+    }
+    return out;
+}
+
+std::string jsonrpc_result_body(const std::string& id_json, const std::string& result_text) {
+    return std::string("{\"jsonrpc\":\"2.0\",\"id\":") + id_json +
+           ",\"result\":\"" + json_escape(result_text) + "\"}";
+}
+
+std::string jsonrpc_error_body(const std::string& id_json, int code, const std::string& message) {
+    return std::string("{\"jsonrpc\":\"2.0\",\"id\":") + id_json +
+           ",\"error\":{\"code\":" + std::to_string(code) +
+           ",\"message\":\"" + json_escape(message) + "\"}}";
+}
+
+namespace {
+
+void skip_ws(const std::string& s, std::size_t& i) {
+    while (i < s.size() && (s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r')) {
+        ++i;
+    }
+}
+
+bool parse_json_string(const std::string& s, std::size_t& i, std::string& out) {
+    skip_ws(s, i);
+    if (i >= s.size() || s[i] != '"') {
+        return false;
+    }
+    ++i;
+    out.clear();
+    while (i < s.size()) {
+        const char c = s[i++];
+        if (c == '"') {
+            return true;
+        }
+        if (c == '\\') {
+            if (i >= s.size()) {
+                return false;
+            }
+            const char e = s[i++];
+            if (e == '"' || e == '\\' || e == '/') {
+                out.push_back(e);
+            } else if (e == 'n') {
+                out.push_back('\n');
+            } else if (e == 'r') {
+                out.push_back('\r');
+            } else if (e == 't') {
+                out.push_back('\t');
+            } else {
+                return false;
+            }
+        } else {
+            out.push_back(c);
+        }
+    }
+    return false;
+}
+
+bool parse_json_number_token(const std::string& s, std::size_t& i, std::string& out) {
+    skip_ws(s, i);
+    if (i >= s.size()) {
+        return false;
+    }
+    const std::size_t start = i;
+    if (s[i] == '-') {
+        ++i;
+    }
+    if (i >= s.size() || s[i] < '0' || s[i] > '9') {
+        return false;
+    }
+    while (i < s.size() && s[i] >= '0' && s[i] <= '9') {
+        ++i;
+    }
+    out = s.substr(start, i - start);
+    return true;
+}
+
+} // namespace
+
+bool parse_jsonrpc_request(const std::string& body,
+                           std::string& method,
+                           std::vector<std::string>& params,
+                           std::string& id_json,
+                           std::string& error) {
+    method.clear();
+    params.clear();
+    id_json = "null";
+    error.clear();
+
+    std::size_t i = 0;
+    skip_ws(body, i);
+    if (i >= body.size() || body[i] != '{') {
+        error = "JSON-RPC body must be an object";
+        return false;
+    }
+    ++i;
+
+    std::string jsonrpc;
+    bool have_method = false;
+    while (i < body.size()) {
+        skip_ws(body, i);
+        if (i < body.size() && body[i] == '}') {
+            break;
+        }
+        std::string key;
+        if (!parse_json_string(body, i, key)) {
+            error = "invalid JSON key";
+            return false;
+        }
+        skip_ws(body, i);
+        if (i >= body.size() || body[i] != ':') {
+            error = "expected ':'";
+            return false;
+        }
+        ++i;
+        skip_ws(body, i);
+        if (i >= body.size()) {
+            error = "truncated JSON-RPC object";
+            return false;
+        }
+
+        if (key == "jsonrpc") {
+            if (!parse_json_string(body, i, jsonrpc)) {
+                error = "jsonrpc must be a string";
+                return false;
+            }
+        } else if (key == "method") {
+            if (!parse_json_string(body, i, method)) {
+                error = "method must be a string";
+                return false;
+            }
+            have_method = true;
+        } else if (key == "id") {
+            if (body[i] == '"') {
+                std::string id_str;
+                if (!parse_json_string(body, i, id_str)) {
+                    error = "invalid id string";
+                    return false;
+                }
+                id_json = std::string("\"") + json_escape(id_str) + "\"";
+            } else if (body.compare(i, 4, "null") == 0) {
+                i += 4;
+                id_json = "null";
+            } else {
+                std::string num;
+                if (!parse_json_number_token(body, i, num)) {
+                    error = "id must be string, number, or null";
+                    return false;
+                }
+                id_json = num;
+            }
+        } else if (key == "params") {
+            if (body[i] != '[') {
+                error = "params must be a positional array";
+                return false;
+            }
+            ++i;
+            skip_ws(body, i);
+            while (i < body.size() && body[i] != ']') {
+                skip_ws(body, i);
+                if (i >= body.size()) {
+                    error = "truncated params";
+                    return false;
+                }
+                std::string value;
+                if (body[i] == '"') {
+                    if (!parse_json_string(body, i, value)) {
+                        error = "invalid params string";
+                        return false;
+                    }
+                } else {
+                    if (!parse_json_number_token(body, i, value)) {
+                        error = "params entries must be strings or integers";
+                        return false;
+                    }
+                }
+                params.push_back(value);
+                skip_ws(body, i);
+                if (i < body.size() && body[i] == ',') {
+                    ++i;
+                    continue;
+                }
+                if (i < body.size() && body[i] == ']') {
+                    break;
+                }
+                error = "invalid params array";
+                return false;
+            }
+            if (i >= body.size() || body[i] != ']') {
+                error = "unterminated params array";
+                return false;
+            }
+            ++i;
+        } else {
+            error = "unknown JSON-RPC field";
+            return false;
+        }
+        skip_ws(body, i);
+        if (i < body.size() && body[i] == ',') {
+            ++i;
+            continue;
+        }
+        if (i < body.size() && body[i] == '}') {
+            break;
+        }
+        error = "invalid JSON-RPC object";
+        return false;
+    }
+
+    if (jsonrpc != "2.0") {
+        error = "jsonrpc must be 2.0";
+        return false;
+    }
+    if (!have_method || method.empty()) {
+        error = "method must be a string";
+        return false;
+    }
+    return true;
+}
+
+namespace {
+
+std::string join_text_command(const std::string& method, const std::vector<std::string>& params) {
+    std::string cmd = method;
+    for (const auto& p : params) {
+        cmd.push_back(' ');
+        cmd += p;
+    }
+    return cmd;
+}
+
+std::string dispatch_public_jsonrpc(RpcServer& rpc,
+                                    const std::string& method,
+                                    const std::vector<std::string>& params,
+                                    const std::string& id_json) {
+    if (method.find(' ') != std::string::npos || method.find('\n') != std::string::npos) {
+        return jsonrpc_error_body(id_json, -32600, "method must be a single TEXT RPC command name");
+    }
+    if (!is_public_read_command(method)) {
+        return jsonrpc_error_body(id_json, -32601, "error: command disabled on public RPC");
+    }
+    for (const auto& p : params) {
+        if (p.find(' ') != std::string::npos || p.find('\n') != std::string::npos || p.find('\r') != std::string::npos) {
+            return jsonrpc_error_body(id_json, -32602, "params must be single TEXT RPC tokens");
+        }
+    }
+    const auto reply = rpc.handle_command(join_text_command(method, params), false);
+    if (reply.rfind("error:", 0) == 0) {
+        return jsonrpc_error_body(id_json, -32000, reply);
+    }
+    return jsonrpc_result_body(id_json, reply);
+}
+
+std::vector<std::string> split_query_params(const std::string& raw) {
+    std::vector<std::string> out;
+    if (raw.empty()) {
+        return out;
+    }
+    std::size_t start = 0;
+    while (start <= raw.size()) {
+        const auto comma = raw.find(',', start);
+        const auto part = raw.substr(start, comma == std::string::npos ? std::string::npos : comma - start);
+        if (!part.empty()) {
+            out.push_back(part);
+        }
+        if (comma == std::string::npos) {
+            break;
+        }
+        start = comma + 1;
+    }
+    return out;
+}
+
+} // namespace
 
 std::string dispatch_public_read_rpc(RpcServer& rpc, const std::string& raw) {
     if (is_http_rpc_request(raw)) {
@@ -242,11 +554,56 @@ std::string dispatch_public_read_rpc(RpcServer& rpc, const std::string& raw) {
         if (path == "/" || path == "/health") {
             return http_rpc_response(200, "addition-public-rpc read-only testnet");
         }
+        if (path == "/jsonrpc" || path == "/jsonrpc/") {
+            if (method == "HEAD") {
+                return http_rpc_response(200, "", "application/json");
+            }
+            std::string jmethod;
+            std::vector<std::string> jparams;
+            std::string id_json = "1";
+            if (method == "GET") {
+                jmethod = query_param(query, "method");
+                jparams = split_query_params(query_param(query, "params"));
+                const auto idq = query_param(query, "id");
+                if (!idq.empty()) {
+                    id_json = idq;
+                    bool numeric = !id_json.empty();
+                    for (char c : id_json) {
+                        if (c < '0' || c > '9') {
+                            numeric = false;
+                            break;
+                        }
+                    }
+                    if (!numeric) {
+                        id_json = std::string("\"") + json_escape(idq) + "\"";
+                    }
+                }
+                if (jmethod.empty()) {
+                    const auto body = jsonrpc_error_body("null", -32600, "missing method");
+                    return http_rpc_response(200, body, "application/json");
+                }
+                const auto body = dispatch_public_jsonrpc(rpc, jmethod, jparams, id_json);
+                return http_rpc_response(200, body, "application/json");
+            }
+            if (method == "POST") {
+                std::string parsed_method;
+                std::vector<std::string> parsed_params;
+                std::string parsed_id;
+                std::string perr;
+                if (!parse_jsonrpc_request(http_body(raw), parsed_method, parsed_params, parsed_id, perr)) {
+                    const auto body = jsonrpc_error_body(parsed_id.empty() ? "null" : parsed_id, -32600, perr);
+                    return http_rpc_response(200, body, "application/json");
+                }
+                const auto body = dispatch_public_jsonrpc(rpc, parsed_method, parsed_params, parsed_id);
+                return http_rpc_response(200, body, "application/json");
+            }
+            return http_rpc_response(405, "error: method not allowed");
+        }
         std::string cmd;
         std::string error;
         if (!parse_http_rpc_command(raw, cmd, error)) {
             if (error == "not an RPC path") {
-                return http_rpc_response(404, "error: use /rpc?cmd=getinfo");
+                return http_rpc_response(404, "error: use /rpc?cmd=getinfo or /jsonrpc?method=getinfo");
             }
             return http_rpc_response(400, std::string("error: ") + error);
         }
