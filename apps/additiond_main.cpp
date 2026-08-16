@@ -1,3 +1,4 @@
+#include "addition/auto_mine.hpp"
 #include "addition/chain.hpp"
 #include "addition/config.hpp"
 #include "addition/bridge.hpp"
@@ -341,6 +342,10 @@ int main(int argc, char** argv) {
     }
     parse_env_u16("ADDITION_LOCAL_RPC_PORT", node_cfg.local_rpc_port);
     parse_env_u16("ADDITION_P2P_PORT", node_cfg.p2p_port);
+    if (!addition::apply_auto_mine_env(node_cfg)) {
+        std::cerr << "fatal: invalid ADDITION_AUTO_MINE_INTERVAL (use 1-86400)\n";
+        return 1;
+    }
 
     for (const auto& peer : node_cfg.bootstrap_peers) {
         if (is_self_p2p_endpoint(peer, node_cfg.p2p_port)) {
@@ -449,11 +454,27 @@ int main(int argc, char** argv) {
     if (!node_cfg.genesis_path.empty()) {
         std::cout << "genesis=" << node_cfg.genesis_path << '\n';
     }
-    std::cout << "bootstrap_peers (localhost examples until a second real node exists):";
+    std::cout << "bootstrap_peers (IPv4 only; operator public P2P is "
+              << addition::kOperatorPublicP2p << "):";
     for (const auto& peer : node_cfg.bootstrap_peers) {
         std::cout << ' ' << peer;
     }
     std::cout << '\n';
+
+    const bool auto_mine_requested = node_cfg.enable_auto_mine;
+    if (auto_mine_requested && mainnet_mode) {
+        node_cfg.enable_auto_mine = false;
+        std::cout << "warning: --auto-mine ignored on mainnet profile (testnet only)\n";
+    }
+    rpc.set_auto_mine_status(node_cfg.enable_auto_mine && !mainnet_mode, node_cfg.auto_mine_interval_sec);
+    if (node_cfg.enable_auto_mine) {
+        std::cout << "auto-mine enabled (testnet in-process) interval_sec="
+                  << node_cfg.auto_mine_interval_sec
+                  << " reward=" << (node_cfg.auto_mine_reward.empty() ? "miner1" : node_cfg.auto_mine_reward)
+                  << " (not exposed on public RPC)\n";
+    } else {
+        std::cout << "auto-mine disabled (default; --auto-mine or ADDITION_AUTO_MINE=1 on testnet)\n";
+    }
     std::cout << "Commands: getinfo, fee_info, createwallet [name], wallet_list, wallet_info <name>, wallet_balance <name>, wallet_send <name> <to> <amount> [fee], wallet_sign <name> <message_hex_utf8>, sign_message <privkey_hex> <message_hex_utf8>, verify_message <pubkey_hex> <message_hex_utf8> <sig_hex>, getbalance <addr>, getbalance_instant <addr>, tx_build <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce>, sendtx_signed <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce> <sig_hex>, sendtx_signed_hash <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce> <sig_hex>, mine,\n"
                  "monetary_info, crypto_selftest,\n"
                  "stake <addr> <amt>, unstake <addr> <amt>, staked <addr>, stake_reward <amt>, stake_claim <addr>,\n"
@@ -529,6 +550,31 @@ int main(int argc, char** argv) {
     std::signal(SIGINT, handle_stop_signal);
     std::signal(SIGTERM, handle_stop_signal);
 
+    std::thread auto_mine_thread;
+    if (node_cfg.enable_auto_mine) {
+        const std::string reward =
+            node_cfg.auto_mine_reward.empty() ? std::string("miner1") : node_cfg.auto_mine_reward;
+        const auto interval = std::chrono::seconds(node_cfg.auto_mine_interval_sec == 0
+                                                       ? 60
+                                                       : node_cfg.auto_mine_interval_sec);
+        auto_mine_thread = std::thread([&rpc, reward, interval]() {
+            auto last = std::chrono::steady_clock::now();
+            while (!g_stay_alive_stop) {
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+                if (g_stay_alive_stop) {
+                    break;
+                }
+                const auto now = std::chrono::steady_clock::now();
+                if (now - last < interval) {
+                    continue;
+                }
+                last = now;
+                const std::string reply = rpc.handle_command("mine " + reward, true);
+                std::cout << "auto-mine: " << reply << '\n';
+            }
+        });
+    }
+
     bool requested_quit = false;
     for (std::string line; std::getline(std::cin, line);) {
         const auto now = std::chrono::steady_clock::now();
@@ -540,6 +586,7 @@ int main(int argc, char** argv) {
 
         if (line == "quit" || line == "exit") {
             requested_quit = true;
+            g_stay_alive_stop = true;
             break;
         }
 
@@ -583,6 +630,11 @@ int main(int argc, char** argv) {
                 last_sync = now;
             }
         }
+    }
+
+    g_stay_alive_stop = true;
+    if (auto_mine_thread.joinable()) {
+        auto_mine_thread.join();
     }
 
     local_rpc.stop();

@@ -7,15 +7,23 @@ network_id = "ADDITION_TESTNET_V1"
 data_dir = "data"
 genesis_file = "genesis.json"
 
-# Localhost examples only until a second real node exists.
-# Do not invent public peer lists or node counts.
+# Operator's current public P2P (IPv4 only). Not a peer-count claim.
+# Outsiders join this endpoint. Write RPC stays 127.0.0.1:8545.
+# Local two-node runs still pass --bootstrap 127.0.0.1:28545.
 bootstrap_peers = [
-  "127.0.0.1:28545"
+  "34.27.30.115:28545"
 ]
 
 # Public read RPC is off unless --public-rpc or ADDITION_ENABLE_PUBLIC_RPC=1.
 # It never exposes mine, sendtx, createwallet, or identity rotation.
 enable_public_rpc = false
+
+# In-process auto-mine is testnet only, off by default, never a public RPC command.
+# Enable with --auto-mine or ADDITION_AUTO_MINE=1. After N seconds the daemon
+# mines one block and persists it to --data-dir/blocks.dat (same path as today).
+enable_auto_mine = false
+auto_mine_interval_sec = 60
+auto_mine_reward = "miner1"
 
 [ports]
 local_rpc = 8545

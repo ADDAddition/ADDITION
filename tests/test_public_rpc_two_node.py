@@ -97,6 +97,9 @@ def start_node(args: list[str], data_dir: Path, log_path: Path) -> subprocess.Po
     env.pop("ADDITION_PUBLIC_RPC_BIND", None)
     env.pop("ADDITION_LOCAL_RPC_PORT", None)
     env.pop("ADDITION_P2P_PORT", None)
+    env.pop("ADDITION_AUTO_MINE", None)
+    env.pop("ADDITION_AUTO_MINE_INTERVAL", None)
+    env.pop("ADDITION_AUTO_MINE_REWARD", None)
     log = log_path.open("w", encoding="utf-8")
     proc = subprocess.Popen(
         args,

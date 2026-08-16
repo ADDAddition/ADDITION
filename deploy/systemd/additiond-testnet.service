@@ -24,7 +24,10 @@ KillSignal=SIGTERM
 # Optional write-RPC token. Do not put secrets in this unit file.
 EnvironmentFile=-/etc/addition/testnet.env
 # This unit is testnet only. Do not set ADDITION_MAINNET_MODE.
-# Leave LAN RPC and P2P off (do not set ADDITION_ENABLE_LAN_RPC or ADDITION_ENABLE_P2P_RPC).
+# Leave LAN RPC off (do not set ADDITION_ENABLE_LAN_RPC). Never open 8545/18545.
+# Live operator public node: ADDITION_ENABLE_P2P_RPC=1 in the env file, and
+# GCP allow-addition-p2p tcp:28545. Bootstrap is 34.27.30.115:28545 (IPv4 only).
+# Auto-mine stays off unless ADDITION_AUTO_MINE=1 (testnet timer; not public RPC).
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

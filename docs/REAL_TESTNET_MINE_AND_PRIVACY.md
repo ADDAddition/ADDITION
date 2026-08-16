@@ -33,6 +33,14 @@ Bulletproofs, ZK-Shield, a DEX, or a token sale.
 
 `getinfo` prints `pow_algorithm=sha3_512` on testnet.
 
+### Optional in-process auto-mine (off by default)
+
+`mine` remains a trusted-RPC / stdin command. The daemon can also start a
+timer (`--auto-mine` or `ADDITION_AUTO_MINE=1`) that, after N seconds, mines
+one block on testnet and persists it via the existing `blocks.dat` hook.
+Refused on `--network mainnet`. Not a public RPC command. `getinfo` reports
+`auto_mine=off|on`.
+
 ### 2. SHA3-512 commitment + nullifier opening (not ZK)
 
 Smallest real proving path that fits this slice:
@@ -94,5 +102,8 @@ through `sha3_opening`.
 with the same `--data-dir`, and checks that height and block hashes survive.
 `--data-dir/blocks.dat` is the chain file; a restart does not wipe height.
 
-`test_privacy` checks the hash relation in-process (good opening, garbage
-trapdoor, double-spend).
+`test_auto_mine` checks auto-mine off-by-default and one mined block when
+enabled (also refuses the mainnet profile and hostname bootstrap).
+`test_auto_mine_daemon` starts `additiond` and checks the same on the live
+timer. `test_privacy` checks the hash relation in-process (good opening,
+garbage trapdoor, double-spend).

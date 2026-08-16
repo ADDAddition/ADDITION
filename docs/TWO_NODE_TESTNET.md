@@ -121,8 +121,14 @@ public port is up. If the daemon is down, pages show **RPC offline**.
 ## Honest P2P limits
 
 - P2P transport is off unless `ADDITION_ENABLE_P2P_RPC=1`.
+- The live operator node sets that env and allows inbound TCP **28545**
+  (GCP rule `allow-addition-p2p`). Allow 28545 only while P2P is enabled.
+  Never open **8545** or **18545**.
 - Endpoints are IPv4 `ip:port` only (`inet_pton`). Docker DNS names do not work.
 - `bootstrap_peers` / `--bootstrap` skip this process’s own P2P port.
+- IPv4 only. The operator’s current public P2P is `34.27.30.115:28545`
+  (`--bootstrap 34.27.30.115:28545`). Do not invent extra peers. Write RPC
+  stays `127.0.0.1:8545`.
 - `addpeer` is a trusted-write command. Public RPC can only `peers`.
 - `sync` on two fresh nodes at height 0 has nothing to fetch. That is not a
   live network and not a peer-count claim.
@@ -136,7 +142,12 @@ Same meaning as CLI / env:
 - `enable_public_rpc`
 - `ports.public_rpc` / `ports.public_rpc_bind`
 - `ports.local_rpc` / `ports.p2p`
-- `bootstrap_peers`
+- `bootstrap_peers` (IPv4 `ip:port` only; repo `config.toml` lists `34.27.30.115:28545`)
+- `enable_auto_mine` / `auto_mine_interval_sec` / `auto_mine_reward` (off by default)
 
 Env: `ADDITION_ENABLE_PUBLIC_RPC=1`, `ADDITION_PUBLIC_RPC_PORT`,
-`ADDITION_PUBLIC_RPC_BIND`, `ADDITION_LOCAL_RPC_PORT`, `ADDITION_P2P_PORT`.
+`ADDITION_PUBLIC_RPC_BIND`, `ADDITION_LOCAL_RPC_PORT`, `ADDITION_P2P_PORT`,
+`ADDITION_AUTO_MINE=1`, `ADDITION_AUTO_MINE_INTERVAL`, `ADDITION_AUTO_MINE_REWARD`.
+
+Auto-mine is testnet only, off unless `--auto-mine` / `ADDITION_AUTO_MINE=1`.
+It is not a public RPC command. Each mined block is written to `blocks.dat`.

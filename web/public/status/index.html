@@ -13,8 +13,14 @@
     <p id="rpc-state" class="offline">Checking RPC…</p>
     <section class="panel">
       <h2>getinfo</h2>
+      <p id="height-line" class="note">Height is shown only when getinfo answers.</p>
       <div id="info-fields"></div>
       <pre id="info-raw" class="raw"></pre>
+    </section>
+    <section class="panel">
+      <h2>Recent blocks (real getblock)</h2>
+      <p class="note">Last few heights from this node only. Fail closed if RPC is down. No invented hashrate or peer counts.</p>
+      <div id="recent-blocks"></div>
     </section>
     <section class="panel">
       <h2>monetary_info</h2>
@@ -49,6 +55,26 @@
       const info = await S.rpcCommand("getinfo");
       S.setStatus(document.getElementById("rpc-state"), info);
       fill("info-raw", info, "info-fields");
+      const heightLine = document.getElementById("height-line");
+      const recentBox = document.getElementById("recent-blocks");
+      if (info.offline || !info.ok) {
+        heightLine.textContent = "RPC offline";
+        S.renderRecentBlocks(recentBox, { offline: true, blocks: [] });
+      } else {
+        const height = S.parseHeight(info.fields);
+        heightLine.textContent = height === null
+          ? "getinfo did not return a height field."
+          : ("height=" + height + " from getinfo");
+        if (height === null) {
+          S.renderRecentBlocks(recentBox, { offline: false, blocks: [] }, "getinfo had no height; no getblock calls.");
+        } else {
+          const recent = await S.loadRecentBlocks(height, 5);
+          S.renderRecentBlocks(recentBox, recent, "No getblock results.");
+          if (recent.offline) {
+            S.setStatus(document.getElementById("rpc-state"), { offline: true, ok: false, raw: "RPC offline" });
+          }
+        }
+      }
       fill("mon-raw", await S.rpcCommand("monetary_info"), "mon-fields");
       fill("crypto-raw", await S.rpcCommand("crypto_selftest"));
       const peers = await S.rpcCommand("peers");

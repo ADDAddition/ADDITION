@@ -17,6 +17,7 @@
 #include "addition/token_engine.hpp"
 #include "addition/wallet_store.hpp"
 
+#include <cstdint>
 #include <mutex>
 #include <string>
 
@@ -44,6 +45,7 @@ public:
               std::string wallet_dir = {});
 
     std::string handle_command(const std::string& line, bool trusted = true);
+    void set_auto_mine_status(bool enabled, std::uint32_t interval_sec);
 
 private:
     Chain& chain_;
@@ -63,6 +65,8 @@ private:
     DecentralizedNode& node_;
     bool allow_insecure_tx_commands_{false};
     bool strict_admin_mode_{true};
+    bool auto_mine_enabled_{false};
+    std::uint32_t auto_mine_interval_sec_{60};
     WalletStore wallets_;
     mutable std::mutex mu_;
 };

@@ -13,8 +13,14 @@
     <p id="rpc-state" class="offline">Checking RPC…</p>
     <section class="panel">
       <h2>getinfo</h2>
+      <p id="height-line" class="note">Height is shown only when getinfo answers.</p>
       <div id="info-fields"></div>
       <pre id="info-raw" class="raw"></pre>
+    </section>
+    <section class="panel">
+      <h2>Recent blocks (real getblock)</h2>
+      <p class="note">Last few heights from getinfo, each loaded with getblock. Empty if RPC is down. No synthetic hashrate or peer counts.</p>
+      <div id="recent-blocks"></div>
     </section>
     <section class="panel">
       <h2>Block lookup</h2>
@@ -43,11 +49,28 @@
       const result = await S.rpcCommand("getinfo");
       S.setStatus(document.getElementById("rpc-state"), result);
       document.getElementById("info-raw").textContent = result.raw;
+      const heightLine = document.getElementById("height-line");
+      const recentBox = document.getElementById("recent-blocks");
       if (result.offline || !result.ok) {
         S.renderFields(document.getElementById("info-fields"), {}, "RPC offline");
+        heightLine.textContent = "RPC offline";
+        S.renderRecentBlocks(recentBox, { offline: true, blocks: [] });
         return;
       }
       S.renderFields(document.getElementById("info-fields"), result.fields, "Node returned no key=value fields.");
+      const height = S.parseHeight(result.fields);
+      heightLine.textContent = height === null
+        ? "getinfo did not return a height field."
+        : ("height=" + height + " from getinfo");
+      if (height === null) {
+        S.renderRecentBlocks(recentBox, { offline: false, blocks: [] }, "getinfo had no height; no getblock calls.");
+        return;
+      }
+      const recent = await S.loadRecentBlocks(height, 5);
+      S.renderRecentBlocks(recentBox, recent, "No getblock results.");
+      if (recent.offline) {
+        S.setStatus(document.getElementById("rpc-state"), { offline: true, ok: false, raw: "RPC offline" });
+      }
     }
 
     async function loadBlock() {
