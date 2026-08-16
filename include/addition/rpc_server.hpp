@@ -48,6 +48,8 @@ public:
     void set_auto_mine_status(bool enabled, std::uint32_t interval_sec);
     void set_advertised_p2p(std::string endpoint);
     std::uint64_t unlocked_balance(const std::string& address) const;
+    // Banner for GET / and /health. Uses the live chain network_mode; no RPC lock.
+    std::string public_rpc_banner() const;
 
 private:
     Chain& chain_;

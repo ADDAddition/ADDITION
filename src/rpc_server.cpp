@@ -16,6 +16,7 @@
 #include <chrono>
 #include <iomanip>
 #include <limits>
+#include <mutex>
 #include <optional>
 #include <thread>
 
@@ -149,6 +150,18 @@ bool requires_admin_signature_command(const std::string& cmd) {
            cmd == "bridge_set_attestor";
 }
 
+// Drop the RPC mutex while PoW hashes. getinfo/getblock take the same mutex,
+// so holding it for memory_hard (or any long search) hangs public-read HTTP.
+struct UnlockWhileHashing {
+    std::unique_lock<std::mutex>& lock;
+    explicit UnlockWhileHashing(std::unique_lock<std::mutex>& lock) : lock(lock) {
+        lock.unlock();
+    }
+    ~UnlockWhileHashing() {
+        lock.lock();
+    }
+};
+
 } // namespace
 
 RpcServer::RpcServer(Chain& chain,
@@ -203,8 +216,12 @@ std::uint64_t RpcServer::unlocked_balance(const std::string& address) const {
     return confirmed > staked ? (confirmed - staked) : 0ULL;
 }
 
+std::string RpcServer::public_rpc_banner() const {
+    return public_rpc_banner_text(chain_.config().network_mode);
+}
+
 std::string RpcServer::handle_command(const std::string& line, bool trusted) {
-    std::lock_guard<std::mutex> lock(mu_);
+    std::unique_lock<std::mutex> lock(mu_);
     std::istringstream iss(line);
     std::string cmd;
     iss >> cmd;
@@ -792,7 +809,12 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
 
         std::string mined_hash;
         std::string error;
-        if (!miner_.mine_next_block(reward_address, 500, threads, mined_hash, error)) {
+        bool ok = false;
+        {
+            UnlockWhileHashing yield(lock);
+            ok = miner_.mine_next_block(reward_address, 500, threads, mined_hash, error);
+        }
+        if (!ok) {
             return "error: " + error;
         }
 
@@ -843,8 +865,13 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         for (std::size_t b = 0; b < blocks; ++b) {
             std::string mined_hash;
             std::string error;
+            bool ok = false;
             // max_txs=0: header PoW only. Do not pull or inject mempool txs.
-            if (!miner_.mine_next_block("bench_miner", 0, threads, mined_hash, error)) {
+            {
+                UnlockWhileHashing yield(lock);
+                ok = miner_.mine_next_block("bench_miner", 0, threads, mined_hash, error);
+            }
+            if (!ok) {
                 return "error: benchmark mine failed: " + error;
             }
             mine_ms_total += miner_.last_mine_ms();
