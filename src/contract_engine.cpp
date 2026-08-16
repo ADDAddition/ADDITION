@@ -112,6 +112,7 @@ bool ContractEngine::call(const std::string& contract_id,
                << " privacy_mode=sha3_opening"
                << " privacy_ok=true"
                << " privacy_verifier=sha3_opening"
+               << " claim=opening_not_zk"
                << " notes=" << privacy_->note_count()
                << " used_nullifiers=" << privacy_->used_nullifier_count();
         out = status.str();

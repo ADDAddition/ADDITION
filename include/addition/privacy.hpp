@@ -77,6 +77,7 @@ public:
     bool verifier_configured() const;
     std::size_t note_count() const;
     std::size_t used_nullifier_count() const;
+    std::size_t spent_commitment_count() const;
 
     std::string dump_state() const;
     bool load_state(const std::string& state, std::string& error);
@@ -102,6 +103,7 @@ private:
     bool strict_zk_mode_{true};
     std::unordered_map<std::string, PrivateNote> notes_;
     std::unordered_set<std::string> used_nullifiers_;
+    std::unordered_set<std::string> spent_commitments_;
 };
 
 } // namespace addition

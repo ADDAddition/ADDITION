@@ -1121,7 +1121,8 @@ bool DecentralizedNode::sync_once(std::string& error) {
     error.clear();
     auto peers = peers_.peers();
     if (peers.empty()) {
-        return true;
+        error = "no peer";
+        return false;
     }
 
     const auto start_height = chain_.height();

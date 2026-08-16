@@ -237,10 +237,15 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " last_mine_ms=" << miner_.last_mine_ms()
             << " last_mined_txs=" << miner_.last_mined_txs()
             << " last_tps=" << std::fixed << std::setprecision(2) << miner_.last_tps()
+            << " last_verify_ms=" << chain_.last_batch_verify_ms()
+            << " last_verify_count=" << chain_.last_batch_verify_count()
+            << " last_verify_per_sec=" << std::fixed << std::setprecision(2) << chain_.last_batch_verify_per_sec()
+            << " last_dropped_mempool_txs=" << miner_.last_dropped_junk()
             << " pq_mode=strict"
             << " pow_algorithm=" << pow_algorithm_label(net.pow_algorithm)
             << " privacy_verifier=sha3_opening"
             << " privacy_mode=sha3_opening"
+            << " privacy_claim=opening_not_zk"
             << " privacy_ok=true"
             << " auto_mine=" << (auto_mine_enabled_ ? "on" : "off")
             << " auto_mine_interval_sec=" << auto_mine_interval_sec_;
@@ -249,22 +254,22 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
 
     if (cmd == "protocol_status") {
         std::ostringstream out;
-        const auto last_tps = miner_.last_tps();
-        const bool objective_tps_ok = last_tps >= kObjectiveTps;
-        const bool objective_privacy_ok = true;
-        const bool objective_100_ok = objective_tps_ok && objective_privacy_ok;
-
-        out << "objective_tps_target=" << std::fixed << std::setprecision(0) << kObjectiveTps
-            << " objective_tps_last=" << std::fixed << std::setprecision(2) << last_tps
-            << " objective_tps_ok=" << (objective_tps_ok ? "true" : "false")
-            << " objective_privacy_ok=" << (objective_privacy_ok ? "true" : "false")
-            << " objective_100_ok=" << (objective_100_ok ? "true" : "false")
+        out << "measured_tps=" << std::fixed << std::setprecision(2) << miner_.last_tps()
+            << " measured_last_mine_ms=" << miner_.last_mine_ms()
+            << " measured_last_mined_txs=" << miner_.last_mined_txs()
+            << " measured_verify_ms=" << chain_.last_batch_verify_ms()
+            << " measured_verify_count=" << chain_.last_batch_verify_count()
+            << " measured_verify_per_sec=" << std::fixed << std::setprecision(2)
+            << chain_.last_batch_verify_per_sec()
+            << " measured_dropped_mempool_txs=" << miner_.last_dropped_junk()
             << " privacy_mode=sha3_opening"
             << " privacy_ok=true"
             << " privacy_verifier=sha3_opening"
+            << " privacy_claim=opening_not_zk"
             << " verifier_configured=" << (privacy_.verifier_configured() ? "true" : "false")
-            << " last_mine_ms=" << miner_.last_mine_ms()
-            << " last_mined_txs=" << miner_.last_mined_txs();
+            << " pouw_storage_check=first_nibble_parity"
+            << " research_goal_tps=" << std::fixed << std::setprecision(0) << kObjectiveTps
+            << " research_goal_is_not_a_measurement=true";
         return out.str();
     }
 
@@ -673,58 +678,72 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
 
     if (cmd == "benchmark_objective") {
         std::size_t blocks = 0;
-        std::size_t tx_per_block = 0;
-        iss >> blocks >> tx_per_block;
-        if (blocks == 0 || tx_per_block == 0) {
-            return "error: usage benchmark_objective <blocks> <tx_per_block>";
+        std::size_t verify_samples = 0;
+        iss >> blocks >> verify_samples;
+        if (blocks == 0 || verify_samples == 0) {
+            return "error: usage benchmark_objective <blocks> <verify_samples>";
+        }
+        if (verify_samples > 16) {
+            verify_samples = 16;
         }
 
+        const auto mempool_before = mempool_.size();
         const auto bench_start = std::chrono::steady_clock::now();
-        std::size_t submitted = 0;
-        std::size_t mined_total = 0;
 
-        for (std::size_t b = 0; b < blocks; ++b) {
-            for (std::size_t i = 0; i < tx_per_block; ++i) {
-                Transaction tx{};
-                tx.signer = "bench_signer";
-                tx.signer_pubkey = "bench_pub";
-                tx.signature = "pq=bench|privacy";
-                tx.fee = 10 + static_cast<std::uint64_t>(i % 10);
-                tx.nonce = static_cast<std::uint64_t>(b * tx_per_block + i + 1);
-                tx.outputs.push_back(TxOutput{"bench_to_" + std::to_string(i % 256), 1});
-                if (mempool_.submit(tx)) {
-                    ++submitted;
-                }
+        std::vector<PqVerifyItem> jobs;
+        jobs.reserve(verify_samples);
+        try {
+            for (std::size_t i = 0; i < verify_samples; ++i) {
+                const auto keys = generate_wallet_keys();
+                const auto msg = std::string("addition-bench|") + std::to_string(i);
+                jobs.push_back(PqVerifyItem{keys.public_key, msg, sign_message_hybrid(keys.private_key, msg)});
             }
+        } catch (const std::exception& e) {
+            return std::string("error: benchmark keygen/sign failed: ") + e.what();
+        }
 
+        std::size_t verify_ok = 0;
+        std::uint64_t verify_ms = 0;
+        std::string verify_err;
+        const auto hw = std::thread::hardware_concurrency();
+        const std::size_t threads = hw > 0 ? static_cast<std::size_t>(hw) : 1;
+        if (!pq_verify_messages_parallel(jobs, threads, verify_ok, verify_ms, verify_err)) {
+            return "error: benchmark pq verify failed: " + verify_err;
+        }
+        const double verify_sec = static_cast<double>(verify_ms > 0 ? verify_ms : 1) / 1000.0;
+        const double verify_per_sec =
+            verify_sec > 0.0 ? static_cast<double>(verify_ok) / verify_sec : static_cast<double>(verify_ok);
+
+        std::uint64_t mine_ms_total = 0;
+        for (std::size_t b = 0; b < blocks; ++b) {
             std::string mined_hash;
             std::string error;
-            const auto hw = std::thread::hardware_concurrency();
-            const std::size_t threads = hw > 0 ? static_cast<std::size_t>(hw) : 1;
-            if (!miner_.mine_next_block("bench_miner", tx_per_block + 50, threads, mined_hash, error)) {
+            // max_txs=0: header PoW only. Do not pull or inject mempool txs.
+            if (!miner_.mine_next_block("bench_miner", 0, threads, mined_hash, error)) {
                 return "error: benchmark mine failed: " + error;
             }
-            mined_total += miner_.last_mined_txs();
+            mine_ms_total += miner_.last_mine_ms();
         }
 
         const auto bench_end = std::chrono::steady_clock::now();
         const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(bench_end - bench_start).count();
-        const double sec = static_cast<double>(elapsed_ms > 0 ? elapsed_ms : 1) / 1000.0;
-        const double avg_tps = sec > 0.0 ? static_cast<double>(mined_total) / sec : static_cast<double>(mined_total);
-        const bool objective_tps_ok = avg_tps >= kObjectiveTps;
-        const bool objective_privacy_ok = true;
-        const bool objective_100_ok = objective_tps_ok && objective_privacy_ok;
+        const auto mempool_after = mempool_.size();
 
         std::ostringstream out;
         out << "bench_blocks=" << blocks
-            << " bench_tx_per_block=" << tx_per_block
-            << " bench_submitted=" << submitted
-            << " bench_mined=" << mined_total
+            << " bench_verify_samples=" << verify_samples
+            << " bench_verify_ok=" << verify_ok
+            << " bench_verify_ms=" << verify_ms
+            << " bench_verify_per_sec=" << std::fixed << std::setprecision(2) << verify_per_sec
+            << " bench_mine_ms=" << mine_ms_total
+            << " bench_mined_txs=0"
+            << " bench_submitted=0"
             << " bench_elapsed_ms=" << elapsed_ms
-            << " bench_avg_tps=" << std::fixed << std::setprecision(2) << avg_tps
-            << " objective_tps_ok=" << (objective_tps_ok ? "true" : "false")
-            << " objective_privacy_ok=" << (objective_privacy_ok ? "true" : "false")
-            << " objective_100_ok=" << (objective_100_ok ? "true" : "false");
+            << " bench_mempool_before=" << mempool_before
+            << " bench_mempool_after=" << mempool_after
+            << " privacy_claim=opening_not_zk"
+            << " research_goal_tps=" << std::fixed << std::setprecision(0) << kObjectiveTps
+            << " research_goal_is_not_a_measurement=true";
         return out.str();
     }
 
@@ -2015,7 +2034,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         if (!error.empty()) {
             return "error: " + error;
         }
-        return note_id;
+        return note_id + " claim=mldsa_wrap_not_zk";
     }
 
     if (cmd == "privacy_spend_zk") {
@@ -2035,7 +2054,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         if (!privacy_.spend_zk(owner, note_id, recipient, amount, nullifier, proof_hex, vk_hex, new_note, error)) {
             return "error: " + error;
         }
-        return new_note;
+        return new_note + " claim=mldsa_wrap_not_zk";
     }
 
     if (cmd == "privacy_status") {
@@ -2049,7 +2068,8 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " verifier_configured=" << (privacy_.verifier_configured() ? "true" : "false")
             << " native_verifier_mode=" << privacy_.native_verifier_mode()
             << " notes=" << privacy_.note_count()
-            << " used_nullifiers=" << privacy_.used_nullifier_count();
+            << " used_nullifiers=" << privacy_.used_nullifier_count()
+            << " spent_commitments=" << privacy_.spent_commitment_count();
         return out.str();
     }
 
@@ -2126,7 +2146,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         if (!pouw_storage_.submit_proof(challenge_id, worker_addr, proof_blob_hash, verdict, error)) {
             return "error: " + error;
         }
-        return "ok:verdict=" + verdict;
+        return "ok:verdict=" + verdict + " check=first_nibble_parity";
     }
 
     if (cmd == "pouw_storage_deal_status") {

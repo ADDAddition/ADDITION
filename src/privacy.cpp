@@ -115,8 +115,8 @@ void PrivacyPool::compute_opening_relation(std::uint64_t amount,
                                            const std::string& trapdoor,
                                            std::string& commitment,
                                            std::string& nullifier) {
-    commitment = to_hex(sha3_512_bytes("cm|" + std::to_string(amount) + "|" + trapdoor));
-    nullifier = to_hex(sha3_512_bytes("nf|" + trapdoor));
+    commitment = to_hex(sha3_512_bytes("cm|v1|" + std::to_string(amount) + "|" + trapdoor));
+    nullifier = to_hex(sha3_512_bytes("nf|v1|" + commitment + "|" + trapdoor));
 }
 
 bool PrivacyPool::verify_opening(std::uint64_t amount,
@@ -171,10 +171,18 @@ std::string PrivacyPool::mint_open(const std::string& owner,
         error = "nullifier already used";
         return {};
     }
+    if (spent_commitments_.count(commitment)) {
+        error = "commitment already spent";
+        return {};
+    }
     for (const auto& [id, existing] : notes_) {
         (void)id;
         if (existing.nullifier == nullifier) {
             error = "nullifier already assigned";
+            return {};
+        }
+        if (existing.commitment == commitment) {
+            error = "commitment already assigned";
             return {};
         }
     }
@@ -297,6 +305,7 @@ bool PrivacyPool::spend_open(const std::string& owner,
 
     note.spent = true;
     used_nullifiers_.insert(note.nullifier);
+    spent_commitments_.insert(note.commitment);
     new_note_id = minted;
     change_note_id = minted_change;
     change_opening = std::move(local_change);
@@ -435,6 +444,10 @@ std::string PrivacyPool::mint_zk(const std::string& owner,
         error = "nullifier already used";
         return {};
     }
+    if (spent_commitments_.count(commitment)) {
+        error = "commitment already spent";
+        return {};
+    }
 
     const std::string public_input = "mint|" + owner + "|" + std::to_string(amount) + "|" + commitment + "|" +
                                      nullifier;
@@ -524,12 +537,14 @@ bool PrivacyPool::spend_zk(const std::string& owner,
 
     note.spent = true;
     used_nullifiers_.insert(nullifier);
+    spent_commitments_.insert(note.commitment);
 
     std::string mint_error;
     new_note_id = mint_note_internal(recipient, amount, mint_error);
     if (!mint_error.empty()) {
         note.spent = false;
         used_nullifiers_.erase(nullifier);
+        spent_commitments_.erase(note.commitment);
         error = mint_error;
         return false;
     }
@@ -541,6 +556,7 @@ bool PrivacyPool::spend_zk(const std::string& owner,
         if (!mint_error.empty() || change_note.empty()) {
             note.spent = false;
             used_nullifiers_.erase(nullifier);
+            spent_commitments_.erase(note.commitment);
             notes_.erase(new_note_id);
             new_note_id.clear();
             error = "failed to mint change note";
@@ -563,6 +579,10 @@ std::size_t PrivacyPool::used_nullifier_count() const {
     return used_nullifiers_.size();
 }
 
+std::size_t PrivacyPool::spent_commitment_count() const {
+    return spent_commitments_.size();
+}
+
 std::string PrivacyPool::dump_state() const {
     std::ostringstream oss;
     oss << "M|" << (strict_zk_mode_ ? 1 : 0) << '\n';
@@ -574,12 +594,16 @@ std::string PrivacyPool::dump_state() const {
     for (const auto& nf : used_nullifiers_) {
         oss << "U|" << nf << '\n';
     }
+    for (const auto& cm : spent_commitments_) {
+        oss << "S|" << cm << '\n';
+    }
     return oss.str();
 }
 
 bool PrivacyPool::load_state(const std::string& state, std::string& error) {
     notes_.clear();
     used_nullifiers_.clear();
+    spent_commitments_.clear();
     native_verifier_mode_ = NativeVerifierMode::pq_mldsa87;
     strict_zk_mode_ = true;
 
@@ -629,6 +653,9 @@ bool PrivacyPool::load_state(const std::string& state, std::string& error) {
                                          cm,
                                          nf,
                                          spent == "1"};
+                if (spent == "1" && !cm.empty()) {
+                    spent_commitments_.insert(cm);
+                }
             } else {
                 // Backward compatibility migration from plaintext owner/amount state.
                 std::string migrated_owner_tag;
@@ -653,6 +680,12 @@ bool PrivacyPool::load_state(const std::string& state, std::string& error) {
             std::getline(ls, nf);
             if (!nf.empty()) {
                 used_nullifiers_.insert(nf);
+            }
+        } else if (tag == 'S') {
+            std::string cm;
+            std::getline(ls, cm);
+            if (!cm.empty()) {
+                spent_commitments_.insert(cm);
             }
         }
     }
