@@ -496,6 +496,7 @@ S.rpcCommand("getinfo").then((offline) => {
 
     def test_raw_markdown_docs_are_fetchable(self) -> None:
         join_md = read("join.md")
+        docs_join_md = read("docs/join.md")
         runbook = read("docs/testnet-rpc-runbook.md")
         wallet = read("docs/wallet.md")
         worker = read("worker.js")
@@ -506,7 +507,9 @@ S.rpcCommand("getinfo").then((offline) => {
 
         self.assertEqual(runbook, (ROOT / "docs" / "TESTNET_PUBLIC_RPC_RUNBOOK.md").read_text(encoding="utf-8"))
         self.assertEqual(wallet, (ROOT / "docs" / "WALLET.md").read_text(encoding="utf-8"))
+        self.assertEqual(docs_join_md, join_md)
         self.assertNotIn("<!DOCTYPE html>", join_md)
+        self.assertNotIn("<!DOCTYPE html>", docs_join_md)
         self.assertIn(
             "additiond --network testnet --data-dir $HOME/addition-testnet --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545",
             join_md,
@@ -538,6 +541,7 @@ S.rpcCommand("getinfo").then((offline) => {
         self.assertIn("text/markdown; charset=utf-8", worker)
         self.assertIn("text/markdown; charset=utf-8", headers)
         self.assertIn("/join.md", docs_index)
+        self.assertIn("/docs/join.md", docs_index)
         self.assertIn("/docs/testnet-rpc-runbook.md", docs_index)
         self.assertIn("/docs/wallet.md", docs_index)
         self.assertIn("Local desktop helper", join_html)
@@ -550,7 +554,7 @@ S.rpcCommand("getinfo").then((offline) => {
         self.assertIsNotNone(spec.loader)
         serve = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(serve)
-        for path in ("/join.md", "/docs/testnet-rpc-runbook.md", "/docs/wallet.md"):
+        for path in ("/join.md", "/docs/join.md", "/docs/testnet-rpc-runbook.md", "/docs/wallet.md"):
             target = serve.resolve_static(path)
             self.assertIsNotNone(target, path)
             self.assertEqual(serve.content_type(target), "text/markdown; charset=utf-8", path)
@@ -564,6 +568,7 @@ S.rpcCommand("getinfo").then((offline) => {
             host, port = server.server_address
             for path, needle in (
                 ("/join.md", "bootstrap 34.27.30.115:28545"),
+                ("/docs/join.md", "bootstrap 34.27.30.115:28545"),
                 ("/docs/testnet-rpc-runbook.md", "public-read"),
                 ("/docs/wallet.md", "127.0.0.1:8545"),
             ):
