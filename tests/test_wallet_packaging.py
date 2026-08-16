@@ -52,8 +52,15 @@ class WalletPackagingTests(unittest.TestCase):
         self.assertIn("./scripts/build_wallet.sh", text)
         self.assertIn("testnet", text.lower())
         self.assertIn("127.0.0.1", text)
+        self.assertIn("addition-wallet-testnet.exe", text)
+        self.assertIn(".\\addition-wallet-testnet.exe --cli getinfo", text)
+        self.assertIn(r"$HOME\addition-testnet", text)
+        self.assertIn("web/public/download/", text)
+        self.assertNotIn("--data-dir <dir>", text)
         self.assertNotIn("wallet-connect", text.lower())
         self.assertNotRegex(text.lower(), r"\bhonest\b")
+        wallet_src = (WEB / "addition_wallet.py").read_text(encoding="utf-8")
+        self.assertNotIn("fchmod", wallet_src)
 
     def test_packaged_binary_smoke_when_present(self) -> None:
         gui = ROOT / "web" / "public" / "download" / "addition-wallet-testnet"

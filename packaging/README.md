@@ -36,19 +36,26 @@ GUI needs `python3-tk` on the build machine if you want the windowed binary.
 
 ## Windows `.exe`
 
-On a Windows machine with Python 3.10+:
+PyInstaller Windows binaries need a Windows machine (Python 3.10+). They are
+not produced on the Linux cloud VM. After the build, binaries land in
+`web/public/download/`:
 
 ```powershell
 powershell -File scripts\build_wallet.ps1
 ```
 
-Output: `web\public\download\addition-wallet-testnet.exe` and
-`addition-wallet-cli-testnet.exe`.
+Output:
 
-## Run
+* `web\public\download\addition-wallet-testnet.exe`
+* `web\public\download\addition-wallet-cli-testnet.exe`
+
+Do not commit fake `.exe` files. Drop real build output in that folder so
+`/download/` can serve the links.
+
+## Run (Linux)
 
 ```bash
-additiond --network testnet
+additiond --network testnet --data-dir $HOME/addition-testnet
 ./web/public/download/addition-wallet-testnet --cli getinfo
 ```
 
@@ -62,7 +69,19 @@ ADDITION_LOCAL_RPC_HOST=127.0.0.1 ADDITION_LOCAL_RPC_PORT=8545 \
 `ADDITION_LOCAL_RPC_HOST=8.8.8.8` must exit non-zero with
 `refuses non-loopback`.
 
+## Run (Windows PowerShell)
+
+Cashier PC (caisse1b). No `chmod`, no `sudo`, no `apt`. These talk to a local
+`additiond` on `127.0.0.1:8545` only. The public host has no write RPC. The
+helper refuses non-loopback RPC.
+
+```powershell
+additiond --network testnet --data-dir $HOME\addition-testnet --local-rpc-port 8545
+.\addition-wallet-testnet.exe --cli getinfo
+.\addition-wallet-testnet.exe
+```
+
 ## Site
 
-`/download/` on the public site links these files and stays labeled
-testnet / local. The public host has no write RPC.
+`/download/` on the public site links the Linux binaries and the two `.exe`
+names and stays labeled testnet / local. The public host has no write RPC.

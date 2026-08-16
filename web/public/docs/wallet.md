@@ -118,14 +118,25 @@ The client refuses to emit `sendtx`, `sendtx_hash`, or `sign_message`.
 
 ## Packaged desktop binary (testnet / local)
 
+Linux:
+
 ```bash
 ./scripts/build_wallet.sh
 ./web/public/download/addition-wallet-testnet --cli getinfo
 ```
 
-Windows: `powershell -File scripts\build_wallet.ps1`. Details in
-[`packaging/README.md`](../packaging/README.md). The public `/download/` page
-links those files. RPC stays loopback-only.
+Windows (PowerShell on a cashier PC). Talks to a local `additiond` on
+`127.0.0.1:8545` only. Refuses non-loopback RPC. The public host has no write
+RPC. Windows binaries land in `web/public/download/`.
+
+```powershell
+powershell -File scripts\build_wallet.ps1
+additiond --network testnet --data-dir $HOME\addition-testnet --local-rpc-port 8545
+.\addition-wallet-testnet.exe --cli getinfo
+```
+
+Details in [`packaging/README.md`](../packaging/README.md). The public
+`/download/` page links the Linux binaries and the two `.exe` names.
 
 ### Tests without a running daemon
 

@@ -3,10 +3,12 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 WEB = ROOT / "web"
@@ -102,6 +104,16 @@ class WalletClientTests(unittest.TestCase):
         self.assertNotEqual(addr, derive_address(PUB, "slh-dsa-shake-256s"))
         self.assertNotEqual(addr, PUB)
         self.assertNotEqual(addr, derive_address("00" * 32))
+
+    def test_save_works_when_fchmod_is_missing(self) -> None:
+        def boom(*_args, **_kwargs):
+            raise AttributeError("module 'os' has no attribute 'fchmod'")
+
+        with mock.patch.object(os, "fchmod", boom, create=True):
+            record = self.client.create()
+        self.assertTrue(self.wallet_path.is_file())
+        self.assertEqual(self.client.show().address, record.address)
+        self.assertNotIn(SECRET, record.public_view())
 
     def test_createwallet_keeps_secret_on_disk_only(self) -> None:
         record = self.client.create()

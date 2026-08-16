@@ -189,6 +189,17 @@ class WalletRecord:
         return line
 
 
+def _restrict_owner_rw(path: Path) -> None:
+    """Best-effort owner-only mode. os.fchmod is missing on Windows."""
+    chmod = getattr(os, "chmod", None)
+    if chmod is None:
+        return
+    try:
+        chmod(path, stat.S_IRUSR | stat.S_IWUSR)
+    except (NotImplementedError, OSError):
+        return
+
+
 class WalletStore:
     def __init__(self, path: Path) -> None:
         self.path = path
@@ -238,12 +249,13 @@ class WalletStore:
             f"next_nonce={record.next_nonce}\n"
         )
         flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+        flags |= getattr(os, "O_BINARY", 0)
         fd = os.open(str(self.path), flags, stat.S_IRUSR | stat.S_IWUSR)
         try:
             os.write(fd, body.encode("ascii"))
-            os.fchmod(fd, stat.S_IRUSR | stat.S_IWUSR)
         finally:
             os.close(fd)
+        _restrict_owner_rw(self.path)
 
 
 def assert_loopback_host(host: str) -> None:

@@ -4,16 +4,33 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Build and run ADDITION testnet</title>
-  <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
-  <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/common.css">
 </head>
 <body data-title="Build and run" data-sub="from the repo">
   <header id="site-header"></header>
   <main class="prose">
     <div class="banner">Build <code>additiond</code> (liboqs + OpenSSL). From the repository README.</div>
-    <p><strong>ADDITION</strong> is a C++20 Layer 1 node (<code>additiond</code>): SHA3-512 hashing, ML-DSA-87 signatures, hash-committed addresses, and SHA3 commitment openings. The public site <a href="https://additionblockchain.com">additionblockchain.com</a> and <a href="https://rpc.additionblockchain.com">rpc.additionblockchain.com</a> are the <strong>testnet</strong> product until the operator switches them.</p>
+    <p>&lt;p align=&quot;center&quot;&gt;</p>
+<p>  &lt;img src=&quot;docs/assets/logo-transparent.png&quot; alt=&quot;ADDITION&quot; width=&quot;280&quot;&gt;</p>
+<p>&lt;/p&gt;</p>
+<p>&lt;h1 align=&quot;center&quot;&gt;ADDITION&lt;/h1&gt;</p>
+<p>&lt;p align=&quot;center&quot;&gt;&lt;b&gt;C++20 Layer 1 · ML-DSA-87 · SHA3-512 · public product: testnet&lt;/b&gt;&lt;/p&gt;</p>
+<p>&lt;p align=&quot;center&quot;&gt;</p>
+<p>  &lt;img src=&quot;https://img.shields.io/badge/license-MIT-blue?style=for-the-badge&quot; alt=&quot;MIT&quot;&gt;</p>
+<p>  &lt;img src=&quot;https://img.shields.io/badge/C%2B%2B-20-00599C?style=for-the-badge&quot; alt=&quot;C++20&quot;&gt;</p>
+<p>  &lt;img src=&quot;https://img.shields.io/badge/public_product-testnet-orange?style=for-the-badge&quot; alt=&quot;Public product: testnet&quot;&gt;</p>
+<p>  &lt;img src=&quot;https://img.shields.io/badge/crypto-ML--DSA--87-red?style=for-the-badge&quot; alt=&quot;ML-DSA-87&quot;&gt;</p>
+<p>  &lt;img src=&quot;https://img.shields.io/badge/Supply-50M_Hard_Cap-gold?style=for-the-badge&quot; alt=&quot;Supply 50M&quot;&gt;</p>
+<p>&lt;/p&gt;</p>
+<p>&lt;p align=&quot;center&quot;&gt;</p>
+<p>  &lt;a href=&quot;https://additionblockchain.com/join/&quot;&gt;Join&lt;/a&gt; ·</p>
+<p>  &lt;a href=&quot;https://additionblockchain.com/download/&quot;&gt;Download wallet&lt;/a&gt; ·</p>
+<p>  &lt;a href=&quot;https://additionblockchain.com/docs/&quot;&gt;Docs&lt;/a&gt; ·</p>
+<p>  &lt;a href=&quot;https://additionblockchain.com/join.md&quot;&gt;join.md&lt;/a&gt; ·</p>
+<p>  &lt;a href=&quot;mailto:contact@additionblockchain.com&quot;&gt;contact@additionblockchain.com&lt;/a&gt;</p>
+<p>&lt;/p&gt;</p>
+<hr>
+<p><strong>ADDITION</strong> is a C++20 Layer 1 node (<code>additiond</code>): SHA3-512 hashing, ML-DSA-87 signatures, hash-committed addresses, and SHA3 commitment openings. The public site <a href="https://additionblockchain.com">additionblockchain.com</a> and <a href="https://rpc.additionblockchain.com">rpc.additionblockchain.com</a> are the <strong>testnet</strong> product until the operator switches them.</p>
 <h3>Technical matrix</h3>
 <table><tr><th>Feature</th><th>ADDITION</th><th>Solana</th><th>Ethereum</th><th>Bitcoin</th></tr><tr><td><strong>Signatures</strong></td><td><strong>ML-DSA-87</strong></td><td>Ed25519</td><td>ECDSA</td><td>ECDSA</td></tr><tr><td><strong>Hash</strong></td><td><strong>SHA3-512</strong></td><td>SHA-256</td><td>Keccak-256</td><td>SHA-256</td></tr><tr><td><strong>Addresses</strong></td><td><strong>SHA3-512 commitment (128 hex)</strong></td><td>Ed25519 pubkey</td><td>keccak</td><td>HASH160</td></tr><tr><td><strong>Privacy path</strong></td><td><strong>SHA3-512 opening (not ZK)</strong></td><td>public ledger</td><td>public ledger</td><td>public ledger</td></tr><tr><td><strong>Public network today</strong></td><td><strong>testnet</strong></td><td>mainnet</td><td>mainnet</td><td>mainnet</td></tr><tr><td><strong>Max supply</strong></td><td><strong>50,000,000</strong> (whole units)</td><td>no fixed cap</td><td>no fixed cap</td><td>21,000,000</td></tr><tr><td><strong>Min fee</strong></td><td><strong>1</strong> (whole unit)</td><td>lamports</td><td>wei</td><td>satoshis</td></tr></table>
 <hr>
@@ -27,8 +44,8 @@
 <p>Whole integers. No 8-decimal subunit. Block reward <code>50</code>, <code>max_supply</code> <code>50000000</code>, min fee <code>1</code>.</p>
 <hr>
 <h2>Cashiers / Windows</h2>
-<p>Cashiers and Windows users download the live testnet / local wallet from <a href="https://additionblockchain.com/download/">https://additionblockchain.com/download/</a> only (<code>addition-wallet-testnet</code> and <code>addition-wallet-cli-testnet</code>). Do not compile liboqs. There is no Windows compile path in this README. This host does not publish a <code>.exe</code>.</p>
-<p>The helper talks to write RPC on <code>127.0.0.1:8545</code> on the machine that already runs <code>additiond --network testnet</code>. additionblockchain.com has no public write RPC.</p>
+<p>Cashiers and Windows users use <a href="https://additionblockchain.com/download/">https://additionblockchain.com/download/</a> (<code>addition-wallet-testnet.exe</code> and <code>addition-wallet-cli-testnet.exe</code>). Do not compile liboqs. Do not paste <code>chmod</code>, <code>sudo</code>, or <code>apt</code> into PowerShell. There is no Windows compile path for <code>additiond</code> in this README.</p>
+<p>On the cashier PC: <code>.\addition-wallet-testnet.exe --cli getinfo</code>. That talks to a local <code>additiond</code> on <code>127.0.0.1:8545</code> only (<code>--data-dir $HOME\addition-testnet</code>). The helper refuses non-loopback RPC. additionblockchain.com has no public write RPC. Windows binaries land in <code>web/public/download/</code>.</p>
 <hr>
 <h2>Join the testnet</h2>
 <p>Build <code>additiond</code> on Linux from this repository on <code>main</code>, then:</p>
@@ -64,7 +81,10 @@ ctest --test-dir build --output-on-failure</pre>
 <p>2. Create a feature branch</p>
 <p>3. Keep secrets out of git (<code>build/</code>, <code>data/</code>, <code>.wrangler/</code>, <code>*.dat</code>, keys)</p>
 <p>4. Open a pull request</p>
-<p><strong>License:</strong> <a href="LICENSE">MIT</a> · <strong>Contact:</strong> <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
+<p>&lt;p align=&quot;center&quot;&gt;</p>
+<p>  &lt;b&gt;License:&lt;/b&gt; &lt;a href=&quot;LICENSE&quot;&gt;MIT&lt;/a&gt; ·</p>
+<p>  &lt;b&gt;Contact:&lt;/b&gt; &lt;a href=&quot;mailto:contact@additionblockchain.com&quot;&gt;contact@additionblockchain.com&lt;/a&gt;</p>
+<p>&lt;/p&gt;</p>
     <p class="note">Source file in the repository: <a href="https://github.com/ADDAddition/ADDITION/blob/main/README.md">README.md</a></p>
   </main>
   <footer id="site-footer"></footer>

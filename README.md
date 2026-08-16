@@ -69,9 +69,9 @@ Whole integers. No 8-decimal subunit. Block reward `50`, `max_supply` `50000000`
 
 ## Cashiers / Windows
 
-Cashiers and Windows users download the live testnet / local wallet from [https://additionblockchain.com/download/](https://additionblockchain.com/download/) only (`addition-wallet-testnet` and `addition-wallet-cli-testnet`). Do not compile liboqs. There is no Windows compile path in this README. This host does not publish a `.exe`.
+Cashiers and Windows users use [https://additionblockchain.com/download/](https://additionblockchain.com/download/) (`addition-wallet-testnet.exe` and `addition-wallet-cli-testnet.exe`). Do not compile liboqs. Do not paste `chmod`, `sudo`, or `apt` into PowerShell. There is no Windows compile path for `additiond` in this README.
 
-The helper talks to write RPC on `127.0.0.1:8545` on the machine that already runs `additiond --network testnet`. additionblockchain.com has no public write RPC.
+On the cashier PC: `.\addition-wallet-testnet.exe --cli getinfo`. That talks to a local `additiond` on `127.0.0.1:8545` only (`--data-dir $HOME\addition-testnet`). The helper refuses non-loopback RPC. additionblockchain.com has no public write RPC. Windows binaries land in `web/public/download/`.
 
 ---
 

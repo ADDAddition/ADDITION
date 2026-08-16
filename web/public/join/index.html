@@ -34,6 +34,10 @@
       <pre>additiond --network testnet --data-dir $HOME/addition-testnet --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545</pre>
       <p>Type <code>sync</code> on the daemon stdin (or send it to write RPC on <code>127.0.0.1</code>). Height should move.</p>
       <p><code>addpeer</code> after <code>--bootstrap</code> is <code>invalid/duplicate</code> (the seed is already listed).</p>
+      <h3>Windows (cashier PC)</h3>
+      <p>PowerShell. Do not paste <code>chmod</code>, <code>sudo</code>, or <code>apt</code>. Wallet files: <a href="/download/">/download/</a> (<code>addition-wallet-testnet.exe</code>, <code>addition-wallet-cli-testnet.exe</code>). They talk to a local <code>additiond</code> on <code>127.0.0.1:8545</code> only. The public host has no write RPC.</p>
+      <pre>additiond --network testnet --data-dir $HOME\addition-testnet --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545
+.\addition-wallet-testnet.exe --cli getinfo</pre>
     </section>
 
     <section class="panel">

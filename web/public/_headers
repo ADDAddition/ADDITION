@@ -3,3 +3,7 @@
 
 /docs/*.md
   Content-Type: text/markdown; charset=utf-8
+
+/download/*.exe
+  Content-Type: application/octet-stream
+  Content-Disposition: attachment
