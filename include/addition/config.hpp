@@ -10,6 +10,7 @@ namespace addition {
 enum class NetworkMode {
     Testnet,
     Mainnet,
+    Regtest,
 };
 
 enum class PowAlgorithm {
@@ -24,10 +25,16 @@ inline constexpr std::uint64_t kTestnetHardDifficultyTarget = 0x000000FFFFFFFFFF
 
 inline constexpr const char* kTestnetNetworkId = "ADDITION_TESTNET_V1";
 inline constexpr const char* kMainnetNetworkId = "ADDITION_MAINNET_V1";
+inline constexpr const char* kRegtestNetworkId = "ADDITION_REGTEST_V1";
 inline constexpr const char* kTestnetNetworkName = "addition-testnet";
 inline constexpr const char* kMainnetNetworkName = "addition-mainnet";
+inline constexpr const char* kRegtestNetworkName = "addition-regtest";
 inline constexpr std::uint64_t kTestnetGenesisTimestamp = 1'763'000'000ULL;
 inline constexpr std::uint64_t kMainnetGenesisTimestamp = 1'770'000'000ULL;
+inline constexpr std::uint64_t kRegtestGenesisTimestamp = 1'765'000'000ULL;
+// Local --regtest only. Higher target = easier. This is min-diff (any SHA3-512
+// header hash meets it). Do not use on ADDITION_MAINNET_V1.
+inline constexpr std::uint64_t kRegtestMinDifficultyTarget = 0xFFFFFFFFFFFFFFFFULL;
 // Mainnet stays at the existing testnet *hard* floor and cannot retarget to the
 // ~4ms easy target. PoW is memory_hard (1 MiB x 16 rounds per attempt).
 inline constexpr std::uint64_t kMainnetDifficultyTarget = kTestnetHardDifficultyTarget;
@@ -55,6 +62,9 @@ struct ChainConfig {
     std::uint64_t initial_difficulty_target{kTestnetEasyDifficultyTarget};
     std::uint64_t min_difficulty_target{kTestnetHardDifficultyTarget};
     std::uint64_t max_difficulty_target{kTestnetEasyDifficultyTarget};
+    std::string pow_profile{"shared-testnet"};
+    std::uint32_t confirmations_policy{2};
+    std::string economic_security{"none"};
     std::uint32_t retarget_window{30U};
     std::uint32_t halving_interval{210000U};
     bool require_pq_signatures{true};
@@ -103,8 +113,11 @@ std::vector<std::string> public_advertised_peers(const std::vector<std::string>&
 const ChainConfig& default_config();
 ChainConfig testnet_chain_config();
 ChainConfig mainnet_chain_config();
+ChainConfig regtest_chain_config();
 NodeConfig default_node_config();
 NodeConfig mainnet_node_config();
+NodeConfig regtest_node_config();
+void apply_regtest_profile(ChainConfig& chain);
 bool validate_network_profile(const NodeConfig& cfg, std::string& error);
 
 void set_runtime_network_mode(NetworkMode mode);

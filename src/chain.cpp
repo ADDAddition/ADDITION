@@ -80,8 +80,8 @@ Block Chain::make_genesis() const {
     Block g{};
     g.header.height = 0;
     // Testnet keeps previous_hash=0 so the live ADDITION_TESTNET_V1 genesis is unchanged.
-    // Mainnet binds the genesis header to its network_id so the hash cannot match testnet.
-    if (cfg_.network_id == kMainnetNetworkId) {
+    // Mainnet and --regtest bind the genesis header to network_id so hashes cannot match.
+    if (cfg_.network_id == kMainnetNetworkId || cfg_.network_id == kRegtestNetworkId) {
         g.header.previous_hash = std::string("genesis:") + cfg_.network_id;
     } else {
         g.header.previous_hash = "0";
@@ -118,6 +118,28 @@ bool Chain::has_block_hash(const std::string& hash) const {
 }
 
 std::uint64_t Chain::cumulative_work() const { return cumulative_work_; }
+
+std::string Chain::genesis_hash() const {
+    return hash_block_header(genesis_block().header);
+}
+
+std::uint64_t Chain::tx_confirmations(const std::string& tx_hash) const {
+    if (tx_hash.empty()) {
+        return 0;
+    }
+    for (const auto& b : blocks_) {
+        for (const auto& tx : b.transactions) {
+            if (hash_transaction(tx) == tx_hash) {
+                return height() >= b.header.height ? (height() - b.header.height + 1) : 0;
+            }
+        }
+    }
+    return 0;
+}
+
+bool Chain::tx_in_best_chain(const std::string& tx_hash) const {
+    return tx_confirmations(tx_hash) > 0;
+}
 std::uint64_t Chain::current_difficulty_target() const { return difficulty_target_; }
 std::uint64_t Chain::total_fees_last_block() const { return total_fees_last_block_; }
 
@@ -616,6 +638,14 @@ bool Chain::validate_block_header(const Block& candidate, std::string& error) co
         return false;
     }
 
+    if (candidate.header.difficulty_target > cfg_.max_difficulty_target) {
+        error = "min-diff: toy difficulty rejected";
+        return false;
+    }
+    if (candidate.header.difficulty_target < cfg_.min_difficulty_target) {
+        error = "invalid difficulty target (below min-diff floor)";
+        return false;
+    }
     if (candidate.header.difficulty_target != difficulty_target_) {
         error = "invalid difficulty target";
         return false;

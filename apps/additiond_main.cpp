@@ -152,6 +152,7 @@ int main(int argc, char** argv) {
 
     addition::set_runtime_network_mode(node_cfg.mode);
     const bool mainnet_mode = node_cfg.mode == addition::NetworkMode::Mainnet;
+    const bool regtest_mode = node_cfg.mode == addition::NetworkMode::Regtest;
 
     const bool allow_insecure_tx_commands = []() {
         if (const char* v = std::getenv("ADDITION_ALLOW_INSECURE_TX_COMMANDS")) {
@@ -448,6 +449,8 @@ int main(int argc, char** argv) {
     }
     if (mainnet_mode) {
         std::cout << "bootstrap_peers (IPv4 only; not the public testnet seed):";
+    } else if (regtest_mode) {
+        std::cout << "bootstrap_peers (IPv4 only; local --regtest, not the public testnet seed):";
     } else {
         std::cout << "bootstrap_peers (IPv4 only; operator public P2P is "
                   << addition::kOperatorPublicP2p << "):";
@@ -463,11 +466,14 @@ int main(int argc, char** argv) {
     }
 
     const bool auto_mine_requested = node_cfg.enable_auto_mine;
-    if (auto_mine_requested && mainnet_mode) {
+    if (auto_mine_requested && (mainnet_mode || regtest_mode)) {
         node_cfg.enable_auto_mine = false;
-        std::cout << "warning: --auto-mine ignored on mainnet profile (testnet only)\n";
+        std::cout << "warning: --auto-mine ignored on "
+                  << addition::network_mode_label(node_cfg.mode)
+                  << " profile (testnet only)\n";
     }
-    rpc.set_auto_mine_status(node_cfg.enable_auto_mine && !mainnet_mode, node_cfg.auto_mine_interval_sec);
+    rpc.set_auto_mine_status(node_cfg.enable_auto_mine && !mainnet_mode && !regtest_mode,
+                             node_cfg.auto_mine_interval_sec);
     if (node_cfg.enable_auto_mine) {
         std::cout << "auto-mine enabled (testnet in-process) interval_sec="
                   << node_cfg.auto_mine_interval_sec
@@ -540,12 +546,19 @@ int main(int argc, char** argv) {
     } else {
         std::cout << "warning: strict admin mode disabled (ADDITION_STRICT_ADMIN_MODE=0)\n";
     }
-    if (mainnet_mode) {
+    switch (node_cfg.mode) {
+    case addition::NetworkMode::Mainnet:
         std::cout << "mainnet chain " << node_cfg.chain.network_id
                   << " data-dir=" << node_cfg.data_dir
                   << "; this is not a live public network\n";
-    } else {
+        break;
+    case addition::NetworkMode::Regtest:
+        std::cout << "regtest mode enabled (local min-diff; not a public network; "
+                  << "write RPC 127.0.0.1)\n";
+        break;
+    case addition::NetworkMode::Testnet:
         std::cout << "testnet mode enabled (default)\n";
+        break;
     }
     if (!has_privacy_master_key) {
         std::cout << "warning: ADDITION_PRIVACY_MASTER_KEY not set or too short (min 32); private note operations will fail\n";

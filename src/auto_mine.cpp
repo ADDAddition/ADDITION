@@ -37,7 +37,14 @@ AutoMiner::AutoMiner(Miner& miner, NetworkMode mode, AutoMineSettings settings)
 }
 
 bool AutoMiner::enabled() const {
-    return settings_.enabled && mode_ == NetworkMode::Testnet;
+    switch (mode_) {
+    case NetworkMode::Testnet:
+        return settings_.enabled;
+    case NetworkMode::Mainnet:
+    case NetworkMode::Regtest:
+        return false;
+    }
+    return false;
 }
 
 std::uint32_t AutoMiner::interval_sec() const {
@@ -62,6 +69,7 @@ bool AutoMiner::maybe_mine(std::chrono::steady_clock::time_point now,
     case NetworkMode::Testnet:
         break;
     case NetworkMode::Mainnet:
+    case NetworkMode::Regtest:
         error = "auto-mine is testnet only";
         return false;
     }

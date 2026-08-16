@@ -181,7 +181,7 @@ bool StateStore::ensure_network_marker(const Chain& chain, std::string& error) c
 bool StateStore::save_chain(const Chain& chain, std::string& error) const {
     std::filesystem::create_directories(data_dir_);
     std::ostringstream blocks;
-    if (chain.config().network_id == kMainnetNetworkId) {
+    if (chain.config().network_id != kTestnetNetworkId) {
         blocks << "N|" << chain.config().network_id << '|' << chain.config().network_mode
                << '|' << hash_block_header(chain.genesis_block().header) << '\n';
     }

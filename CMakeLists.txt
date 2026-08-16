@@ -101,6 +101,10 @@ if(ADDITION_BUILD_TESTS)
     target_link_libraries(test_auto_mine PRIVATE addition_core)
     add_test(NAME test_auto_mine COMMAND test_auto_mine)
 
+    add_executable(test_confirmations tests/test_confirmations.cpp)
+    target_link_libraries(test_confirmations PRIVATE addition_core)
+    add_test(NAME test_confirmations COMMAND test_confirmations)
+
     add_executable(test_p2p_sync tests/test_p2p_sync.cpp)
     target_link_libraries(test_p2p_sync PRIVATE addition_core)
     add_test(NAME test_p2p_sync COMMAND test_p2p_sync)
@@ -210,5 +214,13 @@ if(ADDITION_BUILD_TESTS)
         set_tests_properties(test_core_path_smoke PROPERTIES
             ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
             TIMEOUT 180)
+        add_test(
+            NAME test_regtest_two_node
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_regtest_two_node.py
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        )
+        set_tests_properties(test_regtest_two_node PROPERTIES
+            ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
+            TIMEOUT 120)
     endif()
 endif()
