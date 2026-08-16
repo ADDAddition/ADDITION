@@ -6,6 +6,8 @@ This is not a hosted web wallet. It is not a multi-chain browser. It talks to AD
 
 Contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com)
 
+Screens: Home, Receive, Send, Activity. Node settings sit behind the gear on Home. Brand images are the website files (`logo-transparent.png`, `apple-touch-icon.png`, `og.png`, `favicon-32.png`) copied into the asset catalog.
+
 ## What it does
 
 On a reachable ADDITION node you control:
@@ -26,7 +28,9 @@ If write RPC is down or returns `error:`, the app shows **RPC offline** / the no
 
 Write RPC accepts loopback (`127.0.0.1`, `localhost`, `::1`) or a LAN host you set. It refuses public operator hosts (`rpc.additionblockchain.com`, `34.27.30.115`, and other non-LAN addresses). Do not bind write RPC on a public interface. Do not treat public read as a send/createwallet backend.
 
-On the iOS Simulator, `127.0.0.1:8545` is the Mac that already runs `additiond --network testnet`. On a phone, point the Node tab at your own loopback or LAN node (and token, if you set `ADDITION_RPC_TOKEN`).
+On the iOS Simulator, `127.0.0.1:8545` is the Mac that already runs `additiond --network testnet`. On a phone, open the Home gear and point write RPC at your own loopback or LAN node (and token, if you set `ADDITION_RPC_TOKEN`).
+
+Static layout previews (same brand files, fail-closed empty state): `ios/previews/`.
 
 ## Build on a Mac
 

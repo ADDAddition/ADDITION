@@ -14,7 +14,10 @@ final class WalletSession: ObservableObject {
     @Published var publicReadLine: String = ""
     @Published var status: String = "Set a write RPC node you control, then create or load a wallet."
     @Published var lastSend: String = ""
+    @Published var activity: [ActivityItem] = []
     @Published var busy: Bool = false
+    @Published var showNode: Bool = false
+    @Published var selectedTab: WalletTab = .home
 
     private let defaults = UserDefaults.standard
 
@@ -24,6 +27,22 @@ final class WalletSession: ObservableObject {
         rpcToken = defaults.string(forKey: "rpcToken") ?? ""
         address = defaults.string(forKey: "address") ?? ""
         algorithm = defaults.string(forKey: "algorithm") ?? ""
+        if let data = defaults.data(forKey: "activity"),
+           let items = try? JSONDecoder().decode([ActivityItem].self, from: data) {
+            activity = items
+        }
+    }
+
+    var hasWallet: Bool {
+        !address.isEmpty
+    }
+
+    var displayBalance: String {
+        balanceReady ? balanceText : "unavailable"
+    }
+
+    var assetAmountLabel: String {
+        balanceReady ? balanceText : "—"
     }
 
     func persist() {
@@ -32,6 +51,9 @@ final class WalletSession: ObservableObject {
         defaults.set(rpcToken, forKey: "rpcToken")
         defaults.set(address, forKey: "address")
         defaults.set(algorithm, forKey: "algorithm")
+        if let data = try? JSONEncoder().encode(activity) {
+            defaults.set(data, forKey: "activity")
+        }
     }
 
     func createWallet() {
@@ -40,7 +62,7 @@ final class WalletSession: ObservableObject {
         run { client in
             let record = try client.createwallet(name: name)
             let balance = try client.balance(name: name)
-            return .wallet(record, balance, "Created \(record.name) on the node. Keys stay in the node wallet store.")
+            return .wallet(record, balance, "Created \(record.name) on the node. Keys stay in the node wallet store.", .created)
         }
     }
 
@@ -50,7 +72,7 @@ final class WalletSession: ObservableObject {
         run { client in
             let record = try client.walletInfo(name: name)
             let balance = try client.balance(name: name)
-            return .wallet(record, balance, "Loaded \(record.name) from write RPC.")
+            return .wallet(record, balance, "Loaded \(record.name) from write RPC.", .loaded)
         }
     }
 
@@ -125,12 +147,21 @@ final class WalletSession: ObservableObject {
 
     private func apply(_ result: SessionResult) {
         switch result {
-        case .wallet(let record, let balance, let message):
+        case .wallet(let record, let balance, let message, let kind):
             address = record.address
             algorithm = record.algorithm
             balanceText = "\(balance) ADD"
             balanceReady = true
             status = message
+            prepend(
+                ActivityItem(
+                    id: UUID().uuidString,
+                    kind: kind,
+                    title: kind == .created ? "Wallet created" : "Wallet loaded",
+                    detail: shortAddress(record.address),
+                    amountLabel: nil
+                )
+            )
         case .refresh(let record, let balance, let info):
             address = record.address
             algorithm = record.algorithm
@@ -145,6 +176,7 @@ final class WalletSession: ObservableObject {
             balanceReady = true
             lastSend = reply
             status = reply
+            prepend(ActivityItem.fromSendReply(reply))
         }
         persist()
         busy = false
@@ -152,6 +184,13 @@ final class WalletSession: ObservableObject {
 
     private func unusedSessionResult(_ value: Never) -> Never {
         switch value {}
+    }
+
+    private func prepend(_ item: ActivityItem) {
+        activity.insert(item, at: 0)
+        if activity.count > 20 {
+            activity = Array(activity.prefix(20))
+        }
     }
 
     private func fail(_ message: String) {
@@ -175,7 +214,7 @@ final class WalletSession: ObservableObject {
 }
 
 private enum SessionResult {
-    case wallet(WalletRecord, UInt64, String)
+    case wallet(WalletRecord, UInt64, String, ActivityItem.Kind)
     case refresh(WalletRecord, UInt64, [String: String])
     case sent(WalletRecord, UInt64, String)
 }

@@ -71,6 +71,13 @@ final class FailClosedTests: XCTestCase {
         }
     }
 
+    func testActivityFromRealSendOnly() {
+        let item = ActivityItem.fromSendReply("ok:gossiped hash=abcd from=aa to=bb amount=10 fee=1")
+        XCTAssertEqual(item.kind, .send)
+        XCTAssertEqual(item.amountLabel, "-10 ADD")
+        XCTAssertEqual(item.detail, "to bb")
+    }
+
     func testCommandBuilders() throws {
         XCTAssertEqual(try WalletCommands.createwallet(name: "default"), "createwallet default")
         let addr = String(repeating: "ab", count: 64)

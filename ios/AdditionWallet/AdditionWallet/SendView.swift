@@ -7,35 +7,60 @@ struct SendView: View {
     @State private var fee = ""
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section("Destination") {
-                    TextField("128-hex ADDITION address", text: $to, axis: .vertical)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .font(.body.monospaced())
-                }
-                Section("Whole units") {
-                    TextField("Amount", text: $amount)
-                        .keyboardType(.numberPad)
-                    TextField("Fee (blank uses node fee_info)", text: $fee)
-                        .keyboardType(.numberPad)
-                }
-                Section {
-                    Button("Send") {
+        ScreenBackground {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    BrandWordmark(height: 24)
+                    Text("Send ADD")
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(AdditionTheme.cream)
+                    Card {
+                        AssetRow(amountLabel: session.assetAmountLabel)
+                    }
+                    Card {
+                        Text("Amount")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(AdditionTheme.mute)
+                        TextField("Whole units", text: $amount)
+                            .keyboardType(.numberPad)
+                            .font(.title3.monospaced())
+                            .foregroundStyle(AdditionTheme.cream)
+                        Text("Fee (blank uses node fee_info)")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(AdditionTheme.mute)
+                        TextField("1", text: $fee)
+                            .keyboardType(.numberPad)
+                            .font(.body.monospaced())
+                            .foregroundStyle(AdditionTheme.cream)
+                    }
+                    Card {
+                        Text("To")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(AdditionTheme.mute)
+                        TextField("128-hex ADDITION address", text: $to, axis: .vertical)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .font(.footnote.monospaced())
+                            .foregroundStyle(AdditionTheme.cream)
+                    }
+                    PrimaryButton(
+                        title: session.busy ? "Sending…" : "Send",
+                        enabled: !session.busy && session.hasWallet
+                    ) {
                         session.send(to: to, amountText: amount, feeText: fee)
                     }
-                    .disabled(session.busy || session.address.isEmpty)
-                }
-                Section("Last write RPC reply") {
                     Text(session.lastSend.isEmpty ? session.status : session.lastSend)
-                        .font(.footnote.monospaced())
+                        .font(.caption.monospaced())
+                        .foregroundStyle(AdditionTheme.mute)
                         .textSelection(.enabled)
                 }
+                .padding(20)
             }
-            .scrollContentBackground(.hidden)
-            .background(AdditionTheme.ink.ignoresSafeArea())
-            .navigationTitle("Send ADD")
         }
     }
+}
+
+#Preview("Send") {
+    SendView()
+        .environmentObject(WalletSession())
 }

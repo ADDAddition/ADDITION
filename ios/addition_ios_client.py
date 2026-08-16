@@ -347,6 +347,23 @@ def build_fee_info() -> str:
     return "fee_info"
 
 
+def activity_from_send_reply(reply: str) -> Dict[str, str]:
+    if reply.startswith("error:") or reply == "RPC offline" or not reply.strip():
+        raise AdditionClientError("no activity from a failed send")
+    values = parse_kv(reply)
+    if "ok:gossiped" not in reply and "hash=" not in reply:
+        raise AdditionClientError("wallet_send did not confirm")
+    amount = values.get("amount")
+    dest = values.get("to", "")
+    return {
+        "kind": "send",
+        "title": "Sent ADD",
+        "detail": dest,
+        "amount": f"-{amount} ADD" if amount else "",
+        "hash": values.get("hash", ""),
+    }
+
+
 @dataclass
 class WriteEndpoint:
     host: str = DEFAULT_WRITE_HOST

@@ -19,6 +19,7 @@ from addition_ios_client import (  # noqa: E402
     TextRpcClient,
     WalletClient,
     WriteEndpoint,
+    activity_from_send_reply,
     assert_command_allowed,
     assert_write_endpoint,
     build_createwallet,
@@ -255,6 +256,17 @@ class FailClosedRPCTests(unittest.TestCase):
             f"wallet_send demo {TO_ADDR} 7",
         )
 
+    def test_activity_comes_from_real_send_reply_only(self) -> None:
+        item = activity_from_send_reply(
+            f"ok:gossiped hash={'ab' * 32} from={ADDR} to={TO_ADDR} amount=10 fee=1"
+        )
+        self.assertEqual(item["kind"], "send")
+        self.assertEqual(item["amount"], "-10 ADD")
+        self.assertEqual(item["detail"], TO_ADDR)
+        for bad in ("", "RPC offline", "error: insufficient unlocked balance", "ok"):
+            with self.assertRaises(AdditionClientError):
+                activity_from_send_reply(bad)
+
     def test_public_read_cannot_be_used_as_wallet_backend(self) -> None:
         with self.assertRaises(AdditionClientError):
             public_read_http("createwallet default", "https://rpc.additionblockchain.com/rpc")
@@ -296,6 +308,22 @@ class SourceGuardTests(unittest.TestCase):
         self.assertNotIn("token sale", copy)
         self.assertNotIn("app store", copy)
         self.assertNotIn("0.0.0.0:8545", copy)
+
+    def test_brand_images_are_website_files(self) -> None:
+        assets = IOS / "AdditionWallet" / "AdditionWallet" / "Assets.xcassets"
+        pairs = [
+            (ROOT / "web" / "public" / "logo-transparent.png", assets / "Logo.imageset" / "Logo.png"),
+            (ROOT / "web" / "public" / "apple-touch-icon.png", assets / "Mark.imageset" / "Mark.png"),
+            (ROOT / "web" / "public" / "og.png", assets / "OpenGraph.imageset" / "OpenGraph.png"),
+            (ROOT / "web" / "public" / "favicon-32.png", assets / "Favicon.imageset" / "Favicon.png"),
+        ]
+        for src, dst in pairs:
+            self.assertTrue(src.is_file(), src)
+            self.assertTrue(dst.is_file(), dst)
+            self.assertEqual(src.read_bytes(), dst.read_bytes(), dst.name)
+        icon = assets / "AppIcon.appiconset" / "AppIcon.png"
+        self.assertTrue(icon.is_file())
+        self.assertGreater(icon.stat().st_size, 1000)
 
     def test_no_committed_ipa(self) -> None:
         ipas = list(IOS.rglob("*.ipa"))
