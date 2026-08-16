@@ -5,74 +5,130 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("ADDITION")
-                        .font(.system(size: 34, weight: .bold, design: .default))
-                        .foregroundStyle(AdditionTheme.red)
-                    Text("Research testnet wallet. Local or LAN node only. Not a hosted web wallet.")
-                        .foregroundStyle(AdditionTheme.mute)
-                    panel {
-                        labeled("Wallet name", session.walletName)
-                        labeled("Address", session.address.isEmpty ? "none loaded" : session.address)
-                        labeled("Algorithm", session.algorithm.isEmpty ? "—" : session.algorithm)
-                        if session.balanceReady {
-                            labeled("Balance", session.balanceText)
-                        } else {
-                            labeled("Balance", "unavailable")
-                        }
+            ScreenBackground {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        header
+                        hero
+                        actions
+                        assetCard
+                        recent
                     }
-                    panel {
-                        Text(session.status)
-                            .foregroundStyle(AdditionTheme.cream)
-                            .textSelection(.enabled)
-                    }
-                    HStack {
-                        action("Create") { session.createWallet() }
-                        action("Load") { session.loadWallet() }
-                        action("Refresh") { session.refresh() }
-                    }
-                    Text("createwallet / wallet_info / wallet_balance talk to write RPC on a node you control. If that RPC is down, this screen shows RPC offline and does not invent an ADD amount.")
-                        .font(.footnote)
-                        .foregroundStyle(AdditionTheme.mute)
-                    Text(WriteRPCPolicy.contact)
-                        .font(.footnote)
-                        .foregroundStyle(AdditionTheme.mute)
+                    .padding(20)
                 }
-                .padding(20)
             }
-            .background(AdditionTheme.ink.ignoresSafeArea())
-            .navigationBarHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
             .disabled(session.busy)
         }
     }
 
-    private func labeled(_ title: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title.uppercased())
+    private var header: some View {
+        HStack {
+            BrandWordmark(height: 26)
+            Spacer()
+            Button {
+                session.showNode = true
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(AdditionTheme.cream)
+                    .frame(width: 36, height: 36)
+                    .background(AdditionTheme.panel)
+                    .clipShape(Circle())
+            }
+            .accessibilityLabel("Node")
+        }
+    }
+
+    private var hero: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Research testnet")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(AdditionTheme.mute)
+            if session.balanceReady {
+                Text(session.balanceText)
+                    .font(.system(size: 40, weight: .semibold, design: .rounded))
+                    .foregroundStyle(AdditionTheme.cream)
+            } else {
+                Text(session.status.contains("RPC offline") ? "RPC offline" : "unavailable")
+                    .font(.system(size: 32, weight: .semibold, design: .rounded))
+                    .foregroundStyle(AdditionTheme.cream)
+            }
+            Text(session.hasWallet ? shortAddress(session.address) : "No wallet loaded")
+                .font(.footnote.monospaced())
+                .foregroundStyle(AdditionTheme.mute)
+                .textSelection(.enabled)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var actions: some View {
+        HStack(spacing: 28) {
+            CircleAction(title: "Receive", systemImage: "arrow.down", enabled: true) {
+                session.selectedTab = .receive
+            }
+            CircleAction(title: "Send", systemImage: "arrow.up", enabled: session.hasWallet) {
+                session.selectedTab = .send
+            }
+            CircleAction(title: "Refresh", systemImage: "arrow.clockwise", enabled: true) {
+                if session.hasWallet {
+                    session.refresh()
+                } else {
+                    session.loadWallet()
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var assetCard: some View {
+        Card {
+            Text("Asset")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(AdditionTheme.mute)
+            AssetRow(amountLabel: session.assetAmountLabel)
+        }
+    }
+
+    private var recent: some View {
+        Card {
+            HStack {
+                Text("Activity")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(AdditionTheme.mute)
+                Spacer()
+                Button("See all") {
+                    session.selectedTab = .activity
+                }
+                .font(.caption.weight(.medium))
+                .foregroundStyle(AdditionTheme.red)
+            }
+            if let item = session.activity.first {
+                ActivityRow(item: item)
+            } else {
+                Text("No activity from write RPC yet.")
+                    .font(.footnote)
+                    .foregroundStyle(AdditionTheme.mute)
+            }
+            if !session.hasWallet {
+                HStack(spacing: 10) {
+                    PrimaryButton(title: "Create", enabled: !session.busy) {
+                        session.createWallet()
+                    }
+                    PrimaryButton(title: "Load", enabled: !session.busy) {
+                        session.loadWallet()
+                    }
+                }
+            }
+            Text(session.status)
                 .font(.caption)
                 .foregroundStyle(AdditionTheme.mute)
-            Text(value)
-                .font(.body.monospaced())
-                .foregroundStyle(AdditionTheme.cream)
                 .textSelection(.enabled)
         }
     }
+}
 
-    private func panel<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            content()
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AdditionTheme.panel)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(AdditionTheme.line, lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-
-    private func action(_ title: String, _ work: @escaping () -> Void) -> some View {
-        Button(title, action: work)
-            .buttonStyle(.borderedProminent)
-            .tint(AdditionTheme.red)
-    }
+#Preview("Home") {
+    HomeView()
+        .environmentObject(WalletSession())
 }
