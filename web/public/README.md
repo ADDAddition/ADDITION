@@ -1,13 +1,13 @@
 # ADDITION static site
 
-Publish the contents of this directory as the site root for a Pages project (for example additionblockchain.com).
+Pages root for additionblockchain.com.
 
-The chrome is a short dark Control Center (logo, nav, EN/FR, live getinfo strip). The strip shows only `height`, `peers`, `network`, `pq_mode` from a live `getinfo`. If RPC is down it prints **RPC offline** and leaves those cells empty.
+Dark console: logo, short nav, EN/FR, live getinfo strip (`height`, `peers`, `network`, `pq_mode`). Down node → **RPC offline**, empty cells.
 
 - Pretty URLs are folders with `index.html` (`/explorer/`, `/wallet/`, `/docs/commands/`, …).
-- Explorer and status call `/api/rpc?cmd=…`. On a static host that path is absent unless you attach a real read RPC, so the UI shows **RPC offline** and stays empty.
-- Optional query: `?rpc=https://HOST:38545/rpc` to point the browser at a public read HTTP adapter.
-- Worker var `PUBLIC_RPC_HTTP` is empty by default (`wrangler.toml`). Leave it empty for **RPC offline**. Set it to the real `--public-rpc` HTTP URL when an operator has one. Do not commit trycloudflare URLs.
-- Two local nodes: see `docs/TWO_NODE_TESTNET.md`.
-- Do not add fake live stats. Contact: contact@additionblockchain.com
+- Explorer and status call `/api/rpc?cmd=…`.
+- Optional `?rpc=https://HOST:38545/rpc`.
+- Worker var `PUBLIC_RPC_HTTP` is empty by default. Set it to the real `--public-rpc` HTTP URL. Do not commit trycloudflare URLs.
+- Two local nodes: `docs/TWO_NODE_TESTNET.md`.
+- Contact: contact@additionblockchain.com
 - Source: https://github.com/ADDAddition/ADDITION

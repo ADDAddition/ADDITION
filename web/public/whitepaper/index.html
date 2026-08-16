@@ -3,47 +3,45 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ADDITION research note</title>
+  <title>ADDITION white paper</title>
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="White paper" data-sub="Research note from the public repository. Not a live-network prospectus.">
+<body data-title="White paper" data-sub="from the repo">
   <header id="site-header"></header>
   <main class="prose">
     <div class="banner">
-      Regenerated from the honest testnet tree (<code>docs/WHITE_PAPER.md</code>, <code>config.hpp</code>, <code>genesis.json</code>).
-      Design goals below are <strong>not</strong> proof of a public mainnet, listing, or token sale.
-      The older V3 copy still in the repo contains a “mainnet launch completed” roadmap — treat that as outdated.
+      From <code>docs/WHITE_PAPER.md</code>, <code>config.hpp</code>, <code>genesis.json</code>.
+      Default: <code>additiond --network testnet</code>.
     </div>
 
     <h2>1. What this is</h2>
-    <p>ADDITION is a C++ research prototype for a post-quantum Layer 1 experiment. The runnable default is <code>additiond --network testnet</code> (<code>addition-testnet</code> / <code>ADDITION_TESTNET_V1</code>). There is no live public mainnet in this repository.</p>
+    <p>C++ node. Post-quantum signatures (ML-DSA-87) and SHA3-512. Network name <code>addition-testnet</code> / <code>ADDITION_TESTNET_V1</code>.</p>
     <p>Source: <a href="https://github.com/ADDAddition/ADDITION">https://github.com/ADDAddition/ADDITION</a></p>
 
-    <h2>2. Problem statement (research framing)</h2>
-    <p>Shor’s algorithm threatens elliptic-curve signatures used by many existing chains. This project experiments with lattice-based signatures at the node, not as a claim that the network is production-ready or “quantum-safe forever.”</p>
+    <h2>2. Why lattice signatures</h2>
+    <p>Shor’s algorithm breaks elliptic-curve signatures. This node uses ML-DSA-87 via liboqs. Build fails if liboqs is missing.</p>
 
-    <h2>3. Research goals (design targets)</h2>
+    <h2>3. What the node does</h2>
     <ol>
-      <li><strong>Quantum</strong> — ML-DSA-87 (FIPS 204) via liboqs. <code>getinfo</code> reports <code>pq_mode=strict</code> when the node answers. Build fails if liboqs is missing.</li>
-      <li><strong>Privacy</strong> — SHA3-512 commitment + nullifier opening (<code>privacy_mint_open</code> / <code>privacy_spend_open</code>). This is a hash relation, not a native ZK circuit. Not Groth16, not ZK-Shield.</li>
-      <li><strong>Speed</strong> — local testnet RPC. Publish only real <code>getinfo</code> fields from a running process.</li>
-      <li><strong>Cost of transaction</strong> — spec <code>min_fee=1</code>. This site does not invent USD fees or a gas market.</li>
-      <li><strong>Compatibility</strong> — in-process <code>bridge_*</code> commands and <code>web/evm/evm_rpc_bridge.py</code>. Bootstrap / not a full EVM, not live Uniswap, not connected to every chain today.</li>
+      <li><strong>Quantum</strong> — ML-DSA-87 (FIPS 204). <code>getinfo</code> prints <code>pq_mode</code> when the process answers.</li>
+      <li><strong>Privacy</strong> — SHA3-512 commitment + nullifier opening (<code>privacy_mint_open</code> / <code>privacy_spend_open</code>). Hash relation. Not Groth16.</li>
+      <li><strong>RPC</strong> — public read on :38545 (<code>getinfo</code>, <code>getblock</code>, …). Write RPC on <code>127.0.0.1:8545</code>.</li>
+      <li><strong>Fees</strong> — spec <code>min_fee=1</code>.</li>
+      <li><strong>Bridges</strong> — in-process <code>bridge_*</code> and <code>web/evm/evm_rpc_bridge.py</code> on localhost. <code>eth_sendRawTransaction</code> disabled.</li>
     </ol>
-    <p>Hashing in the daemon is SHA3-512 (OpenSSL). <code>crypto_selftest</code> is whatever the node returns; if RPC is down this page does not invent a pass.</p>
+    <p>Hashing: SHA3-512 (OpenSSL). <code>crypto_selftest</code> is whatever the node returns.</p>
 
-    <h2>4. Consensus experiment: Proof of Measurable Work</h2>
-    <p>The miner/chain use a memory-hard scratch path (about 1 MiB in <code>chain.cpp</code>) plus SHA3-512. <code>getinfo</code> can report <code>last_mine_ms</code>, <code>last_mined_txs</code>, and <code>last_tps</code> <em>from that process</em>. Those fields are not a public hashrate index.</p>
+    <h2>4. Proof of Measurable Work</h2>
+    <p>Miner/chain: memory-hard scratch (~1 MiB in <code>chain.cpp</code>) plus SHA3-512. Testnet PoW is <code>sha3_512</code>. <code>getinfo</code> may print <code>last_mine_ms</code>, <code>last_mined_txs</code>, <code>last_tps</code> from that process.</p>
 
-    <h2>5. Ledger and contracts (what the code does)</h2>
+    <h2>5. Ledger</h2>
     <ul>
-      <li>UTXO-style transactions with PQ signatures and a minimum fee. Local wallets use <code>createwallet</code> (ML-DSA-87) and <code>wallet_send</code> / <code>tx_build</code>+<code>sendtx_signed</code>. Bitcoin-like user model, not BIP compatibility.</li>
-      <li>In-process key-value contracts: <code>contract_deploy</code>, <code>contract_call</code> <code>set|add|get</code>.</li>
-      <li>Token / NFT / swap engines in-process. A swap quote without a pool returns <code>error: pool not found</code>.</li>
-      <li>EVM helper is a <strong>bootstrap</strong> JSON-RPC map. Not a full EVM. <code>eth_sendRawTransaction</code> is disabled.</li>
+      <li>UTXO txs, PQ signatures, min fee. <code>createwallet</code> (ML-DSA-87), <code>wallet_send</code> / <code>tx_build</code>+<code>sendtx_signed</code>.</li>
+      <li>In-process KV: <code>contract_deploy</code>, <code>contract_call</code> <code>set|add|get</code>.</li>
+      <li>Token / NFT / swap engines in-process. Empty pool → <code>error: pool not found</code>.</li>
     </ul>
 
-    <h2>6. Monetary constants in config (design, not a ticker)</h2>
+    <h2>6. Constants in config</h2>
     <table>
       <tr><th>Parameter</th><th>Value in genesis/config</th></tr>
       <tr><td>max_supply</td><td>50,000,000</td></tr>
@@ -53,17 +51,9 @@
       <tr><td>min_fee</td><td>1</td></tr>
       <tr><td>network_name</td><td>addition-testnet</td></tr>
     </table>
-    <p class="note">These are kernel parameters. They are not a circulating-supply figure, not a CoinMarketCap listing, and not a live “ADD price.”</p>
 
-    <h2>7. What this note does not claim</h2>
-    <ul>
-      <li>No ranking against other networks and no “best blockchain” marketing.</li>
-      <li>No live mainnet, listing, token sale, or wallet-connect lure.</li>
-      <li>No hardcoded public node counts, hashrate, or circulating-supply widgets.</li>
-    </ul>
     <p>Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
-
-    <p>Companion pages: <a href="/docs/architecture/">architecture</a>, <a href="/docs/commands/">commands</a>, <a href="/docs/pouw/">PoUW spec</a>, <a href="/legal/">legal notice</a>.</p>
+    <p><a href="/docs/architecture/">architecture</a> · <a href="/docs/commands/">commands</a> · <a href="/docs/pouw/">PoUW spec</a> · <a href="/legal/">legal</a></p>
   </main>
   <footer id="site-footer"></footer>
   <script src="/chrome.js"></script>

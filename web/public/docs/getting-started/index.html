@@ -6,27 +6,26 @@
   <title>Build and run ADDITION testnet</title>
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="Build and run" data-sub="Mirrored from the public repository. Research testnet, not a live mainnet.">
+<body data-title="Build and run" data-sub="from the repo">
   <header id="site-header"></header>
   <main class="prose">
-    <div class="banner">How to build <code>additiond</code> with liboqs + OpenSSL and run the honest testnet. Copied from the repository README.</div>
-    <h2>ADDITION — research prototype / testnet</h2>
+    <div class="banner">Build <code>additiond</code> (liboqs + OpenSSL). From the repository README.</div>
+    <h2>ADDITION testnet</h2>
 <p>!<a href="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge">License</a></p>
 <p>!<a href="https://img.shields.io/badge/C%2B%2B-20-blue?style=for-the-badge">C++</a></p>
-<p><strong>ADDITION</strong> is a research prototype for a post-quantum Layer 1 experiment (Dilithium / ML-DSA + SHA3-512). It ships an <strong>honest testnet</strong>, not a live mainnet.</p>
-<p>This repository does <strong>not</strong> claim production status, public node counts, a token sale, CoinMarketCap listing, or a live chain. CI badges are omitted until a green pipeline exists.</p>
+<p><strong>ADDITION</strong> is a C++ node (ML-DSA-87 + SHA3-512). Default: <code>additiond --network testnet</code>.</p>
 <p>Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
 <hr>
 <h2>Research goals (design targets)</h2>
-<p>These are aims of the testnet / research prototype, not proof of a live public network:</p>
+<p>What the node implements:</p>
 <p>1. <strong>Quantum</strong> — ML-DSA-87 (FIPS 204) signatures, <code>pq_mode=strict</code> when <code>getinfo</code> answers</p>
 <p>2. <strong>Privacy</strong> — SHA3-512 commitment + nullifier <strong>opening</strong> (<code>privacy_mint_open</code> / <code>privacy_spend_open</code>). This is a real hash relation, not a circuit. <code>privacy_*_zk</code> remains an ML-DSA wrap of a mint/spend string. Not Groth16, not Bulletproofs, not ZK-Shield.</p>
 <p>3. <strong>Speed</strong> — local testnet RPC; publish only real <code>getinfo</code> fields from a running node</p>
-<p>4. <strong>Cost of transaction</strong> — spec <code>min_fee=1</code>; no invented USD fees or gas market</p>
-<p>5. <strong>Compatibility</strong> — in-process <code>bridge_*</code> commands and the EVM bootstrap (<code>web/evm/evm_rpc_bridge.py</code>). Bootstrap / not a full EVM, not live Uniswap, not “connected to every chain today”</p>
+<p>4. <strong>Cost of transaction</strong> — spec <code>min_fee=1</code></p>
+<p>5. <strong>Compatibility</strong> — in-process <code>bridge_*</code> and <code>web/evm/evm_rpc_bridge.py</code> on localhost</p>
 <hr>
 <h2>What this is</h2>
-<ul><li>A local / research <strong>testnet</strong> named <code>addition-testnet</code></li><li>Default mode is <strong>testnet</strong> (<code>additiond --network testnet</code>)</li><li>Mainnet profile is opt-in only (<code>--network mainnet</code> or an explicit <code>ADDITION_MAINNET_MODE=1</code>). That profile is still experimental and is <strong>not</strong> a live public network.</li></ul>
+<ul><li>Network name <code>addition-testnet</code></li><li>Default: <code>additiond --network testnet</code></li><li>Opt-in profile: <code>--network mainnet</code> or <code>ADDITION_MAINNET_MODE=1</code></li></ul>
 <p>Checked-in network files:</p>
 <ul><li><a href="config.toml"><code>config.toml</code></a> — network name, ports, reward, localhost bootstrap examples</li><li><a href="genesis.json"><code>genesis.json</code></a> — testnet genesis parameters (no fake node counts)</li></ul>
 <p><code>bootstrap_peers</code> lists localhost examples only (<code>127.0.0.1:28545</code>) until a second real node exists.</p>
@@ -69,7 +68,7 @@ printf &#x27;wallet_info alice\n&#x27; | nc 127.0.0.1 8545
 printf &#x27;getbalance &lt;address&gt;\n&#x27; | nc 127.0.0.1 8545
 printf &#x27;wallet_send alice &lt;to&gt; 10 1\n&#x27; | nc 127.0.0.1 8545</pre>
 <p><code>wallet_send</code> signs on the node from the local file. The explicit path is <code>tx_build</code> + <code>wallet_sign</code> + <code>sendtx_signed</code> (still no raw privkey on the wire). Legacy <code>sendtx</code> needs <code>ADDITION_ALLOW_INSECURE_TX_COMMANDS=1</code>.</p>
-<p>Honest UI:</p>
+<p>UI:</p>
 <ul><li>Page: <code>/wallet/</code> via <code>python3 web/serve.py</code> (loopback <code>/local-rpc</code> only)</li><li>Desktop: <code>python3 web/addition_wallet_gui.py</code> or <code>--cli getinfo</code></li></ul>
 <p>A fresh wallet balance is <code>0</code> until you <code>mine &lt;address&gt;</code> on local RPC (testnet PoW is SHA3-512 of the header, 30s deadline, reward 50 on a fresh testnet) or receive a UTXO. Public RPC cannot create wallets or send. See <a href="docs/REAL_TESTNET_MINE_AND_PRIVACY.md">docs/REAL_TESTNET_MINE_AND_PRIVACY.md</a>.</p>
 <p>Standalone CLI that keeps keys on the <strong>caller</strong> disk (not <code>data/wallets/</code>) and signs ML-DSA-87 locally before <code>sendtx_signed_hash</code>:</p>
@@ -89,12 +88,12 @@ curl &#x27;http://127.0.0.1:38545/rpc?cmd=getinfo&#x27;
 printf &#x27;mine\n&#x27; | nc 127.0.0.1 38545   # error: command disabled on public RPC</pre>
 <p>LAN RPC (<code>18545</code>) still requires <code>ADDITION_ENABLE_LAN_RPC=1</code> and <code>ADDITION_LAN_RPC_TOKEN</code>. P2P stays off unless <code>ADDITION_ENABLE_P2P_RPC=1</code>. Do not open unauthenticated write RPC to the world.</p>
 <p>Config keys: <code>enable_public_rpc</code>, <code>ports.public_rpc</code>, <code>ports.public_rpc_bind</code>. Second local node: <code>--local-rpc-port 8546 --p2p-port 28546 --bootstrap 127.0.0.1:28545</code>. See <a href="docs/TWO_NODE_TESTNET.md">docs/TWO_NODE_TESTNET.md</a>.</p>
-<h3>Honest website (static Pages)</h3>
-<p><code>web/public/</code> is a complete static site (explorer, RPC how-to, mirrored docs, white paper, legal notice). Publish that folder as the Pages root (for example additionblockchain.com). GitHub: <a href="https://github.com/ADDAddition/ADDITION">ADDAddition/ADDITION</a>.</p>
+<h3>Website (static Pages)</h3>
+<p><code>web/public/</code> is the Pages root (additionblockchain.com). GitHub: <a href="https://github.com/ADDAddition/ADDITION">ADDAddition/ADDITION</a>.</p>
 <pre>python3 web/serve.py</pre>
-<table><tr><th>Path</th><th>Content</th></tr><tr><td><code>/</code></td><td>Research testnet home + live <code>getinfo</code> or <strong>RPC offline</strong></td></tr><tr><td><code>/explorer/</code></td><td>Block/tx lookup from the read RPC only</td></tr><tr><td><code>/status/</code></td><td>getinfo, monetary_info, selftest, peers</td></tr><tr><td><code>/rpc/</code></td><td>How to talk to the public allowlist</td></tr><tr><td><code>/docs/</code></td><td>Architecture, commands, PoUW spec, getting started, runbook, ZK contract</td></tr><tr><td><code>/wallet/</code></td><td>Local createwallet / UTXO send via <code>/local-rpc</code> (loopback)</td></tr><tr><td><code>/contracts/</code> <code>/swap/</code> <code>/evm/</code></td><td>Only methods verified on a local node; EVM is bootstrap</td></tr><tr><td><code>/whitepaper/</code> <code>/legal/</code></td><td>Honest research copy. No fake ticker or mainnet live</td></tr></table>
-<p>Explorer/status call <code>/api/rpc</code>. On a static host without a backend they fail closed. Optional <code>?rpc=http://HOST:38545/rpc</code>.</p>
-<p>The Pages worker (<code>web/public/wrangler.toml</code>) ships <code>PUBLIC_RPC_HTTP = &quot;&quot;</code>. Leave it empty so the site fail-closes with <strong>RPC offline</strong>. An operator who runs <code>--public-rpc</code> sets <code>PUBLIC_RPC_HTTP</code> to that process’s real HTTP URL (for example <code>http://127.0.0.1:38545/rpc</code>). Do not commit trycloudflare or other ephemeral URLs.</p>
+<table><tr><th>Path</th><th>Content</th></tr><tr><td><code>/</code></td><td>Home + live <code>getinfo</code> or <strong>RPC offline</strong></td></tr><tr><td><code>/explorer/</code></td><td>getblock, tx_status</td></tr><tr><td><code>/status/</code></td><td>getinfo, monetary_info, selftest, peers</td></tr><tr><td><code>/rpc/</code></td><td>Public read :38545</td></tr><tr><td><code>/docs/</code></td><td>Architecture, commands, PoUW, getting started</td></tr><tr><td><code>/wallet/</code></td><td>createwallet via <code>/local-rpc</code> → 127.0.0.1:8545</td></tr><tr><td><code>/contracts/</code> <code>/swap/</code> <code>/evm/</code></td><td>Local node methods; EVM bootstrap</td></tr><tr><td><code>/whitepaper/</code> <code>/legal/</code></td><td>White paper, MIT</td></tr></table>
+<p>Explorer/status call <code>/api/rpc</code>. Optional <code>?rpc=http://HOST:38545/rpc</code>.</p>
+<p>The Pages worker (<code>web/public/wrangler.toml</code>) ships <code>PUBLIC_RPC_HTTP = &quot;&quot;</code>. Down node → <strong>RPC offline</strong>. An operator who runs <code>--public-rpc</code> sets <code>PUBLIC_RPC_HTTP</code> to that process’s HTTP URL (for example <code>http://127.0.0.1:38545/rpc</code>). Do not commit trycloudflare URLs.</p>
 <p><code>/wallet</code>, <code>/contracts</code>, and <code>/swap</code> use loopback <code>/local-rpc</code> → <code>127.0.0.1:8545</code>. They print the node’s real reply (<code>error: pool not found</code> if you have no pool).</p>
 <pre>python3 web/evm/evm_rpc_bridge.py</pre>
 <p>Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a>.</p>

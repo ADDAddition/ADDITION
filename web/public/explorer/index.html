@@ -3,17 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ADDITION explorer (testnet)</title>
+  <title>ADDITION explorer</title>
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="Explorer" data-sub="Shows only fields returned by the public read RPC.">
+<body data-title="Explorer" data-sub="getblock, tx_status">
   <header id="site-header"></header>
   <main>
-    <div class="banner">Testnet explorer. No synthetic blocks when RPC fails. No live hashrate or node-count widgets.</div>
+    <div class="banner">Public read :38545. getinfo, then getblock for the tip and a few previous heights.</div>
     <p id="rpc-state" class="offline">Checking RPC…</p>
     <section class="panel">
       <h2>Recent getblock</h2>
-      <p class="note">Tip height from live getinfo, then getblock for that height and the previous few. Empty if RPC is offline.</p>
+      <p class="note">Tip from getinfo, then getblock. If the node is down: RPC offline.</p>
       <div id="recent-blocks" class="empty"></div>
     </section>
     <section class="panel">

@@ -3,33 +3,33 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ADDITION — research testnet</title>
+  <title>ADDITION testnet</title>
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="ADDITION" data-sub="Research prototype / honest testnet. Not a live mainnet.">
+<body data-title="ADDITION" data-sub="testnet">
   <header id="site-header"></header>
   <main>
     <section class="hero">
-      <h1 data-i18n="heroTitle">ADDITION Control Center</h1>
-      <p class="lede" data-i18n="heroLede">Research testnet. Not a live mainnet.</p>
-      <p data-i18n="heroBody">Public read RPC only. Writes stay on localhost. This page never invents height, peers, hashrate, or supply.</p>
+      <h1 data-i18n="heroTitle">ADDITION testnet</h1>
+      <p class="lede" data-i18n="heroLede">Public read on :38545. Write RPC on 127.0.0.1:8545.</p>
+      <p data-i18n="heroBody">getinfo, getblock, monetary_info, peers. mine and createwallet stay on localhost.</p>
       <p><a class="github" href="https://github.com/ADDAddition/ADDITION">github.com/ADDAddition/ADDITION</a></p>
     </section>
 
     <div class="cards">
-      <a href="/explorer/"><strong>Explorer</strong><span data-i18n="cardExplorer">Blocks and txs from live getblock / tx_status.</span></a>
-      <a href="/status/"><strong>Status</strong><span data-i18n="cardStatus">Full getinfo, monetary_info, selftest, peers.</span></a>
-      <a href="/rpc/"><strong>RPC</strong><span data-i18n="cardRpc">Allowlisted reads. mine and createwallet stay disabled.</span></a>
-      <a href="/docs/"><strong>Docs</strong><span data-i18n="cardDocs">Build, architecture, commands, PoUW spec.</span></a>
-      <a href="/wallet/"><strong>Wallet</strong><span data-i18n="cardWallet">Loopback / local node only. Not the public site.</span></a>
-      <a href="/legal/"><strong>Legal</strong><span data-i18n="cardLegal">Research notice. No offering, no token sale.</span></a>
+      <a href="/explorer/"><strong>Explorer</strong><span data-i18n="cardExplorer">getblock, tx_status</span></a>
+      <a href="/status/"><strong>Status</strong><span data-i18n="cardStatus">getinfo, monetary_info, crypto_selftest, peers</span></a>
+      <a href="/rpc/"><strong>RPC</strong><span data-i18n="cardRpc">Public read :38545</span></a>
+      <a href="/docs/"><strong>Docs</strong><span data-i18n="cardDocs">Build, commands, architecture</span></a>
+      <a href="/wallet/"><strong>Wallet</strong><span data-i18n="cardWallet">Write RPC 127.0.0.1:8545</span></a>
+      <a href="/legal/"><strong>Legal</strong><span data-i18n="cardLegal">MIT</span></a>
     </div>
 
     <ul class="facts">
-      <li data-i18n="factQuantum">Quantum — ML-DSA-87. pq_mode comes from live getinfo, never hardcoded.</li>
-      <li data-i18n="factPrivacy">Privacy — SHA3-512 commitment + nullifier opening. Not a native ZK circuit, not Groth16, not ZK-Shield.</li>
-      <li data-i18n="factCompat">Compatibility — research / bootstrap bridges. Not all chains today, not a live Uniswap.</li>
-      <li data-i18n="factWrite">Write RPC is 127.0.0.1:8545 only. Public mine / createwallet stay disabled.</li>
+      <li data-i18n="factQuantum">ML-DSA-87. pq_mode from getinfo.</li>
+      <li data-i18n="factPrivacy">SHA3-512 opening (privacy_mint_open / privacy_spend_open).</li>
+      <li data-i18n="factCompat">bridge_* and a localhost EVM bootstrap.</li>
+      <li data-i18n="factWrite">Write RPC 127.0.0.1:8545. Public mine / createwallet disabled.</li>
     </ul>
   </main>
   <footer id="site-footer"></footer>

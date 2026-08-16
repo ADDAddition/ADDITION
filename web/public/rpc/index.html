@@ -6,11 +6,11 @@
   <title>ADDITION public read RPC</title>
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="Public read RPC" data-sub="Allowlisted reads only. Writes stay on localhost.">
+<body data-title="Public read RPC" data-sub=":38545">
   <header id="site-header"></header>
   <main class="prose">
     <div class="banner">
-      This page documents the read-only public port. It is not a JSON-RPC marketplace and not a live mainnet endpoint advertisement.
+      Public read on <code>0.0.0.0:38545</code>. Write RPC on <code>127.0.0.1:8545</code>.
     </div>
     <p id="rpc-state" class="offline">Checking RPC…</p>
     <section class="panel">
@@ -52,7 +52,7 @@ curl 'http://HOST:38545/rpc?cmd=getblock%200'</pre>
       </ul>
       <p>Two local processes: <a href="/docs/two-node/">two-node runbook</a>. Website <code>PUBLIC_RPC_HTTP</code> stays empty until an operator sets the real HTTP URL. Do not commit trycloudflare URLs.</p>
       <p>Do not open unauthenticated write RPC to the world. Full command list: <a href="/docs/commands/">Commands</a>.</p>
-      <p class="note">Speed and fees: show only fields the node returned (<code>last_tps</code>, <code>dynamic_min_fee</code>, …). Spec <code>min_fee=1</code>. This page does not invent USD costs.</p>
+      <p class="note">Fees: spec <code>min_fee=1</code>. <code>last_tps</code> and <code>dynamic_min_fee</code> come from getinfo when the node answers.</p>
     </section>
   </main>
   <footer id="site-footer"></footer>
