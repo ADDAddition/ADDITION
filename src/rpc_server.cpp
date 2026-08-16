@@ -130,17 +130,6 @@ bool requires_admin_signature_command(const std::string& cmd) {
            cmd == "bridge_set_attestor";
 }
 
-std::string join_csv(const std::vector<std::string>& items) {
-    std::ostringstream out;
-    for (std::size_t i = 0; i < items.size(); ++i) {
-        if (i > 0) {
-            out << ',';
-        }
-        out << items[i];
-    }
-    return out.str();
-}
-
 } // namespace
 
 RpcServer::RpcServer(Chain& chain,
