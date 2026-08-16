@@ -24,8 +24,6 @@ struct QRCodeView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: dimension, height: dimension)
-                    .colorInvert()
-                    .background(Color.white)
             }
         }
         .overlay(

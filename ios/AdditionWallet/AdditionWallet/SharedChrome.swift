@@ -40,6 +40,37 @@ struct BrandMark: View {
     }
 }
 
+struct ScreenTitle: View {
+    let title: String
+    var subtitle: String? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(AdditionTheme.cream)
+            if let subtitle {
+                Text(subtitle)
+                    .font(.footnote)
+                    .foregroundStyle(AdditionTheme.mute)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct SectionLabel: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(AdditionTheme.mute)
+            .textCase(.uppercase)
+            .tracking(0.7)
+    }
+}
+
 struct Card<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
@@ -121,6 +152,26 @@ struct PrimaryButton: View {
                 .padding(.vertical, 14)
                 .foregroundStyle(AdditionTheme.cream)
                 .background(enabled ? AdditionTheme.red : AdditionTheme.panelLift)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+    }
+}
+
+struct SecondaryButton: View {
+    let title: String
+    let enabled: Bool
+    let work: () -> Void
+
+    var body: some View {
+        Button(action: work) {
+            Text(title)
+                .font(.body.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .foregroundStyle(AdditionTheme.cream)
+                .background(AdditionTheme.panelLift)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .buttonStyle(.plain)
