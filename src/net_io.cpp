@@ -96,7 +96,7 @@ bool socket_send_all(std::uintptr_t sock_raw, const char* data, std::size_t n) {
 #ifdef _WIN32
         const int sent = send(sock, data + sent_total, static_cast<int>(n - sent_total), 0);
 #else
-        const int sent = static_cast<int>(send(sock, data + sent_total, n - sent_total, 0));
+        const int sent = static_cast<int>(send(sock, data + sent_total, n - sent_total, MSG_NOSIGNAL));
 #endif
         if (sent <= 0) {
             return false;

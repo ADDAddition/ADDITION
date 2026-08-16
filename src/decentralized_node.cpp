@@ -155,21 +155,20 @@ bool send_p2p_request(const std::string& endpoint, const std::string& request, s
 #endif
         return false;
     }
-    if (!socket_send_all(static_cast<std::uintptr_t>(sock), payload.c_str(), payload.size())) {
+    // Persist-era peers RST after one recv (~1.4 KiB on WAN) while we still
+    // have ~15 KiB of HELLO to write. Read any reply that already landed.
+    const bool sent_ok =
+        socket_send_all(static_cast<std::uintptr_t>(sock), payload.c_str(), payload.size());
+    const bool recv_ok =
+        socket_recv_line(static_cast<std::uintptr_t>(sock), response, kMaxLineBytes);
+    if (!recv_ok) {
         close_socket(sock);
 #ifdef _WIN32
         WSACleanup();
 #endif
         return false;
     }
-
-    if (!socket_recv_line(static_cast<std::uintptr_t>(sock), response, kMaxLineBytes)) {
-        close_socket(sock);
-#ifdef _WIN32
-        WSACleanup();
-#endif
-        return false;
-    }
+    (void)sent_ok;
 
     close_socket(sock);
 #ifdef _WIN32
@@ -790,7 +789,8 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
 
         std::string hello_resp;
         if (!send_p2p_request(peer, hello_req.str(), hello_resp)) {
-            error = "HELLO transport failed to " + peer;
+            error = "HELLO transport failed to " + peer +
+                    " (persist one-recv often RSTs a ~15KiB WAN HELLO; seed must loop-read until newline)";
             continue;
         }
 
