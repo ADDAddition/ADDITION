@@ -143,5 +143,10 @@ if(ADDITION_BUILD_TESTS)
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_jsonrpc_adapter.py
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         )
+        add_test(
+            NAME test_evm_rpc_bridge
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_evm_rpc_bridge.py
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        )
     endif()
 endif()

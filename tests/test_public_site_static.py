@@ -194,6 +194,18 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertNotIn("https://rpc.additionblockchain.com/getinfo", blob)
         self.assertNotIn("http://34.27.30.115/getinfo", blob)
 
+    def test_evm_page_is_local_testnet_only(self) -> None:
+        evm = read("evm/index.html")
+        self.assertIn("127.0.0.1:9545", evm)
+        self.assertIn("424242", evm)
+        self.assertIn("send disabled", evm.lower())
+        self.assertIn("eth_sendRawTransaction", evm)
+        self.assertIn("wallet_addEthereumChain", evm)
+        self.assertIn("http://127.0.0.1:9545", evm)
+        self.assertNotIn("0.0.0.0:9545", evm)
+        self.assertNotIn("wallet-connect", evm.lower())
+        self.assertIn("cannot list", evm.lower())
+
     def test_wallet_stays_loopback_only(self) -> None:
         wallet = read("wallet/index.html")
         self.assertIn("/local-rpc", wallet)

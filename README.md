@@ -227,6 +227,7 @@ The Pages worker (`web/public/wrangler.toml`) ships `PUBLIC_RPC_HTTP = ""`. Leav
 
 ```bash
 python3 web/evm/evm_rpc_bridge.py
+# 127.0.0.1:9545 only, chainId 424242, eth_sendRawTransaction disabled
 ```
 
 Contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com).
