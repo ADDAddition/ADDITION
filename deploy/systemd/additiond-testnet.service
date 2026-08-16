@@ -1,0 +1,35 @@
+[Unit]
+Description=ADDITION research testnet public-read RPC (not a live mainnet)
+Documentation=file:///opt/addition/docs/TESTNET_PUBLIC_RPC_RUNBOOK.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Dedicated unprivileged user. Create it before enable (see the runbook).
+User=addition
+Group=addition
+WorkingDirectory=/opt/addition
+# Public-read listener: 0.0.0.0:38545. Write/admin RPC stays 127.0.0.1:8545
+# (hardcoded loopback in additiond; never bound to 0.0.0.0).
+ExecStart=/opt/addition/build/additiond --network testnet --public-rpc --public-rpc-port 38545 --public-rpc-bind 0.0.0.0 --local-rpc-port 8545 --data-dir /var/lib/addition/testnet --config /opt/addition/config.toml
+# Closed stdin so additiond stays up under systemd (SIGTERM stops it).
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+# Optional write-RPC token. Do not put secrets in this unit file.
+EnvironmentFile=-/etc/addition/testnet.env
+# This unit is testnet only. Do not set ADDITION_MAINNET_MODE.
+# Leave LAN RPC and P2P off (do not set ADDITION_ENABLE_LAN_RPC or ADDITION_ENABLE_P2P_RPC).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/addition/testnet
+
+[Install]
+WantedBy=multi-user.target
