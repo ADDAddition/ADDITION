@@ -940,7 +940,23 @@ int test_http_port80_ingest() {
 
 } // namespace
 
+int test_sync_requires_peer() {
+    std::cerr << "test_p2p_sync: sync_once with no peer\n";
+    NodeKit kit(addition::testnet_chain_config());
+    std::string err;
+    if (kit.node.sync_once(err)) {
+        return fail("sync_once must fail without a peer");
+    }
+    if (err.find("no peer") == std::string::npos) {
+        return fail("expected no peer, got: " + err);
+    }
+    return 0;
+}
+
 int main() {
+    if (int rc = test_sync_requires_peer()) {
+        return rc;
+    }
     if (int rc = test_genesis_zero_tx_decode()) {
         return rc;
     }

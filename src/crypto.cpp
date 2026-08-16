@@ -5,10 +5,14 @@
 
 #include <oqs/oqs.h>
 
+#include <atomic>
 #include <cctype>
+#include <chrono>
 #include <iomanip>
+#include <mutex>
 #include <sstream>
 #include <stdexcept>
+#include <thread>
 
 namespace addition {
 namespace {
@@ -33,6 +37,23 @@ bool get_ml_dsa_87_sizes(PqKeySizes& out) {
 
 bool is_hex_char(char c) {
     return std::isxdigit(static_cast<unsigned char>(c)) != 0;
+}
+
+struct TlsOqsSig {
+    OQS_SIG* sig{nullptr};
+    TlsOqsSig() { sig = OQS_SIG_new(OQS_SIG_alg_ml_dsa_87); }
+    ~TlsOqsSig() {
+        if (sig != nullptr) {
+            OQS_SIG_free(sig);
+        }
+    }
+    TlsOqsSig(const TlsOqsSig&) = delete;
+    TlsOqsSig& operator=(const TlsOqsSig&) = delete;
+};
+
+OQS_SIG* tls_ml_dsa_87() {
+    thread_local TlsOqsSig holder;
+    return holder.sig;
 }
 
 bool is_hex_strict(const std::string& hex, std::size_t max_hex_len, std::string& error) {
@@ -211,7 +232,7 @@ bool pq_sign_message(const std::vector<std::uint8_t>& secret_key,
                      const std::string& message,
                      std::vector<std::uint8_t>& signature,
                      std::string& error) {
-    OQS_SIG* sig = OQS_SIG_new(OQS_SIG_alg_ml_dsa_87);
+    OQS_SIG* sig = tls_ml_dsa_87();
     if (sig == nullptr) {
         error = "OQS_SIG_new failed for ml-dsa-87";
         return false;
@@ -219,7 +240,6 @@ bool pq_sign_message(const std::vector<std::uint8_t>& secret_key,
 
     if (secret_key.size() != sig->length_secret_key) {
         error = "secret key size mismatch";
-        OQS_SIG_free(sig);
         return false;
     }
 
@@ -231,7 +251,6 @@ bool pq_sign_message(const std::vector<std::uint8_t>& secret_key,
                                  reinterpret_cast<const std::uint8_t*>(message.data()),
                                  message.size(),
                                  secret_key.data());
-    OQS_SIG_free(sig);
 
     if (rc != OQS_SUCCESS) {
         error = "OQS_SIG_sign failed";
@@ -247,7 +266,7 @@ bool pq_verify_message(const std::vector<std::uint8_t>& public_key,
                        const std::string& message,
                        const std::vector<std::uint8_t>& signature,
                        std::string& error) {
-    OQS_SIG* sig = OQS_SIG_new(OQS_SIG_alg_ml_dsa_87);
+    OQS_SIG* sig = tls_ml_dsa_87();
     if (sig == nullptr) {
         error = "OQS_SIG_new failed for ml-dsa-87";
         return false;
@@ -255,12 +274,10 @@ bool pq_verify_message(const std::vector<std::uint8_t>& public_key,
 
     if (public_key.size() != sig->length_public_key) {
         error = "public key size mismatch";
-        OQS_SIG_free(sig);
         return false;
     }
     if (signature.empty() || signature.size() > sig->length_signature) {
         error = "signature size mismatch";
-        OQS_SIG_free(sig);
         return false;
     }
 
@@ -270,13 +287,83 @@ bool pq_verify_message(const std::vector<std::uint8_t>& public_key,
                                    signature.data(),
                                    signature.size(),
                                    public_key.data());
-    OQS_SIG_free(sig);
 
     if (rc != OQS_SUCCESS) {
         error = "OQS_SIG_verify failed";
         return false;
     }
 
+    return true;
+}
+
+bool pq_verify_messages_parallel(const std::vector<PqVerifyItem>& items,
+                                 std::size_t threads,
+                                 std::size_t& accepted,
+                                 std::uint64_t& elapsed_ms,
+                                 std::string& error) {
+    accepted = 0;
+    elapsed_ms = 0;
+    error.clear();
+    if (items.empty()) {
+        return true;
+    }
+
+    if (threads == 0) {
+        const auto hw = std::thread::hardware_concurrency();
+        threads = hw > 0 ? static_cast<std::size_t>(hw) : 1;
+    }
+    if (threads > items.size()) {
+        threads = items.size();
+    }
+
+    std::atomic<std::size_t> ok{0};
+    std::atomic<std::size_t> next{0};
+    std::atomic<bool> failed{false};
+    std::string first_error;
+    std::mutex err_mu;
+
+    const auto t0 = std::chrono::steady_clock::now();
+    std::vector<std::thread> workers;
+    workers.reserve(threads);
+    for (std::size_t tid = 0; tid < threads; ++tid) {
+        workers.emplace_back([&]() {
+            while (!failed.load(std::memory_order_relaxed)) {
+                const auto i = next.fetch_add(1, std::memory_order_relaxed);
+                if (i >= items.size()) {
+                    return;
+                }
+                std::string verr;
+                if (!verify_message_signature_hybrid(items[i].public_key_hex,
+                                                     items[i].message,
+                                                     items[i].signature)) {
+                    failed.store(true, std::memory_order_relaxed);
+                    std::lock_guard<std::mutex> lk(err_mu);
+                    if (first_error.empty()) {
+                        first_error = "batch pq verify failed at index " + std::to_string(i);
+                    }
+                    (void)verr;
+                    return;
+                }
+                ok.fetch_add(1, std::memory_order_relaxed);
+            }
+        });
+    }
+    for (auto& th : workers) {
+        if (th.joinable()) {
+            th.join();
+        }
+    }
+    const auto t1 = std::chrono::steady_clock::now();
+    elapsed_ms = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
+    if (elapsed_ms == 0) {
+        elapsed_ms = 1;
+    }
+    accepted = ok.load(std::memory_order_relaxed);
+    if (failed.load(std::memory_order_relaxed) || accepted != items.size()) {
+        error = first_error.empty() ? "batch pq verify rejected" : first_error;
+        return false;
+    }
     return true;
 }
 

@@ -17,6 +17,7 @@ public:
     double last_tps() const;
     std::uint64_t last_mine_ms() const;
     std::size_t last_mined_txs() const;
+    std::size_t last_dropped_junk() const;
 
 private:
     Chain& chain_;
@@ -24,6 +25,7 @@ private:
     double last_tps_{0.0};
     std::uint64_t last_mine_ms_{0};
     std::size_t last_mined_txs_{0};
+    std::size_t last_dropped_junk_{0};
 };
 
 } // namespace addition

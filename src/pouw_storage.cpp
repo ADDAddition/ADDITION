@@ -230,7 +230,8 @@ bool PoUWStorageEngine::deal_status(const std::string& deal_id, std::string& out
         << " commitments=" << commitments
         << " challenges_pending=" << pending
         << " challenges_pass=" << pass
-        << " challenges_fail=" << fail;
+        << " challenges_fail=" << fail
+        << " check=first_nibble_parity";
     out = oss.str();
     return true;
 }

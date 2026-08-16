@@ -8,8 +8,9 @@
 ## Modules
 - `block.*`: data model and hashing helpers
 - `chain.*`: canonical ledger state and block validation
-- `mempool.*`: pending transaction queue
-- `miner.*`: block template and simplified PoW loop
+- `mempool.*`: pending transaction queue; rejects unsigned / empty-input / duplicate-outpoint junk
+- `miner.*`: block template and SHA3-512 PoW; drops leftover invalid mempool txs instead of failing the block
+- `crypto.*`: ML-DSA-87 with thread-local OQS_SIG and parallel batch verify
 - `rpc_server.*`: text-command RPC handling
 - `wallet.*`: transaction creation and submission
 
