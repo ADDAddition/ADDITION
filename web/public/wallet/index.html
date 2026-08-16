@@ -10,10 +10,12 @@
   <header id="site-header"></header>
   <main>
     <div class="banner">
-      This page talks to <code>/local-rpc</code> → <code>127.0.0.1:8545</code> only.
-      Public read RPC cannot create wallets or send. Keys stay in the node file
+      A browser on the public site cannot <code>createwallet</code> against port 8545.
+      These forms talk to <code>/local-rpc</code> → <code>127.0.0.1:8545</code> only, when you run
+      <code>python3 web/serve.py</code> next to a local node. The Pages worker does not proxy writes.
+      Public read RPC cannot create wallets, mine, or send. Keys stay in
       <code>data/wallets/&lt;name&gt;.wal</code> (ML-DSA-87). The browser never sees a private key.
-      On a static public host this page stays <strong>RPC offline</strong>.
+      On additionblockchain.com this page stays <strong>RPC offline</strong>.
     </div>
     <p id="rpc-state" class="offline">Checking local RPC…</p>
     <p id="height-line" class="note"></p>
@@ -34,10 +36,10 @@
       <h2>createwallet / balance</h2>
       <label for="name">wallet name</label>
       <input id="name" value="default">
-      <button id="create-btn" type="button">createwallet</button>
-      <button id="list-btn" type="button">wallet_list</button>
-      <button id="info-btn" type="button">wallet_info</button>
-      <button id="bal-btn" type="button">wallet_balance</button>
+      <button id="create-btn" type="button" disabled>createwallet</button>
+      <button id="list-btn" type="button" disabled>wallet_list</button>
+      <button id="info-btn" type="button" disabled>wallet_info</button>
+      <button id="bal-btn" type="button" disabled>wallet_balance</button>
       <pre id="wallet-raw" class="raw"></pre>
     </section>
 
@@ -49,14 +51,14 @@
       <input id="amount" value="1">
       <label for="fee">fee (blank = node floor)</label>
       <input id="fee" value="1">
-      <button id="send-btn" type="button">Send</button>
+      <button id="send-btn" type="button" disabled>Send</button>
       <pre id="send-raw" class="raw"></pre>
     </section>
 
     <section class="panel">
       <h2>mine to this wallet</h2>
       <p class="note">Memory-hard. Can take a long time. Local trusted RPC only. Reward is the node’s <code>next_reward</code> (50 on a fresh testnet).</p>
-      <button id="mine-btn" type="button">mine</button>
+      <button id="mine-btn" type="button" disabled>mine</button>
       <pre id="mine-raw" class="raw"></pre>
     </section>
   </main>
@@ -95,14 +97,21 @@
       const r = await localCmd("getinfo");
       const el = document.getElementById("rpc-state");
       const height = document.getElementById("height-line");
+      const buttons = document.querySelectorAll("main button");
       if (r.offline) {
         el.className = "offline";
         el.textContent = "RPC offline";
-        height.textContent = "";
+        height.textContent = "Public site and missing loopback proxy both fail closed. Start a local node, then python3 web/serve.py.";
+        for (let i = 0; i < buttons.length; i += 1) {
+          buttons[i].disabled = true;
+        }
         return;
       }
       el.className = "ok";
       el.textContent = "Local trusted RPC answered";
+      for (let i = 0; i < buttons.length; i += 1) {
+        buttons[i].disabled = false;
+      }
       height.textContent = "getinfo height=" + (field(r.raw, "height") || "?") +
         " network=" + (field(r.raw, "network") || "?") +
         " network_name=" + (field(r.raw, "network_name") || "?");

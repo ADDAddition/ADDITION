@@ -12,6 +12,11 @@
     <div class="banner">Testnet explorer. No synthetic blocks when RPC fails. No live hashrate or node-count widgets.</div>
     <p id="rpc-state" class="offline">Checking RPC…</p>
     <section class="panel">
+      <h2>Recent getblock</h2>
+      <p class="note">Tip height from live getinfo, then getblock for that height and the previous few. Empty if RPC is offline.</p>
+      <div id="recent-blocks" class="empty"></div>
+    </section>
+    <section class="panel">
       <h2>getinfo</h2>
       <div id="info-fields"></div>
       <pre id="info-raw" class="raw"></pre>
@@ -39,15 +44,72 @@
   <script>
     const S = window.AdditionSite;
 
+    function blockLabel(fields, raw) {
+      if (!fields || Object.keys(fields).length === 0) {
+        return raw || "";
+      }
+      const height = fields.height || fields.block_height || "";
+      const hash = fields.hash || fields.block_hash || "";
+      const parts = [];
+      if (height !== "") {
+        parts.push("height=" + height);
+      }
+      if (hash !== "") {
+        parts.push("hash=" + hash);
+      }
+      return parts.join(" ") || raw;
+    }
+
+    async function loadRecent(heightText) {
+      const box = document.getElementById("recent-blocks");
+      const height = parseInt(heightText, 10);
+      if (!Number.isFinite(height) || height < 0) {
+        box.className = "empty";
+        box.textContent = "";
+        return;
+      }
+      const start = Math.max(0, height - 4);
+      const lines = [];
+      for (let h = height; h >= start; h -= 1) {
+        const result = await S.rpcCommand("getblock " + String(h));
+        if (result.offline) {
+          box.className = "empty";
+          box.textContent = "RPC offline";
+          return;
+        }
+        if (!result.ok || result.raw.indexOf("error:") === 0) {
+          continue;
+        }
+        lines.push(blockLabel(result.fields, result.raw));
+      }
+      if (lines.length === 0) {
+        box.className = "empty";
+        box.textContent = "";
+        return;
+      }
+      box.className = "";
+      box.textContent = "";
+      const pre = document.createElement("pre");
+      pre.className = "raw";
+      pre.textContent = lines.join("\n");
+      box.appendChild(pre);
+    }
+
     async function loadInfo() {
       const result = await S.rpcCommand("getinfo");
       S.setStatus(document.getElementById("rpc-state"), result);
-      document.getElementById("info-raw").textContent = result.raw;
+      document.getElementById("info-raw").textContent = result.offline ? "RPC offline" : result.raw;
       if (result.offline || !result.ok) {
         S.renderFields(document.getElementById("info-fields"), {}, "RPC offline");
+        document.getElementById("recent-blocks").className = "empty";
+        document.getElementById("recent-blocks").textContent = "RPC offline";
         return;
       }
       S.renderFields(document.getElementById("info-fields"), result.fields, "Node returned no key=value fields.");
+      if (result.fields.height) {
+        document.getElementById("block-id").value = result.fields.height;
+      }
+      await loadRecent(result.fields.height);
     }
 
     async function loadBlock() {
@@ -60,7 +122,7 @@
         return;
       }
       const result = await S.rpcCommand("getblock " + id);
-      box.textContent = result.raw;
+      box.textContent = result.offline ? "RPC offline" : result.raw;
       if (result.offline) {
         S.renderFields(fields, {}, "RPC offline");
         return;
@@ -82,7 +144,7 @@
         return;
       }
       const result = await S.rpcCommand("tx_status " + id);
-      box.textContent = result.raw;
+      box.textContent = result.offline ? "RPC offline" : result.raw;
       if (result.offline) {
         S.renderFields(fields, {}, "RPC offline");
         return;

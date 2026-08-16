@@ -25,7 +25,7 @@
     <h2>3. Research goals (design targets)</h2>
     <ol>
       <li><strong>Quantum</strong> — ML-DSA-87 (FIPS 204) via liboqs. <code>getinfo</code> reports <code>pq_mode=strict</code> when the node answers. Build fails if liboqs is missing.</li>
-      <li><strong>Privacy</strong> — native ZK path (<code>pq_mldsa87</code>). Private notes do not persist plaintext owner/amount.</li>
+      <li><strong>Privacy</strong> — SHA3-512 commitment + nullifier opening (<code>privacy_mint_open</code> / <code>privacy_spend_open</code>). This is a hash relation, not a native ZK circuit. Not Groth16, not ZK-Shield.</li>
       <li><strong>Speed</strong> — local testnet RPC. Publish only real <code>getinfo</code> fields from a running process.</li>
       <li><strong>Cost of transaction</strong> — spec <code>min_fee=1</code>. This site does not invent USD fees or a gas market.</li>
       <li><strong>Compatibility</strong> — in-process <code>bridge_*</code> commands and <code>web/evm/evm_rpc_bridge.py</code>. Bootstrap / not a full EVM, not live Uniswap, not connected to every chain today.</li>
