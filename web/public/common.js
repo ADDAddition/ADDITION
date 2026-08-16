@@ -193,15 +193,115 @@
     return out;
   }
 
+  function isHeightQuery(q) {
+    return /^\d+$/.test(String(q || "").trim());
+  }
+
+  function blockSearchCommand(q) {
+    const id = String(q || "").trim();
+    if (!id) {
+      return "";
+    }
+    return "getblock " + id;
+  }
+
+  function formatBlockTime(value) {
+    if (value === undefined || value === null || value === "") {
+      return "";
+    }
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) {
+      return "";
+    }
+    const d = new Date(n * 1000);
+    if (Number.isNaN(d.getTime())) {
+      return "";
+    }
+    return d.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
+  }
+
+  function blockRowFromFields(fields) {
+    const row = {};
+    if (!fields) {
+      return row;
+    }
+    if (Object.prototype.hasOwnProperty.call(fields, "height")) {
+      row.height = fields.height;
+    }
+    if (Object.prototype.hasOwnProperty.call(fields, "hash")) {
+      row.hash = fields.hash;
+    }
+    if (Object.prototype.hasOwnProperty.call(fields, "tx_count")) {
+      row.tx_count = fields.tx_count;
+    }
+    if (Object.prototype.hasOwnProperty.call(fields, "timestamp")) {
+      row.timestamp = fields.timestamp;
+      row.time = formatBlockTime(fields.timestamp);
+    }
+    return row;
+  }
+
+  function explorerAllowed(cmd) {
+    const token = String(cmd || "").trim().split(/\s+/)[0];
+    return token === "getinfo"
+      || token === "getblock"
+      || token === "getblockhash"
+      || token === "getblockraw";
+  }
+
+  async function explorerCommand(cmd) {
+    if (!explorerAllowed(cmd)) {
+      return { ok: false, offline: false, raw: "Not found", fields: {} };
+    }
+    return rpcCommand(cmd);
+  }
+
+  async function loadLatestBlockRows(count) {
+    const max = typeof count === "number" && count > 0 ? count : 10;
+    const info = await explorerCommand("getinfo");
+    if (info.offline || !info.ok) {
+      return { offline: true, blocks: [] };
+    }
+    const height = parseHeight(info.fields);
+    if (height === null) {
+      return { offline: false, blocks: [] };
+    }
+    const start = Math.max(0, height - (max - 1));
+    const blocks = [];
+    for (let h = height; h >= start; h -= 1) {
+      const result = await explorerCommand("getblock " + h);
+      if (result.offline) {
+        return { offline: true, blocks: [] };
+      }
+      if (!result.ok || !result.raw || result.raw.indexOf("error:") === 0) {
+        continue;
+      }
+      const row = blockRowFromFields(result.fields);
+      if (!Object.prototype.hasOwnProperty.call(row, "height")
+        && !Object.prototype.hasOwnProperty.call(row, "hash")) {
+        continue;
+      }
+      blocks.push(row);
+    }
+    return { offline: false, blocks: blocks };
+  }
+
   global.AdditionSite = {
     rpcUrlFromPage: rpcUrlFromPage,
     parseFields: parseFields,
     parseHeight: parseHeight,
     rpcCommand: rpcCommand,
     loadRecentBlocks: loadRecentBlocks,
+    loadLatestBlockRows: loadLatestBlockRows,
     renderRecentBlocks: renderRecentBlocks,
     renderFields: renderFields,
     setStatus: setStatus,
-    stripFields: stripFields
+    stripFields: stripFields,
+    isHeightQuery: isHeightQuery,
+    blockSearchCommand: blockSearchCommand,
+    formatBlockTime: formatBlockTime,
+    blockRowFromFields: blockRowFromFields,
+    explorerAllowed: explorerAllowed,
+    explorerCommand: explorerCommand
   };
 }(window));

@@ -6,85 +6,34 @@
   <title>ADDITION status</title>
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="Status" data-sub="getinfo">
+<body>
   <header id="site-header"></header>
   <main>
-    <div class="banner">getinfo, monetary_info, crypto_selftest, peers from public read <code>/rpc?cmd=getinfo</code> (:80 and :38545).</div>
-    <p id="rpc-state" class="offline">Checking RPC…</p>
-    <section class="panel">
-      <h2>getinfo</h2>
-      <p id="height-line" class="note">Height is shown only when getinfo answers.</p>
-      <div id="info-fields"></div>
-      <pre id="info-raw" class="raw"></pre>
-    </section>
-    <section class="panel">
-      <h2>Recent getblock</h2>
-      <p class="note">Last few heights from getinfo, then getblock. If the node is down: RPC offline.</p>
-      <div id="recent-blocks"></div>
-    </section>
-    <section class="panel">
-      <h2>monetary_info</h2>
-      <div id="mon-fields"></div>
-      <pre id="mon-raw" class="raw"></pre>
-    </section>
-    <section class="panel">
-      <h2>crypto_selftest</h2>
-      <pre id="crypto-raw" class="raw"></pre>
-    </section>
-    <section class="panel">
-      <h2>peers</h2>
-      <pre id="peers-raw" class="raw"></pre>
-    </section>
+    <h2>getinfo</h2>
+    <p id="rpc-state"></p>
+    <div id="info-fields"></div>
+    <pre id="info-raw" class="raw"></pre>
   </main>
   <footer id="site-footer"></footer>
   <script src="/common.js"></script>
   <script src="/chrome.js"></script>
   <script>
     const S = window.AdditionSite;
-    function fill(id, result, fieldId) {
-      document.getElementById(id).textContent = result.offline ? "RPC offline" : result.raw;
-      if (fieldId) {
-        if (result.offline || !result.ok) {
-          S.renderFields(document.getElementById(fieldId), {}, "RPC offline");
-        } else {
-          S.renderFields(document.getElementById(fieldId), result.fields, "Node returned no key=value fields.");
-        }
-      }
-    }
     async function load() {
       const info = await S.rpcCommand("getinfo");
-      S.setStatus(document.getElementById("rpc-state"), info);
-      fill("info-raw", info, "info-fields");
-      const heightLine = document.getElementById("height-line");
-      const recentBox = document.getElementById("recent-blocks");
+      const state = document.getElementById("rpc-state");
+      const raw = document.getElementById("info-raw");
+      const fields = document.getElementById("info-fields");
       if (info.offline || !info.ok) {
-        heightLine.textContent = "RPC offline";
-        S.renderRecentBlocks(recentBox, { offline: true, blocks: [] });
-      } else {
-        const height = S.parseHeight(info.fields);
-        heightLine.textContent = height === null
-          ? "getinfo did not return a height field."
-          : ("height=" + height + " from getinfo");
-        if (height === null) {
-          S.renderRecentBlocks(recentBox, { offline: false, blocks: [] }, "getinfo had no height; no getblock calls.");
-        } else {
-          const recent = await S.loadRecentBlocks(height, 5);
-          S.renderRecentBlocks(recentBox, recent, "No getblock results.");
-          if (recent.offline) {
-            S.setStatus(document.getElementById("rpc-state"), { offline: true, ok: false, raw: "RPC offline" });
-          }
-        }
+        state.className = "offline";
+        state.textContent = "RPC offline";
+        raw.textContent = "RPC offline";
+        S.renderFields(fields, {}, "RPC offline");
+        return;
       }
-      fill("mon-raw", await S.rpcCommand("monetary_info"), "mon-fields");
-      fill("crypto-raw", await S.rpcCommand("crypto_selftest"));
-      const peers = await S.rpcCommand("peers");
-      if (peers.offline) {
-        document.getElementById("peers-raw").textContent = "RPC offline";
-      } else if (!peers.raw) {
-        document.getElementById("peers-raw").textContent = "(empty peer list from node)";
-      } else {
-        document.getElementById("peers-raw").textContent = peers.raw;
-      }
+      state.textContent = "";
+      raw.textContent = info.raw;
+      S.renderFields(fields, info.fields, "RPC offline");
     }
     load();
   </script>

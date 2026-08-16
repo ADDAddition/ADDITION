@@ -209,10 +209,10 @@ python3 web/serve.py
 
 | Path | Content |
 |------|---------|
-| `/` | Testnet home + live `getinfo` or **RPC offline** |
+| `/` | Block explorer: search + latest `getblock` rows, or **RPC offline** |
 | `/join/` | Run `additiond` from `main`, bootstrap `34.27.30.115:28545`, then `sync` |
-| `/explorer/` | Height + last few real `getblock` results from the read RPC, or **RPC offline** |
-| `/status/` | getinfo, recent `getblock`, monetary_info, selftest, peers |
+| `/explorer/` | Redirects to `/` |
+| `/status/` | Live `getinfo`, or **RPC offline** |
 | `/rpc/` | Public read `/rpc?cmd=getinfo` on :80 and :38545 |
 | `/docs/` | Architecture, commands, PoUW spec, getting started, runbook, ZK contract |
 | `/wallet/` | Local createwallet / UTXO send via `/local-rpc` (loopback) |

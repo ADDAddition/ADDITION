@@ -2,11 +2,11 @@
 
 Pages root for additionblockchain.com.
 
-Dark console: logo, short nav, EN/FR, live getinfo strip (`height`, `peers`, `network`, `pq_mode`). Down node → **RPC offline**, empty cells.
+White explorer: search + latest `getblock` rows from live public read RPC. Header is Explorer | Status | Join. Footer is `testnet · contact@additionblockchain.com`. Down node → **RPC offline** and an empty table.
 
-- Pretty URLs are folders with `index.html` (`/join/`, `/explorer/`, `/wallet/`, `/docs/commands/`, …).
-- Join path: build `additiond` from repo `main`, `--bootstrap 34.27.30.115:28545`, then `sync`. Public read is `/rpc?cmd=getinfo` on :80 and :38545.
-- Explorer and status call `/api/rpc?cmd=…`. When the read RPC answers they show `getinfo` height and the last few `getblock` results. Down node → **RPC offline**, empty cells.
+- `/` is the explorer. Pretty URLs are folders with `index.html` (`/join/`, `/status/`, `/wallet/`, `/docs/commands/`, …).
+- Join path: build `additiond` from repo `main`, `--bootstrap 34.27.30.115:28545`, then `sync`. Public HTTP `:80` first; `38545` and `28545` are optional/filtered.
+- Explorer calls `/api/rpc?cmd=…` for `getinfo` / `getblock` / `getblockhash` only. No invented height, hash, tx_count, or time.
 - Optional `?rpc=https://HOST:38545/rpc`.
 - Worker var `PUBLIC_RPC_HTTP` is empty by default. Set it to the real `--public-rpc` HTTP URL. Do not commit trycloudflare URLs.
 - Two local nodes: `docs/TWO_NODE_TESTNET.md`.
