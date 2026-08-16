@@ -7,11 +7,12 @@ struct ReceiveView: View {
 
     var body: some View {
         ScreenBackground {
-            VStack(spacing: 20) {
+            VStack(spacing: 18) {
                 BrandWordmark(height: 24)
-                Text("Receive ADD")
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(AdditionTheme.cream)
+                ScreenTitle(
+                    title: "Receive",
+                    subtitle: "Share this ADDITION address. Whole ADD units only."
+                )
                 QRCodeView(payload: session.address)
                 if session.address.isEmpty {
                     Text("Create or load a wallet on a node you control.")
@@ -20,6 +21,7 @@ struct ReceiveView: View {
                         .multilineTextAlignment(.center)
                 } else {
                     Card {
+                        SectionLabel(title: "Address")
                         HStack(alignment: .top, spacing: 12) {
                             BrandMark(size: 36)
                             Text(session.address)
@@ -33,7 +35,7 @@ struct ReceiveView: View {
                         copied = true
                     }
                 }
-                Text("128-hex hash-committed address. Whole ADD units only.")
+                Text("128-hex hash-committed address.")
                     .font(.caption)
                     .foregroundStyle(AdditionTheme.mute)
                     .multilineTextAlignment(.center)

@@ -309,6 +309,14 @@ class SourceGuardTests(unittest.TestCase):
         self.assertNotIn("app store", copy)
         self.assertNotIn("0.0.0.0:8545", copy)
 
+    def test_previews_stay_fail_closed(self) -> None:
+        for name in ("home", "receive", "send", "activity"):
+            text = (IOS / "previews" / f"{name}.html").read_text(encoding="utf-8")
+            self.assertNotRegex(text, r"\b\d+\s*ADD\b")
+            self.assertNotIn("height=", text)
+            self.assertIn("Logo.png", text)
+            self.assertIn("Mark.png", text)
+
     def test_brand_images_are_website_files(self) -> None:
         assets = IOS / "AdditionWallet" / "AdditionWallet" / "Assets.xcassets"
         pairs = [

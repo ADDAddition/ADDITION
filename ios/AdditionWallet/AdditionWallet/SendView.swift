@@ -9,38 +9,41 @@ struct SendView: View {
     var body: some View {
         ScreenBackground {
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 16) {
                     BrandWordmark(height: 24)
-                    Text("Send ADD")
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(AdditionTheme.cream)
+                    ScreenTitle(
+                        title: "Send",
+                        subtitle: "Whole ADD units on a write RPC node you control."
+                    )
                     Card {
+                        SectionLabel(title: "Available")
                         AssetRow(amountLabel: session.assetAmountLabel)
                     }
                     Card {
-                        Text("Amount")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(AdditionTheme.mute)
-                        TextField("Whole units", text: $amount)
-                            .keyboardType(.numberPad)
-                            .font(.title3.monospaced())
-                            .foregroundStyle(AdditionTheme.cream)
-                        Text("Fee (blank uses node fee_info)")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(AdditionTheme.mute)
-                        TextField("1", text: $fee)
-                            .keyboardType(.numberPad)
-                            .font(.body.monospaced())
-                            .foregroundStyle(AdditionTheme.cream)
+                        SectionLabel(title: "Amount")
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            TextField("0", text: $amount)
+                                .keyboardType(.numberPad)
+                                .font(.system(size: 32, weight: .semibold, design: .rounded).monospacedDigit())
+                                .foregroundStyle(AdditionTheme.cream)
+                            Text("ADD")
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(AdditionTheme.mute)
+                        }
                     }
                     Card {
-                        Text("To")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(AdditionTheme.mute)
+                        SectionLabel(title: "To")
                         TextField("128-hex ADDITION address", text: $to, axis: .vertical)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .font(.footnote.monospaced())
+                            .foregroundStyle(AdditionTheme.cream)
+                    }
+                    Card {
+                        SectionLabel(title: "Fee")
+                        TextField("Blank uses node fee_info", text: $fee)
+                            .keyboardType(.numberPad)
+                            .font(.body.monospaced())
                             .foregroundStyle(AdditionTheme.cream)
                     }
                     PrimaryButton(

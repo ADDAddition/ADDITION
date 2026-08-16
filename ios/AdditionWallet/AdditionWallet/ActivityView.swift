@@ -7,9 +7,10 @@ struct ActivityView: View {
         ScreenBackground {
             VStack(alignment: .leading, spacing: 16) {
                 BrandWordmark(height: 24)
-                Text("Activity")
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(AdditionTheme.cream)
+                ScreenTitle(
+                    title: "Activity",
+                    subtitle: "Only creates, loads, and sends from write RPC."
+                )
                 if session.activity.isEmpty {
                     Card {
                         HStack(spacing: 12) {
