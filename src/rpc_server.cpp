@@ -243,6 +243,9 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " pq_mode=strict"
             << " allowed_sig_algs=" << allowed_sig_algs_list()
             << " pow_algorithm=" << pow_algorithm_label(net.pow_algorithm)
+            << " pow_profile=" << net.pow_profile
+            << " confirmations_policy=" << net.confirmations_policy
+            << " economic_security=" << net.economic_security
             << " mine_deadline_sec=" << mine_deadline_seconds(net)
             << " mine_threads=" << default_mine_thread_count()
             << " privacy_verifier=sha3_opening"
@@ -752,7 +755,8 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " to=" << to
             << " amount=" << amount
             << " fee=" << fee
-            << " nonce=" << tx.nonce;
+            << " nonce=" << tx.nonce
+            << " confirmations=" << chain_.tx_confirmations(hash_transaction(tx));
         return out.str();
     }
 
@@ -1105,21 +1109,23 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         const auto mp = mempool_.snapshot();
         for (const auto& tx : mp) {
             if (hash_transaction(tx) == tx_hash) {
-                return "status=mempool tx_hash=" + tx_hash;
+                return "status=mempool tx_hash=" + tx_hash + " confirmations=0";
             }
         }
 
+        const auto confirms = chain_.tx_confirmations(tx_hash);
         const auto& bs = chain_.blocks();
         for (const auto& b : bs) {
             for (std::size_t i = 0; i < b.transactions.size(); ++i) {
                 if (hash_transaction(b.transactions[i]) == tx_hash) {
                     return "status=mined tx_hash=" + tx_hash + " block_height=" +
-                           std::to_string(b.header.height) + " tx_index=" + std::to_string(i);
+                           std::to_string(b.header.height) + " tx_index=" + std::to_string(i) +
+                           " confirmations=" + std::to_string(confirms);
                 }
             }
         }
 
-        return "status=unknown tx_hash=" + tx_hash;
+        return "status=unknown tx_hash=" + tx_hash + " confirmations=0";
     }
 
     if (cmd == "getblock") {

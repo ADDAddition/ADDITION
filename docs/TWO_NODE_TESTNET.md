@@ -186,3 +186,21 @@ RPC, advertises `ADDITION_ADVERTISED_P2P=34.27.30.115:28545` so public
 
 Auto-mine is testnet only, off unless `--auto-mine` / `ADDITION_AUTO_MINE=1`.
 It is not a public RPC command. Each mined block is written to `blocks.dat`.
+
+## Local `--regtest` min-diff + confirmations
+
+`--regtest` (or `--network regtest`) starts `ADDITION_REGTEST_V1` with min
+difficulty (`0xFFFFFFFFFFFFFFFF`) so two local processes can mine quickly.
+This is not the public testnet and not mainnet. `ADDITION_MAINNET_V1`
+difficulty stays `0x000000FFFFFFFFFF`. Write RPC stays `127.0.0.1`.
+
+```bash
+cmake -S . -B build -DADDITION_BUILD_TESTS=ON
+cmake --build build --target additiond test_confirmations
+ctest --test-dir build -R 'test_confirmations|test_regtest_two_node' --output-on-failure
+```
+
+`getinfo` reports `confirmations_policy` and `economic_security=none`. After
+`wallet_send`, mine N blocks; `tx_status` on both nodes shows the same
+`confirmations=N`. No ZK, no cross-chain, no mainnet claim. Live public RPC
+stays testnet.
