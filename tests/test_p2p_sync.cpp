@@ -9,10 +9,12 @@
 #include "addition/rpc_network_server.hpp"
 #include "addition/wallet_keys.hpp"
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <thread>
 
@@ -275,6 +277,241 @@ int test_two_node_socket_sync() {
     return 0;
 }
 
+int test_persist_wan_truncation();
+
+std::string persist_handle_line(addition::DecentralizedNode& node, const std::string& line) {
+    std::istringstream iss(line);
+    std::string peer;
+    iss >> peer;
+    std::string payload;
+    std::getline(iss, payload);
+    if (!payload.empty() && payload.front() == ' ') {
+        payload.erase(payload.begin());
+    }
+    if (peer.empty() || payload.empty()) {
+        return "error: usage <peer> <payload>";
+    }
+    std::string err;
+    if (!node.handle_inbound_message(peer, payload, err)) {
+        return std::string("error: ") + err;
+    }
+    const auto outbound = node.pull_outbound_messages();
+    if (outbound.empty()) {
+        return "ok";
+    }
+    return "ok:" + outbound.front();
+}
+
+int test_persist_seed_dialect() {
+    std::cerr << "test_p2p_sync: persist-era seed dialect\n";
+    NodeKit node_a(addition::testnet_chain_config());
+    NodeKit persist(addition::testnet_chain_config());
+    NodeKit node_b(addition::testnet_chain_config());
+
+    std::string err;
+    for (int i = 0; i < 3; ++i) {
+        std::string mined;
+        if (!node_a.miner.mine_next_block("miner1", 8, 2, mined, err)) {
+            return fail("persist mine: " + err);
+        }
+        std::string payload;
+        if (!node_a.node.get_block_payload(static_cast<std::uint64_t>(i + 1), payload, err)) {
+            return fail("persist payload: " + err);
+        }
+        if (!persist.node.ingest_block_payload(payload, err)) {
+            return fail("persist ingest: " + err);
+        }
+    }
+    if (persist.peers.add_peer("self")) {
+        for (int i = 0; i < 5; ++i) {
+            persist.peers.mark_peer_bad("self");
+        }
+    }
+    if (!persist.peers.is_banned("self")) {
+        return fail("persist fixture must ban self");
+    }
+
+    int listen_fd = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (listen_fd < 0) {
+        return fail("persist listen socket");
+    }
+    int opt = 1;
+    setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    std::uint16_t port = 0;
+    for (std::uint16_t candidate : {std::uint16_t{29247}, std::uint16_t{29248}, std::uint16_t{29249}}) {
+        sockaddr_in addr{};
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(candidate);
+        inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+        if (::bind(listen_fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0 &&
+            ::listen(listen_fd, 16) == 0) {
+            port = candidate;
+            break;
+        }
+    }
+    if (port == 0) {
+        close(listen_fd);
+        return fail("persist bind");
+    }
+
+    std::atomic<bool> running{true};
+    std::thread worker([&]() {
+        while (running.load()) {
+            sockaddr_in client_addr{};
+            socklen_t client_len = sizeof(client_addr);
+            const int client = ::accept(listen_fd, reinterpret_cast<sockaddr*>(&client_addr), &client_len);
+            if (client < 0) {
+                continue;
+            }
+            char buffer[32768];
+            const int n = static_cast<int>(::recv(client, buffer, sizeof(buffer), 0));
+            if (n > 0) {
+                std::string req(buffer, buffer + n);
+                while (!req.empty() && (req.back() == '\n' || req.back() == '\r')) {
+                    req.pop_back();
+                }
+                std::string resp = persist_handle_line(persist.node, req);
+                if (resp.empty() || resp.back() != '\n') {
+                    resp.push_back('\n');
+                }
+                ::send(client, resp.data(), resp.size(), 0);
+            }
+            close(client);
+        }
+    });
+
+    if (!node_b.peers.add_peer("127.0.0.1:" + std::to_string(port))) {
+        running = false;
+        close(listen_fd);
+        worker.join();
+        return fail("persist addpeer");
+    }
+    if (!node_b.node.sync_once(err)) {
+        running = false;
+        close(listen_fd);
+        worker.join();
+        return fail("persist sync_once: " + err);
+    }
+    running = false;
+    // wake accept
+    {
+        const int poke = static_cast<int>(::socket(AF_INET, SOCK_STREAM, 0));
+        if (poke >= 0) {
+            sockaddr_in addr{};
+            addr.sin_family = AF_INET;
+            addr.sin_port = htons(port);
+            inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+            ::connect(poke, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+            close(poke);
+        }
+    }
+    close(listen_fd);
+    worker.join();
+
+    if (node_b.chain.height() != persist.chain.height()) {
+        return fail("persist dialect: B height " + std::to_string(node_b.chain.height()) +
+                    " != persist height " + std::to_string(persist.chain.height()));
+    }
+    return 0;
+}
+
+int test_persist_wan_truncation() {
+    std::cerr << "test_p2p_sync: persist WAN one-recv truncation\n";
+    NodeKit persist(addition::testnet_chain_config());
+    NodeKit node_b(addition::testnet_chain_config());
+
+    std::string err;
+    std::string mined;
+    if (!persist.miner.mine_next_block("miner1", 8, 2, mined, err)) {
+        return fail("wan persist mine: " + err);
+    }
+
+    int listen_fd = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (listen_fd < 0) {
+        return fail("wan persist listen socket");
+    }
+    int opt = 1;
+    setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    std::uint16_t port = 0;
+    for (std::uint16_t candidate : {std::uint16_t{29347}, std::uint16_t{29348}, std::uint16_t{29349}}) {
+        sockaddr_in addr{};
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(candidate);
+        inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+        if (::bind(listen_fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0 &&
+            ::listen(listen_fd, 16) == 0) {
+            port = candidate;
+            break;
+        }
+    }
+    if (port == 0) {
+        close(listen_fd);
+        return fail("wan persist bind");
+    }
+
+    std::atomic<bool> running{true};
+    std::thread worker([&]() {
+        while (running.load()) {
+            sockaddr_in client_addr{};
+            socklen_t client_len = sizeof(client_addr);
+            const int client = ::accept(listen_fd, reinterpret_cast<sockaddr*>(&client_addr), &client_len);
+            if (client < 0) {
+                continue;
+            }
+            // First IPv4 segment is typically ~1460 bytes. Persist recv returns then.
+            char buffer[1460];
+            const int n = static_cast<int>(::recv(client, buffer, sizeof(buffer), 0));
+            if (n > 0) {
+                std::string req(buffer, buffer + n);
+                while (!req.empty() && (req.back() == '\n' || req.back() == '\r')) {
+                    req.pop_back();
+                }
+                std::string resp = persist_handle_line(persist.node, req);
+                if (resp.empty() || resp.back() != '\n') {
+                    resp.push_back('\n');
+                }
+                ::send(client, resp.data(), resp.size(), 0);
+            }
+            close(client);
+        }
+    });
+
+    if (!node_b.peers.add_peer("127.0.0.1:" + std::to_string(port))) {
+        running = false;
+        close(listen_fd);
+        worker.join();
+        return fail("wan persist addpeer");
+    }
+    const bool synced = node_b.node.sync_once(err);
+    running = false;
+    {
+        const int poke = static_cast<int>(::socket(AF_INET, SOCK_STREAM, 0));
+        if (poke >= 0) {
+            sockaddr_in addr{};
+            addr.sin_family = AF_INET;
+            addr.sin_port = htons(port);
+            inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+            ::connect(poke, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+            close(poke);
+        }
+    }
+    close(listen_fd);
+    worker.join();
+
+    if (synced) {
+        return fail("WAN persist one-recv must not report sync success at height 0");
+    }
+    if (err.find("truncated HELLO") == std::string::npos &&
+        err.find("HELLO_ACK") == std::string::npos &&
+        err.find("invalid hello") == std::string::npos) {
+        return fail("WAN persist error was not a handshake failure: " + err);
+    }
+    if (node_b.chain.height() != 0) {
+        return fail("WAN persist must leave the home node at height 0");
+    }
+    return 0;
+}
+
 } // namespace
 
 int main() {
@@ -285,6 +522,12 @@ int main() {
         return rc;
     }
     if (int rc = test_two_node_socket_sync()) {
+        return rc;
+    }
+    if (int rc = test_persist_seed_dialect()) {
+        return rc;
+    }
+    if (int rc = test_persist_wan_truncation()) {
         return rc;
     }
     std::cout << "test_p2p_sync ok\n";

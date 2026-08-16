@@ -301,6 +301,23 @@ std::string derive_node_id(const std::string& requested, const std::string& pubk
     return "n-" + addition::to_hex(sha3_512_bytes("node-id|" + pubkey)).substr(0, 32);
 }
 
+// Persist-era seed (3a83a32): one recv, reply is ok:+outbound.front().
+// "self" is often banned after failed home HELLOs. Leftover BLK| can shadow HELLO_ACK.
+bool persist_leftover_reply(const std::string& resp) {
+    return resp == "ok" ||
+           resp.rfind("ok:BLK|", 0) == 0 ||
+           resp.rfind("ok:TX|", 0) == 0 ||
+           resp.rfind("ok:HAVE", 0) == 0 ||
+           resp.rfind("ok:INV|", 0) == 0 ||
+           resp.rfind("ok:IDROTATE|", 0) == 0 ||
+           resp.rfind("ok:IDVOTE|", 0) == 0;
+}
+
+bool persist_truncated_hello(const std::string& resp) {
+    // Last-field (sig) cuts still parse as six '|' fields, then fail verify.
+    return resp == "error: invalid hello" || resp == "error: invalid hello signature";
+}
+
 } // namespace
 
 DecentralizedNode::DecentralizedNode(std::string self_id,
@@ -580,10 +597,13 @@ bool DecentralizedNode::get_block_payload(std::uint64_t height,
     return true;
 }
 
-bool DecentralizedNode::fetch_blocks_from_peer(const std::string& peer, std::string& error) {
+bool DecentralizedNode::fetch_blocks_from_peer(const std::string& peer,
+                                              const std::string& wire_id,
+                                              std::string& error) {
+    const std::string id = wire_id.empty() ? self_id_ : wire_id;
     std::ostringstream inv_req;
     const auto inv_start = (chain_.height() > 0) ? (chain_.height() - 1) : 0;
-    inv_req << self_id_ << " REQINV|" << inv_start << "|24";
+    inv_req << id << " REQINV|" << inv_start << "|24";
 
     std::string inv_resp;
     if (!send_p2p_request(peer, inv_req.str(), inv_resp)) {
@@ -648,7 +668,7 @@ bool DecentralizedNode::fetch_blocks_from_peer(const std::string& peer, std::str
             }
 
             std::ostringstream req;
-            req << self_id_ << " REQBLK|" << h;
+            req << id << " REQBLK|" << h;
             std::string block_resp;
             if (!send_p2p_request(peer, req.str(), block_resp)) {
                 error = "REQBLK transport failed at height " + std::to_string(h);
@@ -674,7 +694,7 @@ bool DecentralizedNode::fetch_blocks_from_peer(const std::string& peer, std::str
     }
 
     std::string remote_height_resp;
-    if (!send_p2p_request(peer, self_id_ + " REQH|", remote_height_resp) ||
+    if (!send_p2p_request(peer, id + " REQH|", remote_height_resp) ||
         remote_height_resp.rfind("ok:HAVEH|", 0) != 0) {
         error = "REQH failed during reorg";
         peers_.mark_peer_bad(peer);
@@ -694,7 +714,7 @@ bool DecentralizedNode::fetch_blocks_from_peer(const std::string& peer, std::str
 
     for (std::uint64_t h = 0; h <= remote_h; ++h) {
         std::ostringstream req;
-        req << self_id_ << " REQBLK|" << h;
+        req << id << " REQBLK|" << h;
 
         std::string block_resp;
         if (!send_p2p_request(peer, req.str(), block_resp)) {
@@ -744,6 +764,122 @@ bool DecentralizedNode::fetch_blocks_from_peer(const std::string& peer, std::str
     return true;
 }
 
+bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string& wire_id, std::string& error) {
+    error.clear();
+    handshake_ok_[peer] = false;
+    wire_id.clear();
+
+    for (int attempt = 0; attempt < 8; ++attempt) {
+        const auto hello_ts = now_seconds();
+        const std::string hello_nonce = "s" + std::to_string(attempt) + "-" + std::to_string(hello_ts % 1000000ULL);
+        const std::string hello_body = std::string(kProtoVersion) + "|" + active_network_id(chain_) + "|" +
+                                       std::to_string(hello_ts) + "|" + hello_nonce + "|" +
+                                       node_public_key_;
+        std::string hello_sig;
+        try {
+            hello_sig = sign_message_hybrid(node_private_key_, hello_body);
+        } catch (const std::exception&) {
+            error = "hello signing failed";
+            return false;
+        }
+
+        const std::string attempt_id = (attempt == 0) ? self_id_ : (self_id_ + "x" + std::to_string(attempt));
+        std::ostringstream hello_req;
+        hello_req << attempt_id << " HELLO|" << kProtoVersion << '|' << active_network_id(chain_)
+                  << '|' << hello_ts << '|' << hello_nonce << '|' << node_public_key_ << '|' << hello_sig;
+
+        std::string hello_resp;
+        if (!send_p2p_request(peer, hello_req.str(), hello_resp)) {
+            error = "HELLO transport failed to " + peer;
+            continue;
+        }
+
+        if (hello_resp.rfind("ok:HELLO_ACK|", 0) == 0) {
+            const auto ack = hello_resp.substr(13);
+            std::istringstream as(ack);
+            std::string v;
+            std::string n;
+            std::string ts;
+            std::string nonce;
+            std::string peer_pk;
+            std::string sig;
+            if (!std::getline(as, v, '|') ||
+                !std::getline(as, n, '|') ||
+                !std::getline(as, ts, '|') ||
+                !std::getline(as, nonce, '|') ||
+                !std::getline(as, peer_pk, '|') ||
+                !std::getline(as, sig)) {
+                error = "invalid HELLO_ACK fields";
+                return false;
+            }
+            if (v != kProtoVersion || n != active_network_id(chain_) || nonce != hello_nonce ||
+                peer_pk.empty() || sig.empty()) {
+                error = "HELLO_ACK mismatch";
+                return false;
+            }
+            if (!is_reasonable_field_size(nonce, kMaxNonceLen) ||
+                !is_reasonable_field_size(peer_pk, kMaxPubKeyHexLen) ||
+                !is_reasonable_field_size(sig, kMaxSigHexLen)) {
+                error = "HELLO_ACK field too large";
+                return false;
+            }
+            const auto pit = pinned_peer_pubkeys_.find(peer);
+            if (pit != pinned_peer_pubkeys_.end() && pit->second != peer_pk) {
+                error = "peer pubkey pin mismatch";
+                return false;
+            }
+            const std::string ack_body = std::string(kProtoVersion) + "|" + active_network_id(chain_) + "|" + ts +
+                                         "|" + nonce + "|" + peer_pk;
+            if (!verify_message_signature_hybrid(peer_pk, ack_body, sig)) {
+                error = "invalid HELLO_ACK signature";
+                return false;
+            }
+            peer_pubkeys_[peer] = peer_pk;
+            pinned_peer_pubkeys_.emplace(peer, peer_pk);
+            handshake_ok_[peer] = true;
+            wire_id = attempt_id;
+            return true;
+        }
+
+        if (persist_leftover_reply(hello_resp)) {
+            handshake_ok_[peer] = true;
+            std::string work;
+            if (send_p2p_request(peer, attempt_id + " REQWORK|", work) && work.rfind("ok:HAVEWORK|", 0) == 0) {
+                wire_id = attempt_id;
+                return true;
+            }
+            error = "persist leftover reply without HAVEWORK: " + hello_resp;
+            handshake_ok_[peer] = false;
+            continue;
+        }
+
+        if (persist_truncated_hello(hello_resp)) {
+            error = "persist one-recv truncated HELLO (seed must loop-read until newline)";
+            continue;
+        }
+
+        if (hello_resp == "error: unknown peer") {
+            error = "seed rejected peer id (persist banned self)";
+            continue;
+        }
+
+        error = "expected HELLO_ACK, got: " + hello_resp;
+        if (hello_resp.rfind("error: hello timestamp", 0) == 0 ||
+            hello_resp.rfind("error: handshake mismatch", 0) == 0 ||
+            hello_resp.rfind("error: peer pubkey pin", 0) == 0 ||
+            hello_resp.rfind("error: missing hello", 0) == 0) {
+            return false;
+        }
+    }
+
+    if (error.empty()) {
+        error = "handshake failed";
+    } else if (error.find("truncated HELLO") != std::string::npos) {
+        error += "; seed reply must be ok:HELLO_ACK|2|<network_id>|<unix_ts>|<nonce>|<ml-dsa-87-pubkey-hex>|<sig>";
+    }
+    return false;
+}
+
 bool DecentralizedNode::sync_once(std::string& error) {
     error.clear();
     auto peers = peers_.peers();
@@ -762,97 +898,16 @@ bool DecentralizedNode::sync_once(std::string& error) {
             continue;
         }
 
-        std::ostringstream hello_req;
-        const auto nonce_seed = std::chrono::steady_clock::now().time_since_epoch().count();
-        const auto hello_ts = now_seconds();
-        const std::string hello_nonce = "sync-" + std::to_string(nonce_seed);
-        const std::string hello_body = std::string(kProtoVersion) + "|" + active_network_id(chain_) + "|" +
-                                       std::to_string(hello_ts) + "|" + hello_nonce + "|" +
-                                       node_public_key_;
-        std::string hello_sig;
-        try {
-            hello_sig = sign_message_hybrid(node_private_key_, hello_body);
-        } catch (const std::exception&) {
-            last_error = "hello signing failed";
-            peers_.mark_peer_bad(peer);
+        std::string hs_err;
+        std::string wire_id;
+        if (!handshake_with_peer(peer, wire_id, hs_err)) {
+            last_error = hs_err.empty() ? "handshake failed" : hs_err;
             handshake_ok_[peer] = false;
             continue;
         }
-        hello_req << self_id_ << " HELLO|" << kProtoVersion << '|' << active_network_id(chain_)
-                  << '|' << hello_ts << '|' << hello_nonce << '|' << node_public_key_ << '|' << hello_sig;
-        std::string hello_resp;
-        if (!send_p2p_request(peer, hello_req.str(), hello_resp)) {
-            last_error = "HELLO transport failed to " + peer;
-            peers_.mark_peer_bad(peer);
-            handshake_ok_[peer] = false;
-            continue;
+        if (wire_id.empty()) {
+            wire_id = self_id_;
         }
-
-        if (hello_resp.rfind("ok:HELLO_ACK|", 0) != 0) {
-            last_error = "expected HELLO_ACK, got: " + hello_resp;
-            peers_.mark_peer_bad(peer);
-            handshake_ok_[peer] = false;
-            continue;
-        }
-
-        {
-            const auto ack = hello_resp.substr(13);
-            std::istringstream as(ack);
-            std::string v;
-            std::string n;
-            std::string ts;
-            std::string nonce;
-            std::string peer_pk;
-            std::string sig;
-            if (!std::getline(as, v, '|') ||
-                !std::getline(as, n, '|') ||
-                !std::getline(as, ts, '|') ||
-                !std::getline(as, nonce, '|') ||
-                !std::getline(as, peer_pk, '|') ||
-                !std::getline(as, sig)) {
-                last_error = "invalid HELLO_ACK fields";
-                peers_.mark_peer_bad(peer);
-                handshake_ok_[peer] = false;
-                continue;
-            }
-
-            if (v != kProtoVersion || n != active_network_id(chain_) || nonce != hello_nonce || peer_pk.empty() || sig.empty()) {
-                last_error = "HELLO_ACK mismatch";
-                peers_.mark_peer_bad(peer);
-                handshake_ok_[peer] = false;
-                continue;
-            }
-
-            if (!is_reasonable_field_size(nonce, kMaxNonceLen) ||
-                !is_reasonable_field_size(peer_pk, kMaxPubKeyHexLen) ||
-                !is_reasonable_field_size(sig, kMaxSigHexLen)) {
-                last_error = "HELLO_ACK field too large";
-                peers_.mark_peer_bad(peer);
-                handshake_ok_[peer] = false;
-                continue;
-            }
-
-            const auto pit = pinned_peer_pubkeys_.find(peer);
-            if (pit != pinned_peer_pubkeys_.end() && pit->second != peer_pk) {
-                last_error = "peer pubkey pin mismatch";
-                peers_.mark_peer_bad(peer);
-                handshake_ok_[peer] = false;
-                continue;
-            }
-
-            const std::string ack_body = std::string(kProtoVersion) + "|" + active_network_id(chain_) + "|" + ts + "|" +
-                                         nonce + "|" + peer_pk;
-            if (!verify_message_signature_hybrid(peer_pk, ack_body, sig)) {
-                last_error = "invalid HELLO_ACK signature";
-                peers_.mark_peer_bad(peer);
-                handshake_ok_[peer] = false;
-                continue;
-            }
-
-            peer_pubkeys_[peer] = peer_pk;
-            pinned_peer_pubkeys_.emplace(peer, peer_pk);
-        }
-        handshake_ok_[peer] = true;
         any_handshake = true;
 
         {
@@ -865,7 +920,7 @@ bool DecentralizedNode::sync_once(std::string& error) {
         }
 
         std::string remote_work_resp;
-        if (!send_p2p_request(peer, self_id_ + " REQWORK|", remote_work_resp)) {
+        if (!send_p2p_request(peer, wire_id + " REQWORK|", remote_work_resp)) {
             last_error = "REQWORK transport failed";
             peers_.mark_peer_bad(peer);
             continue;
@@ -892,7 +947,7 @@ bool DecentralizedNode::sync_once(std::string& error) {
         }
 
         std::string remote_height_resp;
-        if (!send_p2p_request(peer, self_id_ + " REQH|", remote_height_resp)) {
+        if (!send_p2p_request(peer, wire_id + " REQH|", remote_height_resp)) {
             last_error = "REQH transport failed";
             peers_.mark_peer_bad(peer);
             continue;
@@ -927,13 +982,13 @@ bool DecentralizedNode::sync_once(std::string& error) {
         while (chain_.height() < remote_h) {
             const auto before = chain_.height();
             std::string fetch_err;
-            if (!fetch_blocks_from_peer(peer, fetch_err)) {
+            if (!fetch_blocks_from_peer(peer, wire_id, fetch_err)) {
                 last_error = fetch_err.empty() ? "block fetch failed" : fetch_err;
                 break;
             }
 
             std::string refresh;
-            if (send_p2p_request(peer, self_id_ + " REQH|", refresh) && refresh.rfind("ok:HAVEH|", 0) == 0) {
+            if (send_p2p_request(peer, wire_id + " REQH|", refresh) && refresh.rfind("ok:HAVEH|", 0) == 0) {
                 try {
                     remote_h = std::stoull(refresh.substr(9));
                     if (remote_h > max_remote_h) {
