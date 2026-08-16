@@ -153,7 +153,8 @@ void apply_network_mode(NodeConfig& cfg, NetworkMode mode) {
             cfg.chain.network_name == "addition-testnet") {
             cfg.chain.network_name = "addition-regtest";
         }
-        if (cfg.chain.network_id.empty() || cfg.chain.network_id == "ADDITION_MAINNET_V1") {
+        if (cfg.chain.network_id.empty() || cfg.chain.network_id == "ADDITION_MAINNET_V1" ||
+            cfg.chain.network_id == "ADDITION_TESTNET_V1") {
             cfg.chain.network_id = "ADDITION_REGTEST_V1";
         }
         cfg.chain.pow_algorithm = PowAlgorithm::Sha3_512;
