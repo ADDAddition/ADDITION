@@ -1,6 +1,6 @@
 # Two-node local testnet runbook
 
-This starts **two `additiond` processes** on one machine. It is not a public
+This starts **two local `additiond` processes** on one machine. It is not a public
 mainnet, not a token sale, and it does not invent peer counts or hashrate.
 
 Contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com)
@@ -85,8 +85,10 @@ exactly:
 error: command disabled on public RPC
 ```
 
-HTTP responses include `Access-Control-Allow-Origin: *`, `OPTIONS` → `204`, and
-`Cache-Control: no-store` so a static site can call the port without caching.
+HTTP responses include `Access-Control-Allow-Origin: *` (credential-less public
+read allowlist; writes stay 403), `Access-Control-Allow-Methods: GET, OPTIONS`,
+`OPTIONS` → `204`, and `Cache-Control: no-store`. `curl /rpc?cmd=getinfo` is
+unchanged. CORS `*` is not a wallet-connect surface.
 
 ## Point the website at a real public RPC
 
@@ -125,7 +127,12 @@ public port is up. If the daemon is down, pages show **RPC offline**.
   (GCP rule `allow-addition-p2p`). Allow 28545 only while P2P is enabled.
   Never open **8545** or **18545**.
 - Endpoints are IPv4 `ip:port` only (`inet_pton`). Docker DNS names do not work.
-- `bootstrap_peers` / `--bootstrap` skip this process’s own P2P port.
+- `bootstrap_peers` / `--bootstrap` skip this process’s own P2P port, `self` /
+  `probe-self`, and `ADDITION_ADVERTISED_P2P` when set (seed must set that to
+  its public `ip:port` so it does not add itself).
+- `getinfo.peers` / `peers` list only non-loopback IPv4 endpoints. Loopback
+  two-node peers stay in the internal set for `sync` and appear as
+  `local=127.0.0.1:…`. Node ids and `self` are not an external peer count.
 - IPv4 only. The operator’s current public P2P is `34.27.30.115:28545`
   (`--bootstrap 34.27.30.115:28545`). Do not invent extra peers. Write RPC
   stays `127.0.0.1:8545`.
