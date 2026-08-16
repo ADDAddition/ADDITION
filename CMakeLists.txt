@@ -110,6 +110,11 @@ if(ADDITION_BUILD_TESTS)
     add_test(NAME test_runtime COMMAND test_runtime)
     set_tests_properties(test_runtime PROPERTIES TIMEOUT 90)
 
+    add_executable(test_amm tests/test_amm.cpp)
+    target_link_libraries(test_amm PRIVATE addition_core)
+    add_test(NAME test_amm COMMAND test_amm)
+    set_tests_properties(test_amm PROPERTIES TIMEOUT 90)
+
     find_package(Python3 COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
         add_test(
@@ -170,6 +175,14 @@ if(ADDITION_BUILD_TESTS)
         set_tests_properties(test_runtime_live PROPERTIES
             ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
             TIMEOUT 180)
+        add_test(
+            NAME test_amm_live
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_amm_live.py
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        )
+        set_tests_properties(test_amm_live PROPERTIES
+            ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
+            TIMEOUT 90)
         add_test(
             NAME test_jsonrpc_adapter
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_jsonrpc_adapter.py
