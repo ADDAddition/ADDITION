@@ -91,6 +91,7 @@ if(ADDITION_BUILD_TESTS)
     add_executable(test_slh_dsa tests/test_slh_dsa.cpp)
     target_link_libraries(test_slh_dsa PRIVATE addition_core)
     add_test(NAME test_slh_dsa COMMAND test_slh_dsa)
+    set_tests_properties(test_slh_dsa PROPERTIES TIMEOUT 180)
 
     find_package(Python3 COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
