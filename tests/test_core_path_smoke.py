@@ -155,8 +155,9 @@ def main() -> int:
         if "privacy_claim=opening_not_zk" not in info0:
             return fail("getinfo must claim opening_not_zk: " + info0)
 
-        delpeer = tcp_rpc("127.0.0.1", ports["a_write"], "delpeer 127.0.0.1:%s" % ports["a_p2p"])
-        print("CMD delpeer", delpeer)
+        if field(info0, "peers") != "0":
+            delpeer = tcp_rpc("127.0.0.1", ports["a_write"], "delpeer 127.0.0.1:%s" % ports["a_p2p"])
+            print("CMD delpeer", delpeer)
         sync_none = tcp_rpc("127.0.0.1", ports["a_write"], "sync")
         print("CMD sync (no peer)", sync_none)
         if "error: no peer" not in sync_none:
