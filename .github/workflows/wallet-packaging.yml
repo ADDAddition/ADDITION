@@ -28,7 +28,7 @@ jobs:
           chmod +x scripts/build_wallet.sh
           ./scripts/build_wallet.sh
       - name: Source tests
-        run: python3 tests/test_wallet_packaging.py tests/test_wallet_client.py
+        run: python3 -m unittest tests.test_wallet_packaging tests.test_wallet_client
       - uses: actions/upload-artifact@v4
         with:
           name: addition-wallet-testnet-linux
