@@ -134,12 +134,22 @@
       "</svg>";
   }
 
+  function rpcQuerySuffix() {
+    const params = new URLSearchParams(window.location.search);
+    const rpc = params.get("rpc");
+    if (!rpc) {
+      return "";
+    }
+    return "?rpc=" + encodeURIComponent(rpc);
+  }
+
   function fillHeader(el) {
     const path = window.location.pathname.replace(/\/+$/, "") || "/";
+    const q = rpcQuerySuffix();
     const nav = NAV.map(function (pair) {
-      const href = pair[0];
+      const href = pair[0] + q;
       const key = pair[1];
-      const dest = href.replace(/\/+$/, "") || "/";
+      const dest = pair[0].replace(/\/+$/, "") || "/";
       const active = path === dest || (dest !== "/" && path.indexOf(dest) === 0);
       return '<a href="' + href + '" data-nav="' + key + '"' +
         (active ? ' class="active"' : "") + ">" + t(key) + "</a>";
@@ -147,7 +157,7 @@
     el.className = "site-chrome";
     el.innerHTML =
       '<div class="site-chrome-inner">' +
-        '<a class="brand" href="/">' +
+        '<a class="brand" href="/' + q + '">' +
           logoSvg() +
           '<span class="brand-text">' +
             "<strong class=\"brand-name\">ADDITION</strong>" +

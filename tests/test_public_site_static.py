@@ -86,6 +86,7 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn('STRIP_KEYS = ["height", "peers", "network", "pq_mode"]', chrome)
         self.assertIn("RPC offline", chrome)
         self.assertIn("emptyStripCells", chrome)
+        self.assertIn("rpcQuerySuffix", chrome)
 
     def test_homepage_is_short_control_center(self) -> None:
         index = read("index.html")
