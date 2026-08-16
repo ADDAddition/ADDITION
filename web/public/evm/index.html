@@ -3,27 +3,32 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ADDITION EVM bridge (bootstrap)</title>
+  <title>ADDITION EVM bridge (local testnet only)</title>
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="EVM bridge" data-sub="Bootstrap JSON-RPC only. Not a full EVM.">
+<body data-title="EVM bridge" data-sub="Local 127.0.0.1:9545 only. Send disabled. Not a public wallet network.">
   <header id="site-header"></header>
   <main>
     <div class="banner">
-      Local bootstrap: <code>web/evm/evm_rpc_bridge.py</code> on <code>127.0.0.1:9545</code>, reading write RPC <code>127.0.0.1:8545</code>.
-      <code>eth_sendRawTransaction</code> is disabled.
+      Local testnet only: <code>python3 web/evm/evm_rpc_bridge.py</code> on <code>127.0.0.1:9545</code>
+      (reads write RPC <code>127.0.0.1:8545</code>). Chain ID <code>424242</code>, symbol <code>ADD</code>.
+      <code>eth_sendRawTransaction</code> is disabled. This is not MetaMask, Trust, or Binance public RPC.
     </div>
     <section class="panel">
       <h2>Run the bootstrap</h2>
       <pre>python3 web/evm/evm_rpc_bridge.py
-# listens on 127.0.0.1:9545 and reads 127.0.0.1:8545</pre>
-      <p>Local wallet values only:</p>
+# listens on 127.0.0.1:9545 and reads 127.0.0.1:8545
+# refuses 0.0.0.0; send stays disabled</pre>
+      <p>Add-to-MetaMask values (loopback only):</p>
       <ul>
-        <li>Network Name: <code>Addition EVM Bridge (bootstrap)</code></li>
+        <li>Network Name: <code>ADDITION local testnet (send disabled)</code></li>
         <li>RPC URL: <code>http://127.0.0.1:9545</code></li>
         <li>Chain ID: <code>424242</code></li>
         <li>Currency Symbol: <code>ADD</code></li>
       </ul>
+      <p class="note">MetaMask/Trust/Binance cannot list this chain as-is. The helper below only talks to <code>127.0.0.1:9545</code> and does not enable send.</p>
+      <p><button id="add-mm" type="button">Add 127.0.0.1:9545 to MetaMask</button></p>
+      <p id="add-mm-status" class="note"></p>
     </section>
     <section class="panel">
       <h2>Live bootstrap probe</h2>
@@ -35,6 +40,25 @@
   <footer id="site-footer"></footer>
   <script src="/chrome.js"></script>
   <script>
+    const LOCAL_CHAIN = {
+      chainId: "0x67932",
+      chainName: "ADDITION local testnet (send disabled)",
+      rpcUrls: ["http://127.0.0.1:9545"],
+      nativeCurrency: { name: "ADD", symbol: "ADD", decimals: 18 }
+    };
+    document.getElementById("add-mm").addEventListener("click", async () => {
+      const el = document.getElementById("add-mm-status");
+      if (!window.ethereum || !window.ethereum.request) {
+        el.textContent = "No injected wallet. This helper only targets 127.0.0.1:9545 chain 424242; send is disabled.";
+        return;
+      }
+      try {
+        await window.ethereum.request({ method: "wallet_addEthereumChain", params: [LOCAL_CHAIN] });
+        el.textContent = "Wallet accepted 127.0.0.1:9545 / 424242. eth_sendRawTransaction stays disabled on the bridge.";
+      } catch (e) {
+        el.textContent = String(e && e.message ? e.message : e);
+      }
+    });
     async function evm(method, params) {
       const res = await fetch("http://127.0.0.1:9545", {
         method: "POST",
@@ -49,13 +73,15 @@
       try {
         const version = await evm("web3_clientVersion");
         const chain = await evm("eth_chainId");
+        const net = await evm("net_version");
         const block = await evm("eth_blockNumber");
         const send = await evm("eth_sendRawTransaction", ["0x00"]);
         el.className = "ok";
-        el.textContent = "Bootstrap bridge answered";
+        el.textContent = "Local bootstrap answered (send disabled)";
         box.textContent =
           "web3_clientVersion: " + JSON.stringify(version.result || version.error) + "\n" +
           "eth_chainId: " + JSON.stringify(chain.result || chain.error) + "\n" +
+          "net_version: " + JSON.stringify(net.result || net.error) + "\n" +
           "eth_blockNumber: " + JSON.stringify(block.result || block.error) + "\n" +
           "eth_sendRawTransaction: " + JSON.stringify(send.error || send.result);
       } catch (e) {

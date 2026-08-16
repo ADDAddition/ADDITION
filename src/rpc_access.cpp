@@ -220,12 +220,15 @@ std::string http_rpc_response(int status, const std::string& body, const std::st
         break;
     }
 
+    // Wildcard CORS is for the credential-less public read allowlist only
+    // (curl /rpc?cmd=getinfo). Writes stay 403. Methods are GET/OPTIONS so a
+    // browser cannot use this port as a generic POST wallet endpoint.
     std::ostringstream out;
     out << "HTTP/1.1 " << status << ' ' << reason << "\r\n"
         << "Content-Type: " << content_type << "\r\n"
         << "Content-Length: " << body.size() << "\r\n"
         << "Access-Control-Allow-Origin: *\r\n"
-        << "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
+        << "Access-Control-Allow-Methods: GET, OPTIONS\r\n"
         << "Access-Control-Allow-Headers: Content-Type\r\n"
         << "Cache-Control: no-store\r\n"
         << "Connection: close\r\n"
