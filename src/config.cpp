@@ -1210,6 +1210,8 @@ std::string daemon_help_text() {
            "Local wallet (trusted RPC only): createwallet [name] [scheme], wallet_list, wallet_info,\n"
            "  wallet_balance, wallet_send, wallet_sign. Keys stay in <data-dir>/wallets/*.wal.\n"
            "  Bitcoin-like user model (keys, UTXOs, send/receive, fee). Not BIP-compatible.\n"
+           "Bitcoin UTXO hygiene (trusted RPC only): hygiene_classify [path], hygiene_attest,\n"
+           "  hygiene_verify. Signed ADDITION receipt; moves_bitcoin=0; not BIP-360.\n"
            "\n"
            "This is a research prototype / testnet. It does not claim to be a live mainnet.\n";
 }

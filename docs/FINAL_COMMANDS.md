@@ -77,6 +77,9 @@ Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so a down no
 - `wallet_balance <name>`
 - `wallet_send <name> <to_addr> <amount> [fee]` — signs from the local file; no privkey on the wire
 - `wallet_sign <name> <message_hex_utf8>` — same as `sign_message` without sending the key
+- `hygiene_classify [path]` — offline Bitcoin script hygiene over operator samples or `fixtures/btc_hygiene_samples.json`. Trusted RPC only. Does not move Bitcoin. Not BIP-360.
+- `hygiene_attest <wallet> <btc_addr> <height> <class> [reuse] [pubkey_on_chain]` — signed ADDITION receipt (`ADDITION-HYGIENE-REHEARSAL`, `moves_bitcoin=0`, `claim=attestation_not_bip360`). Attestation rehearsal, not a consensus change.
+- `hygiene_verify <receipt_note>` — verify the signed receipt; a mutated note is rejected
 - `getbalance <address>`
 - `getbalance_instant <address>`
 - `tx_build <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce>`

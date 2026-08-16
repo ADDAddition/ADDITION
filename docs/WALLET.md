@@ -27,6 +27,9 @@ Relevant commands (see [FINAL_COMMANDS.md](FINAL_COMMANDS.md)):
 | `fee_info` | `recommended_min_fee` (minimum `1`) |
 | `tx_build <from> <pubkey_hex> <to> <amount> <fee> <nonce>` | Builds the unsigned spend and returns `sign_hash=...` |
 | `sendtx_signed_hash ... <sig_hex_without_pq_prefix>` | Submits a PQ signature. No private key argument. |
+| `hygiene_classify [path]` | Offline Bitcoin script hygiene over operator samples / `fixtures/btc_hygiene_samples.json`. Does not move Bitcoin. Not BIP-360. Trusted RPC only. |
+| `hygiene_attest <wallet> <btc_addr> <height> <class> [reuse] [pubkey_on_chain]` | Signed ADDITION receipt (`ADDITION-HYGIENE-REHEARSAL`, `moves_bitcoin=0`, `claim=attestation_not_bip360`). Attestation rehearsal, not a consensus change. |
+| `hygiene_verify <receipt_note>` | Verify the signed receipt. A mutated note is rejected. |
 | `mine <address>` | Local testnet: SHA3-512 header PoW, 30s deadline, coinbase 50 |
 | `getinfo` | `network=testnet`, `height`, `peers`, `pq_mode=strict`, `allowed_sig_algs`, `max_supply=50000000` |
 

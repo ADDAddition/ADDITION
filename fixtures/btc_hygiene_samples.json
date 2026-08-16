@@ -1,0 +1,47 @@
+{
+  "comment": "Offline Bitcoin-like script fixtures for ADDITION hygiene rehearsal. Not live chain data. Does not move Bitcoin. Not BIP-360.",
+  "samples": [
+    {
+      "id": "p2pkh-once",
+      "address": "1BoatSLRHtKNngkdXEeobR76b53LETtpyT",
+      "height": 170,
+      "script_hex": "76a91489abcdefabbaabbaabbaabbaabbaabbaabbaabba88ac"
+    },
+    {
+      "id": "p2pkh-reuse-a",
+      "address": "1ReuseAddrCheckFixture000000000001",
+      "height": 200,
+      "script_hex": "76a91400112233445566778899aabbccddeeff0011223388ac"
+    },
+    {
+      "id": "p2pkh-reuse-b",
+      "address": "1ReuseAddrCheckFixture000000000001",
+      "height": 201,
+      "script_hex": "76a91400112233445566778899aabbccddeeff0011223388ac"
+    },
+    {
+      "id": "p2wpkh",
+      "address": "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
+      "height": 481824,
+      "script_hex": "0014751e76e8199196d454941c45d1b3a323f1433bd6"
+    },
+    {
+      "id": "p2tr",
+      "address": "bc1p5d7rjq7g6rdk2yhzks9smlaqtedr4dekq08ge8ztwac72sfr9rusxg3297",
+      "height": 709632,
+      "script_hex": "51200000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "id": "p2pk-exposed",
+      "address": "1P2PKPubAlreadyOnChainFixture00001",
+      "height": 1,
+      "script_hex": "210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac"
+    },
+    {
+      "id": "p2sh",
+      "address": "3J98t1WpEZ73CNmYviecrnyiWrnqRhWNLy",
+      "height": 170052,
+      "script_hex": "a91489abcdefabbaabbaabbaabbaabbaabbaabbaabba87"
+    }
+  ]
+}

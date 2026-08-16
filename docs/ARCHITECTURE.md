@@ -13,6 +13,7 @@
 - `crypto.*`: default ML-DSA-87 with thread-local OQS_SIG and parallel batch verify; opt-in `slh-dsa-shake-256s` (liboqs `SPHINCS+-SHAKE-256s-simple`) only if `OQS_SIG_sign_with_ctx_str` works with a non-empty context; addresses are SHA3-512(scheme_id || 0x00 || pubkey_bytes) (128 hex)
 - `rpc_server.*`: text-command RPC handling
 - `wallet.*`: transaction creation and submission
+- `btc_hygiene.*`: offline Bitcoin script classifier and signed ADDITION hygiene receipt (attestation rehearsal; does not move Bitcoin; not BIP-360)
 
 ## Current status (v2 in progress)
 1. SHA3-512 hashing implemented with OpenSSL (`src/crypto.cpp`)
