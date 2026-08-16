@@ -34,13 +34,14 @@ Bulletproofs, ZK-Shield, a DEX, or a token sale.
 - `min_difficulty_target` is below the easy bound so a burst of fast blocks
   can harden. A fresh `blocks.dat` is required after this change if the old
   chain stored targets above the new max.
-- `mine` has a **30s deadline**. On testnet a block is expected well inside
+- `mine` has a **30s deadline** on testnet. A block is expected well inside
   that bound (about 2^16 cheap hashes at the default target).
 - Each RPC connection is handled on its own thread. `handle_command` is
   mutex-serialized so chain state stays consistent.
-- The experimental `--network mainnet` *profile* still uses `memory_hard`.
-  That profile is not a live public network. A live memory-hard mine is
-  **not** demonstrated here and may hit the 30s deadline.
+- The experimental `--network mainnet` *profile* uses `memory_hard` at
+  `0x000000FFFFFFFFFF` (~2^24 hashes). That profile is **not** a live public
+  network. `mine` on mainnet has **no 30s deadline**: it searches until it
+  finds a block (or is stopped). `getinfo` reports `mine_deadline_sec=0`.
 
 `getinfo` prints `pow_algorithm=sha3_512` on testnet.
 

@@ -5,10 +5,12 @@
 #include "addition/miner.hpp"
 #include "addition/state_store.hpp"
 
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -66,6 +68,26 @@ int main() {
     }
     if (mainnet_cfg.initial_difficulty_target > addition::kTestnetHardDifficultyTarget) {
         std::cerr << "test failed: mainnet initial target must be at or harder than testnet hard\n";
+        return 1;
+    }
+    if (addition::kMainnetDifficultyTarget != 0x000000FFFFFFFFFFULL ||
+        mainnet_cfg.initial_difficulty_target != 0x000000FFFFFFFFFFULL ||
+        mainnet_cfg.min_difficulty_target != 0x000000FFFFFFFFFFULL ||
+        mainnet_cfg.max_difficulty_target != 0x000000FFFFFFFFFFULL) {
+        std::cerr << "test failed: ADDITION_MAINNET_V1 difficulty_target must stay 0x000000FFFFFFFFFF\n";
+        return 1;
+    }
+    if (addition::mine_deadline_seconds(mainnet_cfg) != addition::kMainnetMineDeadlineSec ||
+        addition::kMainnetMineDeadlineSec != 0) {
+        std::cerr << "test failed: mainnet mine must not use a 30s deadline\n";
+        return 1;
+    }
+    if (addition::mine_deadline_seconds(testnet_cfg) != 30) {
+        std::cerr << "test failed: testnet mine deadline must stay 30s\n";
+        return 1;
+    }
+    if (addition::default_mine_thread_count() < 1) {
+        std::cerr << "test failed: default mine threads\n";
         return 1;
     }
 
@@ -275,6 +297,77 @@ int main() {
         tn.chain.network_mode = "mainnet";
         if (addition::validate_network_profile(tn, err)) {
             std::cerr << "test failed: testnet mode with mainnet id must not validate\n";
+            return 1;
+        }
+    }
+
+    {
+        // Prove the memory_hard multi-thread miner finds a block. Easy target is
+        // test-only; production ADDITION_MAINNET_V1 stays 0x000000FFFFFFFFFF.
+        addition::ChainConfig easy = addition::mainnet_chain_config();
+        easy.initial_difficulty_target = 0xFFFFFFFFFFFFFFFFULL;
+        easy.min_difficulty_target = 0xFFFFFFFFFFFFFFFFULL;
+        easy.max_difficulty_target = 0xFFFFFFFFFFFFFFFFULL;
+        addition::Chain mined(easy);
+        addition::Mempool mempool;
+        addition::Miner miner(mined, mempool);
+        std::string hash;
+        std::string err;
+        const auto t0 = std::chrono::steady_clock::now();
+        if (!miner.mine_next_block("miner1", 200, 2, hash, err)) {
+            std::cerr << "test failed: memory_hard multi-thread mine: " << err << '\n';
+            return 1;
+        }
+        const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::steady_clock::now() - t0)
+                            .count();
+        if (mined.height() != 1 || hash.empty()) {
+            std::cerr << "test failed: memory_hard mine did not commit a block\n";
+            return 1;
+        }
+        if (mined.current_difficulty_target() != 0xFFFFFFFFFFFFFFFFULL) {
+            std::cerr << "test failed: easy test must not change production target knobs\n";
+            return 1;
+        }
+        if (ms > 30000) {
+            std::cerr << "test failed: easy memory_hard mine exceeded 30s: " << ms << "ms\n";
+            return 1;
+        }
+        if (miner.last_threads() < 1) {
+            std::cerr << "test failed: miner threads not recorded\n";
+            return 1;
+        }
+    }
+
+    {
+        // Production mainnet target: mine must still be running after 31s.
+        addition::Chain mainnet(mainnet_cfg);
+        if (mainnet.current_difficulty_target() != 0x000000FFFFFFFFFFULL) {
+            std::cerr << "test failed: live mainnet chain target drifted\n";
+            return 1;
+        }
+        std::atomic<bool> stop{false};
+        std::string hash;
+        std::string err;
+        std::atomic<bool> finished{false};
+        std::thread worker([&]() {
+            mainnet.mine_and_add_block("miner1", {}, 2, hash, err, &stop);
+            finished.store(true, std::memory_order_relaxed);
+        });
+        std::this_thread::sleep_for(std::chrono::seconds(31));
+        const bool done_at_31s = finished.load(std::memory_order_relaxed);
+        stop.store(true, std::memory_order_relaxed);
+        worker.join();
+        if (err.find("30s") != std::string::npos) {
+            std::cerr << "test failed: mainnet mine still uses the 30s leftover: " << err << '\n';
+            return 1;
+        }
+        if (done_at_31s && hash.empty()) {
+            std::cerr << "test failed: mainnet mine aborted before 31s: " << err << '\n';
+            return 1;
+        }
+        if (!done_at_31s && err.find("stopped") == std::string::npos) {
+            std::cerr << "test failed: expected mining stopped after cancel: " << err << '\n';
             return 1;
         }
     }

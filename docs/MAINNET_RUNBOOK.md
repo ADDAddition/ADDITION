@@ -32,6 +32,25 @@ A testnet process still reports `network=testnet`. Mixing a testnet `blocks.dat`
 
 `ADDITION_PRIVACY_MASTER_KEY` (min 32 characters) is required to start `--mainnet`. Auto-mine is refused.
 
+## Mine (local write RPC only)
+
+The 30s `mine` deadline is a **testnet leftover**. On `--mainnet` the search
+runs until it finds a block (`mine_deadline_sec=0` in `getinfo`). Testnet
+keeps the 30s bound.
+
+`mine` uses a multi-thread `memory_hard` miner (one 1 MiB scratch buffer per
+thread, `hardware_concurrency` workers by default) against the existing
+target `0x000000FFFFFFFFFF`. That is about 2^24 hashes. Do not loosen it.
+Do not invent TPS.
+
+Write RPC stays `127.0.0.1:8546`. Public read cannot mine. This is a local
+profile, not a live public network.
+
+```bash
+printf 'mine miner1\n' | nc 127.0.0.1 8546
+# waits until a nonce meets the target; clients must not use a 30s timeout
+```
+
 ## Difficulty (what we picked and why)
 
 The existing retarget in `src/chain.cpp` compares the last `retarget_window` (30) block timestamps to `window * target_block_time_sec` (30 × 60s).

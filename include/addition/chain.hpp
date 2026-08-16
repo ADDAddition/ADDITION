@@ -3,6 +3,7 @@
 #include "addition/block.hpp"
 #include "addition/config.hpp"
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -35,7 +36,8 @@ public:
                             std::vector<Transaction> txs,
                             std::size_t threads,
                             std::string& mined_hash,
-                            std::string& error);
+                            std::string& error,
+                            std::atomic<bool>* stop = nullptr);
     bool replace_with_chain(const std::vector<Block>& candidate,
                             std::string& error);
 

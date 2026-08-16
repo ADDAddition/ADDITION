@@ -5,10 +5,12 @@
 
 #include <oqs/oqs.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cctype>
 #include <chrono>
 #include <iomanip>
+#include <limits>
 #include <mutex>
 #include <sstream>
 #include <stdexcept>
@@ -865,6 +867,41 @@ bool crypto_selftest(std::string& report) {
 
     report = std::string("selftest: ok allowed_sig_algs=") + allowed_sig_algs_list();
     return true;
+}
+
+std::uint64_t hash_head64(const std::string& hex_hash) {
+    if (hex_hash.empty()) {
+        return std::numeric_limits<std::uint64_t>::max();
+    }
+    const auto take = std::min<std::size_t>(16, hex_hash.size());
+    return static_cast<std::uint64_t>(std::stoull(hex_hash.substr(0, take), nullptr, 16));
+}
+
+std::uint64_t memory_hard_head64(const std::string& seed_hex) {
+    constexpr std::size_t kScratchSize = 1 << 20; // 1 MiB
+    constexpr std::size_t kRounds = 16;
+
+    std::vector<std::uint8_t> scratch(kScratchSize, 0);
+    auto digest = sha3_512_bytes(seed_hex);
+
+    for (std::size_t i = 0; i < scratch.size(); ++i) {
+        scratch[i] = static_cast<std::uint8_t>(digest[i % digest.size()] ^ static_cast<std::uint8_t>(i & 0xFF));
+    }
+
+    for (std::size_t r = 0; r < kRounds; ++r) {
+        for (std::size_t i = 0; i < scratch.size(); ++i) {
+            const std::size_t j = (static_cast<std::size_t>(scratch[i]) * 1315423911ULL + i + r) % scratch.size();
+            scratch[i] = static_cast<std::uint8_t>(scratch[i] ^ scratch[j] ^ static_cast<std::uint8_t>((i + r) & 0xFF));
+        }
+        digest = sha3_512_bytes(std::string(reinterpret_cast<const char*>(scratch.data()), scratch.size()));
+        for (std::size_t i = 0; i < digest.size(); ++i) {
+            const std::size_t k = (i * 8191 + r) % scratch.size();
+            scratch[k] ^= digest[i];
+        }
+    }
+
+    const auto final_hex = to_hex(sha3_512_bytes(std::string(reinterpret_cast<const char*>(scratch.data()), scratch.size())));
+    return hash_head64(final_hex);
 }
 
 } // namespace addition

@@ -52,6 +52,15 @@ int main() {
         std::cerr << "test failed: mainnet profile must keep memory_hard PoW\n";
         return 1;
     }
+    if (addition::mine_deadline_seconds(addition::testnet_chain_config()) !=
+        addition::kTestnetMineDeadlineSec) {
+        std::cerr << "test failed: testnet mine deadline must stay 30s\n";
+        return 1;
+    }
+    if (addition::kTestnetMineDeadlineSec != 30) {
+        std::cerr << "test failed: testnet mine deadline constant must stay 30s\n";
+        return 1;
+    }
 
     addition::ChainConfig live = addition::testnet_chain_config();
     addition::Chain chain(live);
