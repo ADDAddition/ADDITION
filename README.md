@@ -225,6 +225,7 @@ Two local processes: `./scripts/start_two_node_testnet.sh` (A: write `8545` / pu
 * [PoUW phase 1 spec](docs/POUW_PHASE1_SPEC.md)
 * [Two-node local testnet](docs/TWO_NODE_TESTNET.md)
 * [Mined block + SHA3 opening privacy](docs/REAL_TESTNET_MINE_AND_PRIVACY.md)
+* [Testnet public-read RPC (systemd)](docs/TESTNET_PUBLIC_RPC_RUNBOOK.md)
 
 Older docs may still say “mainnet”. Treat those as historical. This tree is a research testnet.
 
