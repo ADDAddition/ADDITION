@@ -1,19 +1,69 @@
 <p align="center">
-  <img src="web/public/logo-transparent.png" alt="ADDITION" width="380">
+  <img src="docs/assets/logo-transparent.png" alt="ADDITION" width="280">
 </p>
 
-# ADDITION
+<h1 align="center">ADDITION</h1>
+<p align="center"><b>C++20 Layer 1 · ML-DSA-87 · SHA3-512 · public product: testnet</b></p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT">
   <img src="https://img.shields.io/badge/C%2B%2B-20-00599C?style=for-the-badge" alt="C++20">
   <img src="https://img.shields.io/badge/public_product-testnet-orange?style=for-the-badge" alt="Public product: testnet">
   <img src="https://img.shields.io/badge/crypto-ML--DSA--87-red?style=for-the-badge" alt="ML-DSA-87">
+  <img src="https://img.shields.io/badge/Supply-50M_Hard_Cap-gold?style=for-the-badge" alt="Supply 50M">
 </p>
 
-**ADDITION** is a C++20 Layer 1 node (`additiond`): SHA3-512 hashing, ML-DSA-87 signatures, and SHA3 commitment openings. The public site [additionblockchain.com](https://additionblockchain.com) and [rpc.additionblockchain.com](https://rpc.additionblockchain.com) are the **testnet** product until the operator switches them.
+<p align="center">
+  <a href="https://additionblockchain.com/join/">Join</a> ·
+  <a href="https://additionblockchain.com/download/">Download wallet</a> ·
+  <a href="https://additionblockchain.com/docs/">Docs</a> ·
+  <a href="https://additionblockchain.com/join.md">join.md</a> ·
+  <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a>
+</p>
 
-[Join](https://additionblockchain.com/join/) · [Download wallet](https://additionblockchain.com/download/) · [Docs](https://additionblockchain.com/docs/) · [Raw join.md](https://additionblockchain.com/join.md) · [contact@additionblockchain.com](mailto:contact@additionblockchain.com)
+---
+
+**ADDITION** is a C++20 Layer 1 node (`additiond`): SHA3-512 hashing, ML-DSA-87 signatures, hash-committed addresses, and SHA3 commitment openings. The public site [additionblockchain.com](https://additionblockchain.com) and [rpc.additionblockchain.com](https://rpc.additionblockchain.com) are the **testnet** product until the operator switches them.
+
+### Technical matrix
+
+| Feature | ADDITION | Solana | Ethereum | Bitcoin |
+| :--- | :--- | :--- | :--- | :--- |
+| **Signatures** | **ML-DSA-87** | Ed25519 | ECDSA | ECDSA |
+| **Hash** | **SHA3-512** | SHA-256 | Keccak-256 | SHA-256 |
+| **Addresses** | **SHA3-512 commitment (128 hex)** | Ed25519 pubkey | keccak | HASH160 |
+| **Privacy path** | **SHA3-512 opening (not ZK)** | public ledger | public ledger | public ledger |
+| **Public network today** | **testnet** | mainnet | mainnet | mainnet |
+| **Max supply** | **50,000,000** (whole units) | no fixed cap | no fixed cap | 21,000,000 |
+| **Min fee** | **1** (whole unit) | lamports | wei | satoshis |
+
+---
+
+## Networks
+
+| | Public testnet | Separate `--mainnet` chain |
+| :--- | :--- | :--- |
+| Flag | `additiond --network testnet` | `additiond --mainnet` |
+| `network_id` | `ADDITION_TESTNET_V1` | `ADDITION_MAINNET_V1` |
+| Genesis | [`genesis.json`](genesis.json) | [`genesis-mainnet.json`](genesis-mainnet.json) |
+| Public product | [additionblockchain.com](https://additionblockchain.com) and [rpc.additionblockchain.com](https://rpc.additionblockchain.com) | **Not the website.** Operator public-read: `http://34.27.30.115:38546/rpc?cmd=getinfo` (`network=mainnet`, `height=0`) |
+
+`--mainnet` is its own chain (`ADDITION_MAINNET_V1`), not a label flip on the testnet. It is not a live public mainnet product. See [docs/MAINNET_RUNBOOK.md](docs/MAINNET_RUNBOOK.md).
+
+---
+
+## Architecture
+
+What `main` ships:
+
+- **Hash / PoW** — SHA3-512 of the header on testnet; `memory_hard` on `--mainnet`
+- **Signatures** — ML-DSA-87 (FIPS 204) in `pq_mode=strict`
+- **Addresses** — hash-committed: `SHA3-512(scheme_id || 0x00 || pubkey)` (128 hex)
+- **Privacy** — SHA3-512 commitment + nullifier **opening** (`privacy_mint_open` / `privacy_spend_open`). A hash relation, not ZK
+- **SLH-DSA** — opt-in vault (`slh-dsa-shake-256s`) when this liboqs can sign with a non-empty context; otherwise disabled
+- **RPC** — write on `127.0.0.1`; public read is an allowlist (`getinfo`, `getblockraw`, …). Public `mine` / `createwallet` stay disabled
+
+Whole integers. No 8-decimal subunit. Block reward `50`, `max_supply` `50000000`, min fee `1`.
 
 ---
 
@@ -32,46 +82,6 @@ curl 'https://rpc.additionblockchain.com/rpc?cmd=getinfo'
 ```
 
 Desktop wallet (loopback RPC): [additionblockchain.com/download/](https://additionblockchain.com/download/)
-
----
-
-## Networks
-
-| | Public testnet | Separate `--mainnet` chain |
-|---|---|---|
-| Flag | `additiond --network testnet` | `additiond --mainnet` |
-| `network_id` | `ADDITION_TESTNET_V1` | `ADDITION_MAINNET_V1` |
-| Genesis | [`genesis.json`](genesis.json) | [`genesis-mainnet.json`](genesis-mainnet.json) |
-| Public product | [additionblockchain.com](https://additionblockchain.com) and [rpc.additionblockchain.com](https://rpc.additionblockchain.com) | Not the website. Operator public-read: `http://34.27.30.115:38546/rpc?cmd=getinfo` (`network=mainnet`, `height=0`) |
-
-`--mainnet` is its own chain, not a label flip on the testnet. It is not a live public mainnet product.
-
-See [docs/MAINNET_RUNBOOK.md](docs/MAINNET_RUNBOOK.md).
-
----
-
-## Architecture
-
-What `main` actually ships:
-
-- **Hash / PoW** — SHA3-512 of the header on testnet; `memory_hard` on `--mainnet`
-- **Signatures** — ML-DSA-87 (FIPS 204) in `pq_mode=strict`
-- **Addresses** — hash-committed: `SHA3-512(scheme_id || 0x00 || pubkey)` (128 hex)
-- **Privacy** — SHA3-512 commitment + nullifier **opening** (`privacy_mint_open` / `privacy_spend_open`). A hash relation, not ZK
-- **SLH-DSA** — opt-in vault (`slh-dsa-shake-256s`) when this liboqs can sign with a non-empty context; otherwise disabled
-- **RPC** — write on `127.0.0.1`; public read is an allowlist (`getinfo`, `getblockraw`, …). Public `mine` / `createwallet` stay disabled
-
----
-
-## Units
-
-Whole integers. No 8-decimal subunit.
-
-| | Value |
-|---|---|
-| Block reward | `50` |
-| `max_supply` | `50000000` |
-| Minimum fee | `1` |
 
 ---
 
@@ -102,7 +112,7 @@ ctest --test-dir build --output-on-failure
 ## Docs
 
 | | |
-|---|---|
+| :--- | :--- |
 | Join (HTML) | [additionblockchain.com/join/](https://additionblockchain.com/join/) |
 | Join (raw) | [additionblockchain.com/join.md](https://additionblockchain.com/join.md) |
 | Wallet download | [additionblockchain.com/download/](https://additionblockchain.com/download/) |
@@ -126,4 +136,7 @@ Local static site: `python3 web/serve.py` (Pages root is `web/public/`).
 3. Keep secrets out of git (`build/`, `data/`, `.wrangler/`, `*.dat`, keys)
 4. Open a pull request
 
-**License:** [MIT](LICENSE) · Contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com)
+<p align="center">
+  <b>License:</b> <a href="LICENSE">MIT</a> ·
+  <b>Contact:</b> <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a>
+</p>
