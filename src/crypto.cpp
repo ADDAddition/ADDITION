@@ -23,8 +23,32 @@ struct PqKeySizes {
     std::size_t signature{0};
 };
 
-bool get_ml_dsa_87_sizes(PqKeySizes& out) {
-    OQS_SIG* sig = OQS_SIG_new(OQS_SIG_alg_ml_dsa_87);
+const char* oqs_name_for(SigScheme scheme) {
+    switch (scheme) {
+    case SigScheme::MlDsa87:
+        return OQS_SIG_alg_ml_dsa_87;
+    case SigScheme::SlhDsaShake256s:
+        // liboqs 0.12.0 exposes FIPS 205 SLH-DSA-SHAKE-256s as this SPHINCS+ name.
+        return OQS_SIG_alg_sphincs_shake_256s_simple;
+    case SigScheme::Unknown:
+        return "";
+    }
+    const SigScheme missing = scheme;
+    switch (missing) {
+    case SigScheme::MlDsa87:
+    case SigScheme::SlhDsaShake256s:
+    case SigScheme::Unknown:
+        break;
+    }
+    return "";
+}
+
+bool get_scheme_sizes(SigScheme scheme, PqKeySizes& out) {
+    const char* name = oqs_name_for(scheme);
+    if (name == nullptr || name[0] == '\0') {
+        return false;
+    }
+    OQS_SIG* sig = OQS_SIG_new(name);
     if (sig == nullptr) {
         return false;
     }
@@ -32,6 +56,198 @@ bool get_ml_dsa_87_sizes(PqKeySizes& out) {
     out.secret_key = sig->length_secret_key;
     out.signature = sig->length_signature;
     OQS_SIG_free(sig);
+    return true;
+}
+
+bool get_ml_dsa_87_sizes(PqKeySizes& out) {
+    return get_scheme_sizes(SigScheme::MlDsa87, out);
+}
+
+// Non-empty context used only for SLH-DSA. ML-DSA-87 stays on ctx-less OQS_SIG_sign.
+constexpr const char kSlhDsaSignCtx[] = "ADDITION|slh-dsa-shake-256s";
+
+bool scheme_supports_ctx_sign(SigScheme scheme) {
+    static std::mutex mu;
+    static bool ml_cached = false;
+    static bool ml_ok = false;
+    static bool slh_cached = false;
+    static bool slh_ok = false;
+
+    bool* cached = nullptr;
+    bool* ok = nullptr;
+    switch (scheme) {
+    case SigScheme::MlDsa87:
+        cached = &ml_cached;
+        ok = &ml_ok;
+        break;
+    case SigScheme::SlhDsaShake256s:
+        cached = &slh_cached;
+        ok = &slh_ok;
+        break;
+    case SigScheme::Unknown:
+        return false;
+    }
+    if (cached == nullptr || ok == nullptr) {
+        const SigScheme missing = scheme;
+        switch (missing) {
+        case SigScheme::MlDsa87:
+        case SigScheme::SlhDsaShake256s:
+        case SigScheme::Unknown:
+            break;
+        }
+        return false;
+    }
+    {
+        std::lock_guard<std::mutex> lock(mu);
+        if (*cached) {
+            return *ok;
+        }
+    }
+
+    const char* name = oqs_name_for(scheme);
+    if (name == nullptr || name[0] == '\0') {
+        std::lock_guard<std::mutex> lock(mu);
+        *cached = true;
+        *ok = false;
+        return false;
+    }
+    OQS_SIG* sig = OQS_SIG_new(name);
+    if (sig == nullptr) {
+        std::lock_guard<std::mutex> lock(mu);
+        *cached = true;
+        *ok = false;
+        return false;
+    }
+
+    std::vector<std::uint8_t> pub(sig->length_public_key, 0);
+    std::vector<std::uint8_t> sec(sig->length_secret_key, 0);
+    std::vector<std::uint8_t> out(sig->length_signature, 0);
+    bool works = false;
+    if (OQS_SIG_keypair(sig, pub.data(), sec.data()) == OQS_SUCCESS) {
+        const std::string msg = "addition-ctx-probe";
+        const std::string ctx = "ADDITION|probe|ctx|0";
+        size_t slen = 0;
+        if (OQS_SIG_sign_with_ctx_str(sig,
+                                      out.data(),
+                                      &slen,
+                                      reinterpret_cast<const std::uint8_t*>(msg.data()),
+                                      msg.size(),
+                                      reinterpret_cast<const std::uint8_t*>(ctx.data()),
+                                      ctx.size(),
+                                      sec.data()) == OQS_SUCCESS &&
+            slen > 0 &&
+            OQS_SIG_verify_with_ctx_str(sig,
+                                        reinterpret_cast<const std::uint8_t*>(msg.data()),
+                                        msg.size(),
+                                        out.data(),
+                                        slen,
+                                        reinterpret_cast<const std::uint8_t*>(ctx.data()),
+                                        ctx.size(),
+                                        pub.data()) == OQS_SUCCESS) {
+            works = true;
+        }
+    }
+    OQS_MEM_cleanse(sec.data(), sec.size());
+    OQS_SIG_free(sig);
+
+    std::lock_guard<std::mutex> lock(mu);
+    *cached = true;
+    *ok = works;
+    return works;
+}
+
+SigScheme infer_sig_scheme_from_key_bytes(std::size_t nbytes, bool secret) {
+    PqKeySizes ml{};
+    if (get_scheme_sizes(SigScheme::MlDsa87, ml)) {
+        if (nbytes == (secret ? ml.secret_key : ml.public_key)) {
+            return SigScheme::MlDsa87;
+        }
+    }
+    PqKeySizes slh{};
+    if (get_scheme_sizes(SigScheme::SlhDsaShake256s, slh)) {
+        if (nbytes == (secret ? slh.secret_key : slh.public_key)) {
+            return SigScheme::SlhDsaShake256s;
+        }
+    }
+    return SigScheme::Unknown;
+}
+
+bool slh_sign_with_ctx(const std::vector<std::uint8_t>& secret_key,
+                       const std::string& message,
+                       std::vector<std::uint8_t>& signature,
+                       std::string& error) {
+    if (!sig_scheme_allowed_strict(SigScheme::SlhDsaShake256s)) {
+        error = "slh-dsa-shake-256s rejected in strict mode";
+        return false;
+    }
+    const char* name = oqs_name_for(SigScheme::SlhDsaShake256s);
+    OQS_SIG* sig = OQS_SIG_new(name);
+    if (sig == nullptr) {
+        error = "OQS_SIG_new failed for slh-dsa-shake-256s";
+        return false;
+    }
+    if (secret_key.size() != sig->length_secret_key) {
+        OQS_SIG_free(sig);
+        error = "secret key size mismatch";
+        return false;
+    }
+    signature.assign(sig->length_signature, 0);
+    size_t sig_len = 0;
+    const auto rc = OQS_SIG_sign_with_ctx_str(sig,
+                                              signature.data(),
+                                              &sig_len,
+                                              reinterpret_cast<const std::uint8_t*>(message.data()),
+                                              message.size(),
+                                              reinterpret_cast<const std::uint8_t*>(kSlhDsaSignCtx),
+                                              sizeof(kSlhDsaSignCtx) - 1,
+                                              secret_key.data());
+    OQS_SIG_free(sig);
+    if (rc != OQS_SUCCESS) {
+        error = "OQS_SIG_sign_with_ctx_str failed";
+        signature.clear();
+        return false;
+    }
+    signature.resize(sig_len);
+    return true;
+}
+
+bool slh_verify_with_ctx(const std::vector<std::uint8_t>& public_key,
+                         const std::string& message,
+                         const std::vector<std::uint8_t>& signature,
+                         std::string& error) {
+    if (!sig_scheme_allowed_strict(SigScheme::SlhDsaShake256s)) {
+        error = "slh-dsa-shake-256s rejected in strict mode";
+        return false;
+    }
+    const char* name = oqs_name_for(SigScheme::SlhDsaShake256s);
+    OQS_SIG* sig = OQS_SIG_new(name);
+    if (sig == nullptr) {
+        error = "OQS_SIG_new failed for slh-dsa-shake-256s";
+        return false;
+    }
+    if (public_key.size() != sig->length_public_key) {
+        OQS_SIG_free(sig);
+        error = "public key size mismatch";
+        return false;
+    }
+    if (signature.empty() || signature.size() > sig->length_signature) {
+        OQS_SIG_free(sig);
+        error = "signature size mismatch";
+        return false;
+    }
+    const auto rc = OQS_SIG_verify_with_ctx_str(sig,
+                                                reinterpret_cast<const std::uint8_t*>(message.data()),
+                                                message.size(),
+                                                signature.data(),
+                                                signature.size(),
+                                                reinterpret_cast<const std::uint8_t*>(kSlhDsaSignCtx),
+                                                sizeof(kSlhDsaSignCtx) - 1,
+                                                public_key.data());
+    OQS_SIG_free(sig);
+    if (rc != OQS_SUCCESS) {
+        error = "OQS_SIG_verify_with_ctx_str failed";
+        return false;
+    }
     return true;
 }
 
@@ -155,6 +371,93 @@ bool hex_to_bytes(const std::string& hex,
     return true;
 }
 
+const char* sig_scheme_id(SigScheme scheme) {
+    switch (scheme) {
+    case SigScheme::MlDsa87:
+        return kMlDsa87SchemeId;
+    case SigScheme::SlhDsaShake256s:
+        return kSlhDsaShake256sSchemeId;
+    case SigScheme::Unknown:
+        return "unknown";
+    }
+    const SigScheme missing = scheme;
+    switch (missing) {
+    case SigScheme::MlDsa87:
+    case SigScheme::SlhDsaShake256s:
+    case SigScheme::Unknown:
+        break;
+    }
+    return "unknown";
+}
+
+const char* sig_scheme_oqs_alg(SigScheme scheme) {
+    return oqs_name_for(scheme);
+}
+
+bool parse_sig_scheme(const std::string& name, SigScheme& out) {
+    if (name == "ml-dsa-87" || name == "ML-DSA-87") {
+        out = SigScheme::MlDsa87;
+        return true;
+    }
+    if (name == "slh-dsa-shake-256s" || name == "SLH-DSA-SHAKE-256s" ||
+        name == "SPHINCS+-SHAKE-256s-simple") {
+        out = SigScheme::SlhDsaShake256s;
+        return true;
+    }
+    out = SigScheme::Unknown;
+    return false;
+}
+
+bool sig_scheme_available(SigScheme scheme) {
+    PqKeySizes sizes{};
+    return get_scheme_sizes(scheme, sizes);
+}
+
+bool sig_scheme_allowed_strict(SigScheme scheme) {
+    switch (scheme) {
+    case SigScheme::MlDsa87:
+        return sig_scheme_available(scheme);
+    case SigScheme::SlhDsaShake256s:
+        // Fail closed unless this liboqs build can sign+verify with a non-empty context.
+        // Do not enable slh-dsa-shake-256s and do not fall back to ctx-less sign.
+        return sig_scheme_available(scheme) && scheme_supports_ctx_sign(scheme);
+    case SigScheme::Unknown:
+        return false;
+    }
+    const SigScheme missing = scheme;
+    switch (missing) {
+    case SigScheme::MlDsa87:
+    case SigScheme::SlhDsaShake256s:
+    case SigScheme::Unknown:
+        break;
+    }
+    return false;
+}
+
+std::string allowed_sig_algs_list() {
+    std::string out;
+    if (sig_scheme_allowed_strict(SigScheme::MlDsa87)) {
+        out = kMlDsa87SchemeId;
+    }
+    if (sig_scheme_allowed_strict(SigScheme::SlhDsaShake256s)) {
+        if (!out.empty()) {
+            out += ',';
+        }
+        out += kSlhDsaShake256sSchemeId;
+    }
+    if (out.empty()) {
+        out = "none";
+    }
+    return out;
+}
+
+SigScheme infer_sig_scheme_from_pubkey_hex(const std::string& pubkey_hex) {
+    if ((pubkey_hex.size() % 2) != 0) {
+        return SigScheme::Unknown;
+    }
+    return infer_sig_scheme_from_key_bytes(pubkey_hex.size() / 2, false);
+}
+
 std::string hash_committed_address(const std::string& scheme_id,
                                    const std::vector<std::uint8_t>& pubkey) {
     if (scheme_id.empty() || pubkey.empty()) {
@@ -209,11 +512,45 @@ bool address_binds_pubkey(const std::string& address,
     return true;
 }
 
+std::string hash_committed_address(SigScheme scheme, const std::vector<std::uint8_t>& pubkey) {
+    if (scheme == SigScheme::Unknown) {
+        return {};
+    }
+    return hash_committed_address(std::string(sig_scheme_id(scheme)), pubkey);
+}
+
+std::string hash_committed_address_hex(SigScheme scheme, const std::string& pubkey_hex) {
+    if (scheme == SigScheme::Unknown) {
+        return {};
+    }
+    return hash_committed_address_hex(std::string(sig_scheme_id(scheme)), pubkey_hex);
+}
+
+bool address_binds_pubkey(const std::string& address,
+                          SigScheme scheme,
+                          const std::string& pubkey_hex,
+                          std::string& error) {
+    if (scheme == SigScheme::Unknown) {
+        error = "unknown scheme rejected in strict mode";
+        return false;
+    }
+    return address_binds_pubkey(address, std::string(sig_scheme_id(scheme)), pubkey_hex, error);
+}
+
 std::string sign_message_hybrid(const std::string& private_key,
                                 const std::string& message,
                                 const std::string& pq_context) {
+    (void)pq_context;
+    if ((private_key.size() % 2) != 0) {
+        throw std::runtime_error("invalid private key hex: invalid hex length");
+    }
+    const auto scheme = infer_sig_scheme_from_key_bytes(private_key.size() / 2, true);
+    if (scheme == SigScheme::Unknown || !sig_scheme_allowed_strict(scheme)) {
+        throw std::runtime_error("unknown scheme rejected in strict mode");
+    }
+
     PqKeySizes sizes{};
-    if (!get_ml_dsa_87_sizes(sizes)) {
+    if (!get_scheme_sizes(scheme, sizes)) {
         throw std::runtime_error("liboqs size query failed");
     }
 
@@ -224,32 +561,60 @@ std::string sign_message_hybrid(const std::string& private_key,
 
     std::vector<std::uint8_t> pq_sig;
     std::vector<std::uint8_t> sk;
-    if (hex_to_bytes(private_key, sk, err) && !sk.empty() && pq_sign_message(sk, message, pq_sig, err)) {
+    bool signed_ok = false;
+    if (hex_to_bytes(private_key, sk, err) && !sk.empty()) {
+        switch (scheme) {
+        case SigScheme::MlDsa87:
+            signed_ok = pq_sign_message(sk, message, pq_sig, err);
+            break;
+        case SigScheme::SlhDsaShake256s:
+            signed_ok = slh_sign_with_ctx(sk, message, pq_sig, err);
+            break;
+        case SigScheme::Unknown:
+            err = "unknown scheme rejected in strict mode";
+            break;
+        }
+        if (!signed_ok && err.empty()) {
+            const SigScheme missing = scheme;
+            switch (missing) {
+            case SigScheme::MlDsa87:
+            case SigScheme::SlhDsaShake256s:
+            case SigScheme::Unknown:
+                break;
+            }
+        }
+    }
+    if (!sk.empty()) {
         OQS_MEM_cleanse(sk.data(), sk.size());
+    }
+    if (signed_ok) {
         if (pq_sig.empty() || pq_sig.size() > sizes.signature) {
             throw std::runtime_error("liboqs produced invalid signature size");
         }
         return "pq=" + bytes_to_hex(pq_sig);
     }
-    if (!sk.empty()) {
-        OQS_MEM_cleanse(sk.data(), sk.size());
-    }
     throw std::runtime_error("liboqs signing failed: " + err);
-
-    (void)pq_context;
 }
 
 bool verify_message_signature_hybrid(const std::string& public_key,
                                      const std::string& message,
                                      const std::string& signature,
                                      const std::string& pq_context) {
-    PqKeySizes sizes{};
-    if (!get_ml_dsa_87_sizes(sizes)) {
+    (void)pq_context;
+    constexpr const char* kPrefix = "pq=";
+    if (signature.rfind(kPrefix, 0) != 0) {
+        return false;
+    }
+    if ((public_key.size() % 2) != 0) {
+        return false;
+    }
+    const auto scheme = infer_sig_scheme_from_key_bytes(public_key.size() / 2, false);
+    if (scheme == SigScheme::Unknown || !sig_scheme_allowed_strict(scheme)) {
         return false;
     }
 
-    constexpr const char* kPrefix = "pq=";
-    if (signature.rfind(kPrefix, 0) != 0) {
+    PqKeySizes sizes{};
+    if (!get_scheme_sizes(scheme, sizes)) {
         return false;
     }
 
@@ -278,8 +643,22 @@ bool verify_message_signature_hybrid(const std::string& public_key,
         return false;
     }
 
-    (void)pq_context;
-    return pq_verify_message(pk_bytes, message, sig_bytes, err);
+    switch (scheme) {
+    case SigScheme::MlDsa87:
+        return pq_verify_message(pk_bytes, message, sig_bytes, err);
+    case SigScheme::SlhDsaShake256s:
+        return slh_verify_with_ctx(pk_bytes, message, sig_bytes, err);
+    case SigScheme::Unknown:
+        return false;
+    }
+    const SigScheme missing = scheme;
+    switch (missing) {
+    case SigScheme::MlDsa87:
+    case SigScheme::SlhDsaShake256s:
+    case SigScheme::Unknown:
+        break;
+    }
+    return false;
 }
 
 bool pq_sign_message(const std::vector<std::uint8_t>& secret_key,
@@ -484,7 +863,7 @@ bool crypto_selftest(std::string& report) {
         return false;
     }
 
-    report = "selftest: ok";
+    report = std::string("selftest: ok allowed_sig_algs=") + allowed_sig_algs_list();
     return true;
 }
 

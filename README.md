@@ -39,7 +39,7 @@ curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'
 
 These are aims of the testnet / research prototype, not proof of a live public network:
 
-1. **Quantum** — ML-DSA-87 (FIPS 204) signatures, `pq_mode=strict` when `getinfo` answers
+1. **Quantum** — ML-DSA-87 (FIPS 204) signatures, `pq_mode=strict` when `getinfo` answers. Opt-in `slh-dsa-shake-256s` only if this liboqs can `OQS_SIG_sign_with_ctx_str` with a non-empty context; otherwise the scheme stays disabled. No Falcon/FN-DSA. No FIPS 140-3 claim. This does not make the chain hash-based.
 2. **Privacy** — SHA3-512 commitment + nullifier **opening** (`privacy_mint_open` / `privacy_spend_open`). This is a real hash relation, not a circuit. `privacy_*_zk` remains an ML-DSA wrap of a mint/spend string. Not Groth16, not Bulletproofs, not ZK-Shield.
 3. **Speed** — local testnet RPC; publish only real `getinfo` fields from a running node
 4. **Cost of transaction** — spec `min_fee=1`; no invented USD fees or gas market
@@ -133,7 +133,7 @@ printf 'getinfo\n' | nc 127.0.0.1 8545
 
 ### Local wallet (Bitcoin-like user model)
 
-Trusted RPC only (`127.0.0.1:8545`). `createwallet` generates ML-DSA-87 keys and writes them to `data/wallets/<name>.wal` (owner-only). The reply has `priv_printed=0`. This is keys / UTXOs / send / receive / fee — not BIP compatibility and not a Bitcoin fork.
+Trusted RPC only (`127.0.0.1:8545`). `createwallet [name] [scheme]` generates keys (default ML-DSA-87) and writes them to `data/wallets/<name>.wal` (owner-only). The reply has `priv_printed=0`. This is keys / UTXOs / send / receive / fee — not BIP compatibility and not a Bitcoin fork.
 
 ```bash
 printf 'createwallet alice\n' | nc 127.0.0.1 8545

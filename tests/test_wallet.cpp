@@ -196,6 +196,17 @@ int main() {
         std::cerr << "test failed: createwallet response: " << created_rpc << '\n';
         return 1;
     }
+    const auto info_rpc = rpc.handle_command("getinfo");
+    if (!expect_contains(info_rpc, "pq_mode=strict", "getinfo pq_mode") ||
+        !expect_contains(info_rpc, "allowed_sig_algs=", "getinfo allowed_sig_algs") ||
+        !expect_contains(info_rpc, "ml-dsa-87", "getinfo default scheme")) {
+        return 1;
+    }
+    const auto unknown_scheme = rpc.handle_command("createwallet vault falcon-512");
+    if (unknown_scheme.find("unknown scheme rejected in strict mode") == std::string::npos) {
+        std::cerr << "test failed: unknown createwallet scheme: " << unknown_scheme << '\n';
+        return 1;
+    }
     if (rpc.handle_command("createwallet demo").find("error:") != 0) {
         std::cerr << "test failed: duplicate createwallet should error\n";
         return 1;
