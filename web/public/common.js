@@ -102,8 +102,23 @@
       el.textContent = "RPC offline";
       return;
     }
-    el.className = "";
+    el.className = "ok";
     el.textContent = result.ok ? "RPC answered" : (result.raw || "RPC error");
+  }
+
+  function stripFields(fields) {
+    const keys = ["height", "peers", "network", "pq_mode"];
+    const out = {};
+    if (!fields) {
+      return out;
+    }
+    for (let i = 0; i < keys.length; i += 1) {
+      const key = keys[i];
+      if (Object.prototype.hasOwnProperty.call(fields, key)) {
+        out[key] = fields[key];
+      }
+    }
+    return out;
   }
 
   global.AdditionSite = {
@@ -111,6 +126,7 @@
     parseFields: parseFields,
     rpcCommand: rpcCommand,
     renderFields: renderFields,
-    setStatus: setStatus
+    setStatus: setStatus,
+    stripFields: stripFields
   };
 }(window));
