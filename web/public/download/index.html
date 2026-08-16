@@ -30,29 +30,32 @@
     </section>
 
     <section class="panel">
+      <h2>Cashiers / Windows</h2>
+      <p>Download the live wallet files on this page. Do not compile. There is no Windows compile path here.</p>
+      <p><a href="/download/addition-wallet-testnet.exe">addition-wallet-testnet.exe</a> — GUI + <code>--cli</code></p>
+      <p><a href="/download/addition-wallet-cli-testnet.exe">addition-wallet-cli-testnet.exe</a> — caller-disk CLI</p>
+      <p>Linux files on the same page: <a href="/download/addition-wallet-testnet">addition-wallet-testnet</a> and <a href="/download/addition-wallet-cli-testnet">addition-wallet-cli-testnet</a>.</p>
+      <p>Run against a local <code>additiond --network testnet</code> on <code>127.0.0.1:8545</code>. Write RPC stays on this machine.</p>
+    </section>
+
+    <section class="panel">
       <h2>Linux (testnet / local)</h2>
+      <p>These are Linux commands. Do not paste them into PowerShell.</p>
       <p><a href="/download/addition-wallet-testnet">addition-wallet-testnet</a> — GUI + <code>--cli</code></p>
       <p><a href="/download/addition-wallet-cli-testnet">addition-wallet-cli-testnet</a> — caller-disk CLI</p>
       <pre>chmod +x addition-wallet-testnet
 # terminal 1
-additiond --network testnet
+additiond --network testnet --data-dir $HOME/addition-testnet
 # terminal 2
 ./addition-wallet-testnet --cli getinfo
 # optional GUI (needs a display)
 ./addition-wallet-testnet</pre>
-      <p class="note">If the file is not on this host yet, build it from the repo: <code>./scripts/build_wallet.sh</code></p>
-    </section>
-
-    <section class="panel">
-      <h2>Windows (testnet / local)</h2>
-      <p>Build <code>addition-wallet-testnet.exe</code> on a Windows machine:</p>
-      <pre>powershell -File scripts\build_wallet.ps1</pre>
-      <p>Then run <code>addition-wallet-testnet.exe --cli getinfo</code> against a local <code>additiond --network testnet</code> on <code>127.0.0.1:8545</code>.</p>
     </section>
 
     <section class="panel">
       <h2>Source</h2>
-      <p>Packaging: <a href="https://github.com/ADDAddition/ADDITION/blob/main/packaging/README.md">packaging/README.md</a></p>
+      <p>Linux compile of <code>additiond</code> is in the repository README (Ubuntu EliteDesk). Cashiers and Windows users stay on this page.</p>
+      <p>Packaging notes: <a href="https://github.com/ADDAddition/ADDITION/blob/main/packaging/README.md">packaging/README.md</a></p>
       <p>Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
     </section>
   </main>

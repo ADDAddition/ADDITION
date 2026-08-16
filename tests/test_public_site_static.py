@@ -171,9 +171,11 @@ class PublicSiteStaticTests(unittest.TestCase):
         worker = read("worker.js")
         blob = join + docs + started + rpc + chrome
         self.assertIn(
-            "additiond --network testnet --data-dir &lt;dir&gt; --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545",
+            "additiond --network testnet --data-dir $HOME/addition-testnet --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545",
             join,
         )
+        self.assertNotIn("--data-dir &lt;dir&gt;", join)
+        self.assertNotIn("--data-dir <dir>", join)
         self.assertIn("sync", join)
         self.assertIn("invalid/duplicate", join)
         self.assertIn("/rpc?cmd=getinfo", join)
@@ -252,11 +254,22 @@ class PublicSiteStaticTests(unittest.TestCase):
         worker = read("worker.js")
         self.assertIn("testnet / local", page.lower())
         self.assertIn("addition-wallet-testnet", page)
+        self.assertIn("addition-wallet-testnet.exe", page)
         self.assertIn("127.0.0.1:8545", page)
-        self.assertIn("./scripts/build_wallet.sh", page)
+        self.assertIn("chmod +x", page)
+        self.assertIn("--data-dir $HOME/addition-testnet", page)
+        self.assertIn("Cashiers / Windows", page)
+        self.assertIn("Do not compile", page)
         self.assertIn("RPC offline", page)
         self.assertIn("contact@additionblockchain.com", page)
         self.assertIn('"/download": "/download/index.html"', worker)
+        self.assertNotIn("powershell -File", page.lower())
+        self.assertNotIn("```powershell", page)
+        self.assertNotIn("build_wallet.ps1", page)
+        self.assertNotIn("build_wallet.sh", page)
+        self.assertNotIn("liboqs", page.lower())
+        self.assertNotIn("--data-dir <dir>", page)
+        self.assertNotIn("--data-dir &lt;dir&gt;", page)
         self.assertNotIn("wallet-connect", page.lower())
         self.assertNotIn("walletconnect", page.lower())
         self.assertNotIn("token sale", page.lower())
@@ -267,6 +280,27 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertNotIn("mainnet is live", page.lower())
         self.assertNotIn("live mainnet", page.lower())
         self.assertNotRegex(page.lower(), r"\bhonest\b")
+
+    def test_readme_linux_compile_path(self) -> None:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        started = read("docs/getting-started/index.html")
+        self.assertIn("--data-dir $HOME/addition-testnet", readme)
+        self.assertIn("--data-dir $HOME/addition-testnet", started)
+        self.assertIn("Ubuntu EliteDesk", readme)
+        self.assertIn("Cashiers / Windows", readme)
+        self.assertIn("https://additionblockchain.com/download/", readme)
+        self.assertIn("contact@additionblockchain.com", readme)
+        self.assertIn("sudo apt-get", readme)
+        self.assertIn("127.0.0.1", readme)
+        self.assertNotIn("--data-dir <dir>", readme)
+        self.assertNotIn("```powershell", readme)
+        self.assertNotIn("powershell -File", readme.lower())
+        self.assertNotIn("0.0.0.0:8545", readme)
+        self.assertNotIn("Addison", readme)
+        self.assertNotRegex(readme.lower(), r"\bhonest\b")
+        self.assertNotIn("powershell -File", started.lower())
+        self.assertNotIn("```powershell", started)
+        self.assertNotIn("--data-dir &lt;dir&gt;", started)
 
     def test_wallet_stays_loopback_only(self) -> None:
         wallet = read("wallet/index.html")
@@ -474,9 +508,10 @@ S.rpcCommand("getinfo").then((offline) => {
         self.assertEqual(wallet, (ROOT / "docs" / "WALLET.md").read_text(encoding="utf-8"))
         self.assertNotIn("<!DOCTYPE html>", join_md)
         self.assertIn(
-            "additiond --network testnet --data-dir <dir> --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545",
+            "additiond --network testnet --data-dir $HOME/addition-testnet --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545",
             join_md,
         )
+        self.assertNotIn("--data-dir <dir>", join_md)
         self.assertIn("sync", join_md)
         self.assertIn("invalid/duplicate", join_md)
         self.assertIn("/rpc?cmd=getinfo", join_md)

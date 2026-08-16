@@ -21,7 +21,7 @@ Contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com)
 Build `additiond` from `main`, then:
 
 ```text
-additiond --network testnet --data-dir <dir> --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545
+additiond --network testnet --data-dir $HOME/addition-testnet --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545
 ```
 
 Type `sync` on the daemon stdin (or send it to write RPC on `127.0.0.1`). Height should move.
