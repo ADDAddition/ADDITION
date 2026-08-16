@@ -34,7 +34,7 @@ GET  http://HOST:38545/jsonrpc?method=getblock&amp;params=0
 GET  http://HOST:38545/jsonrpc?method=getblockraw&amp;params=0
 POST http://HOST:38545/jsonrpc
 {&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;monetary_info&quot;,&quot;params&quot;:[]}</pre>
-<p>Join the operator testnet: <code>--bootstrap 34.27.30.115:28545</code>. <code>sync</code> uses HTTP <code>:80</code> then <code>:38545</code> (<code>getblockraw</code>). Write RPC stays <code>127.0.0.1</code>.</p>
+<p>Join the operator testnet: <code>--bootstrap 34.27.30.115:28545</code>. <code>sync</code> uses HTTP <code>:80</code> then <code>:38545</code> (<code>getblockraw</code>). HTTP <code>:80</code> is the reliable path; public TCP 28545 can timeout or be filtered. Seed operators set <code>ADDITION_ADVERTISED_P2P=34.27.30.115:28545</code> so public <code>getinfo</code> / <code>peers</code> do not list <code>self</code>. Write RPC stays <code>127.0.0.1</code>.</p>
 <p>Override bind/port with <code>--public-rpc-bind</code>, <code>--public-rpc-port</code>, <code>ADDITION_PUBLIC_RPC_BIND</code>, or <code>ADDITION_PUBLIC_RPC_PORT</code>. HTTP replies send <code>Access-Control-Allow-Origin: *</code> (read-only allowlist, no cookies), <code>Access-Control-Allow-Methods: GET, OPTIONS</code>, <code>OPTIONS</code> 204, and <code>Cache-Control: no-store</code>. <code>curl /rpc?cmd=getinfo</code> is unchanged.</p>
 <p>Two-node local testnet (write RPC stays loopback):</p>
 <pre>./scripts/start_two_node_testnet.sh</pre>

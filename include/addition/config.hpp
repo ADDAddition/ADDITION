@@ -59,12 +59,17 @@ struct NodeConfig {
     std::uint32_t auto_mine_interval_sec{60};
     std::string auto_mine_reward{"miner1"};
     std::vector<std::string> bootstrap_peers{"127.0.0.1:28545"};
+    // Public advertisement only. Not added to the internal peer set (avoids self-sync).
+    std::string advertised_p2p{};
     std::string data_dir{"data"};
     std::string config_path{};
     std::string genesis_path{};
 };
 
 // Operator's current public P2P (IPv4 only). Not a peer-count claim.
+// Seed operators set ADDITION_ADVERTISED_P2P to this so public getinfo/peers
+// do not list `self`. Public TCP 28545 can timeout or be filtered; HTTP :80
+// sync is the reliable join path.
 inline constexpr const char* kOperatorPublicP2p = "34.27.30.115:28545";
 
 bool is_ipv4_endpoint(const std::string& endpoint);
@@ -72,6 +77,10 @@ bool is_loopback_host(const std::string& host);
 bool is_loopback_endpoint(const std::string& endpoint);
 bool is_self_peer_label(const std::string& endpoint);
 bool is_external_advertised_peer(const std::string& endpoint);
+bool parse_advertised_p2p(const std::string& value, std::string& out, std::string& error);
+void apply_advertised_p2p_env(NodeConfig& cfg);
+std::vector<std::string> public_advertised_peers(const std::vector<std::string>& peers,
+                                                 const std::string& advertised_p2p);
 
 const ChainConfig& default_config();
 ChainConfig testnet_chain_config();

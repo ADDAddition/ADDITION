@@ -1,5 +1,6 @@
 #include "addition/config.hpp"
 
+#include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <exception>
@@ -215,6 +216,13 @@ bool apply_kv(NodeConfig& cfg, const std::string& table, const std::string& key,
         cfg.public_rpc_bind = value;
         return true;
     }
+    if (full == "advertised_p2p" || full == "ports.advertised_p2p") {
+        if (value.empty()) {
+            cfg.advertised_p2p.clear();
+            return true;
+        }
+        return parse_advertised_p2p(value, cfg.advertised_p2p, error);
+    }
     if (full == "enable_public_rpc" || full == "ports.enable_public_rpc") {
         return parse_bool(value, cfg.enable_public_rpc);
     }
@@ -426,6 +434,48 @@ bool is_self_peer_label(const std::string& endpoint) {
 
 bool is_external_advertised_peer(const std::string& endpoint) {
     return is_ipv4_endpoint(endpoint) && !is_loopback_endpoint(endpoint) && !is_self_peer_label(endpoint);
+}
+
+bool parse_advertised_p2p(const std::string& value, std::string& out, std::string& error) {
+    const auto trimmed = trim_copy(value);
+    if (trimmed.empty()) {
+        out.clear();
+        return true;
+    }
+    if (!is_external_advertised_peer(trimmed)) {
+        error = "advertised_p2p must be a non-loopback IPv4 host:port (got " + trimmed + ")";
+        return false;
+    }
+    out = trimmed;
+    return true;
+}
+
+void apply_advertised_p2p_env(NodeConfig& cfg) {
+    const char* raw = std::getenv("ADDITION_ADVERTISED_P2P");
+    if (raw == nullptr) {
+        return;
+    }
+    std::string error;
+    if (!parse_advertised_p2p(raw, cfg.advertised_p2p, error)) {
+        cfg.advertised_p2p.clear();
+    }
+}
+
+std::vector<std::string> public_advertised_peers(const std::vector<std::string>& peers,
+                                                 const std::string& advertised_p2p) {
+    std::vector<std::string> out;
+    for (const auto& peer : peers) {
+        if (is_external_advertised_peer(peer) &&
+            std::find(out.begin(), out.end(), peer) == out.end()) {
+            out.push_back(peer);
+        }
+    }
+    if (is_external_advertised_peer(advertised_p2p) &&
+        std::find(out.begin(), out.end(), advertised_p2p) == out.end()) {
+        out.push_back(advertised_p2p);
+    }
+    std::sort(out.begin(), out.end());
+    return out;
 }
 
 const ChainConfig& default_config() {
@@ -1020,6 +1070,11 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
         }
     }
     cfg.chain.bootstrap_peers = cfg.bootstrap_peers;
+    if (const char* raw = std::getenv("ADDITION_ADVERTISED_P2P")) {
+        if (!parse_advertised_p2p(raw, cfg.advertised_p2p, error)) {
+            return false;
+        }
+    }
     return true;
 }
 
@@ -1051,6 +1106,9 @@ std::string daemon_help_text() {
            "P2P stays off unless ADDITION_ENABLE_P2P_RPC=1. --p2p-port / ADDITION_P2P_PORT (second node: 28546).\n"
            "--bootstrap IP:PORT replaces bootstrap_peers (IPv4 only; hostnames are not resolved).\n"
            "  Operator public P2P (current): 34.27.30.115:28545 — one IPv4 peer, not a peer list.\n"
+           "  Seed operators set ADDITION_ADVERTISED_P2P=34.27.30.115:28545 so public getinfo/peers\n"
+           "  do not list self. Public TCP 28545 can timeout or be filtered; HTTP :80 sync is the\n"
+           "  reliable join path. Write RPC stays 127.0.0.1.\n"
            "Auto-mine (testnet only, off by default, never on public RPC):\n"
            "  --auto-mine or ADDITION_AUTO_MINE=1\n"
            "  --auto-mine-interval SEC or ADDITION_AUTO_MINE_INTERVAL (default 60)\n"
