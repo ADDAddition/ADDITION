@@ -3,37 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ADDITION research notice</title>
+  <title>ADDITION — legal</title>
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="Legal" data-sub="Research software notice. Not an offering.">
+<body data-title="Legal" data-sub="MIT">
   <header id="site-header"></header>
   <main class="prose">
-    <div class="banner">
-      This site and the public repository describe a research prototype / testnet.
-      Nothing here is a live mainnet, a securities offering, or a token sale.
-    </div>
-
-    <h2>Research notice</h2>
-    <p>ADDITION is experimental software published at <a href="https://github.com/ADDAddition/ADDITION">https://github.com/ADDAddition/ADDITION</a>. The default network is <code>addition-testnet</code>. An opt-in mainnet <em>profile</em> exists for local experiments and is not a public live chain.</p>
-    <p>Pages that talk to RPC fail closed: if the node does not answer, they show <strong>RPC offline</strong> and do not invent blocks, heights, hashrate, node counts, or supply.</p>
-
-    <h2>No sale, no listing claims</h2>
-    <ul>
-      <li>No token sale, ICO, or wallet-connect purchase flow on this site.</li>
-      <li>No exchange listing claim.</li>
-      <li>No fabricated liquidity, price, or circulating supply.</li>
-      <li>Kernel constants such as a 50,000,000 cap are design parameters, not a marketed float.</li>
-    </ul>
-
-    <h2>Software license</h2>
-    <p>The repository README states the project is licensed under MIT. The software is provided as-is, without warranty of any kind. Run it at your own risk. Do not commit wallets, <code>node_identity.dat</code> private material, <code>.env</code> files, or keys.</p>
-
-    <h2>Contact</h2>
-    <p>Public contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
-
-    <h2>Privacy of this static site</h2>
-    <p>Static pages do not require an account. Optional local forms call only a loopback RPC proxy when you run <code>python3 web/serve.py</code> yourself.</p>
+    <p>ADDITION is MIT-licensed software. Default network: <code>addition-testnet</code> (<code>additiond --network testnet</code>).</p>
+    <p>Public read on :38545. Write RPC on <code>127.0.0.1:8545</code>. If the node does not answer: <strong>RPC offline</strong>.</p>
+    <p>License: MIT, as-is, no warranty. Do not commit wallets, <code>node_identity.dat</code>, <code>.env</code>, or keys.</p>
+    <p>Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
+    <p>Source: <a href="https://github.com/ADDAddition/ADDITION">https://github.com/ADDAddition/ADDITION</a></p>
   </main>
   <footer id="site-footer"></footer>
   <script src="/chrome.js"></script>

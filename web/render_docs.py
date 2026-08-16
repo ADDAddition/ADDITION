@@ -123,7 +123,7 @@ def write_doc(rel_md: str, dest: Path, title: str, heading: str, banner: str) ->
         SHELL.format(
             title=html.escape(title),
             heading=html.escape(heading),
-            sub="Mirrored from the public repository. Research testnet, not a live mainnet.",
+            sub="from the repo",
             banner=banner,
             body=md_to_html(md),
             github="https://github.com/ADDAddition/ADDITION/blob/main/" + rel_md,
@@ -139,49 +139,49 @@ def main() -> None:
         OUT / "docs" / "architecture" / "index.html",
         "ADDITION architecture",
         "Architecture",
-        "Notes from <code>docs/ARCHITECTURE.md</code>. Some items are historical (signatures are ML-DSA-87 now). This is not proof of a live network.",
+        "From <code>docs/ARCHITECTURE.md</code>. Signatures are ML-DSA-87.",
     )
     write_doc(
         "docs/FINAL_COMMANDS.md",
         OUT / "docs" / "commands" / "index.html",
         "ADDITION command reference",
         "Commands",
-        "Full command surface from <code>docs/FINAL_COMMANDS.md</code>. Public read RPC exposes only the allowlisted subset.",
+        "From <code>docs/FINAL_COMMANDS.md</code>. Public read :38545 is the allowlisted subset.",
     )
     write_doc(
         "docs/POUW_PHASE1_SPEC.md",
         OUT / "docs" / "pouw" / "index.html",
         "ADDITION PoUW phase 1 spec",
         "PoUW spec",
-        "Specification only. RPC names here are a design target. They are not a live product or a public node count.",
+        "From <code>docs/POUW_PHASE1_SPEC.md</code>. Spec text; RPC names are a design target.",
     )
     write_doc(
         "docs/MAINNET_RUNBOOK.md",
         OUT / "docs" / "runbook" / "index.html",
         "ADDITION experimental profile runbook",
         "Experimental runbook",
-        "This is an experimental <em>profile</em> runbook. The repository default is testnet. There is no live public mainnet.",
+        "From <code>docs/MAINNET_RUNBOOK.md</code>. Default remains <code>additiond --network testnet</code>.",
     )
     write_doc(
         "docs/TWO_NODE_TESTNET.md",
         OUT / "docs" / "two-node" / "index.html",
         "ADDITION two-node local testnet",
         "Two-node testnet",
-        "Two honest local processes. Not a public mainnet. No invented peers or hashrate.",
+        "From <code>docs/TWO_NODE_TESTNET.md</code>. Two local <code>additiond</code> processes.",
     )
     write_doc(
         "README.md",
         OUT / "docs" / "getting-started" / "index.html",
         "Build and run ADDITION testnet",
         "Build and run",
-        "How to build <code>additiond</code> with liboqs + OpenSSL and run the honest testnet. Copied from the repository README.",
+        "Build <code>additiond</code> (liboqs + OpenSSL). From the repository README.",
     )
     write_doc(
         "tools/zk_backend_contract.md",
         OUT / "docs" / "zk" / "index.html",
         "ADDITION ZK verifier backend contract",
         "ZK verifier contract",
-        "Tooling contract for an optional external verifier wrapper. Native in-process verification is ML-DSA-87.",
+        "From <code>tools/zk_backend_contract.md</code>. In-process verify is ML-DSA-87.",
     )
     print("rendered docs into", OUT / "docs")
 

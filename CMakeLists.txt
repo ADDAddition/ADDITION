@@ -113,5 +113,10 @@ if(ADDITION_BUILD_TESTS)
         set_tests_properties(test_auto_mine_daemon PROPERTIES
             ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
             TIMEOUT 90)
+        add_test(
+            NAME test_public_site_static
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_public_site_static.py
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        )
     endif()
 endif()

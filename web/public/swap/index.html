@@ -6,12 +6,12 @@
   <title>ADDITION swap quote (in-process)</title>
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="Swap" data-sub="In-process AMM quotes. No Uniswap pool and no token price feed.">
+<body data-title="Swap" data-sub="swap_quote on 127.0.0.1:8545">
   <header id="site-header"></header>
   <main>
     <div class="banner">
-      If no pool exists on this node, the daemon returns <code>error: pool not found</code>.
-      This page prints that answer. It does not fabricate reserves or a USD price.
+      <code>swap_quote</code> / <code>swap_pool_info</code> on <code>/local-rpc</code> → <code>127.0.0.1:8545</code>.
+      No pool → <code>error: pool not found</code>.
     </div>
     <p id="rpc-state" class="offline">Checking local RPC…</p>
     <section class="panel">

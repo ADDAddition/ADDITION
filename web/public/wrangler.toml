@@ -7,7 +7,7 @@ directory = "."
 binding = "ASSETS"
 
 [vars]
-# Leave empty so the worker fail-closes with "RPC offline".
+# Leave empty: down node → "RPC offline".
 # Operator: set this to the real public-rpc HTTP URL (example http://127.0.0.1:38545/rpc).
 # Do not commit trycloudflare or other ephemeral tunnel URLs.
 PUBLIC_RPC_HTTP = ""
