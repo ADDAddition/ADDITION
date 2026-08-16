@@ -75,6 +75,11 @@ if(ADDITION_BUILD_TESTS)
     target_link_libraries(test_rpc_access PRIVATE addition_core)
     add_test(NAME test_rpc_access COMMAND test_rpc_access)
 
+    add_executable(test_public_read_during_mine tests/test_public_read_during_mine.cpp)
+    target_link_libraries(test_public_read_during_mine PRIVATE addition_core)
+    add_test(NAME test_public_read_during_mine COMMAND test_public_read_during_mine)
+    set_tests_properties(test_public_read_during_mine PROPERTIES TIMEOUT 60)
+
     add_executable(test_wallet tests/test_wallet.cpp)
     target_link_libraries(test_wallet PRIVATE addition_core)
     add_test(NAME test_wallet COMMAND test_wallet)

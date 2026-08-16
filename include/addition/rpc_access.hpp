@@ -19,6 +19,7 @@ bool is_http_rpc_request(const std::string& raw);
 bool parse_http_rpc_command(const std::string& raw, std::string& cmd, std::string& error);
 std::string http_rpc_response(int status, const std::string& body);
 std::string http_rpc_response(int status, const std::string& body, const std::string& content_type);
+std::string public_rpc_banner_text(const std::string& network_mode);
 std::string dispatch_public_read_rpc(RpcServer& rpc, const std::string& raw);
 
 // Public-read JSON-RPC 2.0 (same allowlist as public TEXT RPC). No writes.

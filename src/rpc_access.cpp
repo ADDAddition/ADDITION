@@ -190,6 +190,10 @@ bool parse_http_rpc_command(const std::string& raw, std::string& cmd, std::strin
     return true;
 }
 
+std::string public_rpc_banner_text(const std::string& network_mode) {
+    return std::string("addition-public-rpc read-only ") + network_mode;
+}
+
 std::string http_rpc_response(int status, const std::string& body) {
     return http_rpc_response(status, body, "text/plain; charset=utf-8");
 }
@@ -555,7 +559,7 @@ std::string dispatch_public_read_rpc(RpcServer& rpc, const std::string& raw) {
             return http_rpc_response(204, "");
         }
         if (path == "/" || path == "/health") {
-            return http_rpc_response(200, "addition-public-rpc read-only testnet");
+            return http_rpc_response(200, rpc.public_rpc_banner());
         }
         if (path == "/jsonrpc" || path == "/jsonrpc/") {
             if (method == "HEAD") {
