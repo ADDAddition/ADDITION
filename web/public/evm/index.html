@@ -27,8 +27,8 @@
         <li>Currency Symbol: <code>ADD</code></li>
       </ul>
       <p class="note">MetaMask/Trust/Binance cannot list this chain as-is. The helper below only talks to <code>127.0.0.1:9545</code> and does not enable send.</p>
-      <p><button id="add-mm" type="button">Add 127.0.0.1:9545 to MetaMask</button></p>
-      <p id="add-mm-status" class="note"></p>
+      <p><button id="add-mm" type="button" disabled>Add 127.0.0.1:9545 to MetaMask</button></p>
+      <p id="add-mm-status" class="note">Button stays disabled until http://127.0.0.1:9545 answers chain 424242.</p>
     </section>
     <section class="panel">
       <h2>Live bootstrap probe</h2>
@@ -46,17 +46,22 @@
       rpcUrls: ["http://127.0.0.1:9545"],
       nativeCurrency: { name: "ADD", symbol: "ADD", decimals: 18 }
     };
-    document.getElementById("add-mm").addEventListener("click", async () => {
-      const el = document.getElementById("add-mm-status");
+    const addBtn = document.getElementById("add-mm");
+    const addStatus = document.getElementById("add-mm-status");
+    addBtn.disabled = true;
+    addBtn.addEventListener("click", async () => {
+      if (addBtn.disabled) {
+        return;
+      }
       if (!window.ethereum || !window.ethereum.request) {
-        el.textContent = "No injected wallet. This helper only targets 127.0.0.1:9545 chain 424242; send is disabled.";
+        addStatus.textContent = "No injected wallet. This helper only targets 127.0.0.1:9545 chain 424242; send is disabled.";
         return;
       }
       try {
         await window.ethereum.request({ method: "wallet_addEthereumChain", params: [LOCAL_CHAIN] });
-        el.textContent = "Wallet accepted 127.0.0.1:9545 / 424242. eth_sendRawTransaction stays disabled on the bridge.";
+        addStatus.textContent = "Wallet accepted 127.0.0.1:9545 / 424242. eth_sendRawTransaction stays disabled on the bridge.";
       } catch (e) {
-        el.textContent = String(e && e.message ? e.message : e);
+        addStatus.textContent = String(e && e.message ? e.message : e);
       }
     });
     async function evm(method, params) {
@@ -76,8 +81,14 @@
         const net = await evm("net_version");
         const block = await evm("eth_blockNumber");
         const send = await evm("eth_sendRawTransaction", ["0x00"]);
+        const live = chain.result === "0x67932" && String(net.result) === "424242";
+        if (!live) {
+          throw new Error("bridge did not return chain 424242");
+        }
         el.className = "ok";
         el.textContent = "Local bootstrap answered (send disabled)";
+        addBtn.disabled = false;
+        addStatus.textContent = "Local bridge is up. Send stays disabled.";
         box.textContent =
           "web3_clientVersion: " + JSON.stringify(version.result || version.error) + "\n" +
           "eth_chainId: " + JSON.stringify(chain.result || chain.error) + "\n" +
@@ -88,6 +99,8 @@
         el.className = "offline";
         el.textContent = "RPC offline";
         box.textContent = "RPC offline";
+        addBtn.disabled = true;
+        addStatus.textContent = "Button stays disabled until http://127.0.0.1:9545 answers chain 424242.";
       }
     }
     probe();
