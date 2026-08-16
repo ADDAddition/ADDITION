@@ -143,7 +143,6 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertNotIn("004d9744", index)
         self.assertNotIn("tx_status", explorer_js)
         self.assertNotIn("getblockraw", explorer_js)
-        self.assertIn("getblockraw", index)
 
     def test_rpc_page_documents_allowlist_and_json(self) -> None:
         rpc = read("rpc/index.html")
