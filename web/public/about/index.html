@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION about</title>
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body data-page="about">
+  <header id="site-header"></header>
+  <main>
+    <section class="panel fade-up">
+      <h2>ADDITION</h2>
+      <p class="sub">C++ node. Default: <code>additiond --network testnet</code>.</p>
+    </section>
+    <section class="panel fade-up delay-1">
+      <div class="feature-grid">
+        <article>
+          <h3>RPC</h3>
+          <p>Public read on :38545 (<code>getinfo</code>, <code>getblock</code>). Write on <code>127.0.0.1:8545</code>.</p>
+        </article>
+        <article>
+          <h3>Signatures</h3>
+          <p>ML-DSA-87. <code>pq_mode</code> comes from getinfo.</p>
+        </article>
+        <article>
+          <h3>Privacy</h3>
+          <p>SHA3-512 opening (<code>privacy_mint_open</code> / <code>privacy_spend_open</code>). Not a ZK circuit.</p>
+        </article>
+        <article>
+          <h3>PoW</h3>
+          <p><code>pow_algorithm=sha3_512</code> when the node answers.</p>
+        </article>
+      </div>
+    </section>
+    <section class="panel fade-up delay-2">
+      <p>MIT. <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
+      <p><a href="https://github.com/ADDAddition/ADDITION">github.com/ADDAddition/ADDITION</a></p>
+    </section>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/chrome.js"></script>
+</body>
+</html>

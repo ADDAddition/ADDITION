@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Honest ADDITION testnet site + RPC HTTP proxy (stdlib only)."""
+"""ADDITION testnet site + RPC HTTP proxy (stdlib only)."""
 
 from __future__ import annotations
 
@@ -76,6 +76,10 @@ def content_type(path: Path) -> str:
         return "text/html; charset=utf-8"
     if path.suffix == ".md":
         return "text/markdown; charset=utf-8"
+    if path.suffix == ".png":
+        return "image/png"
+    if path.suffix == ".svg":
+        return "image/svg+xml"
     return "text/plain; charset=utf-8"
 
 

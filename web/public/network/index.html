@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION network</title>
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body data-page="network">
+  <header id="site-header"></header>
+  <main>
+    <section class="panel fade-up">
+      <h2>getinfo</h2>
+      <p id="rpc-state" class="offline">Checking RPC…</p>
+      <div class="hero-kpis">
+        <article class="kpi">
+          <label>height</label>
+          <strong id="kpi-height"></strong>
+        </article>
+        <article class="kpi">
+          <label>peers</label>
+          <strong id="kpi-peers"></strong>
+        </article>
+        <article class="kpi" id="kpi-tps-tile" hidden>
+          <label>tps</label>
+          <strong id="kpi-tps"></strong>
+        </article>
+        <article class="kpi">
+          <label>health</label>
+          <strong id="kpi-health" class="status-warn">…</strong>
+        </article>
+      </div>
+      <div id="info-fields"></div>
+      <pre id="info-raw" class="raw"></pre>
+    </section>
+    <section class="panel fade-up delay-1">
+      <h2>getblock</h2>
+      <p class="sub">Tip from getinfo, then getblock for that height and a few previous ones.</p>
+      <div id="recent-blocks" class="empty"></div>
+    </section>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/common.js"></script>
+  <script src="/chrome.js"></script>
+  <script>
+    const S = window.AdditionSite;
+
+    function blockLabel(fields, raw) {
+      if (!fields || Object.keys(fields).length === 0) {
+        return raw || "";
+      }
+      const height = fields.height || fields.block_height || "";
+      const hash = fields.hash || fields.block_hash || "";
+      const parts = [];
+      if (height !== "") {
+        parts.push("height=" + height);
+      }
+      if (hash !== "") {
+        parts.push("hash=" + hash);
+      }
+      return parts.join(" ") || raw;
+    }
+
+    async function loadRecent(heightText) {
+      const box = document.getElementById("recent-blocks");
+      const height = parseInt(heightText, 10);
+      if (!Number.isFinite(height) || height < 0) {
+        box.className = "empty";
+        box.textContent = "";
+        return;
+      }
+      const start = Math.max(0, height - 4);
+      const lines = [];
+      for (let h = height; h >= start; h -= 1) {
+        const result = await S.rpcCommand("getblock " + String(h));
+        if (result.offline) {
+          box.className = "empty";
+          box.textContent = "RPC offline";
+          return;
+        }
+        if (!result.ok || result.raw.indexOf("error:") === 0) {
+          continue;
+        }
+        lines.push(blockLabel(result.fields, result.raw));
+      }
+      if (lines.length === 0) {
+        box.className = "empty";
+        box.textContent = "";
+        return;
+      }
+      box.className = "";
+      box.textContent = "";
+      const pre = document.createElement("pre");
+      pre.className = "raw";
+      pre.textContent = lines.join("\n");
+      box.appendChild(pre);
+    }
+
+    async function loadInfo() {
+      const result = await S.rpcCommand("getinfo");
+      S.setStatus(document.getElementById("rpc-state"), result);
+      document.getElementById("info-raw").textContent = result.offline ? "RPC offline" : result.raw;
+      if (result.offline || !result.ok) {
+        S.renderFields(document.getElementById("info-fields"), {}, "RPC offline");
+        document.getElementById("recent-blocks").className = "empty";
+        document.getElementById("recent-blocks").textContent = "RPC offline";
+        return;
+      }
+      S.renderFields(document.getElementById("info-fields"), result.fields, "Node returned no key=value fields.");
+      await loadRecent(result.fields.height);
+    }
+
+    loadInfo();
+  </script>
+</body>
+</html>

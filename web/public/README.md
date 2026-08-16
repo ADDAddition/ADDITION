@@ -2,12 +2,11 @@
 
 Pages root for additionblockchain.com.
 
-Dark console: logo, short nav, EN/FR, live getinfo strip (`height`, `peers`, `network`, `pq_mode`). Down node → **RPC offline**, empty cells.
+Look from the March 7 `web/portal` dump: Inter + JetBrains Mono, dark topbar, KPI tiles, panel cards, fade-up, orb background. Copy is what the node does.
 
-- Pretty URLs are folders with `index.html` (`/explorer/`, `/wallet/`, `/docs/commands/`, …).
-- Explorer and status call `/api/rpc?cmd=…`.
-- Optional `?rpc=https://HOST:38545/rpc`.
-- Worker var `PUBLIC_RPC_HTTP` is empty by default. Set it to the real `--public-rpc` HTTP URL. Do not commit trycloudflare URLs.
-- Two local nodes: `docs/TWO_NODE_TESTNET.md`.
+- Home, Network (`getinfo` + `getblock`), Node (`additiond --network testnet`), About.
+- KPI tiles: `height`, `peers`, `tps` only if getinfo has `tps` or `last_tps`, health. Down node → **RPC offline**, empty cells.
+- Explorer, Status, RPC, Docs, Wallet, Legal stay linked from the footer.
+- Worker: `worker.js` / `_worker.js`. `PUBLIC_RPC_HTTP` empty by default.
 - Contact: contact@additionblockchain.com
 - Source: https://github.com/ADDAddition/ADDITION

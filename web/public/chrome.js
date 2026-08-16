@@ -1,67 +1,53 @@
 (function () {
   const NAV = [
-    ["/explorer/", "navExplorer"],
-    ["/status/", "navStatus"],
-    ["/rpc/", "navRpc"],
-    ["/docs/", "navDocs"],
-    ["/wallet/", "navWallet"],
-    ["/legal/", "navLegal"]
+    ["/", "navHome"],
+    ["/network/", "navNetwork"],
+    ["/node/", "navNode"],
+    ["/about/", "navAbout"]
   ];
-  const STRIP_KEYS = ["height", "peers", "network", "pq_mode"];
+  const KPI_FIXED = ["height", "peers", "health"];
   const I18N = {
     en: {
       brandTag: "testnet",
-      navExplorer: "Explorer",
-      navStatus: "Status",
-      navRpc: "RPC",
-      navDocs: "Docs",
-      navWallet: "Wallet",
-      navLegal: "Legal",
-      stripPending: "Checking RPC…",
-      stripOffline: "RPC offline",
-      stripOk: "getinfo",
+      navHome: "Home",
+      navNetwork: "Network",
+      navNode: "Node",
+      navAbout: "About",
+      kpiPending: "…",
+      kpiOffline: "RPC offline",
+      kpiUp: "up",
       contact: "Contact",
-      notice: "Legal",
-      heroTitle: "ADDITION testnet",
+      more: "Also",
+      heroTitle: "ADDITION",
       heroLede: "Public read on :38545. Write RPC on 127.0.0.1:8545.",
       heroBody: "getinfo, getblock, monetary_info, peers. mine and createwallet stay on localhost.",
-      cardExplorer: "getblock, tx_status",
-      cardStatus: "getinfo, monetary_info, crypto_selftest, peers",
-      cardRpc: "Public read :38545",
-      cardDocs: "Build, commands, architecture",
-      cardWallet: "Write RPC 127.0.0.1:8545",
-      cardLegal: "MIT",
-      factQuantum: "ML-DSA-87. pq_mode from getinfo.",
-      factPrivacy: "SHA3-512 opening (privacy_mint_open / privacy_spend_open).",
-      factCompat: "bridge_* and a localhost EVM bootstrap.",
-      factWrite: "Write RPC 127.0.0.1:8545. Public mine / createwallet disabled."
+      cardNetwork: "getinfo + getblock",
+      cardNode: "additiond --network testnet",
+      cardAbout: "What the node does",
+      cardExplorer: "height / hash lookup",
+      cardDocs: "Build from this tree",
+      cardWallet: "Write RPC 127.0.0.1:8545"
     },
     fr: {
       brandTag: "testnet",
-      navExplorer: "Explorateur",
-      navStatus: "État",
-      navRpc: "RPC",
-      navDocs: "Docs",
-      navWallet: "Portefeuille",
-      navLegal: "Mentions",
-      stripPending: "RPC…",
-      stripOffline: "RPC offline",
-      stripOk: "getinfo",
+      navHome: "Accueil",
+      navNetwork: "Réseau",
+      navNode: "Nœud",
+      navAbout: "À propos",
+      kpiPending: "…",
+      kpiOffline: "RPC offline",
+      kpiUp: "up",
       contact: "Contact",
-      notice: "Mentions",
-      heroTitle: "ADDITION testnet",
+      more: "Aussi",
+      heroTitle: "ADDITION",
       heroLede: "Lecture publique :38545. RPC d’écriture 127.0.0.1:8545.",
       heroBody: "getinfo, getblock, monetary_info, peers. mine et createwallet restent en localhost.",
-      cardExplorer: "getblock, tx_status",
-      cardStatus: "getinfo, monetary_info, crypto_selftest, peers",
-      cardRpc: "Lecture publique :38545",
-      cardDocs: "Build, commandes, architecture",
-      cardWallet: "RPC d’écriture 127.0.0.1:8545",
-      cardLegal: "MIT",
-      factQuantum: "ML-DSA-87. pq_mode depuis getinfo.",
-      factPrivacy: "Ouverture SHA3-512 (privacy_mint_open / privacy_spend_open).",
-      factCompat: "bridge_* et un bootstrap EVM en localhost.",
-      factWrite: "RPC d’écriture 127.0.0.1:8545. mine / createwallet publics désactivés."
+      cardNetwork: "getinfo + getblock",
+      cardNode: "additiond --network testnet",
+      cardAbout: "Ce que fait le nœud",
+      cardExplorer: "lookup height / hash",
+      cardDocs: "Build depuis cet arbre",
+      cardWallet: "RPC d’écriture 127.0.0.1:8545"
     }
   };
 
@@ -101,16 +87,16 @@
     if (tag) {
       tag.textContent = t("brandTag");
     }
-    const flag = document.getElementById("status-flag");
-    if (flag && flag.getAttribute("data-state")) {
-      flag.textContent = t(flag.getAttribute("data-state"));
-    }
     const nav = document.getElementById("site-nav");
     if (nav) {
       const links = nav.querySelectorAll("a[data-nav]");
       for (let i = 0; i < links.length; i += 1) {
         links[i].textContent = t(links[i].getAttribute("data-nav"));
       }
+    }
+    const health = document.getElementById("kpi-health");
+    if (health && health.getAttribute("data-state")) {
+      health.textContent = t(health.getAttribute("data-state"));
     }
   }
 
@@ -127,13 +113,6 @@
     applyI18n();
   }
 
-  function logoSvg() {
-    return '<svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true">' +
-      '<rect width="28" height="28" fill="#1a3a55"/>' +
-      '<path d="M6 20 L14 7 L22 20 H18.6 L14 12.4 L9.4 20 Z" fill="#3d9cf0"/>' +
-      "</svg>";
-  }
-
   function rpcQuerySuffix() {
     const params = new URLSearchParams(window.location.search);
     const rpc = params.get("rpc");
@@ -143,33 +122,42 @@
     return "?rpc=" + encodeURIComponent(rpc);
   }
 
+  function fillOrbs() {
+    if (document.querySelector(".bg-orb")) {
+      return;
+    }
+    const one = document.createElement("div");
+    one.className = "bg-orb orb-1";
+    const two = document.createElement("div");
+    two.className = "bg-orb orb-2";
+    document.body.insertBefore(one, document.body.firstChild);
+    document.body.insertBefore(two, one.nextSibling);
+  }
+
   function fillHeader(el) {
     const path = window.location.pathname.replace(/\/+$/, "") || "/";
     const q = rpcQuerySuffix();
     const nav = NAV.map(function (pair) {
-      const href = pair[0] + q;
-      const key = pair[1];
+      const href = pair[0] === "/" ? "/" + q.replace(/^\?/, "?") : pair[0] + q;
       const dest = pair[0].replace(/\/+$/, "") || "/";
       const active = path === dest || (dest !== "/" && path.indexOf(dest) === 0);
-      return '<a href="' + href + '" data-nav="' + key + '"' +
-        (active ? ' class="active"' : "") + ">" + t(key) + "</a>";
+      return '<a href="' + href + '" data-nav="' + pair[1] + '"' +
+        (active ? ' class="active"' : "") + ">" + t(pair[1]) + "</a>";
     }).join("");
-    el.className = "site-chrome";
+    el.className = "topbar";
     el.innerHTML =
-      '<div class="site-chrome-inner">' +
-        '<a class="brand" href="/' + q + '">' +
-          logoSvg() +
-          '<span class="brand-text">' +
-            "<strong class=\"brand-name\">ADDITION</strong>" +
-            '<span class="brand-tag" id="brand-tag">' + t("brandTag") + "</span>" +
-          "</span>" +
-        "</a>" +
-        '<div class="chrome-right">' +
-          '<nav id="site-nav">' + nav + "</nav>" +
-          '<div class="lang-toggle" role="group" aria-label="Language">' +
-            '<button type="button" id="lang-en" aria-pressed="true">EN</button>' +
-            '<button type="button" id="lang-fr" aria-pressed="false">FR</button>' +
-          "</div>" +
+      '<a class="brand" href="/' + q + '">' +
+        '<img src="/assets/logo-transparent.png" alt="ADDITION" width="44" height="44">' +
+        "<div>" +
+          "<strong>ADDITION</strong>" +
+          '<span id="brand-tag">' + t("brandTag") + "</span>" +
+        "</div>" +
+      "</a>" +
+      '<div class="chrome-right">' +
+        '<nav class="nav-links" id="site-nav">' + nav + "</nav>" +
+        '<div class="lang-toggle" role="group" aria-label="Language">' +
+          '<button type="button" id="lang-en" aria-pressed="true">EN</button>' +
+          '<button type="button" id="lang-fr" aria-pressed="false">FR</button>' +
         "</div>" +
       "</div>";
     const enBtn = document.getElementById("lang-en");
@@ -183,53 +171,19 @@
   }
 
   function fillFooter(el) {
-    el.className = "site-footer-wrap";
+    const q = rpcQuerySuffix();
+    el.className = "footer";
     el.innerHTML =
       "<p>" + t("contact") + ': <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>' +
-      '<p><a href="https://github.com/ADDAddition/ADDITION">https://github.com/ADDAddition/ADDITION</a> · MIT · ' +
-      '<a href="/legal/">' + t("notice") + "</a></p>";
-  }
-
-  function emptyStripCells() {
-    return STRIP_KEYS.map(function (key) {
-      return "<div><dt>" + key + "</dt><dd></dd></div>";
-    }).join("");
-  }
-
-  function renderStrip(el, result) {
-    const flag = el.querySelector("#status-flag");
-    const cells = el.querySelector("#status-cells");
-    if (!flag || !cells) {
-      return;
-    }
-    if (!result || result.offline || !result.ok) {
-      el.className = "status-strip offline";
-      flag.setAttribute("data-state", "stripOffline");
-      flag.textContent = t("stripOffline");
-      cells.innerHTML = emptyStripCells();
-      return;
-    }
-    const fields = (window.AdditionSite && window.AdditionSite.stripFields)
-      ? window.AdditionSite.stripFields(result.fields)
-      : pickStrip(result.fields || {});
-    el.className = "status-strip ok";
-    flag.setAttribute("data-state", "stripOk");
-    flag.textContent = t("stripOk");
-    cells.innerHTML = STRIP_KEYS.map(function (key) {
-      const value = Object.prototype.hasOwnProperty.call(fields, key) ? fields[key] : "";
-      return "<div><dt>" + key + "</dt><dd>" + escapeText(value) + "</dd></div>";
-    }).join("");
-  }
-
-  function pickStrip(fields) {
-    const out = {};
-    for (let i = 0; i < STRIP_KEYS.length; i += 1) {
-      const key = STRIP_KEYS[i];
-      if (fields && Object.prototype.hasOwnProperty.call(fields, key)) {
-        out[key] = fields[key];
-      }
-    }
-    return out;
+      '<p><a href="https://github.com/ADDAddition/ADDITION">github.com/ADDAddition/ADDITION</a> · MIT</p>' +
+      '<p class="footer-links">' + t("more") + ": " +
+        '<a href="/explorer/' + q + '">Explorer</a>' +
+        '<a href="/status/' + q + '">Status</a>' +
+        '<a href="/rpc/' + q + '">RPC</a>' +
+        '<a href="/docs/' + q + '">Docs</a>' +
+        '<a href="/wallet/' + q + '">Wallet</a>' +
+        '<a href="/legal/' + q + '">Legal</a>' +
+      "</p>";
   }
 
   function escapeText(value) {
@@ -238,6 +192,69 @@
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
+  }
+
+  function tpsFromFields(fields) {
+    if (!fields) {
+      return "";
+    }
+    if (Object.prototype.hasOwnProperty.call(fields, "tps")) {
+      return String(fields.tps);
+    }
+    if (Object.prototype.hasOwnProperty.call(fields, "last_tps")) {
+      return String(fields.last_tps);
+    }
+    return "";
+  }
+
+  function setKpi(id, value, className) {
+    const el = document.getElementById(id);
+    if (!el) {
+      return;
+    }
+    el.textContent = value;
+    if (className) {
+      el.className = className;
+    }
+  }
+
+  function hideTpsTile(hide) {
+    const tile = document.getElementById("kpi-tps-tile");
+    if (tile) {
+      tile.hidden = !!hide;
+    }
+  }
+
+  function renderKpis(result) {
+    const health = document.getElementById("kpi-health");
+    if (!result || result.offline || !result.ok) {
+      setKpi("kpi-height", "");
+      setKpi("kpi-peers", "");
+      setKpi("kpi-tps", "");
+      hideTpsTile(true);
+      if (health) {
+        health.setAttribute("data-state", "kpiOffline");
+        health.textContent = t("kpiOffline");
+        health.className = "status-danger";
+      }
+      return;
+    }
+    const fields = result.fields || {};
+    setKpi("kpi-height", Object.prototype.hasOwnProperty.call(fields, "height") ? escapeText(fields.height) : "");
+    setKpi("kpi-peers", Object.prototype.hasOwnProperty.call(fields, "peers") ? escapeText(fields.peers) : "");
+    const tps = tpsFromFields(fields);
+    if (tps === "") {
+      setKpi("kpi-tps", "");
+      hideTpsTile(true);
+    } else {
+      hideTpsTile(false);
+      setKpi("kpi-tps", escapeText(tps));
+    }
+    if (health) {
+      health.setAttribute("data-state", "kpiUp");
+      health.textContent = t("kpiUp");
+      health.className = "status-ok";
+    }
   }
 
   function parseFields(line) {
@@ -288,32 +305,39 @@
     }
   }
 
-  function ensureStatusStrip(header) {
-    let el = document.getElementById("site-status");
-    if (!el) {
-      el = document.createElement("div");
-      el.id = "site-status";
-      header.insertAdjacentElement("afterend", el);
+  function ensureKpis() {
+    const height = document.getElementById("kpi-height");
+    if (!height) {
+      return;
     }
-    el.className = "status-strip pending";
-    el.innerHTML =
-      '<div class="status-strip-inner">' +
-        '<span class="status-flag" id="status-flag" data-state="stripPending">' + t("stripPending") + "</span>" +
-        '<dl class="status-cells" id="status-cells">' + emptyStripCells() + "</dl>" +
-      "</div>";
-    fetchGetinfo().then(function (result) {
-      renderStrip(el, result);
-    });
+    setKpi("kpi-height", "");
+    setKpi("kpi-peers", "");
+    setKpi("kpi-tps", "");
+    hideTpsTile(true);
+    const health = document.getElementById("kpi-health");
+    if (health) {
+      health.setAttribute("data-state", "kpiPending");
+      health.textContent = t("kpiPending");
+      health.className = "status-warn";
+    }
+    fetchGetinfo().then(renderKpis);
   }
 
+  fillOrbs();
   const header = document.getElementById("site-header");
   const footer = document.getElementById("site-footer");
   if (header) {
     fillHeader(header);
-    ensureStatusStrip(header);
   }
   if (footer) {
     fillFooter(footer);
   }
   applyI18n();
+  ensureKpis();
+
+  window.AdditionChrome = {
+    tpsFromFields: tpsFromFields,
+    renderKpis: renderKpis,
+    kpiFixed: KPI_FIXED
+  };
 }());

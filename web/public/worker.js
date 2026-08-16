@@ -1,5 +1,8 @@
 const PAGE_ROUTES = {
   "/": "/index.html",
+  "/network": "/network/index.html",
+  "/node": "/node/index.html",
+  "/about": "/about/index.html",
   "/explorer": "/explorer/index.html",
   "/status": "/status/index.html",
   "/rpc": "/rpc/index.html",

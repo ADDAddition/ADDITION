@@ -106,19 +106,39 @@
     el.textContent = result.ok ? "RPC answered" : (result.raw || "RPC error");
   }
 
-  function stripFields(fields) {
-    const keys = ["height", "peers", "network", "pq_mode"];
+  function tpsValue(fields) {
+    if (!fields) {
+      return "";
+    }
+    if (Object.prototype.hasOwnProperty.call(fields, "tps")) {
+      return String(fields.tps);
+    }
+    if (Object.prototype.hasOwnProperty.call(fields, "last_tps")) {
+      return String(fields.last_tps);
+    }
+    return "";
+  }
+
+  function kpiFields(fields) {
     const out = {};
     if (!fields) {
       return out;
     }
-    for (let i = 0; i < keys.length; i += 1) {
-      const key = keys[i];
-      if (Object.prototype.hasOwnProperty.call(fields, key)) {
-        out[key] = fields[key];
-      }
+    if (Object.prototype.hasOwnProperty.call(fields, "height")) {
+      out.height = fields.height;
+    }
+    if (Object.prototype.hasOwnProperty.call(fields, "peers")) {
+      out.peers = fields.peers;
+    }
+    const tps = tpsValue(fields);
+    if (tps !== "") {
+      out.tps = tps;
     }
     return out;
+  }
+
+  function stripFields(fields) {
+    return kpiFields(fields);
   }
 
   global.AdditionSite = {
@@ -127,6 +147,8 @@
     rpcCommand: rpcCommand,
     renderFields: renderFields,
     setStatus: setStatus,
-    stripFields: stripFields
+    stripFields: stripFields,
+    kpiFields: kpiFields,
+    tpsValue: tpsValue
   };
 }(window));

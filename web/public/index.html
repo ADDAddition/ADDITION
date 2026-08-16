@@ -6,31 +6,50 @@
   <title>ADDITION testnet</title>
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="ADDITION" data-sub="testnet">
+<body data-page="home">
   <header id="site-header"></header>
   <main>
-    <section class="hero">
-      <h1 data-i18n="heroTitle">ADDITION testnet</h1>
-      <p class="lede" data-i18n="heroLede">Public read on :38545. Write RPC on 127.0.0.1:8545.</p>
-      <p data-i18n="heroBody">getinfo, getblock, monetary_info, peers. mine and createwallet stay on localhost.</p>
-      <p><a class="github" href="https://github.com/ADDAddition/ADDITION">github.com/ADDAddition/ADDITION</a></p>
+    <section class="hero panel">
+      <div class="hero-copy fade-up">
+        <p class="eyebrow">testnet</p>
+        <h1 data-i18n="heroTitle">ADDITION</h1>
+        <p class="lede" data-i18n="heroLede">Public read on :38545. Write RPC on 127.0.0.1:8545.</p>
+        <p class="sub" data-i18n="heroBody">getinfo, getblock, monetary_info, peers. mine and createwallet stay on localhost.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="/network/">Network</a>
+          <a class="btn btn-secondary" href="/node/">Node</a>
+        </div>
+      </div>
+      <div class="hero-kpis fade-up delay-1">
+        <article class="kpi">
+          <label>height</label>
+          <strong id="kpi-height"></strong>
+        </article>
+        <article class="kpi">
+          <label>peers</label>
+          <strong id="kpi-peers"></strong>
+        </article>
+        <article class="kpi" id="kpi-tps-tile" hidden>
+          <label>tps</label>
+          <strong id="kpi-tps"></strong>
+        </article>
+        <article class="kpi">
+          <label>health</label>
+          <strong id="kpi-health" class="status-warn">…</strong>
+        </article>
+      </div>
     </section>
 
-    <div class="cards">
-      <a href="/explorer/"><strong>Explorer</strong><span data-i18n="cardExplorer">getblock, tx_status</span></a>
-      <a href="/status/"><strong>Status</strong><span data-i18n="cardStatus">getinfo, monetary_info, crypto_selftest, peers</span></a>
-      <a href="/rpc/"><strong>RPC</strong><span data-i18n="cardRpc">Public read :38545</span></a>
-      <a href="/docs/"><strong>Docs</strong><span data-i18n="cardDocs">Build, commands, architecture</span></a>
-      <a href="/wallet/"><strong>Wallet</strong><span data-i18n="cardWallet">Write RPC 127.0.0.1:8545</span></a>
-      <a href="/legal/"><strong>Legal</strong><span data-i18n="cardLegal">MIT</span></a>
-    </div>
-
-    <ul class="facts">
-      <li data-i18n="factQuantum">ML-DSA-87. pq_mode from getinfo.</li>
-      <li data-i18n="factPrivacy">SHA3-512 opening (privacy_mint_open / privacy_spend_open).</li>
-      <li data-i18n="factCompat">bridge_* and a localhost EVM bootstrap.</li>
-      <li data-i18n="factWrite">Write RPC 127.0.0.1:8545. Public mine / createwallet disabled.</li>
-    </ul>
+    <section class="panel fade-up delay-2">
+      <div class="cards">
+        <a href="/network/"><strong>Network</strong><span data-i18n="cardNetwork">getinfo + getblock</span></a>
+        <a href="/node/"><strong>Node</strong><span data-i18n="cardNode">additiond --network testnet</span></a>
+        <a href="/about/"><strong>About</strong><span data-i18n="cardAbout">What the node does</span></a>
+        <a href="/explorer/"><strong>Explorer</strong><span data-i18n="cardExplorer">height / hash lookup</span></a>
+        <a href="/docs/"><strong>Docs</strong><span data-i18n="cardDocs">Build from this tree</span></a>
+        <a href="/wallet/"><strong>Wallet</strong><span data-i18n="cardWallet">Write RPC 127.0.0.1:8545</span></a>
+      </div>
+    </section>
   </main>
   <footer id="site-footer"></footer>
   <script src="/common.js"></script>

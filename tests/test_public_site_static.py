@@ -19,6 +19,11 @@ PUBLIC = ROOT / "web" / "public"
 
 FAKE_CLAIMS = (
     "Sovereign Mainnet Active",
+    "The Wallstreet Exchange",
+    "where the wall has no ears",
+    "POST-QUANTUM",
+    "ZK-ONLY",
+    "MAINNET PROFILE",
     "42 Global",
     "124.8 KH/s",
     "1,248,500",
@@ -28,6 +33,9 @@ FAKE_CLAIMS = (
     "labreche_jeremy@outlook",
     "Addison Electronics",
     "Addison Electronique",
+    "xa1.ai",
+    "ADD-CORE-v4.1",
+    "Private Chat",
 )
 
 SERMONS = (
@@ -41,12 +49,10 @@ SERMONS = (
 )
 
 NAV_REQUIRED = (
-    '["/explorer/", "navExplorer"]',
-    '["/status/", "navStatus"]',
-    '["/rpc/", "navRpc"]',
-    '["/docs/", "navDocs"]',
-    '["/wallet/", "navWallet"]',
-    '["/legal/", "navLegal"]',
+    '["/", "navHome"]',
+    '["/network/", "navNetwork"]',
+    '["/node/", "navNode"]',
+    '["/about/", "navAbout"]',
 )
 
 NAV_FORBIDDEN = (
@@ -54,6 +60,9 @@ NAV_FORBIDDEN = (
     '["/evm/"',
     '["/contracts/"',
     '["/whitepaper/"',
+    '["/exchange/"',
+    '["/tokenomics/"',
+    '["/chat/"',
 )
 
 
@@ -94,21 +103,42 @@ class PublicSiteStaticTests(unittest.TestCase):
         index = read("index.html")
         self.assertNotIn("labjay69", index)
         self.assertNotIn("outlook.com", index)
+        about = read("about/index.html")
+        self.assertIn("contact@additionblockchain.com", about)
 
-    def test_chrome_nav_is_short(self) -> None:
+    def test_chrome_nav_is_portal_short(self) -> None:
         chrome = read("chrome.js")
         for item in NAV_REQUIRED:
             self.assertIn(item, chrome)
         for item in NAV_FORBIDDEN:
             self.assertNotIn(item, chrome)
-        self.assertIn('STRIP_KEYS = ["height", "peers", "network", "pq_mode"]', chrome)
         self.assertIn("RPC offline", chrome)
-        self.assertIn("emptyStripCells", chrome)
+        self.assertIn("kpi-height", chrome)
+        self.assertIn("hideTpsTile", chrome)
+        self.assertIn("/api/rpc?cmd=getinfo", chrome)
         self.assertIn("rpcQuerySuffix", chrome)
+        self.assertIn("logo-transparent.png", chrome)
+        self.assertIn("bg-orb", chrome)
+
+    def test_look_uses_portal_fonts_and_kpis(self) -> None:
+        css = read("common.css")
+        self.assertIn("Inter", css)
+        self.assertIn("JetBrains Mono", css)
+        self.assertIn(".hero-kpis", css)
+        self.assertIn(".bg-orb", css)
+        self.assertIn(".fade-up", css)
+        self.assertIn(".topbar", css)
+        self.assertIn(".panel", css)
+        index = read("index.html")
+        self.assertIn("kpi-height", index)
+        self.assertIn("kpi-peers", index)
+        self.assertIn("kpi-tps-tile", index)
+        self.assertIn("hidden", index)
+        self.assertIn("kpi-health", index)
 
     def test_homepage_is_short(self) -> None:
         index = read("index.html")
-        self.assertIn("ADDITION testnet", index)
+        self.assertIn("ADDITION", index)
         self.assertIn(":38545", index)
         self.assertIn("127.0.0.1:8545", index)
         self.assertIn('data-i18n="heroLede"', index)
@@ -117,9 +147,23 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertNotIn("/contracts/", index)
         self.assertNotIn("CoinMarketCap", index)
         self.assertNotIn("token sale", index.lower())
-        self.assertLess(len(index.splitlines()), 50)
-        self.assertIn("SHA3-512", index)
+        self.assertLess(len(index.splitlines()), 70)
         self.assertIn("getinfo", index)
+
+    def test_true_pages_exist(self) -> None:
+        network = read("network/index.html")
+        self.assertIn('S.rpcCommand("getinfo")', network)
+        self.assertIn('S.rpcCommand("getblock "', network)
+        self.assertIn("RPC offline", network)
+        self.assertIn("loadRecent", network)
+        node = read("node/index.html")
+        self.assertIn("additiond --network testnet", node)
+        self.assertNotIn("xa1.ai", node)
+        self.assertNotIn("ADD-CORE", node)
+        about = read("about/index.html")
+        self.assertIn("SHA3-512", about)
+        self.assertIn("ML-DSA-87", about)
+        self.assertLess(len(about.splitlines()), 50)
 
     def test_wallet_stays_loopback_only(self) -> None:
         wallet = read("wallet/index.html")
@@ -130,11 +174,12 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("RPC offline", wallet)
         self.assertNotIn("wallet-connect", wallet.lower())
 
-    def test_common_js_fail_closed_and_strip_keys(self) -> None:
+    def test_common_js_fail_closed_and_kpi_keys(self) -> None:
         common = read("common.js")
         self.assertIn('raw: "RPC offline"', common)
         self.assertIn("looksLikeHtml", common)
-        self.assertIn('const keys = ["height", "peers", "network", "pq_mode"]', common)
+        self.assertIn("kpiFields", common)
+        self.assertIn("tpsValue", common)
         self.assertIn("stripFields", common)
 
     def test_explorer_still_calls_getblock(self) -> None:
@@ -142,6 +187,14 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn('S.rpcCommand("getblock "', explorer)
         self.assertIn("RPC offline", explorer)
         self.assertIn("loadRecent", explorer)
+
+    def test_worker_kept(self) -> None:
+        worker = read("worker.js")
+        self.assertIn("/api/rpc", worker)
+        self.assertIn("RPC offline", worker)
+        self.assertIn('"/network": "/network/index.html"', worker)
+        self.assertTrue((PUBLIC / "_worker.js").is_file())
+        self.assertIn("worker.js", read("_worker.js"))
 
     def test_no_hardcoded_live_stats(self) -> None:
         index = read("index.html")
@@ -153,7 +206,7 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertNotIn("1,248,500", blob)
         self.assertNotIn("124.8", blob)
 
-    def test_strip_fields_and_rpc_fail_closed(self) -> None:
+    def test_kpi_fields_and_rpc_fail_closed(self) -> None:
         node = shutil.which("node")
         if not node:
             self.skipTest("node is required for the RPC helper check")
@@ -169,13 +222,17 @@ function run(fetchImpl) {
   return window.AdditionSite;
 }
 const S = run(async () => { throw new Error("offline"); });
-const fields = S.parseFields("network=testnet height=20 peers=1 pq_mode=strict pow_algorithm=sha3_512 last_tps=9.99");
-const strip = S.stripFields(fields);
-if (strip.height !== "20" || strip.peers !== "1" || strip.network !== "testnet" || strip.pq_mode !== "strict") {
-  throw new Error("missing live strip fields");
+const withTps = S.parseFields("network=testnet height=20 peers=1 pq_mode=strict pow_algorithm=sha3_512 last_tps=9.99");
+const kpis = S.kpiFields(withTps);
+if (kpis.height !== "20" || kpis.peers !== "1" || kpis.tps !== "9.99") {
+  throw new Error("missing live kpi fields");
 }
-if (Object.prototype.hasOwnProperty.call(strip, "last_tps") || Object.prototype.hasOwnProperty.call(strip, "pow_algorithm")) {
-  throw new Error("strip leaked non-strip getinfo fields");
+if (Object.prototype.hasOwnProperty.call(kpis, "pow_algorithm") || Object.prototype.hasOwnProperty.call(kpis, "network")) {
+  throw new Error("kpi leaked non-kpi getinfo fields");
+}
+const noTps = S.kpiFields(S.parseFields("height=21 peers=1 pq_mode=strict"));
+if (Object.prototype.hasOwnProperty.call(noTps, "tps")) {
+  throw new Error("tps tile must be omitted when getinfo has no tps");
 }
 S.rpcCommand("getinfo").then((offline) => {
   if (!offline.offline || offline.raw !== "RPC offline" || Object.keys(offline.fields).length !== 0) {
@@ -243,10 +300,10 @@ S.rpcCommand("getinfo").then((offline) => {
         try:
             host, port = server.server_address
             index = urllib.request.urlopen(f"http://{host}:{port}/").read().decode("utf-8")
-            self.assertIn("ADDITION testnet", index)
+            self.assertIn("ADDITION", index)
             self.assertIn("/common.css", index)
             chrome = urllib.request.urlopen(f"http://{host}:{port}/chrome.js").read().decode("utf-8")
-            self.assertIn("navExplorer", chrome)
+            self.assertIn("navNetwork", chrome)
             try:
                 urllib.request.urlopen(f"http://{host}:{port}/api/rpc?cmd=getinfo")
                 self.fail("offline RPC must not return HTTP 200")

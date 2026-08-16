@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION node</title>
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body data-page="node">
+  <header id="site-header"></header>
+  <main>
+    <section class="panel fade-up">
+      <h2>Run additiond</h2>
+      <p class="sub">Build from this tree, then start the daemon on testnet.</p>
+      <pre>cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --target additiond
+./build/additiond --network testnet</pre>
+      <p>Needs liboqs + OpenSSL. Details: <a href="/docs/getting-started/">Build and run</a>.</p>
+    </section>
+    <section class="panel fade-up delay-1">
+      <h2>Ports</h2>
+      <ul class="checklist">
+        <li>Write RPC: <code>127.0.0.1:8545</code> — <code>mine</code>, <code>createwallet</code>, <code>wallet_*</code></li>
+        <li>Public read: <code>:38545</code> — <code>getinfo</code>, <code>getblock</code>, <code>monetary_info</code>, <code>peers</code></li>
+      </ul>
+      <pre>./build/additiond --network testnet --public-rpc
+printf 'getinfo\n' | nc 127.0.0.1 8545
+curl 'http://127.0.0.1:38545/rpc?cmd=getinfo'</pre>
+    </section>
+    <section class="panel fade-up delay-2">
+      <h2>Source</h2>
+      <p><a class="btn btn-primary" href="https://github.com/ADDAddition/ADDITION">github.com/ADDAddition/ADDITION</a></p>
+    </section>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/chrome.js"></script>
+</body>
+</html>
