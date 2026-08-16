@@ -102,6 +102,7 @@ private:
     bool validate_block_transactions(const Block& candidate, std::string& error) const;
     bool validate_transaction_signature(const Transaction& tx, std::string& error) const;
     std::uint64_t compute_next_difficulty_target() const;
+    std::uint64_t clamp_difficulty_target(std::uint64_t target) const;
     std::uint64_t compute_block_reward(std::uint64_t height) const;
     bool hash_meets_target(const std::string& hex_hash, std::uint64_t target) const;
 };

@@ -188,44 +188,57 @@ std::uint64_t Chain::compute_block_reward(std::uint64_t h) const {
     return shifted;
 }
 
+std::uint64_t Chain::clamp_difficulty_target(std::uint64_t target) const {
+    if (target < cfg_.min_difficulty_target) {
+        return cfg_.min_difficulty_target;
+    }
+    if (target > cfg_.max_difficulty_target) {
+        return cfg_.max_difficulty_target;
+    }
+    return target;
+}
+
 std::uint64_t Chain::compute_next_difficulty_target() const {
-    if (blocks_.size() < 2) {
-        return difficulty_target_;
+    const auto window = static_cast<std::size_t>(cfg_.retarget_window);
+    // Need genesis + at least `window` mined blocks. Retarget only on window boundaries
+    // so a 2-block CI mine stays at the easy bound.
+    if (window == 0 || blocks_.size() < window + 1) {
+        return clamp_difficulty_target(difficulty_target_);
+    }
+    if ((blocks_.back().header.height % static_cast<std::uint64_t>(window)) != 0) {
+        return clamp_difficulty_target(difficulty_target_);
     }
 
-    const auto window = std::min<std::size_t>(cfg_.retarget_window, blocks_.size() - 1);
+    // Skip genesis as the oldest bound. Its frozen timestamp (Nov 2025) vs "now"
+    // made the first window look months-slow and ratcheted the target to 2^56-1.
+    std::size_t oldest_index = blocks_.size() - 1 - window;
+    if (oldest_index == 0) {
+        oldest_index = 1;
+    }
+    if (oldest_index >= blocks_.size() - 1) {
+        return clamp_difficulty_target(difficulty_target_);
+    }
+
     const auto& newest = blocks_.back();
-    const auto& oldest = blocks_[blocks_.size() - 1 - window];
+    const auto& oldest = blocks_[oldest_index];
     const auto observed = (newest.header.timestamp > oldest.header.timestamp)
                               ? (newest.header.timestamp - oldest.header.timestamp)
                               : 1ULL;
     const auto expected = static_cast<std::uint64_t>(window) * cfg_.target_block_time_sec;
+    if (expected == 0) {
+        return clamp_difficulty_target(difficulty_target_);
+    }
+
+    const auto floor_span = std::max<std::uint64_t>(1ULL, expected / 4ULL);
+    const auto observed_capped = std::min(std::max(observed, floor_span), expected * 4ULL);
 
     std::uint64_t next = difficulty_target_;
-
-    if (observed < expected) {
-        next = std::max(cfg_.min_difficulty_target, static_cast<std::uint64_t>(difficulty_target_ * 9 / 10));
-    } else if (observed > expected) {
-        const std::uint64_t observed_capped = std::min<std::uint64_t>(observed, expected * 32ULL);
-        std::uint64_t scaled = difficulty_target_;
-        if (expected > 0 && scaled <= (std::numeric_limits<std::uint64_t>::max() / observed_capped)) {
-            scaled = (scaled * observed_capped) / expected;
-        } else {
-            scaled = cfg_.max_difficulty_target;
-        }
-        if (scaled < difficulty_target_) {
-            scaled = difficulty_target_;
-        }
-        next = std::min(cfg_.max_difficulty_target, scaled);
-    }
-
-    if (next < cfg_.min_difficulty_target) {
-        next = cfg_.min_difficulty_target;
-    }
-    if (next > cfg_.max_difficulty_target) {
+    if (difficulty_target_ > (std::numeric_limits<std::uint64_t>::max() / observed_capped)) {
         next = cfg_.max_difficulty_target;
+    } else {
+        next = (difficulty_target_ * observed_capped) / expected;
     }
-    return next;
+    return clamp_difficulty_target(next);
 }
 
 std::uint64_t Chain::balance_of(const std::string& address) const {
