@@ -98,7 +98,7 @@ unchanged. CORS `*` is not a wallet-connect surface.
 PUBLIC_RPC_HTTP = ""
 ```
 
-Leave it empty. The worker and static pages show **RPC offline**.
+Leave it empty. The worker and static pages show **RPC offline** when the node is down.
 They do not invent blocks, peers, or hashrate.
 
 When an operator has a **real** public-rpc HTTP URL (this machine, a VPS, or a

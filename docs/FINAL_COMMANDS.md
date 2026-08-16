@@ -65,7 +65,7 @@ Node B: `--data-dir` second tree, write `8546`, P2P `28546`, `--bootstrap 127.0.
 Operator public P2P (IPv4 only): `--bootstrap 34.27.30.115:28545`. Write RPC stays loopback.
 See [TWO_NODE_TESTNET.md](TWO_NODE_TESTNET.md).
 
-Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so the worker shows `RPC offline`. Set it only to a real public-rpc HTTP URL you operate. Do not commit trycloudflare URLs.
+Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so a down node shows `RPC offline`. Set it only to a real public-rpc HTTP URL you operate. Do not commit trycloudflare URLs.
 
 ## Core chain
 - `getinfo`
