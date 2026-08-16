@@ -116,6 +116,11 @@ def md_to_html(md: str) -> str:
     return "\n".join(out)
 
 
+def publish_raw(rel_md: str, dest: Path) -> None:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text((ROOT / rel_md).read_text(encoding="utf-8"), encoding="utf-8")
+
+
 def write_doc(rel_md: str, dest: Path, title: str, heading: str, banner: str) -> None:
     md = (ROOT / rel_md).read_text(encoding="utf-8")
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -183,6 +188,8 @@ def main() -> None:
         "SHA3 opening notes",
         "From <code>tools/zk_backend_contract.md</code>. Privacy is SHA3-512 opening, not a ZK circuit.",
     )
+    publish_raw("docs/TESTNET_PUBLIC_RPC_RUNBOOK.md", OUT / "docs" / "testnet-rpc-runbook.md")
+    publish_raw("docs/WALLET.md", OUT / "docs" / "wallet.md")
     print("rendered docs into", OUT / "docs")
 
 

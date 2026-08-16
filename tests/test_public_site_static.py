@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import re
 import shutil
 import subprocess
@@ -455,6 +456,93 @@ S.rpcCommand("getinfo").then((offline) => {
             except urllib.error.HTTPError as exc:
                 self.assertEqual(exc.code, 503)
                 self.assertEqual(exc.read().decode("utf-8"), "RPC offline")
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_raw_markdown_docs_are_fetchable(self) -> None:
+        join_md = read("join.md")
+        runbook = read("docs/testnet-rpc-runbook.md")
+        wallet = read("docs/wallet.md")
+        worker = read("worker.js")
+        headers = read("_headers")
+        docs_index = read("docs/index.html")
+        join_html = read("join/index.html")
+        download_html = read("download/index.html")
+
+        self.assertEqual(runbook, (ROOT / "docs" / "TESTNET_PUBLIC_RPC_RUNBOOK.md").read_text(encoding="utf-8"))
+        self.assertEqual(wallet, (ROOT / "docs" / "WALLET.md").read_text(encoding="utf-8"))
+        self.assertNotIn("<!DOCTYPE html>", join_md)
+        self.assertIn(
+            "additiond --network testnet --data-dir <dir> --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545",
+            join_md,
+        )
+        self.assertIn("sync", join_md)
+        self.assertIn("invalid/duplicate", join_md)
+        self.assertIn("/rpc?cmd=getinfo", join_md)
+        self.assertIn("https://rpc.additionblockchain.com/rpc?cmd=getinfo", join_md)
+        self.assertIn("http://34.27.30.115/rpc?cmd=getinfo", join_md)
+        self.assertIn("getblockraw", join_md)
+        self.assertIn("ok:BLKDATA", join_md)
+        self.assertIn("HELLO", join_md)
+        self.assertIn("127.0.0.1", join_md)
+        self.assertIn("error: command disabled on public RPC", join_md)
+        self.assertIn("ADDITION_ADVERTISED_P2P=34.27.30.115:28545", join_md)
+        self.assertIn("Research testnet", join_md)
+        self.assertIn("contact@additionblockchain.com", join_md)
+        self.assertNotIn("0.0.0.0:8545", join_md)
+        self.assertNotIn("wallet-connect", join_md.lower())
+        self.assertNotIn("token sale", join_md.lower())
+        self.assertNotRegex(join_md.lower(), r"\bhonest\b")
+        self.assertIn("38545", runbook)
+        self.assertIn("127.0.0.1", runbook)
+        self.assertIn("Never publish **8545**", runbook)
+        self.assertIn("127.0.0.1:8545", wallet)
+        self.assertIn("loopback", wallet.lower())
+        self.assertIn('url.pathname.endsWith(".md")', worker)
+        self.assertIn("text/markdown; charset=utf-8", worker)
+        self.assertIn("text/markdown; charset=utf-8", headers)
+        self.assertIn("/join.md", docs_index)
+        self.assertIn("/docs/testnet-rpc-runbook.md", docs_index)
+        self.assertIn("/docs/wallet.md", docs_index)
+        self.assertIn("Local desktop helper", join_html)
+        self.assertIn("/download/", join_html)
+        self.assertIn("testnet / local", download_html.lower())
+        self.assertIn("127.0.0.1:8545", download_html)
+
+        spec = importlib.util.spec_from_file_location("addition_serve", ROOT / "web" / "serve.py")
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        serve = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(serve)
+        for path in ("/join.md", "/docs/testnet-rpc-runbook.md", "/docs/wallet.md"):
+            target = serve.resolve_static(path)
+            self.assertIsNotNone(target, path)
+            self.assertEqual(serve.content_type(target), "text/markdown; charset=utf-8", path)
+        self.assertEqual(serve.resolve_static("/join/").name, "index.html")
+        self.assertEqual(serve.resolve_static("/download/").name, "index.html")
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), serve.Handler)
+        thread = Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            host, port = server.server_address
+            for path, needle in (
+                ("/join.md", "bootstrap 34.27.30.115:28545"),
+                ("/docs/testnet-rpc-runbook.md", "public-read"),
+                ("/docs/wallet.md", "127.0.0.1:8545"),
+            ):
+                with urllib.request.urlopen(f"http://{host}:{port}{path}") as resp:
+                    self.assertIn("text/markdown", resp.headers.get("Content-Type", ""))
+                    body = resp.read().decode("utf-8")
+                self.assertIn(needle, body)
+                self.assertNotIn("<!DOCTYPE html>", body)
+            with urllib.request.urlopen(f"http://{host}:{port}/join/") as resp:
+                self.assertIn("text/html", resp.headers.get("Content-Type", ""))
+                self.assertIn("Join the ADDITION testnet", resp.read().decode("utf-8"))
+            with urllib.request.urlopen(f"http://{host}:{port}/download/") as resp:
+                self.assertIn("text/html", resp.headers.get("Content-Type", ""))
+                self.assertIn("addition-wallet-testnet", resp.read().decode("utf-8"))
         finally:
             server.shutdown()
             server.server_close()
