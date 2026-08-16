@@ -45,6 +45,7 @@ Two-node local testnet (write RPC stays loopback):
 
 Node A: `--public-rpc` on `38545`, P2P `28545`, write `127.0.0.1:8545`.
 Node B: `--data-dir` second tree, write `8546`, P2P `28546`, `--bootstrap 127.0.0.1:28545`.
+Operator public P2P (IPv4 only): `--bootstrap 34.27.30.115:28545`. Write RPC stays loopback.
 See [TWO_NODE_TESTNET.md](TWO_NODE_TESTNET.md).
 
 Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so the worker fail-closes with `RPC offline`. Set it only to a real public-rpc HTTP URL you operate. Do not commit trycloudflare URLs.
@@ -69,7 +70,7 @@ Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so the worke
 - `tx_status <tx_hash>`
 - `getblock <height_or_hash>`
 - `getblockhash <height>`
-- `mine` — testnet: SHA3-512 header PoW, 30s deadline. `getinfo` reports `pow_algorithm=sha3_512`. The mainnet *profile* still uses memory-hard hashing and is not demonstrated live.
+- `mine` — testnet: SHA3-512 header PoW, 30s deadline. Trusted RPC / stdin only. Optional in-process auto-mine (`--auto-mine`, `ADDITION_AUTO_MINE=1`) is off by default, testnet only, and is not a public RPC command. `getinfo` reports `pow_algorithm=sha3_512` and `auto_mine=off|on`. The mainnet *profile* still uses memory-hard hashing and is not demonstrated live.
 
 ## P2P + Consensus
 - `addpeer <ip:port>`

@@ -48,11 +48,19 @@ struct NodeConfig {
     std::uint16_t public_rpc_port{38545};
     std::string public_rpc_bind{"0.0.0.0"};
     bool enable_public_rpc{false};
+    bool enable_auto_mine{false};
+    std::uint32_t auto_mine_interval_sec{60};
+    std::string auto_mine_reward{"miner1"};
     std::vector<std::string> bootstrap_peers{"127.0.0.1:28545"};
     std::string data_dir{"data"};
     std::string config_path{};
     std::string genesis_path{};
 };
+
+// Operator's current public P2P (IPv4 only). Not a peer-count claim.
+inline constexpr const char* kOperatorPublicP2p = "34.27.30.115:28545";
+
+bool is_ipv4_endpoint(const std::string& endpoint);
 
 const ChainConfig& default_config();
 ChainConfig testnet_chain_config();

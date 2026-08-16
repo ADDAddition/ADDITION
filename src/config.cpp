@@ -189,6 +189,12 @@ bool apply_kv(NodeConfig& cfg, const std::string& table, const std::string& key,
             error = "invalid bootstrap_peers array";
             return false;
         }
+        for (const auto& peer : peers) {
+            if (!is_ipv4_endpoint(peer)) {
+                error = "bootstrap_peers must be IPv4 host:port (got " + peer + ")";
+                return false;
+            }
+        }
         cfg.bootstrap_peers = peers;
         cfg.chain.bootstrap_peers = peers;
         return true;
@@ -211,6 +217,26 @@ bool apply_kv(NodeConfig& cfg, const std::string& table, const std::string& key,
     }
     if (full == "enable_public_rpc" || full == "ports.enable_public_rpc") {
         return parse_bool(value, cfg.enable_public_rpc);
+    }
+    if (full == "enable_auto_mine" || full == "auto_mine") {
+        return parse_bool(value, cfg.enable_auto_mine);
+    }
+    if (full == "auto_mine_interval_sec" || full == "auto_mine_interval") {
+        std::uint64_t v = 0;
+        if (!parse_u64(value, v) || v == 0 || v > 86400) {
+            error = "invalid auto_mine_interval_sec (1-86400)";
+            return false;
+        }
+        cfg.auto_mine_interval_sec = static_cast<std::uint32_t>(v);
+        return true;
+    }
+    if (full == "auto_mine_reward") {
+        if (value.empty()) {
+            error = "auto_mine_reward must not be empty";
+            return false;
+        }
+        cfg.auto_mine_reward = value;
+        return true;
     }
     if (full == "chain.block_reward" || full == "block_reward") {
         return parse_u64(value, cfg.chain.block_reward);
@@ -309,6 +335,52 @@ void apply_env_network_opt_in(NodeConfig& cfg) {
 }
 
 } // namespace
+
+bool is_ipv4_endpoint(const std::string& endpoint) {
+    const auto colon = endpoint.rfind(':');
+    if (colon == std::string::npos || colon == 0 || colon + 1 >= endpoint.size()) {
+        return false;
+    }
+    const std::string host = endpoint.substr(0, colon);
+    const std::string port = endpoint.substr(colon + 1);
+    if (host.empty() || port.empty()) {
+        return false;
+    }
+    std::uint64_t port_n = 0;
+    if (!parse_u64(port, port_n) || port_n == 0 || port_n > 65535) {
+        return false;
+    }
+
+    int dots = 0;
+    std::string octet;
+    auto flush_octet = [&]() -> bool {
+        if (octet.empty() || octet.size() > 3) {
+            return false;
+        }
+        if (octet.size() > 1 && octet.front() == '0') {
+            return false;
+        }
+        for (char c : octet) {
+            if (c < '0' || c > '9') {
+                return false;
+            }
+        }
+        const int n = std::stoi(octet);
+        return n >= 0 && n <= 255;
+    };
+    for (char c : host) {
+        if (c == '.') {
+            if (!flush_octet()) {
+                return false;
+            }
+            octet.clear();
+            ++dots;
+            continue;
+        }
+        octet.push_back(c);
+    }
+    return dots == 3 && flush_octet();
+}
 
 const ChainConfig& default_config() {
     static const ChainConfig cfg = testnet_chain_config();
@@ -631,8 +703,11 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
     std::string cli_local_rpc_port;
     std::string cli_p2p_port;
     std::vector<std::string> cli_bootstrap;
+    std::string cli_auto_mine_interval;
+    std::string cli_auto_mine_reward;
     bool network_from_cli = false;
     bool public_rpc_from_cli = false;
+    bool auto_mine_from_cli = false;
 
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i] ? argv[i] : "";
@@ -747,6 +822,30 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
             cli_bootstrap.push_back(arg.substr(12));
             continue;
         }
+        if (arg == "--auto-mine") {
+            auto_mine_from_cli = true;
+            continue;
+        }
+        if (arg == "--auto-mine-interval") {
+            if (!take_value(cli_auto_mine_interval)) {
+                return false;
+            }
+            continue;
+        }
+        if (arg.rfind("--auto-mine-interval=", 0) == 0) {
+            cli_auto_mine_interval = arg.substr(21);
+            continue;
+        }
+        if (arg == "--auto-mine-reward") {
+            if (!take_value(cli_auto_mine_reward)) {
+                return false;
+            }
+            continue;
+        }
+        if (arg.rfind("--auto-mine-reward=", 0) == 0) {
+            cli_auto_mine_reward = arg.substr(19);
+            continue;
+        }
         error = "unknown argument: " + arg;
         return false;
     }
@@ -813,8 +912,28 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
         }
     }
     if (!cli_bootstrap.empty()) {
+        for (const auto& peer : cli_bootstrap) {
+            if (!is_ipv4_endpoint(peer)) {
+                error = "invalid --bootstrap (IPv4 host:port only): " + peer;
+                return false;
+            }
+        }
         cfg.bootstrap_peers = cli_bootstrap;
         cfg.chain.bootstrap_peers = cli_bootstrap;
+    }
+    if (auto_mine_from_cli) {
+        cfg.enable_auto_mine = true;
+    }
+    if (!cli_auto_mine_interval.empty()) {
+        std::uint64_t v = 0;
+        if (!parse_u64(cli_auto_mine_interval, v) || v == 0 || v > 86400) {
+            error = "invalid --auto-mine-interval (1-86400 seconds)";
+            return false;
+        }
+        cfg.auto_mine_interval_sec = static_cast<std::uint32_t>(v);
+    }
+    if (!cli_auto_mine_reward.empty()) {
+        cfg.auto_mine_reward = cli_auto_mine_reward;
     }
 
     if (network_from_cli) {
@@ -831,6 +950,13 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
         cfg.bootstrap_peers = {"127.0.0.1:28545"};
         cfg.chain.bootstrap_peers = cfg.bootstrap_peers;
     }
+    for (const auto& peer : cfg.bootstrap_peers) {
+        if (!is_ipv4_endpoint(peer)) {
+            error = "bootstrap_peers must be IPv4 host:port (got " + peer + ")";
+            return false;
+        }
+    }
+    cfg.chain.bootstrap_peers = cfg.bootstrap_peers;
     return true;
 }
 
@@ -841,6 +967,7 @@ std::string daemon_help_text() {
            "  additiond [--network testnet|mainnet] [--config PATH] [--genesis PATH] [--data-dir PATH]\n"
            "            [--public-rpc] [--public-rpc-port PORT] [--public-rpc-bind IP]\n"
            "            [--local-rpc-port PORT] [--p2p-port PORT] [--bootstrap IP:PORT]\n"
+           "            [--auto-mine] [--auto-mine-interval SEC] [--auto-mine-reward ADDR]\n"
            "\n"
            "Defaults:\n"
            "  --network testnet\n"
@@ -860,6 +987,13 @@ std::string daemon_help_text() {
            "LAN RPC stays token-gated (ADDITION_ENABLE_LAN_RPC=1 + ADDITION_LAN_RPC_TOKEN).\n"
            "P2P stays off unless ADDITION_ENABLE_P2P_RPC=1. --p2p-port / ADDITION_P2P_PORT (second node: 28546).\n"
            "--bootstrap IP:PORT replaces bootstrap_peers (IPv4 only; hostnames are not resolved).\n"
+           "  Operator public P2P (current): 34.27.30.115:28545 — one IPv4 peer, not a peer list.\n"
+           "Auto-mine (testnet only, off by default, never on public RPC):\n"
+           "  --auto-mine or ADDITION_AUTO_MINE=1\n"
+           "  --auto-mine-interval SEC or ADDITION_AUTO_MINE_INTERVAL (default 60)\n"
+           "  --auto-mine-reward ADDR or ADDITION_AUTO_MINE_REWARD (default miner1)\n"
+           "  After N seconds the daemon mines one block in-process and persists blocks.dat.\n"
+           "  Refused on --network mainnet even if the flag is set.\n"
            "Do not expose write RPC to the world.\n"
            "\n"
            "Local wallet (trusted RPC only): createwallet [name], wallet_list, wallet_info,\n"

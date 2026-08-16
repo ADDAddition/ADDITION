@@ -158,6 +158,11 @@ RpcServer::RpcServer(Chain& chain,
             strict_admin_mode_(strict_admin_mode),
             wallets_(std::move(wallet_dir)) {}
 
+void RpcServer::set_auto_mine_status(bool enabled, std::uint32_t interval_sec) {
+    auto_mine_enabled_ = enabled;
+    auto_mine_interval_sec_ = interval_sec == 0 ? 60 : interval_sec;
+}
+
 std::string RpcServer::handle_command(const std::string& line, bool trusted) {
     std::lock_guard<std::mutex> lock(mu_);
     std::istringstream iss(line);
@@ -207,7 +212,9 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " pq_mode=strict"
             << " pow_algorithm=" << pow_algorithm_label(net.pow_algorithm)
             << " privacy_verifier=sha3_opening"
-            << " privacy_mode=enabled";
+            << " privacy_mode=enabled"
+            << " auto_mine=" << (auto_mine_enabled_ ? "on" : "off")
+            << " auto_mine_interval_sec=" << auto_mine_interval_sec_;
         return out.str();
     }
 

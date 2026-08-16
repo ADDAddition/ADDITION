@@ -19,7 +19,14 @@ additiond --network testnet --public-rpc
 | Write / admin RPC | `127.0.0.1` | **8545** | Trusted local only |
 
 `additiond` always binds write RPC to `127.0.0.1`. Do not publish **8545**.
-Do not open LAN RPC (`18545`) or P2P (`28545`) from this unit.
+Do not open LAN RPC (`18545`) from this unit.
+
+The operator’s current public P2P is **34.27.30.115:28545** (IPv4 only).
+`config.toml` / `getinfo.bootstrap_peers` advertise that one endpoint so
+outsiders can `--bootstrap 34.27.30.115:28545`. That is not a peer-count
+claim. Joining still needs `ADDITION_ENABLE_P2P_RPC=1` on the process that
+listens on 28545. This unit leaves P2P off unless the operator sets that
+env in `/etc/addition/testnet.env`.
 
 Public allowlist: `getinfo`, `monetary_info`, `crypto_selftest`, `tx_status`,
 `peers`, `getblock`, `getblockhash`. Writes (`mine`, `sendtx*`, `createwallet`,
@@ -53,6 +60,17 @@ ADDITION_RPC_TOKEN=<strong_token>
 ```
 
 Do not set `ADDITION_MAINNET_MODE`. This unit is testnet only.
+
+Optional in-process auto-mine (off by default; never on public RPC):
+
+```bash
+# /etc/addition/testnet.env
+ADDITION_AUTO_MINE=1
+ADDITION_AUTO_MINE_INTERVAL=60
+ADDITION_AUTO_MINE_REWARD=miner1
+```
+
+After N seconds the daemon mines one testnet block and writes `blocks.dat`.
 
 ## Firewall: allow 38545 only
 

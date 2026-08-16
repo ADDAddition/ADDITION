@@ -93,4 +93,6 @@ dl { display: grid; grid-template-columns: 12rem 1fr; gap: 0.35rem 1rem; }
 dt { color: var(--muted); }
 dd { margin: 0; }
 .note { color: var(--muted); font-size: 0.95rem; }
+.recent-block { margin: 0.85rem 0 1.1rem; padding-top: 0.4rem; border-top: 1px solid var(--line); }
+.recent-block h3 { margin: 0 0 0.4rem; font-size: 1rem; }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }

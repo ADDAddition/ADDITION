@@ -44,6 +44,7 @@ add_library(addition_core
     src/private_messaging.cpp
     src/ai_optimizer.cpp
     src/wallet.cpp
+    src/auto_mine.cpp
 )
 
 target_include_directories(addition_core PUBLIC include)
@@ -75,6 +76,10 @@ if(ADDITION_BUILD_TESTS)
     target_link_libraries(test_privacy PRIVATE addition_core)
     add_test(NAME test_privacy COMMAND test_privacy)
 
+    add_executable(test_auto_mine tests/test_auto_mine.cpp)
+    target_link_libraries(test_auto_mine PRIVATE addition_core)
+    add_test(NAME test_auto_mine COMMAND test_auto_mine)
+
     find_package(Python3 COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
         add_test(
@@ -98,6 +103,14 @@ if(ADDITION_BUILD_TESTS)
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         )
         set_tests_properties(test_chain_persist_restart PROPERTIES
+            ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
+            TIMEOUT 90)
+        add_test(
+            NAME test_auto_mine_daemon
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_auto_mine_daemon.py
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        )
+        set_tests_properties(test_auto_mine_daemon PROPERTIES
             ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
             TIMEOUT 90)
     endif()

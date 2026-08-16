@@ -93,6 +93,78 @@
     target.appendChild(dl);
   }
 
+  function parseHeight(fields) {
+    if (!fields || fields.height === undefined) {
+      return null;
+    }
+    const n = Number(fields.height);
+    if (!Number.isFinite(n) || n < 0) {
+      return null;
+    }
+    return Math.floor(n);
+  }
+
+  async function loadRecentBlocks(height, count) {
+    const max = typeof count === "number" && count > 0 ? count : 5;
+    if (height === null || height === undefined) {
+      return { offline: false, blocks: [] };
+    }
+    const tip = Number(height);
+    if (!Number.isFinite(tip) || tip < 0) {
+      return { offline: false, blocks: [] };
+    }
+    const start = Math.max(0, tip - (max - 1));
+    const blocks = [];
+    for (let h = tip; h >= start; h -= 1) {
+      const result = await rpcCommand("getblock " + h);
+      if (result.offline) {
+        return { offline: true, blocks: [] };
+      }
+      if (!result.ok || result.raw.indexOf("error:") === 0) {
+        blocks.push({ height: h, ok: false, raw: result.raw || "error: block not found", fields: {} });
+        continue;
+      }
+      blocks.push({ height: h, ok: true, raw: result.raw, fields: result.fields });
+    }
+    return { offline: false, blocks: blocks };
+  }
+
+  function renderRecentBlocks(target, recent, emptyText) {
+    target.innerHTML = "";
+    if (!recent || recent.offline) {
+      const p = document.createElement("p");
+      p.className = "empty";
+      p.textContent = "RPC offline";
+      target.appendChild(p);
+      return;
+    }
+    if (!recent.blocks || recent.blocks.length === 0) {
+      const p = document.createElement("p");
+      p.className = "empty";
+      p.textContent = emptyText || "No getblock results.";
+      target.appendChild(p);
+      return;
+    }
+    for (let i = 0; i < recent.blocks.length; i += 1) {
+      const block = recent.blocks[i];
+      const wrap = document.createElement("div");
+      wrap.className = "recent-block";
+      const title = document.createElement("h3");
+      title.textContent = "getblock " + block.height;
+      wrap.appendChild(title);
+      if (block.ok && block.fields && Object.keys(block.fields).length > 0) {
+        const fields = document.createElement("div");
+        renderFields(fields, block.fields, "Node returned no key=value fields.");
+        wrap.appendChild(fields);
+      }
+      const pre = document.createElement("pre");
+      pre.className = "raw";
+      pre.textContent = block.raw || "";
+      wrap.appendChild(pre);
+      target.appendChild(wrap);
+    }
+  }
+
   function setStatus(el, result) {
     if (!el) {
       return;
@@ -109,7 +181,10 @@
   global.AdditionSite = {
     rpcUrlFromPage: rpcUrlFromPage,
     parseFields: parseFields,
+    parseHeight: parseHeight,
     rpcCommand: rpcCommand,
+    loadRecentBlocks: loadRecentBlocks,
+    renderRecentBlocks: renderRecentBlocks,
     renderFields: renderFields,
     setStatus: setStatus
   };

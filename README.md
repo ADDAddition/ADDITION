@@ -34,7 +34,7 @@ Checked-in network files:
 * [`config.toml`](config.toml) — network name, ports, reward, localhost bootstrap examples
 * [`genesis.json`](genesis.json) — testnet genesis parameters (no fake node counts)
 
-`bootstrap_peers` lists localhost examples only (`127.0.0.1:28545`) until a second real node exists.
+`bootstrap_peers` is IPv4 `ip:port` only. The operator’s current public P2P is `34.27.30.115:28545`. That is one real endpoint, not a peer-count claim. Local two-node runs still use `--bootstrap 127.0.0.1:28545`. Write RPC stays `127.0.0.1:8545`.
 
 ---
 
@@ -125,7 +125,7 @@ Honest UI:
 * Page: `/wallet/` via `python3 web/serve.py` (loopback `/local-rpc` only)
 * Desktop: `python3 web/addition_wallet_gui.py` or `--cli getinfo`
 
-A fresh wallet balance is `0` until you `mine <address>` on local RPC (testnet PoW is SHA3-512 of the header, 30s deadline, reward 50 on a fresh testnet) or receive a UTXO. Public RPC cannot create wallets or send. See [docs/REAL_TESTNET_MINE_AND_PRIVACY.md](docs/REAL_TESTNET_MINE_AND_PRIVACY.md).
+A fresh wallet balance is `0` until a block is mined to that address (testnet PoW is SHA3-512 of the header, 30s deadline, reward 50 on a fresh testnet) or a UTXO arrives. `mine <address>` is trusted local RPC only. Optional in-process auto-mine (`--auto-mine`, off by default, testnet only) mines one block every N seconds and writes `blocks.dat` the same way as a manual mine. Public RPC cannot mine, create wallets, or send. See [docs/REAL_TESTNET_MINE_AND_PRIVACY.md](docs/REAL_TESTNET_MINE_AND_PRIVACY.md).
 
 Standalone CLI that keeps keys on the **caller** disk (not `data/wallets/`) and signs ML-DSA-87 locally before `sendtx_signed_hash`:
 
@@ -159,7 +159,18 @@ printf 'mine\n' | nc 127.0.0.1 38545   # error: command disabled on public RPC
 
 LAN RPC (`18545`) still requires `ADDITION_ENABLE_LAN_RPC=1` and `ADDITION_LAN_RPC_TOKEN`. P2P stays off unless `ADDITION_ENABLE_P2P_RPC=1`. Do not open unauthenticated write RPC to the world.
 
-Config keys: `enable_public_rpc`, `ports.public_rpc`, `ports.public_rpc_bind`. Second local node: `--local-rpc-port 8546 --p2p-port 28546 --bootstrap 127.0.0.1:28545`. See [docs/TWO_NODE_TESTNET.md](docs/TWO_NODE_TESTNET.md).
+Config keys: `enable_public_rpc`, `ports.public_rpc`, `ports.public_rpc_bind`, `enable_auto_mine`, `auto_mine_interval_sec`, `auto_mine_reward`, `bootstrap_peers`. Second local node: `--local-rpc-port 8546 --p2p-port 28546 --bootstrap 127.0.0.1:28545`. To join the operator testnet: `--bootstrap 34.27.30.115:28545` (IPv4 only; P2P stays off unless `ADDITION_ENABLE_P2P_RPC=1`). See [docs/TWO_NODE_TESTNET.md](docs/TWO_NODE_TESTNET.md).
+
+### Testnet auto-mine (off by default)
+
+The chain only grows when something mines. That can be a human/`mine` on localhost **or** an optional in-process timer:
+
+```bash
+./build/additiond --network testnet --auto-mine --auto-mine-interval 60 --auto-mine-reward miner1
+# equivalent: ADDITION_AUTO_MINE=1 ADDITION_AUTO_MINE_INTERVAL=60 ./build/additiond --network testnet
+```
+
+Auto-mine is refused on `--network mainnet`. It is not a public RPC command (`mine` stays rejected on port 38545). Each accepted block is persisted to `--data-dir/blocks.dat` as today.
 
 ### Honest website (static Pages)
 
@@ -172,8 +183,8 @@ python3 web/serve.py
 | Path | Content |
 |------|---------|
 | `/` | Research testnet home + live `getinfo` or **RPC offline** |
-| `/explorer/` | Block/tx lookup from the read RPC only |
-| `/status/` | getinfo, monetary_info, selftest, peers |
+| `/explorer/` | Height + last few real `getblock` results from the read RPC, or **RPC offline** |
+| `/status/` | getinfo, recent `getblock`, monetary_info, selftest, peers |
 | `/rpc/` | How to talk to the public allowlist |
 | `/docs/` | Architecture, commands, PoUW spec, getting started, runbook, ZK contract |
 | `/wallet/` | Local createwallet / UTXO send via `/local-rpc` (loopback) |
