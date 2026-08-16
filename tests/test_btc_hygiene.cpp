@@ -119,12 +119,12 @@ int main() {
         std::cerr << "test failed: hygiene_attest: " << attested << '\n';
         return 1;
     }
-    const auto note_pos = attested.find("note=");
-    auto note_end = attested.find(" btc_addr=", note_pos);
-    if (note_end == std::string::npos) {
-        note_end = attested.size();
+    const auto note_pos = attested.find(" note=");
+    if (note_pos == std::string::npos) {
+        std::cerr << "test failed: hygiene_attest missing trailing note=: " << attested << '\n';
+        return 1;
     }
-    const auto note = attested.substr(note_pos + 5, note_end - (note_pos + 5));
+    const auto note = attested.substr(note_pos + 6);
     const auto verified = rpc.handle_command("hygiene_verify " + note);
     if (verified.find("ok:hygiene_receipt") == std::string::npos) {
         std::cerr << "test failed: hygiene_verify good: " << verified << '\n';

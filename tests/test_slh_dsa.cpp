@@ -8,6 +8,7 @@
 
 #include <iostream>
 #include <string>
+#include <vector>
 
 int main() {
     if (!addition::sig_scheme_allowed_strict(addition::SigScheme::MlDsa87)) {
@@ -60,13 +61,28 @@ int main() {
         return 1;
     }
 
-    if (!addition::sig_scheme_available(addition::SigScheme::SlhDsaShake256s)) {
-        std::cout << "SLH-DSA-SHAKE-256s unavailable in this liboqs; scheme_id hook fail-closed ok\n";
+    {
+        const std::vector<std::uint8_t> dummy(64, 1);
+        const auto a_ml = addition::hash_committed_address(addition::SigScheme::MlDsa87, dummy);
+        const auto a_slh = addition::hash_committed_address(addition::SigScheme::SlhDsaShake256s, dummy);
+        if (a_ml.empty() || a_slh.empty() || a_ml == a_slh) {
+            std::cerr << "test failed: scheme_id must change the address hash\n";
+            return 1;
+        }
+    }
+
+    if (!addition::sig_scheme_allowed_strict(addition::SigScheme::SlhDsaShake256s)) {
+        if (addition::sig_scheme_available(addition::SigScheme::SlhDsaShake256s)) {
+            std::cout << "SLH-DSA-SHAKE-256s present in liboqs but "
+                         "OQS_SIG_sign_with_ctx_str failed; fail-closed, no fake verify\n";
+        } else {
+            std::cout << "SLH-DSA-SHAKE-256s unavailable in this liboqs; scheme_id hook fail-closed ok\n";
+        }
         std::cout << "allowed_sig_algs=" << algs << '\n';
         return 0;
     }
     if (algs.find("slh-dsa-shake-256s") == std::string::npos) {
-        std::cerr << "test failed: SLH available but not listed: " << algs << '\n';
+        std::cerr << "test failed: SLH allowed but not listed: " << algs << '\n';
         return 1;
     }
 

@@ -412,10 +412,10 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         std::ostringstream out;
         out << "ok:hygiene_receipt"
             << " hash=" << tx_hash
-            << " note=" << note
             << " " << format_hygiene_report(report)
             << " attestor=" << stored.address
-            << " moves_bitcoin=0";
+            << " moves_bitcoin=0"
+            << " note=" << note;
         return out.str();
     }
 

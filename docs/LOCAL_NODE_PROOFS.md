@@ -110,8 +110,11 @@ printf 'crypto_selftest\n' | nc 127.0.0.1 18545
 schemes are rejected in strict mode. This does **not** make the chain
 hash-based. Falcon / FN-DSA are not added. No FIPS 140-3 claim.
 
-If this liboqs build lacks SPHINCS+-SHAKE-256s-simple, keygen/verify fail
-closed; `test_slh_dsa` records that instead of faking a verify.
+If this liboqs build lacks SPHINCS+-SHAKE-256s-simple, **or** that algorithm
+cannot `OQS_SIG_sign_with_ctx_str` (liboqs 0.12.0 SPHINCS+ returns failure
+for a non-empty context), keygen/spend fail closed. `test_slh_dsa` records
+that instead of signing without context or faking a verify. The `scheme_id`
+address hook still distinguishes the two types.
 
 ## Not claimed
 

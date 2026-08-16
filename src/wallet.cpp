@@ -3,6 +3,8 @@
 #include "addition/block.hpp"
 #include "addition/crypto.hpp"
 
+#include <exception>
+
 namespace addition {
 
 Wallet::Wallet(std::string address, std::string public_key, std::string private_key)
@@ -36,7 +38,12 @@ bool Wallet::build_signed_send(const Chain& chain,
                                : "ml-dsa-87";
     out_tx.signature.clear();
     const auto msg = hash_transaction(out_tx);
-    out_tx.signature = sign_message_hybrid(private_key_, msg, chain.consensus_sign_context(), out_tx.signer_scheme);
+    try {
+        out_tx.signature = sign_message_hybrid(private_key_, msg, chain.consensus_sign_context(), out_tx.signer_scheme);
+    } catch (const std::exception& e) {
+        error = e.what();
+        return false;
+    }
 
     if (!chain.validate_transaction(out_tx, error)) {
         return false;

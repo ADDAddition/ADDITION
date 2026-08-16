@@ -11,6 +11,7 @@
 #include <mutex>
 #include <sstream>
 #include <stdexcept>
+#include <vector>
 
 namespace addition {
 namespace {
@@ -104,6 +105,86 @@ bool ctx_usable(const std::string& ctx, std::string& error) {
         return false;
     }
     return true;
+}
+
+bool scheme_supports_ctx_sign(SigScheme scheme) {
+    static std::mutex mu;
+    static bool ml_cached = false;
+    static bool ml_ok = false;
+    static bool slh_cached = false;
+    static bool slh_ok = false;
+
+    bool* cached = nullptr;
+    bool* ok = nullptr;
+    switch (scheme) {
+    case SigScheme::MlDsa87:
+        cached = &ml_cached;
+        ok = &ml_ok;
+        break;
+    case SigScheme::SlhDsaShake256s:
+        cached = &slh_cached;
+        ok = &slh_ok;
+        break;
+    case SigScheme::Unknown:
+        return false;
+    }
+    {
+        std::lock_guard<std::mutex> lock(mu);
+        if (*cached) {
+            return *ok;
+        }
+    }
+
+    const char* name = oqs_name_for(scheme);
+    if (name == nullptr || name[0] == '\0') {
+        std::lock_guard<std::mutex> lock(mu);
+        *cached = true;
+        *ok = false;
+        return false;
+    }
+    OQS_SIG* sig = OQS_SIG_new(name);
+    if (sig == nullptr) {
+        std::lock_guard<std::mutex> lock(mu);
+        *cached = true;
+        *ok = false;
+        return false;
+    }
+
+    std::vector<std::uint8_t> pub(sig->length_public_key, 0);
+    std::vector<std::uint8_t> sec(sig->length_secret_key, 0);
+    std::vector<std::uint8_t> out(sig->length_signature, 0);
+    bool works = false;
+    if (OQS_SIG_keypair(sig, pub.data(), sec.data()) == OQS_SUCCESS) {
+        const std::string msg = "addition-ctx-probe";
+        const std::string ctx = "ADDITION|probe|ctx|0";
+        size_t slen = 0;
+        if (OQS_SIG_sign_with_ctx_str(sig,
+                                      out.data(),
+                                      &slen,
+                                      reinterpret_cast<const std::uint8_t*>(msg.data()),
+                                      msg.size(),
+                                      reinterpret_cast<const std::uint8_t*>(ctx.data()),
+                                      ctx.size(),
+                                      sec.data()) == OQS_SUCCESS &&
+            slen > 0 &&
+            OQS_SIG_verify_with_ctx_str(sig,
+                                        reinterpret_cast<const std::uint8_t*>(msg.data()),
+                                        msg.size(),
+                                        out.data(),
+                                        slen,
+                                        reinterpret_cast<const std::uint8_t*>(ctx.data()),
+                                        ctx.size(),
+                                        pub.data()) == OQS_SUCCESS) {
+            works = true;
+        }
+    }
+    OQS_MEM_cleanse(sec.data(), sec.size());
+    OQS_SIG_free(sig);
+
+    std::lock_guard<std::mutex> lock(mu);
+    *cached = true;
+    *ok = works;
+    return works;
 }
 
 } // namespace
@@ -228,9 +309,10 @@ bool sig_scheme_available(SigScheme scheme) {
 bool sig_scheme_allowed_strict(SigScheme scheme) {
     switch (scheme) {
     case SigScheme::MlDsa87:
-        return sig_scheme_available(scheme);
+        return sig_scheme_available(scheme) && scheme_supports_ctx_sign(scheme);
     case SigScheme::SlhDsaShake256s:
-        return sig_scheme_available(scheme);
+        // Fail closed unless this liboqs build can sign+verify with a non-empty context.
+        return sig_scheme_available(scheme) && scheme_supports_ctx_sign(scheme);
     case SigScheme::Unknown:
         return false;
     }
@@ -402,8 +484,8 @@ bool verify_message_signature_hybrid(const std::string& public_key,
     }
 
     std::string err;
-    const auto used_ctx = resolve_ctx(ctx);
-    if (!ctx_usable(used_ctx, err)) {
+    // Empty ctx is a failed verify (FIPS 204/205). Do not silently substitute the process default.
+    if (!ctx_usable(ctx, err)) {
         return false;
     }
 
