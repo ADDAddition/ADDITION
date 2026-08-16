@@ -44,6 +44,7 @@ add_library(addition_core
     src/private_messaging.cpp
     src/ai_optimizer.cpp
     src/wallet.cpp
+    src/btc_hygiene.cpp
 )
 
 target_include_directories(addition_core PUBLIC include)
@@ -75,6 +76,10 @@ if(ADDITION_BUILD_TESTS)
     target_link_libraries(test_privacy PRIVATE addition_core)
     add_test(NAME test_privacy COMMAND test_privacy)
 
+    add_executable(test_hash_address tests/test_hash_address.cpp)
+    target_link_libraries(test_hash_address PRIVATE addition_core)
+    add_test(NAME test_hash_address COMMAND test_hash_address)
+
     find_package(Python3 COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
         add_test(
@@ -92,5 +97,13 @@ if(ADDITION_BUILD_TESTS)
         set_tests_properties(test_live_mine_and_privacy PROPERTIES
             ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
             TIMEOUT 90)
+        add_test(
+            NAME test_two_node_sync
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_two_node_sync.py
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        )
+        set_tests_properties(test_two_node_sync PROPERTIES
+            ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
+            TIMEOUT 120)
     endif()
 endif()

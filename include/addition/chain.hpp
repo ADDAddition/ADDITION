@@ -67,6 +67,11 @@ public:
     std::optional<Block> block_by_hash(const std::string& hash) const;
     bool has_block_hash(const std::string& hash) const;
     std::uint64_t cumulative_work() const;
+    std::string genesis_hash() const;
+    std::string consensus_sign_context() const;
+    std::uint64_t tx_confirmations(const std::string& tx_hash) const;
+    bool tx_in_best_chain(const std::string& tx_hash) const;
+    std::vector<Transaction> collect_dropped_transactions(const std::vector<Block>& old_blocks) const;
 
 private:
     struct UTXO {

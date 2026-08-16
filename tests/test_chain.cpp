@@ -33,7 +33,7 @@ int main() {
         return 1;
     }
 
-    addition::ChainConfig live = addition::testnet_chain_config();
+    addition::ChainConfig live = addition::regtest_chain_config();
     addition::Chain chain(live);
 
     {
@@ -103,7 +103,8 @@ int main() {
         addition::Transaction unsigned_pay = pay;
         unsigned_pay.signature.clear();
         const auto msg = addition::hash_transaction(unsigned_pay);
-        pay.signature = addition::sign_message_hybrid(miner_keys.private_key, msg);
+        pay.signature = addition::sign_message_hybrid(
+            miner_keys.private_key, msg, chain.consensus_sign_context(), miner_keys.algorithm);
     }
     if (!chain.validate_transaction(pay, error)) {
         std::cerr << "test failed: signed tx invalid: " << error << '\n';

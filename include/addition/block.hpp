@@ -21,7 +21,9 @@ struct Transaction {
     std::vector<TxOutput> outputs;
     std::string signer;
     std::string signer_pubkey;
+    std::string signer_scheme{"ml-dsa-87"};
     std::string signature;
+    std::string note;
     std::uint64_t fee{0};
     std::uint64_t nonce{0};
 };

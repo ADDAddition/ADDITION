@@ -38,8 +38,16 @@ class WalletError(RuntimeError):
     pass
 
 
+def hash_committed_address(pubkey_hex: str, scheme: str = ML_DSA_87) -> str:
+    """SHA3-512(scheme_id || 0x00 || pubkey_bytes), 128 hex. Same as the node."""
+    if not _looks_like_hex(pubkey_hex):
+        raise WalletError("public key is not even-length hex")
+    preimage = scheme.encode("ascii") + b"\x00" + bytes.fromhex(pubkey_hex)
+    return hashlib.sha3_512(preimage).hexdigest()
+
+
 def derive_address(pubkey_hex: str) -> str:
-    return hashlib.sha3_512(("addr|" + pubkey_hex).encode("ascii")).hexdigest()[:40]
+    return hash_committed_address(pubkey_hex, ML_DSA_87)
 
 
 def parse_kv(line: str) -> Dict[str, str]:
@@ -71,15 +79,17 @@ class LiboqsMlDsa87:
         self._lib.OQS_SIG_free.argtypes = [ctypes.c_void_p]
         self._lib.OQS_SIG_keypair.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
         self._lib.OQS_SIG_keypair.restype = ctypes.c_int
-        self._lib.OQS_SIG_sign.argtypes = [
+        self._lib.OQS_SIG_sign_with_ctx_str.argtypes = [
             ctypes.c_void_p,
             ctypes.c_void_p,
             ctypes.POINTER(ctypes.c_size_t),
             ctypes.c_void_p,
             ctypes.c_size_t,
             ctypes.c_void_p,
+            ctypes.c_size_t,
+            ctypes.c_void_p,
         ]
-        self._lib.OQS_SIG_sign.restype = ctypes.c_int
+        self._lib.OQS_SIG_sign_with_ctx_str.restype = ctypes.c_int
 
     @staticmethod
     def _load(library_path: Optional[str]) -> ctypes.CDLL:
@@ -134,9 +144,11 @@ class LiboqsMlDsa87:
         finally:
             self._lib.OQS_SIG_free(sig)
 
-    def sign(self, private_key_hex: str, message: bytes) -> str:
+    def sign(self, private_key_hex: str, message: bytes, ctx: str) -> str:
         if not _looks_like_hex(private_key_hex) or len(private_key_hex) != ML_DSA_87_SK_BYTES * 2:
             raise WalletError("private key hex does not match ML-DSA-87 secret size")
+        if not ctx or len(ctx.encode("utf-8")) > 255:
+            raise WalletError("FIPS 204 context must be non-empty and <=255 bytes")
         sig = self._lib.OQS_SIG_new(b"ML-DSA-87")
         if not sig:
             raise WalletError("OQS_SIG_new failed for ML-DSA-87")
@@ -146,16 +158,19 @@ class LiboqsMlDsa87:
             )
             signature = (ctypes.c_uint8 * ML_DSA_87_SIG_BYTES)()
             sig_len = ctypes.c_size_t(ML_DSA_87_SIG_BYTES)
-            rc = self._lib.OQS_SIG_sign(
+            ctx_bytes = ctx.encode("utf-8")
+            rc = self._lib.OQS_SIG_sign_with_ctx_str(
                 sig,
                 signature,
                 ctypes.byref(sig_len),
                 message,
                 len(message),
+                ctx_bytes,
+                len(ctx_bytes),
                 secret_key,
             )
             if rc != OQS_SUCCESS or sig_len.value == 0 or sig_len.value > ML_DSA_87_SIG_BYTES:
-                raise WalletError("OQS_SIG_sign failed")
+                raise WalletError("OQS_SIG_sign_with_ctx_str failed")
             return bytes(signature[: sig_len.value]).hex()
         finally:
             self._lib.OQS_SIG_free(sig)
@@ -307,10 +322,17 @@ class WalletClient:
             return self._keygen()
         return self._oqs_backend().generate()
 
-    def sign_local(self, private_key_hex: str, message: bytes) -> str:
+    def sign_local(self, private_key_hex: str, message: bytes, ctx: str = "") -> str:
         if self._signer is not None:
             return self._signer(private_key_hex, message)
-        return self._oqs_backend().sign(private_key_hex, message)
+        return self._oqs_backend().sign(private_key_hex, message, ctx)
+
+    def consensus_sign_context(self) -> str:
+        info = parse_kv(self.getinfo())
+        ctx = info.get("sign_context", "")
+        if not ctx:
+            raise WalletError("getinfo did not return sign_context")
+        return ctx
 
     def create(self, force: bool = False) -> WalletRecord:
         if self.store.exists() and not force:
@@ -365,6 +387,7 @@ class WalletClient:
 
         last_error = "send failed"
         nonce = max(record.next_nonce, 1)
+        ctx = self.consensus_sign_context()
         for _ in range(8):
             built = self.rpc.call(
                 f"tx_build {record.address} {record.public_key} {to_addr} {amount} {used_fee} {nonce}"
@@ -378,7 +401,7 @@ class WalletClient:
             sign_hash = parse_kv(built).get("sign_hash", "")
             if not sign_hash:
                 raise WalletError("tx_build did not return sign_hash: " + built)
-            signature = self.sign_local(record.private_key, sign_hash.encode("utf-8"))
+            signature = self.sign_local(record.private_key, sign_hash.encode("utf-8"), ctx)
             if signature.startswith("pq="):
                 signature = signature[3:]
             if record.private_key in signature:

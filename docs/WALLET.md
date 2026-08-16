@@ -21,14 +21,14 @@ Relevant commands (see [FINAL_COMMANDS.md](FINAL_COMMANDS.md)):
 
 | Command | Role |
 |---|---|
-| `createwallet [name]` | Node-side ML-DSA-87 keygen. Writes `data/wallets/<name>.wal`. Returns `address`, `pub`, `algo=ml-dsa-87`, `priv_printed=0`. |
+| `createwallet [name] [scheme]` | Node-side keygen (default `ml-dsa-87`; opt-in `slh-dsa-shake-256s`). Writes `data/wallets/<name>.wal`. Returns a 128-hex hash-address, `pub`, `algo`, `priv_printed=0`. |
 | `wallet_send <name> <to> <amount> [fee]` | Node signs from that `.wal` file. No privkey on the wire. |
 | `getbalance <address>` | Confirmed balance |
 | `fee_info` | `recommended_min_fee` (minimum `1`) |
 | `tx_build <from> <pubkey_hex> <to> <amount> <fee> <nonce>` | Builds the unsigned spend and returns `sign_hash=...` |
 | `sendtx_signed_hash ... <sig_hex_without_pq_prefix>` | Submits a PQ signature. No private key argument. |
 | `mine <address>` | Local testnet: SHA3-512 header PoW, 30s deadline, coinbase 50 |
-| `getinfo` | `network=testnet`, `height`, `peers`, `pq_mode=strict`, `max_supply=50000000` |
+| `getinfo` | `network`, `height`, `peers`, `pq_mode=strict`, `max_supply=50000000`, `confirmations_policy`, `economic_security=none`, `allowed_sig_algs`, `sign_context` |
 
 Legacy `sendtx` / `sendtx_hash` (private key on the RPC line) stay **disabled**
 unless `ADDITION_ALLOW_INSECURE_TX_COMMANDS=1`. Leave that unset.
@@ -47,8 +47,10 @@ Keys are generated **locally** with liboqs ML-DSA-87, using the same address
 formula as the node:
 
 ```text
-address = sha3_512("addr|" + pubkey_hex)[0:40]
+address = sha3_512(scheme_id || 0x00 || pubkey_bytes)   # 128 hex, not the raw 2592-byte key
 ```
+
+Local spends must use the node's FIPS 204 context from `getinfo sign_context=` (hedged `OQS_SIG_sign_with_ctx_str`). Empty or wrong context fails verify.
 
 The secret is written to a gitignored file (default `data/addition.wallet`,
 mode `0600`) and is used only in-process to sign `sign_hash`.

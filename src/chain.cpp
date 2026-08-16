@@ -14,8 +14,16 @@
 namespace addition {
 namespace {
 
-std::string derive_address_from_pubkey(const std::string& pubkey_hex) {
-    return to_hex(sha3_512_bytes("addr|" + pubkey_hex)).substr(0, 40);
+std::string derive_address_from_pubkey(const std::string& pubkey_hex, const std::string& scheme) {
+    SigScheme parsed = SigScheme::Unknown;
+    if (!scheme.empty() && parse_sig_scheme(scheme, parsed)) {
+        return hash_committed_address_hex(parsed, pubkey_hex);
+    }
+    parsed = infer_sig_scheme_from_pubkey_hex(pubkey_hex);
+    if (parsed == SigScheme::Unknown) {
+        return {};
+    }
+    return hash_committed_address_hex(parsed, pubkey_hex);
 }
 
 std::uint64_t now_seconds() {
@@ -73,6 +81,7 @@ Chain::Chain(ChainConfig cfg) : cfg_(std::move(cfg)) {
     auto g = make_genesis();
     blocks_.push_back(g);
     cumulative_work_ = work_for_target(g.header.difficulty_target);
+    set_default_sign_context(consensus_sign_context());
 }
 
 void Chain::reset() {
@@ -127,6 +136,51 @@ bool Chain::has_block_hash(const std::string& hash) const {
 }
 
 std::uint64_t Chain::cumulative_work() const { return cumulative_work_; }
+
+std::string Chain::genesis_hash() const {
+    return hash_block_header(blocks_.front().header);
+}
+
+std::string Chain::consensus_sign_context() const {
+    return make_consensus_sign_context(cfg_.network_mode, cfg_.network_id, genesis_hash());
+}
+
+std::uint64_t Chain::tx_confirmations(const std::string& tx_hash) const {
+    for (const auto& b : blocks_) {
+        for (const auto& tx : b.transactions) {
+            if (hash_transaction(tx) == tx_hash) {
+                return (height() >= b.header.height) ? (height() - b.header.height + 1ULL) : 0ULL;
+            }
+        }
+    }
+    return 0;
+}
+
+bool Chain::tx_in_best_chain(const std::string& tx_hash) const {
+    return tx_confirmations(tx_hash) > 0;
+}
+
+std::vector<Transaction> Chain::collect_dropped_transactions(const std::vector<Block>& old_blocks) const {
+    std::unordered_set<std::string> keep;
+    for (const auto& b : blocks_) {
+        for (const auto& tx : b.transactions) {
+            keep.insert(hash_transaction(tx));
+        }
+    }
+    std::vector<Transaction> dropped;
+    for (const auto& b : old_blocks) {
+        for (const auto& tx : b.transactions) {
+            if (tx.inputs.empty()) {
+                continue;
+            }
+            const auto id = hash_transaction(tx);
+            if (keep.count(id) == 0) {
+                dropped.push_back(tx);
+            }
+        }
+    }
+    return dropped;
+}
 std::uint64_t Chain::current_difficulty_target() const { return difficulty_target_; }
 std::uint64_t Chain::total_fees_last_block() const { return total_fees_last_block_; }
 
@@ -531,8 +585,19 @@ bool Chain::validate_transaction_signature(const Transaction& tx, std::string& e
         return false;
     }
 
-    if (derive_address_from_pubkey(tx.signer_pubkey) != tx.signer) {
-        error = "signer/pubkey mismatch";
+    SigScheme scheme = SigScheme::Unknown;
+    if (!tx.signer_scheme.empty() && !parse_sig_scheme(tx.signer_scheme, scheme)) {
+        error = "unknown scheme rejected in strict mode";
+        return false;
+    }
+    if (scheme == SigScheme::Unknown) {
+        scheme = infer_sig_scheme_from_pubkey_hex(tx.signer_pubkey);
+    }
+    if (cfg_.require_pq_signatures && !sig_scheme_allowed_strict(scheme)) {
+        error = "unknown scheme rejected in strict mode";
+        return false;
+    }
+    if (!address_binds_pubkey(tx.signer, scheme, tx.signer_pubkey, error)) {
         return false;
     }
 
@@ -554,7 +619,11 @@ bool Chain::validate_transaction_signature(const Transaction& tx, std::string& e
     Transaction unsigned_tx = tx;
     unsigned_tx.signature.clear();
     const auto msg = hash_transaction(unsigned_tx);
-    if (!verify_message_signature_hybrid(tx.signer_pubkey, msg, tx.signature)) {
+    if (!verify_message_signature_hybrid(tx.signer_pubkey,
+                                         msg,
+                                         tx.signature,
+                                         consensus_sign_context(),
+                                         sig_scheme_id(scheme))) {
         error = "invalid signature";
         return false;
     }
@@ -624,6 +693,14 @@ bool Chain::validate_block_header(const Block& candidate, std::string& error) co
         return false;
     }
 
+    if (candidate.header.difficulty_target > cfg_.max_difficulty_target) {
+        error = "difficulty below min-diff floor (toy target rejected)";
+        return false;
+    }
+    if (candidate.header.difficulty_target < cfg_.min_difficulty_target) {
+        error = "difficulty target harder than profile min";
+        return false;
+    }
     if (candidate.header.difficulty_target != difficulty_target_) {
         error = "invalid difficulty target";
         return false;

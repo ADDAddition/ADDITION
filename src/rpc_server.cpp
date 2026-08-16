@@ -1,6 +1,7 @@
 #include "addition/rpc_server.hpp"
 
 #include "addition/block.hpp"
+#include "addition/btc_hygiene.hpp"
 #include "addition/config.hpp"
 #include "addition/crypto.hpp"
 #include "addition/rpc_access.hpp"
@@ -93,12 +94,48 @@ std::string format_block(const Block& b) {
             }
             out << hash_transaction(b.transactions[i]);
         }
+        out << " tx_signers=";
+        for (std::size_t i = 0; i < b.transactions.size(); ++i) {
+            if (i > 0) {
+                out << ',';
+            }
+            const auto& tx = b.transactions[i];
+            if (tx.signer.empty()) {
+                out << "coinbase";
+            } else {
+                out << tx.signer;
+            }
+        }
+        bool any_note = false;
+        for (const auto& tx : b.transactions) {
+            if (!tx.note.empty()) {
+                any_note = true;
+                break;
+            }
+        }
+        if (any_note) {
+            out << " tx_notes=";
+            for (std::size_t i = 0; i < b.transactions.size(); ++i) {
+                if (i > 0) {
+                    out << ',';
+                }
+                out << (b.transactions[i].note.empty() ? "-" : b.transactions[i].note);
+            }
+        }
     }
     return out.str();
 }
 
-std::string derive_address_from_pubkey(const std::string& pubkey_hex) {
-    return to_hex(sha3_512_bytes("addr|" + pubkey_hex)).substr(0, 40);
+std::string derive_address_from_pubkey(const std::string& pubkey_hex, const std::string& scheme = {}) {
+    SigScheme parsed = SigScheme::Unknown;
+    if (!scheme.empty() && parse_sig_scheme(scheme, parsed)) {
+        return hash_committed_address_hex(parsed, pubkey_hex);
+    }
+    parsed = infer_sig_scheme_from_pubkey_hex(pubkey_hex);
+    if (parsed == SigScheme::Unknown) {
+        return {};
+    }
+    return hash_committed_address_hex(parsed, pubkey_hex);
 }
 
 bool verify_admin_signature(const std::string& admin_addr,
@@ -111,7 +148,8 @@ bool verify_admin_signature(const std::string& admin_addr,
     if (derive_address_from_pubkey(admin_pubkey) != admin_addr) {
         return false;
     }
-    return verify_message_signature_hybrid(admin_pubkey, payload, std::string("pq=") + admin_sig_hex);
+    return verify_message_signature_hybrid(admin_pubkey, payload, std::string("pq=") + admin_sig_hex,
+                                          default_sign_context());
 }
 
 bool requires_admin_signature_command(const std::string& cmd) {
@@ -206,6 +244,13 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " last_tps=" << std::fixed << std::setprecision(2) << miner_.last_tps()
             << " pq_mode=strict"
             << " pow_algorithm=" << pow_algorithm_label(net.pow_algorithm)
+            << " pow_profile=" << net.pow_profile
+            << " confirmations_policy=" << net.confirmations_policy
+            << " economic_security=" << net.economic_security
+            << " allowed_sig_algs=" << allowed_sig_algs_list()
+            << " genesis_hash=" << chain_.genesis_hash()
+            << " sign_context=" << chain_.consensus_sign_context()
+            << " address_format=sha3_512(scheme_id||0x00||pubkey)"
             << " privacy_verifier=sha3_opening"
             << " privacy_mode=enabled";
         return out.str();
@@ -261,6 +306,119 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         return ok ? std::string("ok:") + report : std::string("error:") + report;
     }
 
+    if (cmd == "hygiene_classify") {
+        std::string path;
+        iss >> path;
+        if (path.empty()) {
+            path = "fixtures/btc_hygiene_samples.json";
+        }
+        std::vector<BtcScriptSample> samples;
+        std::string error;
+        if (!load_btc_hygiene_fixtures(path, samples, error)) {
+            return "error: " + error;
+        }
+        const auto reports = classify_btc_samples(samples);
+        std::ostringstream out;
+        out << "ok:hygiene_rehearsal samples=" << reports.size()
+            << " moves_bitcoin=0 claim=attestation_not_bip360";
+        for (const auto& r : reports) {
+            out << " | " << format_hygiene_report(r);
+        }
+        return out.str();
+    }
+
+    if (cmd == "hygiene_verify") {
+        std::string note;
+        std::getline(iss, note);
+        note = note.substr(note.find_first_not_of(" \t") == std::string::npos
+                               ? note.size()
+                               : note.find_first_not_of(" \t"));
+        if (note.empty()) {
+            return "error: usage hygiene_verify <receipt_note>";
+        }
+        const auto sig_pos = note.rfind("|attest_sig=");
+        const auto pub_pos = note.rfind("|attest_pub=");
+        if (sig_pos == std::string::npos || pub_pos == std::string::npos || pub_pos > sig_pos) {
+            return "error: receipt missing attestation fields";
+        }
+        const auto body = note.substr(0, pub_pos);
+        const auto pub = note.substr(pub_pos + 12, sig_pos - (pub_pos + 12));
+        const auto sig = note.substr(sig_pos + 12);
+        BtcHygieneReport parsed{};
+        std::string error;
+        if (!parse_hygiene_receipt_body(body, parsed, error)) {
+            return "error: " + error;
+        }
+        if (!verify_message_signature_hybrid(pub, body, sig, chain_.consensus_sign_context())) {
+            return "error: garbage hygiene receipt rejected";
+        }
+        return std::string("ok:hygiene_receipt ") + format_hygiene_report(parsed) +
+               " attestor=" + derive_address_from_pubkey(pub);
+    }
+
+    if (cmd == "hygiene_attest") {
+        std::string name;
+        std::string btc_addr;
+        std::uint64_t height = 0;
+        std::string class_name;
+        int reuse = 0;
+        int pubkey_on_chain = 0;
+        iss >> name >> btc_addr >> height >> class_name >> reuse >> pubkey_on_chain;
+        if (name.empty() || btc_addr.empty() || class_name.empty()) {
+            return "error: usage hygiene_attest <wallet> <btc_addr> <height> <class> [reuse] [pubkey_on_chain]";
+        }
+        StoredWallet stored{};
+        std::string error;
+        if (!wallets_.load(name, stored, error, true)) {
+            return "error: " + error;
+        }
+        BtcHygieneReport report{};
+        report.address = btc_addr;
+        report.height = height;
+        report.class_name = class_name;
+        report.address_reuse = reuse != 0;
+        report.pubkey_already_on_chain = pubkey_on_chain != 0;
+        const auto body = hygiene_receipt_body(report);
+        std::string sig;
+        try {
+            sig = sign_message_hybrid(stored.private_key, body, chain_.consensus_sign_context(), stored.algorithm);
+        } catch (const std::exception& e) {
+            return std::string("error: hygiene sign failed: ") + e.what();
+        }
+        const auto note = body + "|attest_pub=" + stored.public_key + "|attest_sig=" + sig;
+
+        const auto fee = std::max(recommended_min_fee(mempool_.size(), chain_.total_fees_last_block()),
+                                  chain_.config().min_fee);
+        Wallet wallet(stored.address, stored.public_key, stored.private_key);
+        Transaction tx{};
+        if (!wallet.build_signed_send(chain_, stored.address, 1, fee, tx, error)) {
+            return "error: " + error;
+        }
+        tx.note = note;
+        tx.signature.clear();
+        const auto msg = hash_transaction(tx);
+        try {
+            tx.signature = sign_message_hybrid(stored.private_key, msg, chain_.consensus_sign_context(), stored.algorithm);
+        } catch (const std::exception& e) {
+            return std::string("error: tx sign failed: ") + e.what();
+        }
+        if (!chain_.validate_transaction(tx, error)) {
+            return "error: " + error;
+        }
+        if (!node_.submit_transaction(tx, error)) {
+            return "error: " + error;
+        }
+        const auto tx_hash = hash_transaction(tx);
+        std::ostringstream out;
+        out << "ok:hygiene_receipt"
+            << " hash=" << tx_hash
+            << " note=" << note
+            << " " << format_hygiene_report(report)
+            << " attestor=" << stored.address
+            << " moves_bitcoin=0";
+        return out.str();
+    }
+
     if (cmd == "sign_message") {
         std::string privkey;
         std::string message_hex;
@@ -279,7 +437,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
 
         const std::string msg(reinterpret_cast<const char*>(msg_bytes.data()), msg_bytes.size());
         try {
-            return sign_message_hybrid(privkey, msg);
+            return sign_message_hybrid(privkey, msg, chain_.consensus_sign_context());
         } catch (const std::exception& e) {
             return std::string("error: signing failed: ") + e.what();
         }
@@ -304,7 +462,8 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         }
 
         const std::string msg(reinterpret_cast<const char*>(msg_bytes.data()), msg_bytes.size());
-        const bool ok = verify_message_signature_hybrid(pubkey, msg, std::string("pq=") + sig_hex);
+        const bool ok = verify_message_signature_hybrid(pubkey, msg, std::string("pq=") + sig_hex,
+                                                       chain_.consensus_sign_context());
         return ok ? "true" : "false";
     }
 
@@ -449,16 +608,20 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
 
     if (cmd == "createwallet") {
         std::string name;
-        iss >> name;
+        std::string scheme;
+        iss >> name >> scheme;
         if (name.empty()) {
             name = "default";
+        }
+        if (scheme.empty()) {
+            scheme = "ml-dsa-87";
         }
         if (!wallets_.configured()) {
             return "error: wallet store not configured";
         }
         WalletKeys keys{};
         try {
-            keys = generate_wallet_keys();
+            keys = generate_wallet_keys(scheme);
         } catch (const std::exception& e) {
             return std::string("error: wallet generation failed: ") + e.what();
         }
@@ -469,7 +632,9 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         }
         std::ostringstream out;
         out << "address=" << stored.address
+            << " address_chars=" << stored.address.size()
             << " pub=" << stored.public_key
+            << " pub_bytes=" << (stored.public_key.size() / 2)
             << " algo=" << stored.algorithm
             << " name=" << stored.name
             << " path=" << stored.path
@@ -552,7 +717,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         }
         const std::string msg(reinterpret_cast<const char*>(msg_bytes.data()), msg_bytes.size());
         try {
-            return sign_message_hybrid(stored.private_key, msg);
+            return sign_message_hybrid(stored.private_key, msg, chain_.consensus_sign_context(), stored.algorithm);
         } catch (const std::exception& e) {
             return std::string("error: signing failed: ") + e.what();
         }
@@ -589,14 +754,29 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         if (!node_.submit_transaction(tx, error)) {
             return "error: " + error;
         }
+        const auto tx_hash = hash_transaction(tx);
+        const auto needed = chain_.config().confirmations_policy;
+        std::uint64_t conf = chain_.tx_confirmations(tx_hash);
+        if (needed > 0 && conf < needed) {
+            for (std::uint32_t i = 0; i < needed && chain_.tx_confirmations(tx_hash) < needed; ++i) {
+                std::string mined_hash;
+                if (!miner_.mine_next_block(stored.address, 500, 1, mined_hash, error)) {
+                    break;
+                }
+            }
+            conf = chain_.tx_confirmations(tx_hash);
+        }
         std::ostringstream out;
         out << "ok:gossiped"
-            << " hash=" << hash_transaction(tx)
+            << " hash=" << tx_hash
             << " from=" << stored.address
             << " to=" << to
             << " amount=" << amount
             << " fee=" << fee
-            << " nonce=" << tx.nonce;
+            << " nonce=" << tx.nonce
+            << " confirmations=" << conf
+            << " confirmations_policy=" << needed
+            << " economic_security=none";
         return out.str();
     }
 
@@ -744,9 +924,10 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
 
         tx.signer = from;
         tx.signer_pubkey = pubkey;
+        tx.signer_scheme = sig_scheme_id(infer_sig_scheme_from_pubkey_hex(pubkey));
         const auto msg = hash_transaction(tx);
         try {
-            tx.signature = sign_message_hybrid(privkey, msg);
+            tx.signature = sign_message_hybrid(privkey, msg, chain_.consensus_sign_context(), tx.signer_scheme);
         } catch (const std::exception& e) {
             return std::string("error: signing failed: ") + e.what();
         }
@@ -790,9 +971,10 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
 
         tx.signer = from;
         tx.signer_pubkey = pubkey;
+        tx.signer_scheme = sig_scheme_id(infer_sig_scheme_from_pubkey_hex(pubkey));
         const auto msg = hash_transaction(tx);
         try {
-            tx.signature = sign_message_hybrid(privkey, msg);
+            tx.signature = sign_message_hybrid(privkey, msg, chain_.consensus_sign_context(), tx.signer_scheme);
         } catch (const std::exception& e) {
             return std::string("error: signing failed: ") + e.what();
         }
@@ -838,6 +1020,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
 
         tx.signer = from;
         tx.signer_pubkey = pubkey;
+        tx.signer_scheme = sig_scheme_id(infer_sig_scheme_from_pubkey_hex(pubkey));
         tx.signature.clear();
         const auto sign_hash = hash_transaction(tx);
         return "sign_hash=" + sign_hash;
@@ -870,6 +1053,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
 
         tx.signer = from;
         tx.signer_pubkey = pubkey;
+        tx.signer_scheme = sig_scheme_id(infer_sig_scheme_from_pubkey_hex(pubkey));
         tx.signature = std::string("pq=") + sig_hex;
 
         if (!chain_.validate_transaction(tx, error)) {
@@ -909,6 +1093,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
 
         tx.signer = from;
         tx.signer_pubkey = pubkey;
+        tx.signer_scheme = sig_scheme_id(infer_sig_scheme_from_pubkey_hex(pubkey));
         tx.signature = std::string("pq=") + sig_hex;
 
         if (!chain_.validate_transaction(tx, error)) {
@@ -931,7 +1116,15 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         const auto mp = mempool_.snapshot();
         for (const auto& tx : mp) {
             if (hash_transaction(tx) == tx_hash) {
-                return "status=mempool tx_hash=" + tx_hash;
+                std::ostringstream out;
+                out << "status=unconfirmed tx_hash=" << tx_hash
+                    << " confirmations=0"
+                    << " confirmations_policy=" << chain_.config().confirmations_policy
+                    << " economic_security=none";
+                if (!tx.note.empty()) {
+                    out << " note=" << tx.note;
+                }
+                return out.str();
             }
         }
 
@@ -939,13 +1132,24 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         for (const auto& b : bs) {
             for (std::size_t i = 0; i < b.transactions.size(); ++i) {
                 if (hash_transaction(b.transactions[i]) == tx_hash) {
-                    return "status=mined tx_hash=" + tx_hash + " block_height=" +
-                           std::to_string(b.header.height) + " tx_index=" + std::to_string(i);
+                    const auto conf = chain_.tx_confirmations(tx_hash);
+                    std::ostringstream out;
+                    out << "status=mined tx_hash=" << tx_hash
+                        << " block_height=" << b.header.height
+                        << " tx_index=" << i
+                        << " confirmations=" << conf
+                        << " confirmations_policy=" << chain_.config().confirmations_policy
+                        << " economic_security=none"
+                        << " signer=" << b.transactions[i].signer;
+                    if (!b.transactions[i].note.empty()) {
+                        out << " note=" << b.transactions[i].note;
+                    }
+                    return out.str();
                 }
             }
         }
 
-        return "status=unknown tx_hash=" + tx_hash;
+        return "status=unconfirmed tx_hash=" + tx_hash + " confirmations=0 economic_security=none";
     }
 
     if (cmd == "getblock") {
@@ -1725,7 +1929,8 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         const std::string sign_payload = "swap_best_route_exact_in|" + token_in + "|" + token_out + "|" + trader +
                                          "|" + std::to_string(amount_in) + "|" + std::to_string(min_out) + "|" +
                                          std::to_string(deadline_unix) + "|" + std::to_string(max_hops);
-        if (!verify_message_signature_hybrid(trader_pubkey, sign_payload, std::string("pq=") + trader_sig)) {
+        if (!verify_message_signature_hybrid(trader_pubkey, sign_payload, std::string("pq=") + trader_sig,
+                                            chain_.consensus_sign_context())) {
             return "error: invalid trader signature";
         }
 

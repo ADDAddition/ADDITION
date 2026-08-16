@@ -1,5 +1,6 @@
 #include "addition/crypto.hpp"
 
+#include <openssl/crypto.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 
@@ -7,20 +8,48 @@
 
 #include <cctype>
 #include <iomanip>
+#include <mutex>
 #include <sstream>
 #include <stdexcept>
 
 namespace addition {
 namespace {
 
-struct PqKeySizes {
+std::mutex g_ctx_mu;
+std::string g_default_sign_ctx;
+
+struct PqSizes {
     std::size_t public_key{0};
     std::size_t secret_key{0};
     std::size_t signature{0};
 };
 
-bool get_ml_dsa_87_sizes(PqKeySizes& out) {
-    OQS_SIG* sig = OQS_SIG_new(OQS_SIG_alg_ml_dsa_87);
+const char* oqs_name_for(SigScheme scheme) {
+    switch (scheme) {
+    case SigScheme::MlDsa87:
+        return OQS_SIG_alg_ml_dsa_87;
+    case SigScheme::SlhDsaShake256s:
+        // liboqs 0.12.0 exposes FIPS 205 SLH-DSA-SHAKE-256s as this SPHINCS+ name.
+        return OQS_SIG_alg_sphincs_shake_256s_simple;
+    case SigScheme::Unknown:
+        return "";
+    }
+    const SigScheme missing = scheme;
+    switch (missing) {
+    case SigScheme::MlDsa87:
+    case SigScheme::SlhDsaShake256s:
+    case SigScheme::Unknown:
+        break;
+    }
+    return "";
+}
+
+bool get_scheme_sizes(SigScheme scheme, PqSizes& out) {
+    const char* name = oqs_name_for(scheme);
+    if (name == nullptr || name[0] == '\0') {
+        return false;
+    }
+    OQS_SIG* sig = OQS_SIG_new(name);
     if (sig == nullptr) {
         return false;
     }
@@ -53,6 +82,26 @@ bool is_hex_strict(const std::string& hex, std::size_t max_hex_len, std::string&
             error = "invalid hex data";
             return false;
         }
+    }
+    return true;
+}
+
+std::string resolve_ctx(const std::string& ctx) {
+    if (!ctx.empty()) {
+        return ctx;
+    }
+    std::lock_guard<std::mutex> lock(g_ctx_mu);
+    return g_default_sign_ctx;
+}
+
+bool ctx_usable(const std::string& ctx, std::string& error) {
+    if (ctx.empty()) {
+        error = "empty FIPS 204 context rejected";
+        return false;
+    }
+    if (ctx.size() > 255) {
+        error = "context exceeds 255 bytes";
+        return false;
     }
     return true;
 }
@@ -117,7 +166,7 @@ bool hex_to_bytes(const std::string& hex,
                   std::vector<std::uint8_t>& out,
                   std::string& error) {
     out.clear();
-    if (!is_hex_strict(hex, 131072, error)) {
+    if (!is_hex_strict(hex, 262144, error)) {
         return false;
     }
     out.reserve(hex.size() / 2);
@@ -134,22 +183,185 @@ bool hex_to_bytes(const std::string& hex,
     return true;
 }
 
+const char* sig_scheme_id(SigScheme scheme) {
+    switch (scheme) {
+    case SigScheme::MlDsa87:
+        return "ml-dsa-87";
+    case SigScheme::SlhDsaShake256s:
+        return "slh-dsa-shake-256s";
+    case SigScheme::Unknown:
+        return "unknown";
+    }
+    const SigScheme missing = scheme;
+    switch (missing) {
+    case SigScheme::MlDsa87:
+    case SigScheme::SlhDsaShake256s:
+    case SigScheme::Unknown:
+        break;
+    }
+    return "unknown";
+}
+
+const char* sig_scheme_oqs_alg(SigScheme scheme) {
+    return oqs_name_for(scheme);
+}
+
+bool parse_sig_scheme(const std::string& name, SigScheme& out) {
+    if (name == "ml-dsa-87" || name == "ML-DSA-87") {
+        out = SigScheme::MlDsa87;
+        return true;
+    }
+    if (name == "slh-dsa-shake-256s" || name == "SLH-DSA-SHAKE-256s" ||
+        name == "SPHINCS+-SHAKE-256s-simple") {
+        out = SigScheme::SlhDsaShake256s;
+        return true;
+    }
+    out = SigScheme::Unknown;
+    return false;
+}
+
+bool sig_scheme_available(SigScheme scheme) {
+    PqSizes sizes{};
+    return get_scheme_sizes(scheme, sizes);
+}
+
+bool sig_scheme_allowed_strict(SigScheme scheme) {
+    switch (scheme) {
+    case SigScheme::MlDsa87:
+        return sig_scheme_available(scheme);
+    case SigScheme::SlhDsaShake256s:
+        return sig_scheme_available(scheme);
+    case SigScheme::Unknown:
+        return false;
+    }
+    return false;
+}
+
+std::string allowed_sig_algs_list() {
+    std::string out;
+    if (sig_scheme_allowed_strict(SigScheme::MlDsa87)) {
+        out = "ml-dsa-87";
+    }
+    if (sig_scheme_allowed_strict(SigScheme::SlhDsaShake256s)) {
+        if (!out.empty()) {
+            out += ',';
+        }
+        out += "slh-dsa-shake-256s";
+    }
+    if (out.empty()) {
+        out = "none";
+    }
+    return out;
+}
+
+SigScheme infer_sig_scheme_from_pubkey_hex(const std::string& pubkey_hex) {
+    if ((pubkey_hex.size() % 2) != 0) {
+        return SigScheme::Unknown;
+    }
+    const auto nbytes = pubkey_hex.size() / 2;
+    PqSizes ml{};
+    if (get_scheme_sizes(SigScheme::MlDsa87, ml) && nbytes == ml.public_key) {
+        return SigScheme::MlDsa87;
+    }
+    PqSizes slh{};
+    if (get_scheme_sizes(SigScheme::SlhDsaShake256s, slh) && nbytes == slh.public_key) {
+        return SigScheme::SlhDsaShake256s;
+    }
+    return SigScheme::Unknown;
+}
+
+std::string hash_committed_address(SigScheme scheme, const std::vector<std::uint8_t>& pubkey) {
+    const std::string id = sig_scheme_id(scheme);
+    std::vector<std::uint8_t> preimage;
+    preimage.reserve(id.size() + 1 + pubkey.size());
+    preimage.insert(preimage.end(), id.begin(), id.end());
+    preimage.push_back(0);
+    preimage.insert(preimage.end(), pubkey.begin(), pubkey.end());
+    return to_hex(sha3_512_bytes(preimage));
+}
+
+std::string hash_committed_address_hex(SigScheme scheme, const std::string& pubkey_hex) {
+    std::vector<std::uint8_t> pk;
+    std::string error;
+    if (!hex_to_bytes(pubkey_hex, pk, error)) {
+        return {};
+    }
+    return hash_committed_address(scheme, pk);
+}
+
+bool address_binds_pubkey(const std::string& address,
+                          SigScheme scheme,
+                          const std::string& pubkey_hex,
+                          std::string& error) {
+    if (scheme == SigScheme::Unknown || !sig_scheme_allowed_strict(scheme)) {
+        error = "unknown scheme rejected in strict mode";
+        return false;
+    }
+    const auto derived = hash_committed_address_hex(scheme, pubkey_hex);
+    if (derived.empty()) {
+        error = "invalid pubkey hex";
+        return false;
+    }
+    if (derived != address) {
+        error = "signer/pubkey hash-address mismatch";
+        return false;
+    }
+    return true;
+}
+
+std::string make_consensus_sign_context(const std::string& network_mode,
+                                        const std::string& network_id,
+                                        const std::string& genesis_hash) {
+    std::string ctx = "ADDITION|";
+    ctx += network_mode.empty() ? "testnet" : network_mode;
+    ctx += '|';
+    ctx += network_id.empty() ? "ADDITION_TESTNET_V1" : network_id;
+    ctx += '|';
+    ctx += genesis_hash;
+    if (ctx.size() > 255) {
+        ctx.resize(255);
+    }
+    return ctx;
+}
+
+void set_default_sign_context(const std::string& ctx) {
+    std::lock_guard<std::mutex> lock(g_ctx_mu);
+    g_default_sign_ctx = ctx;
+}
+
+std::string default_sign_context() {
+    std::lock_guard<std::mutex> lock(g_ctx_mu);
+    return g_default_sign_ctx;
+}
+
 std::string sign_message_hybrid(const std::string& private_key,
                                 const std::string& message,
-                                const std::string& pq_context) {
-    PqKeySizes sizes{};
-    if (!get_ml_dsa_87_sizes(sizes)) {
+                                const std::string& ctx,
+                                const std::string& scheme) {
+    SigScheme parsed = SigScheme::Unknown;
+    if (!parse_sig_scheme(scheme, parsed) || !sig_scheme_allowed_strict(parsed)) {
+        throw std::runtime_error("unknown or unavailable signature scheme");
+    }
+
+    PqSizes sizes{};
+    if (!get_scheme_sizes(parsed, sizes)) {
         throw std::runtime_error("liboqs size query failed");
     }
 
     std::string err;
+    const auto used_ctx = resolve_ctx(ctx);
+    if (!ctx_usable(used_ctx, err)) {
+        throw std::runtime_error(err);
+    }
+
     if (!is_hex_strict(private_key, sizes.secret_key * 2, err) || private_key.size() != sizes.secret_key * 2) {
         throw std::runtime_error("invalid private key hex: " + err);
     }
 
     std::vector<std::uint8_t> pq_sig;
     std::vector<std::uint8_t> sk;
-    if (hex_to_bytes(private_key, sk, err) && !sk.empty() && pq_sign_message(sk, message, pq_sig, err)) {
+    if (hex_to_bytes(private_key, sk, err) && !sk.empty() &&
+        pq_sign_message(sk, message, used_ctx, parsed, pq_sig, err)) {
         OQS_MEM_cleanse(sk.data(), sk.size());
         if (pq_sig.empty() || pq_sig.size() > sizes.signature) {
             throw std::runtime_error("liboqs produced invalid signature size");
@@ -160,16 +372,27 @@ std::string sign_message_hybrid(const std::string& private_key,
         OQS_MEM_cleanse(sk.data(), sk.size());
     }
     throw std::runtime_error("liboqs signing failed: " + err);
-
-    (void)pq_context;
 }
 
 bool verify_message_signature_hybrid(const std::string& public_key,
                                      const std::string& message,
                                      const std::string& signature,
-                                     const std::string& pq_context) {
-    PqKeySizes sizes{};
-    if (!get_ml_dsa_87_sizes(sizes)) {
+                                     const std::string& ctx,
+                                     const std::string& scheme) {
+    SigScheme parsed = SigScheme::Unknown;
+    if (!scheme.empty()) {
+        if (!parse_sig_scheme(scheme, parsed) || !sig_scheme_allowed_strict(parsed)) {
+            return false;
+        }
+    } else {
+        parsed = infer_sig_scheme_from_pubkey_hex(public_key);
+        if (!sig_scheme_allowed_strict(parsed)) {
+            return false;
+        }
+    }
+
+    PqSizes sizes{};
+    if (!get_scheme_sizes(parsed, sizes)) {
         return false;
     }
 
@@ -179,6 +402,11 @@ bool verify_message_signature_hybrid(const std::string& public_key,
     }
 
     std::string err;
+    const auto used_ctx = resolve_ctx(ctx);
+    if (!ctx_usable(used_ctx, err)) {
+        return false;
+    }
+
     if (!is_hex_strict(public_key, sizes.public_key * 2, err) || public_key.size() != sizes.public_key * 2) {
         return false;
     }
@@ -203,17 +431,27 @@ bool verify_message_signature_hybrid(const std::string& public_key,
         return false;
     }
 
-    (void)pq_context;
-    return pq_verify_message(pk_bytes, message, sig_bytes, err);
+    return pq_verify_message(pk_bytes, message, sig_bytes, used_ctx, parsed, err);
 }
 
 bool pq_sign_message(const std::vector<std::uint8_t>& secret_key,
                      const std::string& message,
+                     const std::string& ctx,
+                     SigScheme scheme,
                      std::vector<std::uint8_t>& signature,
                      std::string& error) {
-    OQS_SIG* sig = OQS_SIG_new(OQS_SIG_alg_ml_dsa_87);
+    if (!sig_scheme_allowed_strict(scheme)) {
+        error = "unknown scheme rejected in strict mode";
+        return false;
+    }
+    if (!ctx_usable(ctx, error)) {
+        return false;
+    }
+
+    const char* name = oqs_name_for(scheme);
+    OQS_SIG* sig = OQS_SIG_new(name);
     if (sig == nullptr) {
-        error = "OQS_SIG_new failed for ml-dsa-87";
+        error = std::string("OQS_SIG_new failed for ") + sig_scheme_id(scheme);
         return false;
     }
 
@@ -225,16 +463,18 @@ bool pq_sign_message(const std::vector<std::uint8_t>& secret_key,
 
     signature.assign(sig->length_signature, 0);
     size_t sig_len = 0;
-    const auto rc = OQS_SIG_sign(sig,
-                                 signature.data(),
-                                 &sig_len,
-                                 reinterpret_cast<const std::uint8_t*>(message.data()),
-                                 message.size(),
-                                 secret_key.data());
+    const auto rc = OQS_SIG_sign_with_ctx_str(sig,
+                                              signature.data(),
+                                              &sig_len,
+                                              reinterpret_cast<const std::uint8_t*>(message.data()),
+                                              message.size(),
+                                              reinterpret_cast<const std::uint8_t*>(ctx.data()),
+                                              ctx.size(),
+                                              secret_key.data());
     OQS_SIG_free(sig);
 
     if (rc != OQS_SUCCESS) {
-        error = "OQS_SIG_sign failed";
+        error = "OQS_SIG_sign_with_ctx_str failed";
         signature.clear();
         return false;
     }
@@ -246,10 +486,21 @@ bool pq_sign_message(const std::vector<std::uint8_t>& secret_key,
 bool pq_verify_message(const std::vector<std::uint8_t>& public_key,
                        const std::string& message,
                        const std::vector<std::uint8_t>& signature,
+                       const std::string& ctx,
+                       SigScheme scheme,
                        std::string& error) {
-    OQS_SIG* sig = OQS_SIG_new(OQS_SIG_alg_ml_dsa_87);
+    if (!sig_scheme_allowed_strict(scheme)) {
+        error = "unknown scheme rejected in strict mode";
+        return false;
+    }
+    if (!ctx_usable(ctx, error)) {
+        return false;
+    }
+
+    const char* name = oqs_name_for(scheme);
+    OQS_SIG* sig = OQS_SIG_new(name);
     if (sig == nullptr) {
-        error = "OQS_SIG_new failed for ml-dsa-87";
+        error = std::string("OQS_SIG_new failed for ") + sig_scheme_id(scheme);
         return false;
     }
 
@@ -264,16 +515,18 @@ bool pq_verify_message(const std::vector<std::uint8_t>& public_key,
         return false;
     }
 
-    const auto rc = OQS_SIG_verify(sig,
-                                   reinterpret_cast<const std::uint8_t*>(message.data()),
-                                   message.size(),
-                                   signature.data(),
-                                   signature.size(),
-                                   public_key.data());
+    const auto rc = OQS_SIG_verify_with_ctx_str(sig,
+                                                reinterpret_cast<const std::uint8_t*>(message.data()),
+                                                message.size(),
+                                                signature.data(),
+                                                signature.size(),
+                                                reinterpret_cast<const std::uint8_t*>(ctx.data()),
+                                                ctx.size(),
+                                                public_key.data());
     OQS_SIG_free(sig);
 
     if (rc != OQS_SUCCESS) {
-        error = "OQS_SIG_verify failed";
+        error = "OQS_SIG_verify_with_ctx_str failed";
         return false;
     }
 
@@ -298,14 +551,19 @@ bool random_hex(std::size_t nbytes, std::string& out, std::string& error) {
 bool crypto_selftest(std::string& report) {
     report.clear();
 
-    OQS_SIG* sig = OQS_SIG_new(OQS_SIG_alg_ml_dsa_87);
+    const char* oqs_name = oqs_name_for(SigScheme::MlDsa87);
+    OQS_SIG* sig = OQS_SIG_new(oqs_name);
     if (sig == nullptr) {
         report = "selftest: OQS_SIG_new failed";
         return false;
     }
 
-    std::vector<std::uint8_t> pub(sig->length_public_key, 0);
-    std::vector<std::uint8_t> sec(sig->length_secret_key, 0);
+    const std::size_t pk_len = sig->length_public_key;
+    const std::size_t sk_len = sig->length_secret_key;
+    const std::size_t sig_max = sig->length_signature;
+
+    std::vector<std::uint8_t> pub(pk_len, 0);
+    std::vector<std::uint8_t> sec(sk_len, 0);
     if (OQS_SIG_keypair(sig, pub.data(), sec.data()) != OQS_SUCCESS) {
         OQS_SIG_free(sig);
         report = "selftest: keypair failed";
@@ -313,14 +571,19 @@ bool crypto_selftest(std::string& report) {
     }
 
     const std::string msg = "addition-crypto-selftest";
-    std::vector<std::uint8_t> sig_bytes(sig->length_signature, 0);
+    const auto sha = to_hex(sha3_512_bytes(msg));
+    const std::string ctx = make_consensus_sign_context("testnet", "ADDITION_TESTNET_V1", sha);
+
+    std::vector<std::uint8_t> sig_bytes(sig_max, 0);
     size_t sig_len = 0;
-    if (OQS_SIG_sign(sig,
-                     sig_bytes.data(),
-                     &sig_len,
-                     reinterpret_cast<const std::uint8_t*>(msg.data()),
-                     msg.size(),
-                     sec.data()) != OQS_SUCCESS) {
+    if (OQS_SIG_sign_with_ctx_str(sig,
+                                  sig_bytes.data(),
+                                  &sig_len,
+                                  reinterpret_cast<const std::uint8_t*>(msg.data()),
+                                  msg.size(),
+                                  reinterpret_cast<const std::uint8_t*>(ctx.data()),
+                                  ctx.size(),
+                                  sec.data()) != OQS_SUCCESS) {
         OQS_MEM_cleanse(sec.data(), sec.size());
         OQS_SIG_free(sig);
         report = "selftest: sign failed";
@@ -328,12 +591,17 @@ bool crypto_selftest(std::string& report) {
     }
     sig_bytes.resize(sig_len);
 
-    const auto vr = OQS_SIG_verify(sig,
-                                   reinterpret_cast<const std::uint8_t*>(msg.data()),
-                                   msg.size(),
-                                   sig_bytes.data(),
-                                   sig_bytes.size(),
-                                   pub.data());
+    const auto vr = OQS_SIG_verify_with_ctx_str(sig,
+                                                reinterpret_cast<const std::uint8_t*>(msg.data()),
+                                                msg.size(),
+                                                sig_bytes.data(),
+                                                sig_bytes.size(),
+                                                reinterpret_cast<const std::uint8_t*>(ctx.data()),
+                                                ctx.size(),
+                                                pub.data());
+
+    std::string empty_err;
+    const bool empty_ctx_rejected = !pq_verify_message(pub, msg, sig_bytes, "", SigScheme::MlDsa87, empty_err);
 
     OQS_MEM_cleanse(sec.data(), sec.size());
     OQS_SIG_free(sig);
@@ -342,8 +610,27 @@ bool crypto_selftest(std::string& report) {
         report = "selftest: verify failed";
         return false;
     }
+    if (!empty_ctx_rejected) {
+        report = "selftest: empty context was accepted";
+        return false;
+    }
 
-    report = "selftest: ok";
+    const char* openssl_ver = OpenSSL_version(OPENSSL_VERSION);
+    std::ostringstream out;
+    out << "scheme=ml-dsa-87"
+        << " pk_bytes=" << pk_len
+        << " sk_bytes=" << sk_len
+        << " sig_bytes=" << sig_len
+        << " sha3_512=" << sha
+        << " pq_mode=strict"
+        << " liboqs=" << OQS_VERSION_TEXT
+        << " openssl=" << (openssl_ver != nullptr ? openssl_ver : "unknown")
+        << " sign_verify=ok"
+        << " ctx_len=" << ctx.size()
+        << " empty_ctx_rejected=1"
+        << " allowed_sig_algs=" << allowed_sig_algs_list()
+        << " address_format=sha3_512(scheme_id||0x00||pubkey)";
+    report = out.str();
     return true;
 }
 

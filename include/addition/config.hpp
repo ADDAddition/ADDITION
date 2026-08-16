@@ -9,6 +9,7 @@ namespace addition {
 enum class NetworkMode {
     Testnet,
     Mainnet,
+    Regtest,
 };
 
 enum class PowAlgorithm {
@@ -27,9 +28,12 @@ struct ChainConfig {
     std::uint32_t target_block_time_sec{60U};
     std::uint32_t difficulty_window{120U};
     PowAlgorithm pow_algorithm{PowAlgorithm::Sha3_512};
-    std::uint64_t initial_difficulty_target{0x0000FFFFFFFFFFFFULL};
-    std::uint64_t min_difficulty_target{0x0000FFFFFFFFFFFFULL};
-    std::uint64_t max_difficulty_target{0x00FFFFFFFFFFFFFFULL};
+    std::uint64_t initial_difficulty_target{0x000000FFFFFFFFFFULL};
+    std::uint64_t min_difficulty_target{0x00000000FFFFFFFFULL};
+    std::uint64_t max_difficulty_target{0x000000FFFFFFFFFFULL};
+    std::string pow_profile{"shared-testnet"};
+    std::uint32_t confirmations_policy{2};
+    std::string economic_security{"none"};
     std::uint32_t retarget_window{30U};
     std::uint32_t halving_interval{210000U};
     bool require_pq_signatures{true};
@@ -57,7 +61,9 @@ struct NodeConfig {
 const ChainConfig& default_config();
 ChainConfig testnet_chain_config();
 ChainConfig mainnet_chain_config();
+ChainConfig regtest_chain_config();
 NodeConfig default_node_config();
+void apply_regtest_profile(ChainConfig& chain);
 
 void set_runtime_network_mode(NetworkMode mode);
 NetworkMode runtime_network_mode();

@@ -139,6 +139,25 @@ void apply_network_mode(NodeConfig& cfg, NetworkMode mode) {
             cfg.chain.network_id = "ADDITION_TESTNET_V1";
         }
         cfg.chain.pow_algorithm = PowAlgorithm::Sha3_512;
+        cfg.chain.pow_profile = "shared-testnet";
+        cfg.chain.initial_difficulty_target = 0x000000FFFFFFFFFFULL;
+        cfg.chain.min_difficulty_target = 0x00000000FFFFFFFFULL;
+        cfg.chain.max_difficulty_target = 0x000000FFFFFFFFFFULL;
+        cfg.chain.confirmations_policy = 2;
+        cfg.chain.economic_security = "none";
+        return;
+    }
+    if (mode == NetworkMode::Regtest) {
+        cfg.chain.network_mode = "regtest";
+        if (cfg.chain.network_name.empty() || cfg.chain.network_name == "mainnet" ||
+            cfg.chain.network_name == "addition-testnet") {
+            cfg.chain.network_name = "addition-regtest";
+        }
+        if (cfg.chain.network_id.empty() || cfg.chain.network_id == "ADDITION_MAINNET_V1") {
+            cfg.chain.network_id = "ADDITION_REGTEST_V1";
+        }
+        cfg.chain.pow_algorithm = PowAlgorithm::Sha3_512;
+        apply_regtest_profile(cfg.chain);
         return;
     }
     cfg.chain.network_mode = "mainnet";
@@ -315,12 +334,37 @@ const ChainConfig& default_config() {
     return cfg;
 }
 
+void apply_regtest_profile(ChainConfig& chain) {
+    chain.pow_profile = "regtest";
+    chain.pow_algorithm = PowAlgorithm::Sha3_512;
+    chain.initial_difficulty_target = 0xFFFFFFFFFFFFFFFFULL;
+    chain.min_difficulty_target = 0xFFFFFFFFFFFFFFFFULL;
+    chain.max_difficulty_target = 0xFFFFFFFFFFFFFFFFULL;
+    chain.confirmations_policy = 1;
+    chain.economic_security = "none";
+}
+
 ChainConfig testnet_chain_config() {
     ChainConfig cfg{};
     cfg.network_mode = "testnet";
     cfg.network_name = "addition-testnet";
     cfg.network_id = "ADDITION_TESTNET_V1";
+    cfg.pow_profile = "shared-testnet";
+    cfg.initial_difficulty_target = 0x000000FFFFFFFFFFULL;
+    cfg.min_difficulty_target = 0x00000000FFFFFFFFULL;
+    cfg.max_difficulty_target = 0x000000FFFFFFFFFFULL;
+    cfg.confirmations_policy = 2;
+    cfg.economic_security = "none";
     cfg.bootstrap_peers = {"127.0.0.1:28545"};
+    return cfg;
+}
+
+ChainConfig regtest_chain_config() {
+    ChainConfig cfg = testnet_chain_config();
+    cfg.network_mode = "regtest";
+    cfg.network_name = "addition-regtest";
+    cfg.network_id = "ADDITION_REGTEST_V1";
+    apply_regtest_profile(cfg);
     return cfg;
 }
 
@@ -363,6 +407,7 @@ bool is_mainnet_runtime() {
     case NetworkMode::Mainnet:
         return true;
     case NetworkMode::Testnet:
+    case NetworkMode::Regtest:
         return false;
     }
     return false;
@@ -374,6 +419,8 @@ const char* network_mode_label(NetworkMode mode) {
         return "testnet";
     case NetworkMode::Mainnet:
         return "mainnet";
+    case NetworkMode::Regtest:
+        return "regtest";
     }
     return "testnet";
 }
@@ -413,6 +460,10 @@ NetworkMode parse_network_mode(const std::string& value, bool& ok) {
     if (v == "testnet" || v == "addition-testnet") {
         ok = true;
         return NetworkMode::Testnet;
+    }
+    if (v == "regtest" || v == "addition-regtest") {
+        ok = true;
+        return NetworkMode::Regtest;
     }
     if (v == "mainnet") {
         ok = true;
@@ -633,6 +684,7 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
     std::vector<std::string> cli_bootstrap;
     bool network_from_cli = false;
     bool public_rpc_from_cli = false;
+    bool regtest_from_cli = false;
 
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i] ? argv[i] : "";
@@ -689,6 +741,10 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
         }
         if (arg.rfind("--data-dir=", 0) == 0) {
             cli_data_dir = arg.substr(11);
+            continue;
+        }
+        if (arg == "--regtest") {
+            regtest_from_cli = true;
             continue;
         }
         if (arg == "--public-rpc") {
@@ -821,10 +877,13 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
         bool ok = false;
         const auto mode = parse_network_mode(cli_network, ok);
         if (!ok) {
-            error = "invalid --network value (use testnet or mainnet)";
+            error = "invalid --network value (use testnet, regtest, or mainnet)";
             return false;
         }
         apply_network_mode(cfg, mode);
+    }
+    if (regtest_from_cli) {
+        apply_network_mode(cfg, NetworkMode::Regtest);
     }
 
     if (cfg.bootstrap_peers.empty()) {
@@ -838,12 +897,13 @@ std::string daemon_help_text() {
     return "ADDITION research daemon (testnet by default; not a live mainnet)\n"
            "\n"
            "Usage:\n"
-           "  additiond [--network testnet|mainnet] [--config PATH] [--genesis PATH] [--data-dir PATH]\n"
+           "  additiond [--network testnet|regtest|mainnet] [--regtest] [--config PATH] [--genesis PATH] [--data-dir PATH]\n"
            "            [--public-rpc] [--public-rpc-port PORT] [--public-rpc-bind IP]\n"
            "            [--local-rpc-port PORT] [--p2p-port PORT] [--bootstrap IP:PORT]\n"
            "\n"
            "Defaults:\n"
-           "  --network testnet\n"
+           "  --network testnet (shared-testnet min-diff floor; not economic security)\n"
+           "  --regtest keeps toy-diff / fast local mines for tests only\n"
            "  --config  config.toml (if present)\n"
            "  --genesis genesis.json (if present)\n"
            "\n"

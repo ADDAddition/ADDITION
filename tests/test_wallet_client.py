@@ -54,7 +54,8 @@ class FakeNode:
         if cmd == "getinfo":
             return (
                 "network=testnet network_name=addition-testnet height=1 peers=0 "
-                "pq_mode=strict max_supply=50000000"
+                "pq_mode=strict max_supply=50000000 "
+                "sign_context=ADDITION|testnet|ADDITION_TESTNET_V1|fixture"
             )
         if cmd == "fee_info":
             return "base_min_fee=1 recommended_min_fee=1"
@@ -94,9 +95,10 @@ class WalletClientTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_address_derivation_matches_node_formula(self) -> None:
-        # sha3_512("addr|" + pubkey_hex)[:40] — same as src/rpc_server.cpp
-        self.assertEqual(len(derive_address(PUB)), 40)
+        # sha3_512(scheme_id || 0x00 || pubkey_bytes) — 128 hex, same as the node
+        self.assertEqual(len(derive_address(PUB)), 128)
         self.assertEqual(derive_address(PUB), derive_address(PUB))
+        self.assertNotEqual(derive_address(PUB), PUB)
 
     def test_createwallet_keeps_secret_on_disk_only(self) -> None:
         record = self.client.create()
@@ -123,9 +125,10 @@ class WalletClientTests(unittest.TestCase):
         self.client.create()
         txid = self.client.send(TO_ADDR, 10, fee=1)
         self.assertEqual(txid, "deadbeef" * 8)
-        self.assertEqual(len(self.rpc.sent), 2)
-        self.assertTrue(self.rpc.sent[0].startswith("tx_build "))
-        self.assertTrue(self.rpc.sent[1].startswith("sendtx_signed_hash "))
+        self.assertGreaterEqual(len(self.rpc.sent), 3)
+        self.assertTrue(any(c == "getinfo" for c in self.rpc.sent))
+        self.assertTrue(any(c.startswith("tx_build ") for c in self.rpc.sent))
+        self.assertTrue(any(c.startswith("sendtx_signed_hash ") for c in self.rpc.sent))
         for command in self.rpc.sent:
             self.assertNotIn(SECRET, command)
             self.assertNotIn("sign_message", command)
@@ -172,7 +175,11 @@ class LiboqsWalletTests(unittest.TestCase):
         self.assertEqual(record.address, derive_address(record.public_key))
         self.assertEqual(len(record.public_key), 2592 * 2)
         self.assertEqual(len(record.private_key), 4896 * 2)
-        signature = backend.sign(record.private_key, b"abc123def456")
+        signature = backend.sign(
+            record.private_key,
+            b"abc123def456",
+            "ADDITION|testnet|ADDITION_TESTNET_V1|wallet-client-selftest",
+        )
         self.assertTrue(signature)
         self.assertNotIn(record.private_key, signature)
         self.assertEqual(len(signature) % 2, 0)

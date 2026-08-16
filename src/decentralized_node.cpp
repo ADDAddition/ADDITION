@@ -30,12 +30,12 @@ namespace {
 
 constexpr const char* kProtoVersion = "2";
 constexpr std::uint64_t kMsgSkewSec = 90;
-constexpr std::size_t kMaxP2PLineBytes = 32768;
+constexpr std::size_t kMaxP2PLineBytes = 262144;
 constexpr int kSocketTimeoutMs = 4000;
 constexpr std::size_t kMaxPeerIdLen = 128;
 constexpr std::size_t kMaxNonceLen = 128;
 constexpr std::size_t kMaxPubKeyHexLen = 12000;
-constexpr std::size_t kMaxSigHexLen = 40000;
+constexpr std::size_t kMaxSigHexLen = 80000;
 constexpr std::size_t kMaxRotationIdLen = 128;
 
 std::string active_network_id(const Chain& chain) {
@@ -437,7 +437,7 @@ bool DecentralizedNode::propose_identity_rotation(const std::string& new_public_
                                       std::to_string(now + grace_seconds);
     std::string proof;
     try {
-        proof = sign_message_hybrid(node_private_key_, rotation_body);
+        proof = sign_message_hybrid(node_private_key_, rotation_body, chain_.consensus_sign_context());
     } catch (const std::exception&) {
         error = "rotation proof signing failed";
         return false;
@@ -483,7 +483,7 @@ bool DecentralizedNode::broadcast_identity_rotation_vote(std::string& error) {
     const std::string vote_body = std::string("idvote|") + pending_rotation_->rotation_id + "|" + self_id_;
     std::string sig;
     try {
-        sig = sign_message_hybrid(node_private_key_, vote_body);
+        sig = sign_message_hybrid(node_private_key_, vote_body, chain_.consensus_sign_context());
     } catch (const std::exception&) {
         error = "vote signing failed";
         return false;
@@ -609,7 +609,7 @@ bool DecentralizedNode::sync_once(std::string& error) {
                                        node_public_key_;
         std::string hello_sig;
         try {
-            hello_sig = sign_message_hybrid(node_private_key_, hello_body);
+            hello_sig = sign_message_hybrid(node_private_key_, hello_body, chain_.consensus_sign_context());
         } catch (const std::exception&) {
             peers_.mark_peer_bad(peer);
             handshake_ok_[peer] = false;
@@ -673,7 +673,7 @@ bool DecentralizedNode::sync_once(std::string& error) {
 
             const std::string ack_body = std::string(kProtoVersion) + "|" + active_network_id(chain_) + "|" + ts + "|" +
                                          nonce + "|" + peer_pk;
-            if (!verify_message_signature_hybrid(peer_pk, ack_body, sig)) {
+            if (!verify_message_signature_hybrid(peer_pk, ack_body, sig, chain_.consensus_sign_context())) {
                 peers_.mark_peer_bad(peer);
                 handshake_ok_[peer] = false;
                 continue;
@@ -859,10 +859,16 @@ bool DecentralizedNode::sync_once(std::string& error) {
         }
 
         std::string reorg_error;
+        const auto old_blocks = chain_.blocks();
         if (!chain_.replace_with_chain(candidate, reorg_error)) {
             peers_.mark_peer_bad(peer);
             error = reorg_error;
             continue;
+        }
+        for (const auto& dropped : chain_.collect_dropped_transactions(old_blocks)) {
+            std::string ignore;
+            mempool_.submit(dropped);
+            (void)ignore;
         }
 
         for (const auto& b : candidate) {
@@ -990,7 +996,7 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         }
 
         const std::string hello_body = version + "|" + network + "|" + ts_s + "|" + nonce + "|" + peer_pk;
-        if (!verify_message_signature_hybrid(peer_pk, hello_body, peer_sig)) {
+        if (!verify_message_signature_hybrid(peer_pk, hello_body, peer_sig, chain_.consensus_sign_context())) {
             error = "invalid hello signature";
             peers_.mark_peer_bad(peer);
             handshake_ok_[peer] = false;
@@ -1016,7 +1022,7 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
                                      std::to_string(now) + "|" + nonce + "|" + node_public_key_;
         std::string ack_sig;
         try {
-            ack_sig = sign_message_hybrid(node_private_key_, ack_body);
+            ack_sig = sign_message_hybrid(node_private_key_, ack_body, chain_.consensus_sign_context());
         } catch (const std::exception&) {
             error = "ack signing failed";
             peers_.mark_peer_bad(peer);
@@ -1183,7 +1189,7 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         }
 
         const std::string sign_body = std::string("rotate|") + old_pk + "|" + new_pk + "|" + eff_s;
-        if (!verify_message_signature_hybrid(old_pk, sign_body, proof)) {
+        if (!verify_message_signature_hybrid(old_pk, sign_body, proof, chain_.consensus_sign_context())) {
             error = "invalid rotation proof";
             peers_.mark_peer_bad(peer);
             return false;
@@ -1254,7 +1260,7 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         }
 
         const std::string vote_body = std::string("idvote|") + rid + "|" + voter_id;
-        if (!verify_message_signature_hybrid(voter_pk, vote_body, sig)) {
+        if (!verify_message_signature_hybrid(voter_pk, vote_body, sig, chain_.consensus_sign_context())) {
             error = "invalid vote signature";
             peers_.mark_peer_bad(peer);
             return false;
@@ -1290,11 +1296,13 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
 std::string DecentralizedNode::encode_tx_payload(const Transaction& tx) const {
     std::string bin;
     bin.reserve(256);
-    bin.append("TXB2", 4);
+    bin.append("TXB3", 4);
 
     write_string(bin, tx.signer);
     write_string(bin, tx.signer_pubkey);
+    write_string(bin, tx.signer_scheme);
     write_string(bin, tx.signature);
+    write_string(bin, tx.note);
     write_u64(bin, tx.fee);
     write_u64(bin, tx.nonce);
 
@@ -1325,18 +1333,31 @@ bool DecentralizedNode::decode_tx_payload(const std::string& payload,
         error = "invalid tx payload hex";
         return false;
     }
-    if (bin.size() < 4 || (bin.compare(0, 4, "TXB1") != 0 && bin.compare(0, 4, "TXB2") != 0)) {
+    if (bin.size() < 4 ||
+        (bin.compare(0, 4, "TXB1") != 0 && bin.compare(0, 4, "TXB2") != 0 && bin.compare(0, 4, "TXB3") != 0)) {
         error = "invalid tx payload magic";
         return false;
     }
-    const bool has_checksum = (bin.compare(0, 4, "TXB2") == 0);
+    const bool has_checksum = (bin.compare(0, 4, "TXB2") == 0 || bin.compare(0, 4, "TXB3") == 0);
+    const bool has_scheme_note = (bin.compare(0, 4, "TXB3") == 0);
 
     std::size_t off = 4;
-    if (!read_string(bin, off, tx.signer) ||
-        !read_string(bin, off, tx.signer_pubkey) ||
-        !read_string(bin, off, tx.signature)) {
+    if (!read_string(bin, off, tx.signer) || !read_string(bin, off, tx.signer_pubkey)) {
         error = "invalid tx payload header";
         return false;
+    }
+    if (has_scheme_note) {
+        if (!read_string(bin, off, tx.signer_scheme) || !read_string(bin, off, tx.signature) ||
+            !read_string(bin, off, tx.note)) {
+            error = "invalid tx payload header";
+            return false;
+        }
+    } else if (!read_string(bin, off, tx.signature)) {
+        error = "invalid tx payload header";
+        return false;
+    }
+    if (tx.signer_scheme.empty()) {
+        tx.signer_scheme = "ml-dsa-87";
     }
     if (!read_u64(bin, off, tx.fee) || !read_u64(bin, off, tx.nonce)) {
         error = "invalid tx payload numeric fields";

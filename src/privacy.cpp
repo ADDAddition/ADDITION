@@ -339,6 +339,7 @@ bool PrivacyPool::verify_native_proof(const std::string& public_input,
         if (verify_message_signature_hybrid(verification_key_hex,
                                             public_input,
                                             std::string("pq=") + proof_hex,
+                                            default_sign_context(),
                                             "ml-dsa-87")) {
             return true;
         }

@@ -109,7 +109,7 @@ bool BridgeEngine::mint_wrapped_attested(const std::string& chain,
     }
 
     const std::string msg = "bridge_mint|" + chain + "|" + user + "|" + std::to_string(amount);
-    if (!verify_message_signature_hybrid(it->second.attestor_pubkey, msg, attestation)) {
+    if (!verify_message_signature_hybrid(it->second.attestor_pubkey, msg, attestation, default_sign_context())) {
         error = "invalid attestation signature";
         return false;
     }
@@ -184,7 +184,7 @@ bool BridgeEngine::release_attested(const std::string& chain,
     }
 
     const std::string msg = "bridge_release|" + chain + "|" + user + "|" + std::to_string(amount);
-    if (!verify_message_signature_hybrid(it->second.attestor_pubkey, msg, attestation)) {
+    if (!verify_message_signature_hybrid(it->second.attestor_pubkey, msg, attestation, default_sign_context())) {
         error = "invalid attestation signature";
         return false;
     }

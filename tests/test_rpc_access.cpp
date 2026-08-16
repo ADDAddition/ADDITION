@@ -41,6 +41,9 @@ int main() {
         "privacy_spend_open",
         "privacy_mint_zk",
         "privacy_spend_zk",
+        "hygiene_classify",
+        "hygiene_attest",
+        "hygiene_verify",
     };
     for (const char* cmd : blocked) {
         if (addition::is_public_read_command(cmd)) {

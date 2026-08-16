@@ -121,8 +121,7 @@ def main() -> int:
         proc = start_node(
             [
                 str(BIN),
-                "--network",
-                "testnet",
+                "--regtest",
                 "--data-dir",
                 str(data_dir),
                 "--local-rpc-port",
@@ -134,21 +133,38 @@ def main() -> int:
         info0 = wait_port("127.0.0.1", port)
         print("CMD getinfo")
         print(info0)
-        if "network=testnet" not in info0:
+        if "network=regtest" not in info0:
             return fail("getinfo network: " + info0)
         if "pow_algorithm=sha3_512" not in info0:
             return fail("expected pow_algorithm=sha3_512: " + info0)
+        if "pow_profile=regtest" not in info0:
+            return fail("expected pow_profile=regtest: " + info0)
+        if "economic_security=none" not in info0:
+            return fail("expected economic_security=none: " + info0)
         if "privacy_verifier=sha3_opening" not in info0:
             return fail("expected privacy_verifier=sha3_opening: " + info0)
         if field(info0, "height") != "0":
             return fail("fresh node height must be 0: " + info0)
 
+        print("CMD crypto_selftest")
+        selftest = tcp_rpc("127.0.0.1", port, "crypto_selftest")
+        print(selftest)
+        if "sign_verify=ok" not in selftest or "empty_ctx_rejected=1" not in selftest:
+            return fail("crypto_selftest: " + selftest)
+        if "tps" in selftest:
+            return fail("selftest must not print TPS: " + selftest)
+
         print("CMD createwallet alice")
         alice = tcp_rpc("127.0.0.1", port, "createwallet alice")
-        print(alice)
+        print("createwallet alice address=" + field(alice, "address") +
+              " address_chars=" + field(alice, "address_chars") +
+              " algo=" + field(alice, "algo") +
+              " pub_bytes=" + field(alice, "pub_bytes"))
         alice_addr = field(alice, "address")
         if not alice_addr or "algo=ml-dsa-87" not in alice:
             return fail("createwallet alice: " + alice)
+        if len(alice_addr) != 128 or alice_addr == field(alice, "pub"):
+            return fail("createwallet must return 128-hex hash-address, not raw key")
 
         print("CMD createwallet bob")
         bob = tcp_rpc("127.0.0.1", port, "createwallet bob")
@@ -183,11 +199,13 @@ def main() -> int:
                 return fail("alice coinbase balance: " + bal_alice)
 
         print("CMD wallet_send alice", bob_addr, "10 1")
-        sent = tcp_rpc("127.0.0.1", port, "wallet_send alice %s 10 1" % bob_addr)
+        sent = tcp_rpc("127.0.0.1", port, "wallet_send alice %s 10 1" % bob_addr, timeout=30.0)
         print(sent)
         tx_hash = field(sent, "hash")
         if "ok:gossiped" not in sent or not tx_hash:
             return fail("wallet_send: " + sent)
+        if int(field(sent, "confirmations") or "0") < 1:
+            return fail("wallet_send did not wait for confirmations: " + sent)
 
         print("CMD mine", alice_addr)
         t1 = time.monotonic()
@@ -209,6 +227,15 @@ def main() -> int:
         print(status)
         if "status=mined" not in status and "block_height=" not in status:
             return fail("tx_status not mined: " + status)
+
+        print("CMD getblock", field(info1, "height") or "1")
+        blk = tcp_rpc("127.0.0.1", port, "getblock 1")
+        print(blk)
+        alice_pub = field(alice, "pub")
+        if alice_pub and alice_pub in blk:
+            return fail("getblock showed raw ML-DSA pubkey")
+        if alice_addr not in blk and "tx_signers=" not in blk:
+            return fail("getblock missing hash-address signers: " + blk)
 
         print("CMD privacy_note_prepare 25")
         prep = tcp_rpc("127.0.0.1", port, "privacy_note_prepare 25")
