@@ -4,17 +4,46 @@
 #include <functional>
 #include <limits>
 #include <sstream>
+#include <stdexcept>
+#include <vector>
 
 namespace addition {
 
 namespace {
 
-constexpr const char* kPoolPrefix = "pool:";
+bool token_name_ok(const std::string& name) {
+    if (name.empty()) {
+        return false;
+    }
+    for (unsigned char c : name) {
+        if (c == '|' || c == '\n' || c == '\r' || c == ' ' || c == '\t') {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool parse_u64_field(const std::string& text, std::uint64_t& out) {
+    if (text.empty()) {
+        return false;
+    }
+    try {
+        std::size_t idx = 0;
+        const auto value = std::stoull(text, &idx, 10);
+        if (idx != text.size()) {
+            return false;
+        }
+        out = static_cast<std::uint64_t>(value);
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
 
 } // namespace
 
 bool TokenEngine::ordered_pair(const std::string& a, const std::string& b, std::string& t0, std::string& t1) {
-    if (a.empty() || b.empty() || a == b) {
+    if (!token_name_ok(a) || !token_name_ok(b) || a == b) {
         return false;
     }
     if (a < b) {
@@ -543,9 +572,9 @@ bool TokenEngine::create_pool(const std::string& token_a,
         return false;
     }
 
-    const auto key = t0 + "|" + t1;
-    if (pools_.find(key) != pools_.end()) {
-        error = "pool already exists";
+    const auto key = pool_key(t0, t1);
+    if (key.empty() || pools_.find(key) != pools_.end()) {
+        error = key.empty() ? "invalid token pair" : "pool already exists";
         return false;
     }
 
@@ -1074,10 +1103,13 @@ std::string TokenEngine::dump_state() const {
     }
 
     for (const auto& [k, p] : pools_) {
-        oss << "P|" << k << '|' << p.token0 << '|' << p.token1 << '|' << p.reserve0 << '|' << p.reserve1 << '|'
+        (void)k;
+        // Do not embed the in-memory key (token0|token1). A '|' inside the key
+        // made tokens.dat unreadable: P|AAA|BBB|AAA|BBB|... parsed as junk.
+        oss << "P|" << p.token0 << '|' << p.token1 << '|' << p.reserve0 << '|' << p.reserve1 << '|'
             << p.fee_bps << '|' << p.lp_total_supply << '\n';
         for (const auto& [owner, bal] : p.lp_balances) {
-            oss << "L|" << k << '|' << owner << '|' << bal << '\n';
+            oss << "L|" << p.token0 << '|' << p.token1 << '|' << owner << '|' << bal << '\n';
         }
     }
 
@@ -1089,6 +1121,7 @@ bool TokenEngine::load_state(const std::string& state, std::string& error) {
     nfts_.clear();
     pools_.clear();
 
+    try {
     std::istringstream iss(state);
     for (std::string line; std::getline(iss, line);) {
         if (line.empty()) {
@@ -1184,36 +1217,67 @@ bool TokenEngine::load_state(const std::string& state, std::string& error) {
             }
             nfts_[col][id] = NftAsset{owner, meta};
         } else if (tag == "P") {
-            std::string key, t0, t1, r0, r1, fee, lps;
-            std::getline(ls, key, '|');
-            std::getline(ls, t0, '|');
-            std::getline(ls, t1, '|');
-            std::getline(ls, r0, '|');
-            std::getline(ls, r1, '|');
-            std::getline(ls, fee, '|');
-            std::getline(ls, lps);
-            if (key.empty() || t0.empty() || t1.empty()) {
+            std::vector<std::string> parts;
+            for (std::string p; std::getline(ls, p, '|');) {
+                parts.push_back(p);
+            }
+            std::string t0;
+            std::string t1;
+            std::string r0;
+            std::string r1;
+            std::string fee;
+            std::string lps;
+            if (parts.size() == 6) {
+                t0 = parts[0];
+                t1 = parts[1];
+                r0 = parts[2];
+                r1 = parts[3];
+                fee = parts[4];
+                lps = parts[5];
+            } else if (parts.size() == 8) {
+                // Legacy dump embedded key token0|token1, which split into two fields.
+                t0 = parts[2];
+                t1 = parts[3];
+                r0 = parts[4];
+                r1 = parts[5];
+                fee = parts[6];
+                lps = parts[7];
+            } else {
+                error = "invalid pool line";
+                return false;
+            }
+            const auto key = pool_key(t0, t1);
+            if (key.empty()) {
                 error = "invalid pool line";
                 return false;
             }
             Pool p{};
             p.token0 = t0;
             p.token1 = t1;
-            p.reserve0 = static_cast<std::uint64_t>(std::stoull(r0));
-            p.reserve1 = static_cast<std::uint64_t>(std::stoull(r1));
-            p.fee_bps = static_cast<std::uint64_t>(std::stoull(fee));
-            p.lp_total_supply = static_cast<std::uint64_t>(std::stoull(lps));
+            if (!parse_u64_field(r0, p.reserve0) ||
+                !parse_u64_field(r1, p.reserve1) ||
+                !parse_u64_field(fee, p.fee_bps) ||
+                !parse_u64_field(lps, p.lp_total_supply)) {
+                error = "invalid pool line";
+                return false;
+            }
             pools_[key] = std::move(p);
         } else if (tag == "L") {
-            std::string key, owner, bal;
-            std::getline(ls, key, '|');
-            std::getline(ls, owner, '|');
-            std::getline(ls, bal);
-            if (key.empty() || owner.empty()) {
+            std::vector<std::string> parts;
+            for (std::string p; std::getline(ls, p, '|');) {
+                parts.push_back(p);
+            }
+            if (parts.size() != 4) {
                 error = "invalid lp line";
                 return false;
             }
-            pools_[key].lp_balances[owner] = static_cast<std::uint64_t>(std::stoull(bal));
+            const auto key = pool_key(parts[0], parts[1]);
+            std::uint64_t lp_bal = 0;
+            if (key.empty() || parts[2].empty() || !parse_u64_field(parts[3], lp_bal)) {
+                error = "invalid lp line";
+                return false;
+            }
+            pools_[key].lp_balances[parts[2]] = lp_bal;
         } else if (tag == "X") {
             std::string sym, wallet;
             std::getline(ls, sym, '|');
@@ -1236,6 +1300,13 @@ bool TokenEngine::load_state(const std::string& state, std::string& error) {
     }
 
     return true;
+    } catch (const std::exception&) {
+        error = "invalid token state";
+        tokens_.clear();
+        nfts_.clear();
+        pools_.clear();
+        return false;
+    }
 }
 
 } // namespace addition

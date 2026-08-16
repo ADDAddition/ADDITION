@@ -24,6 +24,10 @@ commands:
 | `nft_mint <collection> <token_id> <owner> <metadata>` | write | in-process NFT record |
 | `nft_transfer <collection> <token_id> <from> <to>` | write | owner check only |
 | `nft_owner <collection> <token_id>` | read | address or `error: nft not found` |
+| `swap_pool_create <token_a> <token_b> <fee_bps>` | write | local TEXT RPC only; tokens must exist |
+| `add_liquidity` / `swap_add_liquidity <token_a> <token_b> <provider> <amount_a> <amount_b>` | write | moves provider balances into pool reserves |
+| `swap_exact_in <token_in> <token_out> <trader> <amount_in> <min_out>` | write | updates reserves; `ok:amount_out=N` |
+| `swap_tvl` | read | sum of live pool reserves, or `tvl=0` |
 
 State is persisted to `data/tokens.dat` when the daemon shuts down (`quit`)
 and reloaded on the next start.
@@ -35,8 +39,10 @@ There is no private key on the wire, and no PQ signature check on
 security.
 
 LAN / untrusted RPC (when enabled) already filters writes: `token_balance`,
-`token_info`, and `nft_owner` are on the remote allowlist; `token_create` /
-`token_mint` / `token_transfer` are not.
+`token_info`, `nft_owner`, `swap_quote`, `swap_pool_info`, and `swap_tvl` are
+on the remote allowlist; `token_create` / `token_mint` / `token_transfer` /
+`swap_pool_create` / `add_liquidity` / `swap_exact_in` are not. Public-read
+RPC keeps the same tighter allowlist and still refuses those writes.
 
 ## What this is not
 

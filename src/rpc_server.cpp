@@ -87,6 +87,24 @@ bool is_all_digits(const std::string& s) {
     return true;
 }
 
+bool parse_u64_token(std::istringstream& iss, std::uint64_t& out) {
+    std::string tok;
+    if (!(iss >> tok) || !is_all_digits(tok)) {
+        return false;
+    }
+    try {
+        out = static_cast<std::uint64_t>(std::stoull(tok));
+    } catch (const std::exception&) {
+        return false;
+    }
+    return true;
+}
+
+bool no_trailing_token(std::istringstream& iss) {
+    std::string extra;
+    return !(iss >> extra);
+}
+
 std::string format_block(const Block& b) {
     std::ostringstream out;
     out << "height=" << b.header.height
@@ -1664,8 +1682,8 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         std::string token_a;
         std::string token_b;
         std::uint64_t fee_bps = 0;
-        iss >> token_a >> token_b >> fee_bps;
-        if (token_a.empty() || token_b.empty() || fee_bps == 0) {
+        iss >> token_a >> token_b;
+        if (token_a.empty() || token_b.empty() || !parse_u64_token(iss, fee_bps) || !no_trailing_token(iss)) {
             return "error: usage swap_pool_create <token_a> <token_b> <fee_bps>";
         }
         std::string error;
@@ -1681,8 +1699,10 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         std::string provider;
         std::uint64_t amount_a = 0;
         std::uint64_t amount_b = 0;
-        iss >> token_a >> token_b >> provider >> amount_a >> amount_b;
-        if (token_a.empty() || token_b.empty() || provider.empty() || amount_a == 0 || amount_b == 0) {
+        iss >> token_a >> token_b >> provider;
+        if (token_a.empty() || token_b.empty() || provider.empty() ||
+            !parse_u64_token(iss, amount_a) || !parse_u64_token(iss, amount_b) ||
+            amount_a == 0 || amount_b == 0 || !no_trailing_token(iss)) {
             return "error: usage add_liquidity <token_a> <token_b> <provider> <amount_a> <amount_b>";
         }
         std::string error;
@@ -1757,8 +1777,10 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         std::string trader;
         std::uint64_t amount_in = 0;
         std::uint64_t min_out = 0;
-        iss >> token_in >> token_out >> trader >> amount_in >> min_out;
-        if (token_in.empty() || token_out.empty() || trader.empty() || amount_in == 0) {
+        iss >> token_in >> token_out >> trader;
+        if (token_in.empty() || token_out.empty() || trader.empty() ||
+            !parse_u64_token(iss, amount_in) || !parse_u64_token(iss, min_out) ||
+            amount_in == 0 || !no_trailing_token(iss)) {
             return "error: usage swap_exact_in <token_in> <token_out> <trader> <amount_in> <min_out>";
         }
         std::uint64_t amount_out = 0;
