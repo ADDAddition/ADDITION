@@ -62,6 +62,15 @@ curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'</pre>
       <p>There is no public wallet UI. <code>createwallet</code>, balances, and swap commands exist on localhost write RPC only.</p>
       <p>Pages under <a href="/local/"><code>/local/</code></a> (<code>/wallet/</code>, <code>/tokens/</code>, <code>/swap/</code>, <code>/privacy/</code>) talk to <code>/local-rpc</code> → <code>127.0.0.1:8545</code>. On this host they stay <strong>RPC offline</strong>.</p>
       <p>Local desktop helper: <a href="/download/">/download/</a> (testnet / local binary, loopback RPC only).</p>
+      <div class="tool-grid">
+        <a href="/local/"><strong>Local hub</strong>pair + pool, then the other forms</a>
+        <a href="/tokens/"><strong>Tokens</strong>token_create / mint / transfer</a>
+        <a href="/swap/"><strong>Swap pool</strong>fee_bps=0 allowed. In-process math, not Uniswap</a>
+        <a href="/wallet/"><strong>Mine / stake</strong>createwallet, mine, stake, unstake, claim</a>
+        <a href="/privacy/"><strong>Privacy opening</strong>SHA3-512. claim=opening_not_zk. Not Monero</a>
+        <a href="/evm/"><strong>EVM probe</strong>send stays disabled</a>
+      </div>
+      <p class="note">Floor fee is <code>min_fee=0</code> on current <code>main</code>. Spend signatures are ML-DSA-87. Public read cannot write.</p>
     </section>
   </main>
   <footer id="site-footer"></footer>
