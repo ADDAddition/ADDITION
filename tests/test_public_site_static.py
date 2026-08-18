@@ -372,6 +372,13 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("/tokens/", docs)
         self.assertIn("/privacy/", docs)
         self.assertIn("/local/", join)
+        self.assertIn("127.0.0.1:8546", local)
+        self.assertIn("ADDITION_MAINNET_V1", local)
+        self.assertIn("not a public network", local)
+        self.assertIn("create pair + pool", local)
+        self.assertIn("token_create", local)
+        self.assertIn("swap_pool_create", local)
+        self.assertIn("Not a hosted web wallet, Uniswap, or public token sale", local)
 
     def test_common_js_fail_closed_and_strip_keys(self) -> None:
         common = read("common.js")

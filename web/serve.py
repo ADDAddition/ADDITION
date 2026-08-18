@@ -31,6 +31,24 @@ def env_int(name: str, default: int) -> int:
     return int(raw)
 
 
+def network_label() -> str:
+    return os.environ.get("ADDITION_NETWORK", "").strip().lower()
+
+
+def default_local_rpc_port() -> int:
+    if network_label() in {"mainnet", "main"}:
+        return 8546
+    return 8545
+
+
+def local_rpc_timeout(command_token: str) -> float:
+    if command_token != "mine":
+        return 30.0
+    if network_label() in {"mainnet", "main"}:
+        return 3600.0
+    return 300.0
+
+
 def first_token(line: str) -> str:
     parts = line.strip().split()
     return parts[0] if parts else ""
@@ -187,8 +205,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(403, "error: local RPC proxy is loopback-only")
                 return
             host = os.environ.get("ADDITION_LOCAL_RPC_HOST", "127.0.0.1")
-            port = env_int("ADDITION_LOCAL_RPC_PORT", 8545)
-            timeout = 300.0 if token == "mine" else 30.0
+            port = env_int("ADDITION_LOCAL_RPC_PORT", default_local_rpc_port())
+            timeout = local_rpc_timeout(token)
         else:
             if token not in PUBLIC_ALLOWLIST:
                 self._send(403, "error: command disabled on public RPC")
@@ -276,7 +294,7 @@ def main() -> None:
     port = env_int("ADDITION_SITE_PORT", 8080)
     httpd = ThreadingHTTPServer((bind, port), Handler)
     print(
-        "ADDITION testnet site on http://%s:%s (/api/rpc allowlist, /jsonrpc public-read, /local-rpc loopback-only)"
+        "ADDITION site on http://%s:%s (/api/rpc allowlist, /jsonrpc public-read, /local-rpc loopback-only)"
         % (bind, port)
     )
     httpd.serve_forever()

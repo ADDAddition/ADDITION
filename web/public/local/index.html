@@ -13,9 +13,12 @@
   <header id="site-header"></header>
   <main>
     <div class="banner">
-      Forms on these pages call <code>/local-rpc</code> → write RPC <code>127.0.0.1:8545</code>.
-      Run <code>additiond --network testnet</code> and <code>python3 web/serve.py</code> on this machine.
-      The public host has no write RPC. Buttons stay disabled and panels stay <strong>RPC offline</strong>.
+      Forms on these pages call <code>/local-rpc</code> → write RPC <code>127.0.0.1:8545</code>
+      (testnet) or <code>127.0.0.1:8546</code> (<code>additiond --mainnet</code>, set
+      <code>ADDITION_NETWORK=mainnet</code> on <code>python3 web/serve.py</code>).
+      <code>--mainnet</code> is a separate local chain (<code>ADDITION_MAINNET_V1</code>), not a public network.
+      Do not point additionblockchain.com at it. The public host has no write RPC.
+      Buttons stay disabled and panels stay <strong>RPC offline</strong>.
     </div>
     <p id="rpc-state" class="offline">Checking local RPC…</p>
     <p id="height-line" class="note"></p>
@@ -27,6 +30,27 @@
       <a href="/evm/"><strong>EVM bridge</strong>local 127.0.0.1:9545 probe. eth_sendRawTransaction stays disabled</a>
       <a href="/contracts/"><strong>KV contracts</strong>contract_deploy / contract_call on the in-process store</a>
     </div>
+
+    <section class="panel">
+      <h2>create pair + pool</h2>
+      <p class="note">
+        Local <code>token_create</code> then <code>swap_pool_create</code> + <code>add_liquidity</code>.
+        Not a public offering. Not Uniswap.
+      </p>
+      <div class="form-grid">
+        <div><label for="pair-a">token_a</label><input id="pair-a" value="AAA"></div>
+        <div><label for="pair-b">token_b</label><input id="pair-b" value="BBB"></div>
+        <div><label for="pair-owner">owner</label><input id="pair-owner" value="alice"></div>
+        <div><label for="pair-mint">initial_mint</label><input id="pair-mint" value="1000"></div>
+        <div><label for="pair-liq">liquidity each</label><input id="pair-liq" value="200"></div>
+        <div><label for="pair-fee">fee_bps</label><input id="pair-fee" value="30"></div>
+      </div>
+      <div class="btn-row">
+        <button id="pair-btn" type="button" disabled>Create pair + pool</button>
+      </div>
+      <pre id="pair-raw" class="raw"></pre>
+    </section>
+
     <section class="panel">
       <h2>What this is not</h2>
       <ul>
@@ -47,12 +71,44 @@
     L.ping(document.getElementById("rpc-state")).then(function (info) {
       const line = document.getElementById("height-line");
       if (info.offline) {
-        line.textContent = "No node on 127.0.0.1:8545. Start additiond, then python3 web/serve.py.";
+        line.textContent = "No node on 127.0.0.1:8545 (testnet) or 127.0.0.1:8546 (--mainnet). Start additiond, then python3 web/serve.py.";
         return;
       }
+      const net = info.fields.network || "?";
+      const netId = info.fields.network_id || "?";
       line.textContent = "getinfo height=" + (info.fields.height || "?") +
-        " network=" + (info.fields.network || "?") +
+        " network=" + net +
+        " network_id=" + netId +
         " pq_mode=" + (info.fields.pq_mode || "?");
+      if (net === "mainnet") {
+        line.textContent += " — local --mainnet profile, not a public network";
+      }
+    });
+    document.getElementById("pair-btn").addEventListener("click", async function () {
+      const a = L.val("pair-a");
+      const b = L.val("pair-b");
+      const owner = L.val("pair-owner");
+      const mint = L.val("pair-mint");
+      const liq = L.val("pair-liq");
+      const fee = L.val("pair-fee");
+      const out = document.getElementById("pair-raw");
+      const lines = [];
+      const steps = [
+        "token_create " + a + " " + owner + " 1000000 " + mint,
+        "token_create " + b + " " + owner + " 1000000 " + mint,
+        "swap_pool_create " + a + " " + b + " " + fee,
+        "add_liquidity " + a + " " + b + " " + owner + " " + liq + " " + liq,
+        "swap_tvl"
+      ];
+      for (let i = 0; i < steps.length; i += 1) {
+        const r = await L.cmd(steps[i]);
+        lines.push("$ " + steps[i]);
+        lines.push(r.raw);
+        if (r.offline || (!r.ok && r.raw.indexOf("already") < 0 && r.raw.indexOf("exists") < 0)) {
+          break;
+        }
+      }
+      out.textContent = lines.join("\n");
     });
   </script>
 </body>
