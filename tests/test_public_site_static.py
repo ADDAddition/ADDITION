@@ -359,6 +359,7 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("privacy_spend_open", privacy)
         self.assertIn("opening_not_zk", privacy)
         self.assertIn("this page does not call it", privacy)
+        self.assertIn("ADDITION_PRIVACY_MASTER_KEY", privacy)
         self.assertIn('raw: "RPC offline"', helper)
         self.assertIn("/local-rpc?cmd=", helper)
         self.assertIn('["/local/", "Local"]', nav)

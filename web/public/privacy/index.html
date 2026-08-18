@@ -17,6 +17,7 @@
       The node sees the trapdoor. <code>claim=opening_not_zk</code>.
       Not Groth16, Bulletproofs, or ZK-Shield.
       <code>privacy_mint_zk</code> is an ML-DSA wrap, not a circuit — this page does not call it.
+      Mint/spend need <code>ADDITION_PRIVACY_MASTER_KEY</code> (≥32 chars) on the daemon. Without it the node returns <code>error: ADDITION_PRIVACY_MASTER_KEY not set</code>.
     </div>
     <p id="rpc-state" class="offline">Checking local RPC…</p>
     <p id="status-line" class="note"></p>
