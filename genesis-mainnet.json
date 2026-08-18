@@ -9,7 +9,7 @@
   "tail_emission_reward": 1,
   "target_block_time_sec": 60,
   "halving_interval": 210000,
-  "min_fee": 1,
+  "min_fee": 0,
   "pow_algorithm": "memory_hard",
   "initial_difficulty_target": "0x000000FFFFFFFFFF",
   "min_difficulty_target": "0x000000FFFFFFFFFF",

@@ -565,7 +565,7 @@ ChainConfig mainnet_chain_config() {
     cfg.require_pq_signatures = true;
     cfg.require_privacy_pool = true;
     cfg.allow_zero_reward_blocks = true;
-    cfg.min_fee = 1ULL;
+    cfg.min_fee = 0ULL;
     cfg.pow_profile = "mainnet";
     cfg.confirmations_policy = 2;
     cfg.economic_security = "none";

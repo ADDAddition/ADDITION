@@ -24,10 +24,9 @@ enum Amount {
         if text.isEmpty {
             return nil
         }
-        let fee = try parseWhole(text)
-        if fee < 1 {
-            throw AdditionError.invalidAmount
+        if text == "0" {
+            return 0
         }
-        return fee
+        return try parseWhole(text)
     }
 }

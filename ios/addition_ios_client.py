@@ -153,10 +153,9 @@ def parse_optional_fee(raw: Optional[str]) -> Optional[int]:
     text = raw.strip()
     if not text:
         return None
-    fee = parse_whole_amount(text)
-    if fee < 1:
-        raise AdditionClientError("fee must be >= 1")
-    return fee
+    if text == "0":
+        return 0
+    return parse_whole_amount(text)
 
 
 def first_command_token(command: str) -> str:
@@ -331,8 +330,8 @@ def build_wallet_send(
     validate_address(to_addr)
     if amount <= 0:
         raise AdditionClientError("amount must be > 0")
-    if fee is not None and fee < 1:
-        raise AdditionClientError("fee must be >= 1")
+    if fee is not None and fee < 0:
+        raise AdditionClientError("fee must be >= 0")
     line = f"wallet_send {name} {to_addr} {amount}"
     if fee is not None:
         line += f" {fee}"

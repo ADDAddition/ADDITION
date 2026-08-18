@@ -379,6 +379,12 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("token_create", local)
         self.assertIn("swap_pool_create", local)
         self.assertIn("Not a hosted web wallet, Uniswap, or public token sale", local)
+        self.assertIn("min_fee=0", local)
+        self.assertIn("opening_not_zk", local)
+        self.assertIn("ml-dsa-87", local.lower())
+        self.assertIn("Not Monero, not Zcash", local)
+        self.assertIn("research_goal_tps", local)
+        self.assertIn("Not IBC", local)
 
     def test_common_js_fail_closed_and_strip_keys(self) -> None:
         common = read("common.js")

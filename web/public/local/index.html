@@ -43,7 +43,7 @@
         <div><label for="pair-owner">owner</label><input id="pair-owner" value="alice"></div>
         <div><label for="pair-mint">initial_mint</label><input id="pair-mint" value="1000"></div>
         <div><label for="pair-liq">liquidity each</label><input id="pair-liq" value="200"></div>
-        <div><label for="pair-fee">fee_bps</label><input id="pair-fee" value="30"></div>
+        <div><label for="pair-fee">fee_bps (0 = free)</label><input id="pair-fee" value="0"></div>
       </div>
       <div class="btn-row">
         <button id="pair-btn" type="button" disabled>Create pair + pool</button>
@@ -51,6 +51,17 @@
       <pre id="pair-raw" class="raw"></pre>
     </section>
 
+    <section class="panel">
+      <h2>What this is</h2>
+      <ul>
+        <li><strong>Fees</strong> — <code>min_fee=0</code>. Empty mempool: <code>recommended_min_fee=0</code>. Swap <code>fee_bps=0</code> is allowed. Congestion can raise the native floor. Not a Solana/XRP throughput claim.</li>
+        <li><strong>PQ</strong> — spend signatures are ML-DSA-87 (<code>pq_mode=strict</code>). That is the quantum-resistant property that exists. Not FIPS 140-3.</li>
+        <li><strong>Privacy</strong> — SHA3-512 opening. The node sees the trapdoor. <code>claim=opening_not_zk</code>. Not Monero, not Zcash, not a circuit.</li>
+        <li><strong>Speed</strong> — <code>last_tps</code> is measured. <code>research_goal_tps</code> is labeled not a measurement. PoW is SHA3-512 (testnet) or memory_hard (mainnet profile).</li>
+        <li><strong>Contracts</strong> — in-process KV <code>contract_deploy</code> / <code>contract_call</code>. Not a scalable VM.</li>
+        <li><strong>Other chains</strong> — EVM helper is a send-disabled bootstrap. Not IBC, not a bridge, not MetaMask public RPC.</li>
+      </ul>
+    </section>
     <section class="panel">
       <h2>What this is not</h2>
       <ul>

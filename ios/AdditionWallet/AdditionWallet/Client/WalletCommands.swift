@@ -27,9 +27,6 @@ enum WalletCommands {
         if amount == 0 {
             throw AdditionError.invalidAmount
         }
-        if let fee, fee < 1 {
-            throw AdditionError.invalidAmount
-        }
         var line = "wallet_send \(name) \(to) \(amount)"
         if let fee {
             line += " \(fee)"

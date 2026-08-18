@@ -38,7 +38,7 @@ std::string join_csv(const std::vector<std::string>& items) {
 }
 
 std::uint64_t recommended_min_fee(std::size_t mempool_size, std::uint64_t last_block_fees) {
-    std::uint64_t base = 1;
+    std::uint64_t base = 0;
     if (mempool_size > 1000) {
         base += 20;
     } else if (mempool_size > 500) {
@@ -319,7 +319,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         const auto dyn = recommended_min_fee(msz, last);
         const auto ai_floor = ai_optimizer_.recommended_fee_floor();
         std::ostringstream out;
-        out << "base_min_fee=1"
+        out << "base_min_fee=" << chain_.config().min_fee
             << " mempool_size=" << msz
             << " fees_last_block=" << last
             << " recommended_min_fee=" << std::max(dyn, ai_floor)

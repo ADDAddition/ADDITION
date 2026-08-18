@@ -247,7 +247,7 @@ Notes:
 - Monetary cap is enforced on-chain: `max_supply = 50,000,000`.
 - Runtime strict gates enabled:
 	- PQ signatures required for spend transactions (`signature` must be `pq=` format)
-	- Minimum transaction fee enforced (`min_fee=1`)
+	- Floor fee is `min_fee=0`. Empty mempool: `recommended_min_fee=0`. Congestion can raise it. Not a Solana/XRP claim.
 	- RPC LAN commands are filtered by untrusted allowlist
 	- Admin-sensitive commands require trusted interface when strict admin mode is enabled
 	- Local/LAN RPC token auth supported via `ADDITION_RPC_TOKEN` / `ADDITION_LAN_RPC_TOKEN`

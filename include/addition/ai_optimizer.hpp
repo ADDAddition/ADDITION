@@ -21,7 +21,7 @@ private:
     };
 
     std::deque<Sample> samples_;
-    std::uint64_t fee_floor_{1};
+    std::uint64_t fee_floor_{0};
     std::uint64_t difficulty_bias_bps_{10000};
 };
 

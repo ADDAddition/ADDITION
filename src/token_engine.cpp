@@ -567,8 +567,8 @@ bool TokenEngine::create_pool(const std::string& token_a,
         error = "pool tokens must exist";
         return false;
     }
-    if (fee_bps == 0 || fee_bps >= 10000) {
-        error = "fee_bps must be in [1,9999]";
+    if (fee_bps >= 10000) {
+        error = "fee_bps must be in [0,9999]";
         return false;
     }
 
