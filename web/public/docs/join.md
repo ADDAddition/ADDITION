@@ -56,7 +56,9 @@ That env is advertisement only. Public TCP 28545 can still timeout or be filtere
 
 There is no public wallet UI. `createwallet`, balances, and swap commands exist on localhost write RPC only.
 
-Pages under `/wallet/` and `/swap/` talk to `/local-rpc` → `127.0.0.1:8545`. On the public host they stay **RPC offline**.
+Pages under `/local/` (`/wallet/`, `/tokens/`, `/swap/`, `/privacy/`) talk to `/local-rpc` → `127.0.0.1:8545`. On the public host they stay **RPC offline**.
+
+Local forms: `/local/` hub, `/tokens/` (`token_create`), `/swap/` (`fee_bps=0` allowed), `/wallet/` (mine / stake), `/privacy/` (`claim=opening_not_zk`). Floor fee is `min_fee=0` on current `main`. Spend signatures are ML-DSA-87. Public read cannot write.
 
 Local desktop helper: [`/download/`](/download/) (testnet / local binary, loopback RPC only).
 
