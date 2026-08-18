@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION tokens (local)</title>
+  <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body data-title="Tokens" data-sub="token_* on 127.0.0.1:8545">
+  <header id="site-header"></header>
+  <main>
+    <div class="banner">
+      <code>token_create</code> / <code>token_mint</code> / <code>token_transfer</code> on
+      <code>/local-rpc</code> → <code>127.0.0.1:8545</code>.
+      In-process ledger. Not ERC-20, not a public sale, not Uniswap.
+      Owner strings are opaque names (they do not need to be mined addresses).
+      On this host the forms stay <strong>RPC offline</strong>.
+    </div>
+    <p id="rpc-state" class="offline">Checking local RPC…</p>
+
+    <section class="panel">
+      <h2>token_create</h2>
+      <div class="form-grid">
+        <div><label for="symbol">symbol</label><input id="symbol" value="AAA"></div>
+        <div><label for="owner">owner</label><input id="owner" value="alice"></div>
+        <div><label for="max">max_supply</label><input id="max" value="1000000"></div>
+        <div><label for="mint0">initial_mint</label><input id="mint0" value="1000"></div>
+      </div>
+      <div class="btn-row">
+        <button id="create-btn" type="button" disabled>Create token</button>
+        <button id="info-btn" type="button" disabled>token_info</button>
+        <button id="bal-btn" type="button" disabled>token_balance</button>
+      </div>
+      <div id="create-fields"></div>
+      <pre id="create-raw" class="raw"></pre>
+    </section>
+
+    <section class="panel">
+      <h2>token_mint</h2>
+      <div class="form-grid">
+        <div><label for="mint-to">to</label><input id="mint-to" value="bob"></div>
+        <div><label for="mint-amt">amount</label><input id="mint-amt" value="50"></div>
+      </div>
+      <div class="btn-row">
+        <button id="mint-btn" type="button" disabled>Mint</button>
+      </div>
+      <pre id="mint-raw" class="raw"></pre>
+    </section>
+
+    <section class="panel">
+      <h2>token_transfer</h2>
+      <div class="form-grid">
+        <div><label for="xfer-from">from</label><input id="xfer-from" value="alice"></div>
+        <div><label for="xfer-to">to</label><input id="xfer-to" value="bob"></div>
+        <div><label for="xfer-amt">amount</label><input id="xfer-amt" value="10"></div>
+      </div>
+      <div class="btn-row">
+        <button id="xfer-btn" type="button" disabled>Transfer</button>
+      </div>
+      <pre id="xfer-raw" class="raw"></pre>
+    </section>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/common.js"></script>
+  <script src="/local-rpc.js"></script>
+  <script src="/chrome.js"></script>
+  <script src="/local-nav.js"></script>
+  <script>
+    const L = window.AdditionLocal;
+    function symbol() { return L.val("symbol"); }
+    function owner() { return L.val("owner"); }
+    L.ping(document.getElementById("rpc-state"));
+    document.getElementById("create-btn").addEventListener("click", async function () {
+      const r = await L.cmd("token_create " + symbol() + " " + owner() + " " + L.val("max") + " " + L.val("mint0"));
+      L.showResult(document.getElementById("create-raw"), document.getElementById("create-fields"), r);
+    });
+    document.getElementById("info-btn").addEventListener("click", async function () {
+      const r = await L.cmd("token_info " + symbol());
+      L.showResult(document.getElementById("create-raw"), document.getElementById("create-fields"), r);
+    });
+    document.getElementById("bal-btn").addEventListener("click", async function () {
+      const r = await L.cmd("token_balance " + symbol() + " " + owner());
+      L.showResult(document.getElementById("create-raw"), document.getElementById("create-fields"), r);
+    });
+    document.getElementById("mint-btn").addEventListener("click", async function () {
+      const r = await L.cmd("token_mint " + symbol() + " " + owner() + " " + L.val("mint-to") + " " + L.val("mint-amt"));
+      document.getElementById("mint-raw").textContent = r.raw;
+    });
+    document.getElementById("xfer-btn").addEventListener("click", async function () {
+      const r = await L.cmd("token_transfer " + symbol() + " " + L.val("xfer-from") + " " + L.val("xfer-to") + " " + L.val("xfer-amt"));
+      document.getElementById("xfer-raw").textContent = r.raw;
+    });
+  </script>
+</body>
+</html>

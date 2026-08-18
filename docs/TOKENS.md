@@ -48,8 +48,9 @@ RPC keeps the same tighter allowlist and still refuses those writes.
 
 - Not a live mainnet and not a public token contract.
 - Not a DEX, Uniswap fork, or public AMM. `swap_*` commands exist on the
-  daemon as **in-process pool math** on the same `TokenEngine`. This slice
-  does not ship a swap UI, liquidity product, or public peer list for trading.
+  daemon as **in-process pool math** on the same `TokenEngine`. Local forms
+  live at `/tokens/` and `/swap/` and talk to loopback `/local-rpc` only.
+  The public host stays RPC offline. There is no public peer list for trading.
 - Not Ethereum JSON-RPC and not MetaMask.
 - Not ZK-Shield / private balances. Privacy commands are a separate, stricter
   path and are out of scope here.

@@ -283,7 +283,7 @@ Notes:
 - MetaMask EVM bridge (bootstrap): `web/evm/evm_rpc_bridge.py`
 
 ## Website
-- Static Pages root: `web/public/` (`/`, `/explorer/`, `/status/`, `/rpc/`, `/wallet/`, `/docs/`, `/contracts/`, `/swap/`, `/evm/`, `/whitepaper/`, `/legal/`)
+- Static Pages root: `web/public/` (`/`, `/explorer/`, `/status/`, `/rpc/`, `/local/`, `/wallet/`, `/tokens/`, `/swap/`, `/privacy/`, `/docs/`, `/contracts/`, `/evm/`, `/whitepaper/`, `/legal/`)
 - Local server: `python3 web/serve.py` (default `127.0.0.1:8080`)
 - `/api/rpc` (and `/rpc?cmd=`) proxy the public allowlist to port `38545`
 - `/rpc/` without `cmd` is the how-to page

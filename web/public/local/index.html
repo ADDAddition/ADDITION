@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION local node tools</title>
+  <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body data-title="Local tools" data-sub="127.0.0.1:8545 via /local-rpc">
+  <header id="site-header"></header>
+  <main>
+    <div class="banner">
+      Forms on these pages call <code>/local-rpc</code> → write RPC <code>127.0.0.1:8545</code>.
+      Run <code>additiond --network testnet</code> and <code>python3 web/serve.py</code> on this machine.
+      The public host has no write RPC. Buttons stay disabled and panels stay <strong>RPC offline</strong>.
+    </div>
+    <p id="rpc-state" class="offline">Checking local RPC…</p>
+    <p id="height-line" class="note"></p>
+    <div class="tool-grid">
+      <a href="/wallet/"><strong>Wallet / mine / stake</strong>createwallet, wallet_send, mine, stake, unstake, claim</a>
+      <a href="/tokens/"><strong>Tokens</strong>token_create, mint, transfer, info, balance</a>
+      <a href="/swap/"><strong>Swap pool</strong>swap_pool_create, add_liquidity, quote, swap_exact_in, swap_tvl</a>
+      <a href="/privacy/"><strong>Privacy opening</strong>privacy_note_prepare, mint_open, spend_open. SHA3-512, not a ZK circuit</a>
+      <a href="/evm/"><strong>EVM bridge</strong>local 127.0.0.1:9545 probe. eth_sendRawTransaction stays disabled</a>
+      <a href="/contracts/"><strong>KV contracts</strong>contract_deploy / contract_call on the in-process store</a>
+    </div>
+    <section class="panel">
+      <h2>What this is not</h2>
+      <ul>
+        <li>Not a hosted web wallet, Uniswap, or public token sale</li>
+        <li>Not Groth16 / Bulletproofs / ZK-Shield</li>
+        <li>Token and swap writes are unsigned TEXT RPC on loopback. Anyone who can reach 8545 can name an owner</li>
+        <li>EVM helper is a bootstrap. It is not a full EVM and cannot send</li>
+      </ul>
+    </section>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/common.js"></script>
+  <script src="/local-rpc.js"></script>
+  <script src="/chrome.js"></script>
+  <script src="/local-nav.js"></script>
+  <script>
+    const L = window.AdditionLocal;
+    L.ping(document.getElementById("rpc-state")).then(function (info) {
+      const line = document.getElementById("height-line");
+      if (info.offline) {
+        line.textContent = "No node on 127.0.0.1:8545. Start additiond, then python3 web/serve.py.";
+        return;
+      }
+      line.textContent = "getinfo height=" + (info.fields.height || "?") +
+        " network=" + (info.fields.network || "?") +
+        " pq_mode=" + (info.fields.pq_mode || "?");
+    });
+  </script>
+</body>
+</html>

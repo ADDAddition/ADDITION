@@ -13,150 +13,156 @@
   <header id="site-header"></header>
   <main>
     <div class="banner">
-      <code>createwallet</code>, <code>wallet_send</code>, and <code>mine</code> go to
+      <code>createwallet</code>, <code>wallet_send</code>, <code>mine</code>, and <code>stake</code> go to
       <code>/local-rpc</code> → <code>127.0.0.1:8545</code>.
       Run <code>python3 web/serve.py</code> next to a local node.
-      The public read port (:38545) does not accept those commands.
+      The public read port does not accept those commands.
       Keys stay in <code>data/wallets/&lt;name&gt;.wal</code> (ML-DSA-87).
     </div>
     <p id="rpc-state" class="offline">Checking local RPC…</p>
     <p id="height-line" class="note"></p>
 
     <section class="panel">
-      <h2>What this is</h2>
-      <ul>
-        <li>UTXO receive/send, <code>createwallet</code> (ML-DSA-87), <code>getbalance</code> / <code>wallet_balance</code></li>
-        <li>Default send: <code>wallet_send</code> (node signs from the local file; no raw privkey on the wire)</li>
-        <li>Explicit send: <code>tx_build</code> + <code>wallet_sign</code> + <code>sendtx_signed</code></li>
-        <li>Fees: spec <code>min_fee=1</code>, plus the node’s <code>fee_info</code> floor. Cap: 50,000,000</li>
-        <li>Desktop helper: <a href="/download/">/download/</a> (same local RPC; testnet / local binary)</li>
-      </ul>
-      <p class="note">“Like Bitcoin” here means the user model. This tree does not implement BIP-32/39/44 or Bitcoin P2P/script.</p>
-    </section>
-
-    <section class="panel">
       <h2>createwallet / balance</h2>
-      <label for="name">wallet name</label>
-      <input id="name" value="default">
-      <button id="create-btn" type="button" disabled>createwallet</button>
-      <button id="list-btn" type="button" disabled>wallet_list</button>
-      <button id="info-btn" type="button" disabled>wallet_info</button>
-      <button id="bal-btn" type="button" disabled>wallet_balance</button>
+      <div class="form-grid">
+        <div><label for="name">wallet name</label><input id="name" value="default"></div>
+      </div>
+      <div class="btn-row">
+        <button id="create-btn" type="button" disabled>createwallet</button>
+        <button id="list-btn" type="button" disabled>wallet_list</button>
+        <button id="info-btn" type="button" disabled>wallet_info</button>
+        <button id="bal-btn" type="button" disabled>wallet_balance</button>
+      </div>
+      <div id="wallet-fields"></div>
       <pre id="wallet-raw" class="raw"></pre>
     </section>
 
     <section class="panel">
       <h2>wallet_send</h2>
-      <label for="to">to address</label>
-      <input id="to">
-      <label for="amount">amount</label>
-      <input id="amount" value="1">
-      <label for="fee">fee (blank = node floor)</label>
-      <input id="fee" value="1">
-      <button id="send-btn" type="button" disabled>Send</button>
+      <div class="form-grid">
+        <div><label for="to">to address</label><input id="to"></div>
+        <div><label for="amount">amount</label><input id="amount" value="1"></div>
+        <div><label for="fee">fee (blank = node floor)</label><input id="fee" value="1"></div>
+      </div>
+      <div class="btn-row">
+        <button id="send-btn" type="button" disabled>Send</button>
+      </div>
       <pre id="send-raw" class="raw"></pre>
     </section>
 
-    <section class="panel">
+    <section class="panel" id="mine">
       <h2>mine to this wallet</h2>
-      <p class="note">Memory-hard. Can take a long time. Local trusted RPC only. Reward is the node’s <code>next_reward</code> (50 on a fresh testnet).</p>
-      <button id="mine-btn" type="button" disabled>mine</button>
+      <p class="note">Testnet SHA3-512, 30s deadline. Reward is the node’s <code>next_reward</code> (50 on a fresh testnet). Local trusted RPC only.</p>
+      <div class="btn-row">
+        <button id="mine-btn" type="button" disabled>mine</button>
+      </div>
       <pre id="mine-raw" class="raw"></pre>
+    </section>
+
+    <section class="panel" id="stake">
+      <h2>stake / unstake / claim</h2>
+      <p class="note">Uses the wallet address from <code>wallet_info</code>. Needs unlocked on-chain ADD (mine first). Whole units.</p>
+      <div class="form-grid">
+        <div><label for="stake-amt">amount</label><input id="stake-amt" value="1"></div>
+      </div>
+      <div class="btn-row">
+        <button id="stake-btn" type="button" disabled>stake</button>
+        <button id="unstake-btn" type="button" disabled>unstake</button>
+        <button id="staked-btn" type="button" disabled>staked</button>
+        <button id="claim-btn" type="button" disabled>stake_claim</button>
+      </div>
+      <pre id="stake-raw" class="raw"></pre>
     </section>
   </main>
   <footer id="site-footer"></footer>
   <script src="/common.js"></script>
+  <script src="/local-rpc.js"></script>
   <script src="/chrome.js"></script>
+  <script src="/local-nav.js"></script>
   <script>
-    async function localCmd(cmd, timeoutMs) {
-      const ctrl = timeoutMs ? new AbortController() : null;
-      const timer = timeoutMs ? setTimeout(function () { ctrl.abort(); }, timeoutMs) : null;
-      try {
-        const res = await fetch("/local-rpc?cmd=" + encodeURIComponent(cmd), {
-          cache: "no-store",
-          signal: ctrl ? ctrl.signal : undefined
-        });
-        const raw = (await res.text()).trim();
-        if (!res.ok || raw.charAt(0) === "<") {
-          return { offline: true, raw: raw && raw.charAt(0) !== "<" ? raw : "RPC offline" };
-        }
-        return { offline: raw === "RPC offline", raw: raw };
-      } catch (e) {
-        return { offline: true, raw: "RPC offline" };
-      } finally {
-        if (timer) clearTimeout(timer);
+    const L = window.AdditionLocal;
+    function name() { return L.val("name"); }
+    async function walletAddress() {
+      const info = await L.cmd("wallet_info " + name());
+      if (info.offline || !info.ok) {
+        return info;
       }
-    }
-    function field(line, key) {
-      const parts = line.split(/\s+/);
-      const prefix = key + "=";
-      for (let i = 0; i < parts.length; i++) {
-        if (parts[i].indexOf(prefix) === 0) return parts[i].slice(prefix.length);
-      }
-      return "";
+      return info;
     }
     async function ping() {
-      const r = await localCmd("getinfo");
-      const el = document.getElementById("rpc-state");
+      const r = await L.ping(document.getElementById("rpc-state"));
       const height = document.getElementById("height-line");
-      const buttons = document.querySelectorAll("main button");
       if (r.offline) {
-        el.className = "offline";
-        el.textContent = "RPC offline";
         height.textContent = "No node on 127.0.0.1:8545. Start additiond, then python3 web/serve.py.";
-        for (let i = 0; i < buttons.length; i += 1) {
-          buttons[i].disabled = true;
-        }
+        document.getElementById("wallet-raw").textContent = "RPC offline";
+        document.getElementById("send-raw").textContent = "RPC offline";
+        document.getElementById("mine-raw").textContent = "RPC offline";
+        document.getElementById("stake-raw").textContent = "RPC offline";
         return;
       }
-      el.className = "ok";
-      el.textContent = "Local trusted RPC answered";
-      for (let i = 0; i < buttons.length; i += 1) {
-        buttons[i].disabled = false;
-      }
-      height.textContent = "getinfo height=" + (field(r.raw, "height") || "?") +
-        " network=" + (field(r.raw, "network") || "?") +
-        " network_name=" + (field(r.raw, "network_name") || "?");
+      height.textContent = "getinfo height=" + (r.fields.height || "?") +
+        " network=" + (r.fields.network || "?") +
+        " next_reward=" + (r.fields.next_reward || "?");
     }
     document.getElementById("create-btn").addEventListener("click", async function () {
-      const r = await localCmd("createwallet " + document.getElementById("name").value.trim());
-      document.getElementById("wallet-raw").textContent = r.raw;
+      const r = await L.cmd("createwallet " + name());
+      L.showResult(document.getElementById("wallet-raw"), document.getElementById("wallet-fields"), r);
     });
     document.getElementById("list-btn").addEventListener("click", async function () {
-      const r = await localCmd("wallet_list");
-      document.getElementById("wallet-raw").textContent = r.raw;
+      const r = await L.cmd("wallet_list");
+      L.showResult(document.getElementById("wallet-raw"), document.getElementById("wallet-fields"), r);
     });
     document.getElementById("info-btn").addEventListener("click", async function () {
-      const r = await localCmd("wallet_info " + document.getElementById("name").value.trim());
-      document.getElementById("wallet-raw").textContent = r.raw;
+      const r = await L.cmd("wallet_info " + name());
+      L.showResult(document.getElementById("wallet-raw"), document.getElementById("wallet-fields"), r);
     });
     document.getElementById("bal-btn").addEventListener("click", async function () {
-      const r = await localCmd("wallet_balance " + document.getElementById("name").value.trim());
-      document.getElementById("wallet-raw").textContent = r.raw;
+      const r = await L.cmd("wallet_balance " + name());
+      L.showResult(document.getElementById("wallet-raw"), document.getElementById("wallet-fields"), r);
     });
     document.getElementById("send-btn").addEventListener("click", async function () {
-      const name = document.getElementById("name").value.trim();
-      const to = document.getElementById("to").value.trim();
-      const amount = document.getElementById("amount").value.trim();
-      const fee = document.getElementById("fee").value.trim();
-      let cmd = "wallet_send " + name + " " + to + " " + amount;
-      if (fee) cmd += " " + fee;
-      const r = await localCmd(cmd);
+      let line = "wallet_send " + name() + " " + L.val("to") + " " + L.val("amount");
+      if (L.val("fee")) {
+        line += " " + L.val("fee");
+      }
+      const r = await L.cmd(line);
       document.getElementById("send-raw").textContent = r.raw;
     });
     document.getElementById("mine-btn").addEventListener("click", async function () {
-      const info = await localCmd("wallet_info " + document.getElementById("name").value.trim());
-      if (info.offline || info.raw.indexOf("error:") === 0) {
+      const info = await walletAddress();
+      if (info.offline || !info.ok) {
         document.getElementById("mine-raw").textContent = info.raw;
         return;
       }
-      const addr = field(info.raw, "address");
+      const addr = info.fields.address || L.field(info.raw, "address");
       document.getElementById("mine-raw").textContent = "mining to " + addr + " …";
-      const r = await localCmd("mine " + addr, 300000);
+      const r = await L.cmd("mine " + addr, 300000);
       document.getElementById("mine-raw").textContent = r.raw;
-      const bal = await localCmd("wallet_balance " + document.getElementById("name").value.trim());
-      document.getElementById("wallet-raw").textContent = bal.raw;
+      const bal = await L.cmd("wallet_balance " + name());
+      L.showResult(document.getElementById("wallet-raw"), document.getElementById("wallet-fields"), bal);
       ping();
+    });
+    async function stakeCmd(line) {
+      const info = await walletAddress();
+      if (info.offline || !info.ok) {
+        document.getElementById("stake-raw").textContent = info.raw;
+        return;
+      }
+      const addr = info.fields.address || L.field(info.raw, "address");
+      const r = await L.cmd(line.replace("%ADDR%", addr));
+      document.getElementById("stake-raw").textContent = r.raw;
+    }
+    document.getElementById("stake-btn").addEventListener("click", function () {
+      stakeCmd("stake %ADDR% " + L.val("stake-amt"));
+    });
+    document.getElementById("unstake-btn").addEventListener("click", function () {
+      stakeCmd("unstake %ADDR% " + L.val("stake-amt"));
+    });
+    document.getElementById("staked-btn").addEventListener("click", function () {
+      stakeCmd("staked %ADDR%");
+    });
+    document.getElementById("claim-btn").addEventListener("click", function () {
+      stakeCmd("stake_claim %ADDR%");
     });
     ping();
   </script>
