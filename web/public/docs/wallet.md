@@ -24,7 +24,7 @@ Relevant commands (see [FINAL_COMMANDS.md](FINAL_COMMANDS.md)):
 | `createwallet [name] [scheme]` | Default scheme `ml-dsa-87`. Optional `slh-dsa-shake-256s` only if this liboqs can `OQS_SIG_sign_with_ctx_str` with a non-empty context; otherwise rejected in `pq_mode=strict`. Unknown schemes (including Falcon/FN-DSA) are rejected. Writes `data/wallets/<name>.wal`. Returns `address`, `pub`, `algo=...`, `priv_printed=0`. |
 | `wallet_send <name> <to> <amount> [fee]` | Node signs from that `.wal` file. No privkey on the wire. |
 | `getbalance <address>` | Confirmed balance |
-| `fee_info` | `recommended_min_fee` (minimum `1`) |
+| `fee_info` | `recommended_min_fee` (floor `0`; congestion can raise it) |
 | `tx_build <from> <pubkey_hex> <to> <amount> <fee> <nonce>` | Builds the unsigned spend and returns `sign_hash=...` |
 | `sendtx_signed_hash ... <sig_hex_without_pq_prefix>` | Submits a PQ signature. No private key argument. |
 | `hygiene_classify [path]` | Offline Bitcoin script hygiene over operator samples / `fixtures/btc_hygiene_samples.json`. Does not move Bitcoin. Not BIP-360. Trusted RPC only. |
@@ -87,7 +87,7 @@ python3 web/addition_wallet.py balance
 
 # 4. Send: tx_build on the node, ML-DSA-87 sign locally, sendtx_signed_hash
 python3 web/addition_wallet.py send <to_address> <amount>
-# fee defaults to fee_info.recommended_min_fee (at least 1)
+# fee defaults to fee_info.recommended_min_fee (0 when the mempool is empty)
 ```
 
 Optional flags:

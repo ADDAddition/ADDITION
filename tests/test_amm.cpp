@@ -145,7 +145,8 @@ int test_engine_rejects_bad_inputs() {
     addition::TokenEngine tokens;
     std::string error;
     if (!tokens.create_token("AAA", "alice", 100000, 1000, error) ||
-        !tokens.create_token("BBB", "alice", 100000, 1000, error)) {
+        !tokens.create_token("BBB", "alice", 100000, 1000, error) ||
+        !tokens.create_token("CCC", "alice", 100000, 1000, error)) {
         std::cerr << "test failed: token_create: " << error << '\n';
         return 1;
     }
@@ -158,8 +159,12 @@ int test_engine_rejects_bad_inputs() {
         std::cerr << "test failed: missing token pool must fail\n";
         return 1;
     }
-    if (tokens.create_pool("AAA", "BBB", 0, error) || tokens.create_pool("AAA", "BBB", 10000, error)) {
-        std::cerr << "test failed: fee_bps bounds must fail\n";
+    if (tokens.create_pool("AAA", "BBB", 10000, error)) {
+        std::cerr << "test failed: fee_bps 10000 must fail\n";
+        return 1;
+    }
+    if (!tokens.create_pool("AAA", "CCC", 0, error)) {
+        std::cerr << "test failed: fee_bps 0 must be allowed: " << error << '\n';
         return 1;
     }
     if (tokens.create_pool("AA|A", "BBB", 30, error)) {

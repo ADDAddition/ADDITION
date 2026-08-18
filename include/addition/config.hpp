@@ -70,7 +70,7 @@ struct ChainConfig {
     bool require_pq_signatures{true};
     bool require_privacy_pool{true};
     bool allow_zero_reward_blocks{true};
-    std::uint64_t min_fee{1ULL};
+    std::uint64_t min_fee{0ULL};
     std::vector<std::string> bootstrap_peers{"127.0.0.1:28545"};
 };
 

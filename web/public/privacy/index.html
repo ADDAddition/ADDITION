@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION privacy opening (local)</title>
+  <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body data-title="Privacy" data-sub="SHA3-512 opening on 127.0.0.1:8545">
+  <header id="site-header"></header>
+  <main>
+    <div class="banner">
+      SHA3-512 commitment + nullifier opening.
+      The node sees the trapdoor. <code>claim=opening_not_zk</code>.
+      Not Groth16, Bulletproofs, or ZK-Shield.
+      <code>privacy_mint_zk</code> is an ML-DSA wrap, not a circuit — this page does not call it.
+      Mint/spend need <code>ADDITION_PRIVACY_MASTER_KEY</code> (≥32 chars) on the daemon. Without it the node returns <code>error: ADDITION_PRIVACY_MASTER_KEY not set</code>.
+    </div>
+    <p id="rpc-state" class="offline">Checking local RPC…</p>
+    <p id="status-line" class="note"></p>
+
+    <section class="panel">
+      <h2>privacy_note_prepare</h2>
+      <div class="form-grid">
+        <div><label for="amount">amount</label><input id="amount" value="5"></div>
+        <div><label for="owner">owner</label><input id="owner" value="alice"></div>
+      </div>
+      <div class="btn-row">
+        <button id="prep-btn" type="button" disabled>Prepare note</button>
+        <button id="status-btn" type="button" disabled>privacy_status</button>
+      </div>
+      <div id="prep-fields"></div>
+      <pre id="prep-raw" class="raw"></pre>
+    </section>
+
+    <section class="panel">
+      <h2>privacy_mint_open</h2>
+      <div class="form-grid">
+        <div><label for="cm">commitment</label><input id="cm"></div>
+        <div><label for="nf">nullifier</label><input id="nf"></div>
+        <div><label for="td">trapdoor</label><input id="td"></div>
+      </div>
+      <div class="btn-row">
+        <button id="mint-btn" type="button" disabled>Mint open</button>
+      </div>
+      <div id="mint-fields"></div>
+      <pre id="mint-raw" class="raw"></pre>
+    </section>
+
+    <section class="panel">
+      <h2>privacy_spend_open</h2>
+      <div class="form-grid">
+        <div><label for="note">note_id</label><input id="note"></div>
+        <div><label for="recv">recipient</label><input id="recv" value="bob"></div>
+        <div><label for="spend-amt">amount</label><input id="spend-amt" value="5"></div>
+        <div><label for="spend-td">trapdoor</label><input id="spend-td"></div>
+      </div>
+      <div class="btn-row">
+        <button id="spend-btn" type="button" disabled>Spend open</button>
+      </div>
+      <div id="spend-fields"></div>
+      <pre id="spend-raw" class="raw"></pre>
+    </section>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/common.js"></script>
+  <script src="/local-rpc.js"></script>
+  <script src="/chrome.js"></script>
+  <script src="/local-nav.js"></script>
+  <script>
+    const L = window.AdditionLocal;
+    async function loadStatus() {
+      const r = await L.cmd("privacy_status");
+      document.getElementById("status-line").textContent = r.offline ? "" : r.raw;
+    }
+    L.ping(document.getElementById("rpc-state")).then(function (info) {
+      if (!info.offline) {
+        loadStatus();
+      } else {
+        document.getElementById("prep-raw").textContent = "RPC offline";
+        document.getElementById("mint-raw").textContent = "RPC offline";
+        document.getElementById("spend-raw").textContent = "RPC offline";
+      }
+    });
+    document.getElementById("status-btn").addEventListener("click", loadStatus);
+    document.getElementById("prep-btn").addEventListener("click", async function () {
+      const r = await L.cmd("privacy_note_prepare " + L.val("amount"));
+      L.showResult(document.getElementById("prep-raw"), document.getElementById("prep-fields"), r);
+      L.setVal("cm", r.fields.commitment);
+      L.setVal("nf", r.fields.nullifier);
+      L.setVal("td", r.fields.trapdoor);
+      L.setVal("spend-td", r.fields.trapdoor);
+      L.setVal("spend-amt", r.fields.amount || L.val("amount"));
+    });
+    document.getElementById("mint-btn").addEventListener("click", async function () {
+      const r = await L.cmd("privacy_mint_open " + L.val("owner") + " " + L.val("amount") + " " +
+        L.val("cm") + " " + L.val("nf") + " " + L.val("td"));
+      L.showResult(document.getElementById("mint-raw"), document.getElementById("mint-fields"), r);
+      L.setVal("note", r.fields.note_id);
+      loadStatus();
+    });
+    document.getElementById("spend-btn").addEventListener("click", async function () {
+      const r = await L.cmd("privacy_spend_open " + L.val("owner") + " " + L.val("note") + " " +
+        L.val("recv") + " " + L.val("spend-amt") + " " + L.val("spend-td"));
+      L.showResult(document.getElementById("spend-raw"), document.getElementById("spend-fields"), r);
+      loadStatus();
+    });
+  </script>
+</body>
+</html>

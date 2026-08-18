@@ -16,6 +16,7 @@
       Local testnet only: <code>python3 web/evm/evm_rpc_bridge.py</code> on <code>127.0.0.1:9545</code>
       (reads write RPC <code>127.0.0.1:8545</code>). Chain ID <code>424242</code>, symbol <code>ADD</code>.
       <code>eth_sendRawTransaction</code> is disabled. This is not MetaMask, Trust, or Binance public RPC.
+      Native ADDITION pool swap is on <a href="/swap/">/swap/</a> (TEXT RPC, not this bridge).
     </div>
     <section class="panel">
       <h2>Run the bootstrap</h2>
@@ -37,11 +38,22 @@
       <h2>Live bootstrap probe</h2>
       <p class="note">Calls <code>http://127.0.0.1:9545</code> from this browser. If the bridge is not running, the panel stays <strong>RPC offline</strong>.</p>
       <p id="rpc-state" class="offline">Checking bridge…</p>
+      <div class="form-grid">
+        <div>
+          <label for="bal-addr">eth_getBalance address (optional)</label>
+          <input id="bal-addr" placeholder="0x… or 128-hex ADDITION address">
+        </div>
+      </div>
+      <div class="btn-row">
+        <button id="probe-btn" type="button">Refresh probe</button>
+        <button id="bal-btn" type="button" disabled>eth_getBalance</button>
+      </div>
       <pre id="evm-raw" class="raw"></pre>
     </section>
   </main>
   <footer id="site-footer"></footer>
   <script src="/chrome.js"></script>
+  <script src="/local-nav.js"></script>
   <script>
     const LOCAL_CHAIN = {
       chainId: "0x67932",
@@ -51,7 +63,9 @@
     };
     const addBtn = document.getElementById("add-mm");
     const addStatus = document.getElementById("add-mm-status");
+    const balBtn = document.getElementById("bal-btn");
     addBtn.disabled = true;
+    balBtn.disabled = true;
     addBtn.addEventListener("click", async () => {
       if (addBtn.disabled) {
         return;
@@ -83,6 +97,7 @@
         const chain = await evm("eth_chainId");
         const net = await evm("net_version");
         const block = await evm("eth_blockNumber");
+        const gas = await evm("eth_gasPrice");
         const send = await evm("eth_sendRawTransaction", ["0x00"]);
         const live = chain.result === "0x67932" && String(net.result) === "424242";
         if (!live) {
@@ -91,21 +106,39 @@
         el.className = "ok";
         el.textContent = "Local bootstrap answered (send disabled)";
         addBtn.disabled = false;
+        balBtn.disabled = false;
         addStatus.textContent = "Local bridge is up. Send stays disabled.";
         box.textContent =
           "web3_clientVersion: " + JSON.stringify(version.result || version.error) + "\n" +
           "eth_chainId: " + JSON.stringify(chain.result || chain.error) + "\n" +
           "net_version: " + JSON.stringify(net.result || net.error) + "\n" +
           "eth_blockNumber: " + JSON.stringify(block.result || block.error) + "\n" +
+          "eth_gasPrice: " + JSON.stringify(gas.result || gas.error) + "\n" +
           "eth_sendRawTransaction: " + JSON.stringify(send.error || send.result);
       } catch (e) {
         el.className = "offline";
         el.textContent = "RPC offline";
         box.textContent = "RPC offline";
         addBtn.disabled = true;
+        balBtn.disabled = true;
         addStatus.textContent = "Button stays disabled until http://127.0.0.1:9545 answers chain 424242.";
       }
     }
+    document.getElementById("probe-btn").addEventListener("click", probe);
+    document.getElementById("bal-btn").addEventListener("click", async function () {
+      const addr = document.getElementById("bal-addr").value.trim();
+      const box = document.getElementById("evm-raw");
+      if (!addr) {
+        box.textContent = "error: address required";
+        return;
+      }
+      try {
+        const bal = await evm("eth_getBalance", [addr, "latest"]);
+        box.textContent = "eth_getBalance " + addr + ": " + JSON.stringify(bal.result || bal.error);
+      } catch (e) {
+        box.textContent = "RPC offline";
+      }
+    });
     probe();
   </script>
 </body>

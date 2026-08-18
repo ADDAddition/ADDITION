@@ -3,96 +3,115 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ADDITION swap quote (in-process)</title>
+  <title>ADDITION swap pool (in-process)</title>
   <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="Swap" data-sub="swap_quote on 127.0.0.1:8545">
+<body data-title="Swap" data-sub="swap_* on 127.0.0.1:8545">
   <header id="site-header"></header>
   <main>
     <div class="banner">
-      <code>swap_quote</code> / <code>swap_pool_info</code> on <code>/local-rpc</code> → <code>127.0.0.1:8545</code>.
-      No pool → <code>error: pool not found</code>.
+      In-process pool math on the same local token ledger.
+      Tokens must exist first (<a href="/tokens/">/tokens/</a>).
+      Public read RPC rejects <code>swap_*</code> writes. Not Uniswap.
     </div>
     <p id="rpc-state" class="offline">Checking local RPC…</p>
+    <p id="tvl-line" class="note"></p>
+
     <section class="panel">
-      <h2>swap_quote</h2>
-      <label for="tin">token_in</label>
-      <input id="tin" value="AAA">
-      <label for="tout">token_out</label>
-      <input id="tout" value="BBB">
-      <label for="amt">amount_in</label>
-      <input id="amt" value="1">
-      <button id="quote-btn" type="button" disabled>Quote</button>
-      <pre id="quote-raw" class="raw"></pre>
-    </section>
-    <section class="panel">
-      <h2>swap_pool_info</h2>
-      <label for="pa">token_a</label>
-      <input id="pa" value="AAA">
-      <label for="pb">token_b</label>
-      <input id="pb" value="BBB">
-      <button id="pool-btn" type="button" disabled>Pool info</button>
+      <h2>swap_pool_create</h2>
+      <div class="form-grid">
+        <div><label for="ta">token_a</label><input id="ta" value="AAA"></div>
+        <div><label for="tb">token_b</label><input id="tb" value="BBB"></div>
+        <div><label for="fee">fee_bps (0 = free pool)</label><input id="fee" value="0"></div>
+      </div>
+      <div class="btn-row">
+        <button id="create-btn" type="button" disabled>Create pool</button>
+        <button id="info-btn" type="button" disabled>swap_pool_info</button>
+        <button id="tvl-btn" type="button" disabled>swap_tvl</button>
+      </div>
       <div id="pool-fields"></div>
       <pre id="pool-raw" class="raw"></pre>
+    </section>
+
+    <section class="panel">
+      <h2>add_liquidity</h2>
+      <div class="form-grid">
+        <div><label for="lp">provider</label><input id="lp" value="alice"></div>
+        <div><label for="amt-a">amount_a</label><input id="amt-a" value="100"></div>
+        <div><label for="amt-b">amount_b</label><input id="amt-b" value="100"></div>
+      </div>
+      <div class="btn-row">
+        <button id="liq-btn" type="button" disabled>Add liquidity</button>
+      </div>
+      <pre id="liq-raw" class="raw"></pre>
+    </section>
+
+    <section class="panel">
+      <h2>swap_quote / swap_exact_in</h2>
+      <div class="form-grid">
+        <div><label for="tin">token_in</label><input id="tin" value="AAA"></div>
+        <div><label for="tout">token_out</label><input id="tout" value="BBB"></div>
+        <div><label for="trader">trader</label><input id="trader" value="alice"></div>
+        <div><label for="amt-in">amount_in</label><input id="amt-in" value="10"></div>
+        <div><label for="min-out">min_out</label><input id="min-out" value="1"></div>
+      </div>
+      <div class="btn-row">
+        <button id="quote-btn" type="button" disabled>Quote</button>
+        <button id="swap-btn" type="button" disabled>Exact in</button>
+      </div>
+      <div id="quote-fields"></div>
+      <pre id="quote-raw" class="raw"></pre>
     </section>
   </main>
   <footer id="site-footer"></footer>
   <script src="/common.js"></script>
+  <script src="/local-rpc.js"></script>
   <script src="/chrome.js"></script>
+  <script src="/local-nav.js"></script>
   <script>
-    const S = window.AdditionSite;
-    async function localCmd(cmd) {
-      try {
-        const res = await fetch("/local-rpc?cmd=" + encodeURIComponent(cmd), { cache: "no-store" });
-        const raw = (await res.text()).trim();
-        if (!res.ok || raw.charAt(0) === "<") {
-          return { offline: true, raw: "RPC offline", fields: {} };
-        }
-        return { offline: raw === "RPC offline", raw: raw, fields: S.parseFields(raw) };
-      } catch (e) {
-        return { offline: true, raw: "RPC offline", fields: {} };
-      }
+    const L = window.AdditionLocal;
+    async function refreshTvl() {
+      const r = await L.cmd("swap_tvl");
+      document.getElementById("tvl-line").textContent = r.offline ? "" : r.raw;
     }
-    async function ping() {
-      const r = await localCmd("getinfo");
-      const el = document.getElementById("rpc-state");
-      const buttons = document.querySelectorAll("main button");
-      if (r.offline) {
-        el.className = "offline";
-        el.textContent = "RPC offline";
-        for (let i = 0; i < buttons.length; i += 1) {
-          buttons[i].disabled = true;
-        }
-        document.getElementById("quote-raw").textContent = "RPC offline";
-        document.getElementById("pool-raw").textContent = "RPC offline";
-        document.getElementById("pool-fields").textContent = "";
-        return;
-      }
-      el.className = "ok";
-      el.textContent = "Local trusted RPC answered";
-      for (let i = 0; i < buttons.length; i += 1) {
-        buttons[i].disabled = false;
-      }
-    }
-    document.getElementById("quote-btn").addEventListener("click", async function () {
-      const r = await localCmd("swap_quote " + document.getElementById("tin").value.trim() + " " +
-        document.getElementById("tout").value.trim() + " " + document.getElementById("amt").value.trim());
-      document.getElementById("quote-raw").textContent = r.raw;
-    });
-    document.getElementById("pool-btn").addEventListener("click", async function () {
-      const r = await localCmd("swap_pool_info " + document.getElementById("pa").value.trim() + " " +
-        document.getElementById("pb").value.trim());
-      document.getElementById("pool-raw").textContent = r.raw;
-      if (r.offline || r.raw.indexOf("error:") === 0) {
-        S.renderFields(document.getElementById("pool-fields"), {}, r.raw || "RPC offline");
+    L.ping(document.getElementById("rpc-state")).then(function (info) {
+      if (!info.offline) {
+        refreshTvl();
       } else {
-        S.renderFields(document.getElementById("pool-fields"), r.fields, "Node returned no key=value fields.");
+        document.getElementById("pool-raw").textContent = "RPC offline";
+        document.getElementById("liq-raw").textContent = "RPC offline";
+        document.getElementById("quote-raw").textContent = "RPC offline";
       }
     });
-    ping();
+    document.getElementById("create-btn").addEventListener("click", async function () {
+      const r = await L.cmd("swap_pool_create " + L.val("ta") + " " + L.val("tb") + " " + L.val("fee"));
+      L.showResult(document.getElementById("pool-raw"), document.getElementById("pool-fields"), r);
+      refreshTvl();
+    });
+    document.getElementById("info-btn").addEventListener("click", async function () {
+      const r = await L.cmd("swap_pool_info " + L.val("ta") + " " + L.val("tb"));
+      L.showResult(document.getElementById("pool-raw"), document.getElementById("pool-fields"), r);
+    });
+    document.getElementById("tvl-btn").addEventListener("click", refreshTvl);
+    document.getElementById("liq-btn").addEventListener("click", async function () {
+      const r = await L.cmd("add_liquidity " + L.val("ta") + " " + L.val("tb") + " " +
+        L.val("lp") + " " + L.val("amt-a") + " " + L.val("amt-b"));
+      document.getElementById("liq-raw").textContent = r.raw;
+      refreshTvl();
+    });
+    document.getElementById("quote-btn").addEventListener("click", async function () {
+      const r = await L.cmd("swap_quote " + L.val("tin") + " " + L.val("tout") + " " + L.val("amt-in"));
+      L.showResult(document.getElementById("quote-raw"), document.getElementById("quote-fields"), r);
+    });
+    document.getElementById("swap-btn").addEventListener("click", async function () {
+      const r = await L.cmd("swap_exact_in " + L.val("tin") + " " + L.val("tout") + " " +
+        L.val("trader") + " " + L.val("amt-in") + " " + L.val("min-out"));
+      L.showResult(document.getElementById("quote-raw"), document.getElementById("quote-fields"), r);
+      refreshTvl();
+    });
   </script>
 </body>
 </html>

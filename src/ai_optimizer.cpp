@@ -22,14 +22,14 @@ void AIRoutingOptimizer::observe(std::size_t mempool_size, std::uint64_t fees_la
         avg_fees /= static_cast<std::uint64_t>(samples_.size());
     }
 
-    std::uint64_t base = 1;
+    std::uint64_t base = 0;
     if (avg_mempool > 1500) base += 25;
     else if (avg_mempool > 800) base += 14;
     else if (avg_mempool > 400) base += 8;
     else if (avg_mempool > 150) base += 4;
 
     base += std::min<std::uint64_t>(avg_fees / 50, 32);
-    fee_floor_ = std::max<std::uint64_t>(1, base);
+    fee_floor_ = base;
 
     if (avg_mempool > 1500) difficulty_bias_bps_ = 9800;
     else if (avg_mempool > 800) difficulty_bias_bps_ = 9900;

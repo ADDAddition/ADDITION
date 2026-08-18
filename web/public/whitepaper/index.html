@@ -29,7 +29,7 @@
       <li><strong>Quantum</strong> — ML-DSA-87 (FIPS 204). <code>getinfo</code> prints <code>pq_mode</code> when the process answers.</li>
       <li><strong>Privacy</strong> — SHA3-512 commitment + nullifier opening (<code>privacy_mint_open</code> / <code>privacy_spend_open</code>). Hash relation. Not Groth16.</li>
       <li><strong>RPC</strong> — public read on :38545 (<code>getinfo</code>, <code>getblock</code>, …). Write RPC on <code>127.0.0.1:8545</code>.</li>
-      <li><strong>Fees</strong> — spec <code>min_fee=1</code>.</li>
+      <li><strong>Fees</strong> — spec <code>min_fee=0</code>. Congestion can raise <code>recommended_min_fee</code>.</li>
       <li><strong>Bridges</strong> — in-process <code>bridge_*</code> and <code>web/evm/evm_rpc_bridge.py</code> on localhost. <code>eth_sendRawTransaction</code> disabled.</li>
     </ol>
     <p>Hashing: SHA3-512 (OpenSSL). <code>crypto_selftest</code> is whatever the node returns.</p>
@@ -51,7 +51,7 @@
       <tr><td>block_reward</td><td>50</td></tr>
       <tr><td>halving_interval</td><td>210,000</td></tr>
       <tr><td>target_block_time_sec</td><td>60</td></tr>
-      <tr><td>min_fee</td><td>1</td></tr>
+      <tr><td>min_fee</td><td>0</td></tr>
       <tr><td>network_name</td><td>addition-testnet</td></tr>
     </table>
 

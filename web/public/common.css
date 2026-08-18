@@ -333,6 +333,45 @@ code { font-family: var(--mono); font-size: 0.92em; }
 .facts li { margin: 0.35rem 0; }
 .facts strong { color: var(--ink); }
 
+.local-nav {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0.45rem 1.25rem 0;
+  font-size: 12px;
+}
+.local-nav a { text-decoration: none; }
+.local-nav a.active { color: var(--ink); font-weight: 600; }
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0 0.85rem;
+}
+.form-grid label { margin-top: 0.55rem; }
+.btn-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.75rem; }
+.btn-row button { margin-top: 0; }
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin: 0.9rem 0;
+}
+.tool-grid a {
+  display: block;
+  border: 1px solid var(--line);
+  padding: 0.85rem 0.9rem;
+  text-decoration: none;
+  color: var(--ink);
+}
+.tool-grid a:hover { border-color: var(--accent); }
+.tool-grid strong {
+  display: block;
+  color: var(--accent);
+  margin-bottom: 0.25rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+}
+
 @media (max-width: 720px) {
   .site-chrome-inner { padding: 0.55rem 0.85rem; }
   .brand { min-width: 0; }

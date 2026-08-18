@@ -360,7 +360,7 @@ class WalletClient:
             fee = int(raw)
         except ValueError as exc:
             raise WalletError("fee_info returned a non-integer recommended_min_fee") from exc
-        return max(fee, 1)
+        return max(fee, 0)
 
     def mine(self, address: Optional[str] = None) -> str:
         record = self.store.load() if address is None else None
@@ -378,8 +378,8 @@ class WalletClient:
         if to_addr == record.address:
             raise WalletError("refusing to send to the same address")
         used_fee = fee if fee is not None else self.recommended_fee()
-        if used_fee < 1:
-            raise WalletError("fee must be >= 1")
+        if used_fee < 0:
+            raise WalletError("fee must be >= 0")
 
         last_error = "send failed"
         nonce = max(record.next_nonce, 1)

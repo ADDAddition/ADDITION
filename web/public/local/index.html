@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION local node tools</title>
+  <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body data-title="Local tools" data-sub="127.0.0.1:8545 via /local-rpc">
+  <header id="site-header"></header>
+  <main>
+    <div class="banner">
+      Forms on these pages call <code>/local-rpc</code> → write RPC <code>127.0.0.1:8545</code>
+      (testnet) or <code>127.0.0.1:8546</code> (<code>additiond --mainnet</code>, set
+      <code>ADDITION_NETWORK=mainnet</code> on <code>python3 web/serve.py</code>).
+      <code>--mainnet</code> is a separate local chain (<code>ADDITION_MAINNET_V1</code>), not a public network.
+      Do not point additionblockchain.com at it. The public host has no write RPC.
+      Buttons stay disabled and panels stay <strong>RPC offline</strong>.
+    </div>
+    <p id="rpc-state" class="offline">Checking local RPC…</p>
+    <p id="height-line" class="note"></p>
+    <div class="tool-grid">
+      <a href="/wallet/"><strong>Wallet / mine / stake</strong>createwallet, wallet_send, mine, stake, unstake, claim</a>
+      <a href="/tokens/"><strong>Tokens</strong>token_create, mint, transfer, info, balance</a>
+      <a href="/swap/"><strong>Swap pool</strong>swap_pool_create, add_liquidity, quote, swap_exact_in, swap_tvl</a>
+      <a href="/privacy/"><strong>Privacy opening</strong>privacy_note_prepare, mint_open, spend_open. SHA3-512, not a ZK circuit</a>
+      <a href="/evm/"><strong>EVM bridge</strong>local 127.0.0.1:9545 probe. eth_sendRawTransaction stays disabled</a>
+      <a href="/contracts/"><strong>KV contracts</strong>contract_deploy / contract_call on the in-process store</a>
+    </div>
+
+    <section class="panel">
+      <h2>create pair + pool</h2>
+      <p class="note">
+        Local <code>token_create</code> then <code>swap_pool_create</code> + <code>add_liquidity</code>.
+        Not a public offering. Not Uniswap.
+      </p>
+      <div class="form-grid">
+        <div><label for="pair-a">token_a</label><input id="pair-a" value="AAA"></div>
+        <div><label for="pair-b">token_b</label><input id="pair-b" value="BBB"></div>
+        <div><label for="pair-owner">owner</label><input id="pair-owner" value="alice"></div>
+        <div><label for="pair-mint">initial_mint</label><input id="pair-mint" value="1000"></div>
+        <div><label for="pair-liq">liquidity each</label><input id="pair-liq" value="200"></div>
+        <div><label for="pair-fee">fee_bps (0 = free)</label><input id="pair-fee" value="0"></div>
+      </div>
+      <div class="btn-row">
+        <button id="pair-btn" type="button" disabled>Create pair + pool</button>
+      </div>
+      <pre id="pair-raw" class="raw"></pre>
+    </section>
+
+    <section class="panel">
+      <h2>What this is</h2>
+      <ul>
+        <li><strong>Fees</strong> — <code>min_fee=0</code>. Empty mempool: <code>recommended_min_fee=0</code>. Swap <code>fee_bps=0</code> is allowed. Congestion can raise the native floor. Not a Solana/XRP throughput claim.</li>
+        <li><strong>PQ</strong> — spend signatures are ML-DSA-87 (<code>pq_mode=strict</code>). That is the quantum-resistant property that exists. Not FIPS 140-3.</li>
+        <li><strong>Privacy</strong> — SHA3-512 opening. The node sees the trapdoor. <code>claim=opening_not_zk</code>. Not Monero, not Zcash, not a circuit.</li>
+        <li><strong>Speed</strong> — <code>last_tps</code> is measured. <code>research_goal_tps</code> is labeled not a measurement. PoW is SHA3-512 (testnet) or memory_hard (mainnet profile).</li>
+        <li><strong>Contracts</strong> — in-process KV <code>contract_deploy</code> / <code>contract_call</code>. Not a scalable VM.</li>
+        <li><strong>Other chains</strong> — EVM helper is a send-disabled bootstrap. Not IBC, not a bridge, not MetaMask public RPC.</li>
+      </ul>
+    </section>
+    <section class="panel">
+      <h2>What this is not</h2>
+      <ul>
+        <li>Not a hosted web wallet, Uniswap, or public token sale</li>
+        <li>Not Groth16 / Bulletproofs / ZK-Shield</li>
+        <li>Token and swap writes are unsigned TEXT RPC on loopback. Anyone who can reach 8545 can name an owner</li>
+        <li>EVM helper is a bootstrap. It is not a full EVM and cannot send</li>
+      </ul>
+    </section>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/common.js"></script>
+  <script src="/local-rpc.js"></script>
+  <script src="/chrome.js"></script>
+  <script src="/local-nav.js"></script>
+  <script>
+    const L = window.AdditionLocal;
+    L.ping(document.getElementById("rpc-state")).then(function (info) {
+      const line = document.getElementById("height-line");
+      if (info.offline) {
+        line.textContent = "No node on 127.0.0.1:8545 (testnet) or 127.0.0.1:8546 (--mainnet). Start additiond, then python3 web/serve.py.";
+        return;
+      }
+      const net = info.fields.network || "?";
+      const netId = info.fields.network_id || "?";
+      line.textContent = "getinfo height=" + (info.fields.height || "?") +
+        " network=" + net +
+        " network_id=" + netId +
+        " pq_mode=" + (info.fields.pq_mode || "?");
+      if (net === "mainnet") {
+        line.textContent += " — local --mainnet profile, not a public network";
+      }
+    });
+    document.getElementById("pair-btn").addEventListener("click", async function () {
+      const a = L.val("pair-a");
+      const b = L.val("pair-b");
+      const owner = L.val("pair-owner");
+      const mint = L.val("pair-mint");
+      const liq = L.val("pair-liq");
+      const fee = L.val("pair-fee");
+      const out = document.getElementById("pair-raw");
+      const lines = [];
+      const steps = [
+        "token_create " + a + " " + owner + " 1000000 " + mint,
+        "token_create " + b + " " + owner + " 1000000 " + mint,
+        "swap_pool_create " + a + " " + b + " " + fee,
+        "add_liquidity " + a + " " + b + " " + owner + " " + liq + " " + liq,
+        "swap_tvl"
+      ];
+      for (let i = 0; i < steps.length; i += 1) {
+        const r = await L.cmd(steps[i]);
+        lines.push("$ " + steps[i]);
+        lines.push(r.raw);
+        if (r.offline || (!r.ok && r.raw.indexOf("already") < 0 && r.raw.indexOf("exists") < 0)) {
+          break;
+        }
+      }
+      out.textContent = lines.join("\n");
+    });
+  </script>
+</body>
+</html>
