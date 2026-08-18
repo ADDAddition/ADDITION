@@ -10,8 +10,10 @@
     <div class="notch">Send</div>
     <div class="screen">
       <img class="wordmark" src="../AdditionWallet/AdditionWallet/Assets.xcassets/Logo.imageset/Logo.png" alt="ADDITION">
-      <p class="title">Send ADD</p>
+      <p class="title">Send</p>
+      <p class="status" style="margin-top:4px">Whole ADD units on a write RPC node you control.</p>
       <div class="card">
+        <h3>Available</h3>
         <div class="asset">
           <img class="mark" src="../AdditionWallet/AdditionWallet/Assets.xcassets/Mark.imageset/Mark.png" alt="ADD">
           <div><b>ADD</b><span>ADDITION</span></div>
@@ -20,13 +22,18 @@
       </div>
       <div class="card">
         <h3>Amount</h3>
-        <input class="field" placeholder="Whole units" readonly>
-        <h3 style="margin-top:14px">Fee (blank uses node fee_info)</h3>
-        <input class="field small" placeholder="1" readonly>
+        <div class="row">
+          <input class="field" placeholder="0" readonly>
+          <span class="unit">ADD</span>
+        </div>
       </div>
       <div class="card">
         <h3>To</h3>
         <input class="field small" placeholder="128-hex ADDITION address" readonly>
+      </div>
+      <div class="card">
+        <h3>Fee</h3>
+        <input class="field small" placeholder="Blank uses node fee_info" readonly>
       </div>
       <button class="btn">Send</button>
       <p class="status">Set a write RPC node you control, then create or load a wallet.</p>

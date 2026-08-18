@@ -3,8 +3,11 @@
 
 from __future__ import annotations
 
+import struct
 import sys
 import unittest
+import zlib
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -309,6 +312,31 @@ class SourceGuardTests(unittest.TestCase):
         self.assertNotIn("app store", copy)
         self.assertNotIn("0.0.0.0:8545", copy)
 
+    def test_previews_stay_fail_closed(self) -> None:
+        for name in ("home", "receive", "send", "activity"):
+            text = (IOS / "previews" / f"{name}.html").read_text(encoding="utf-8")
+            self.assertNotRegex(text, r"\b\d+\s*ADD\b")
+            self.assertNotIn("height=", text)
+            self.assertIn("Logo.png", text)
+            self.assertIn("Mark.png", text)
+
+    def test_theme_red_matches_logo_wordmark(self) -> None:
+        logo = ROOT / "web" / "public" / "logo-transparent.png"
+        red, green, blue = _mode_logo_red(logo)
+        self.assertEqual((red, green, blue), (230, 29, 22))
+        hex_color = f"{red:02x}{green:02x}{blue:02x}"
+        theme = (IOS / "AdditionWallet" / "AdditionWallet" / "Theme.swift").read_text(
+            encoding="utf-8"
+        )
+        css = (IOS / "previews" / "preview.css").read_text(encoding="utf-8")
+        self.assertIn("230.0 / 255.0", theme)
+        self.assertIn("29.0 / 255.0", theme)
+        self.assertIn("22.0 / 255.0", theme)
+        self.assertIn(hex_color.upper(), theme)
+        self.assertIn(f"#{hex_color}", css)
+        self.assertNotIn("0.89", theme)
+        self.assertNotIn("#e31b23", css)
+
     def test_brand_images_are_website_files(self) -> None:
         assets = IOS / "AdditionWallet" / "AdditionWallet" / "Assets.xcassets"
         pairs = [
@@ -350,6 +378,70 @@ class SourceGuardTests(unittest.TestCase):
             self.assertNotIn("App Store", text)
             self.assertNotIn("TestFlight", text)
             self.assertNotIn("AdditionWallet.xcodeproj", text)
+
+
+def _mode_logo_red(path: Path) -> tuple[int, int, int]:
+    data = path.read_bytes()
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        raise AssertionError("logo is not a PNG")
+    pos = 8
+    width = height = color = 0
+    idat = b""
+    while pos + 8 <= len(data):
+        length = struct.unpack(">I", data[pos : pos + 4])[0]
+        ctype = data[pos + 4 : pos + 8]
+        chunk = data[pos + 8 : pos + 8 + length]
+        pos += 12 + length
+        if ctype == b"IHDR":
+            width, height, _bit, color, _comp, _filt, _inter = struct.unpack(
+                ">IIBBBBB", chunk
+            )
+        elif ctype == b"IDAT":
+            idat += chunk
+        elif ctype == b"IEND":
+            break
+    raw = zlib.decompress(idat)
+    bpp = 4 if color == 6 else 3
+    stride = width * bpp
+    reds: list[tuple[int, int, int]] = []
+    index = 0
+    prev = bytearray(stride)
+    for _ in range(height):
+        filt = raw[index]
+        index += 1
+        row = bytearray(raw[index : index + stride])
+        index += stride
+        if filt == 1:
+            for x in range(stride):
+                left = row[x - bpp] if x >= bpp else 0
+                row[x] = (row[x] + left) & 255
+        elif filt == 2:
+            for x in range(stride):
+                row[x] = (row[x] + prev[x]) & 255
+        elif filt == 3:
+            for x in range(stride):
+                left = row[x - bpp] if x >= bpp else 0
+                row[x] = (row[x] + ((left + prev[x]) // 2)) & 255
+        elif filt == 4:
+            for x in range(stride):
+                a = row[x - bpp] if x >= bpp else 0
+                b = prev[x]
+                c = prev[x - bpp] if x >= bpp else 0
+                p = a + b - c
+                pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+                pr = a if pa <= pb and pa <= pc else (b if pb <= pc else c)
+                row[x] = (row[x] + pr) & 255
+        elif filt != 0:
+            raise AssertionError(f"unsupported PNG filter {filt}")
+        for x in range(0, stride, bpp):
+            r, g, b = row[x], row[x + 1], row[x + 2]
+            a = row[x + 3] if bpp == 4 else 255
+            if a >= 200 and r > 140 and r > g + 40 and r > b + 40:
+                reds.append((r, g, b))
+        prev = row
+    if not reds:
+        raise AssertionError("no red pixels in logo")
+    return Counter(reds).most_common(1)[0][0]
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@
   --panel: #17171a;
   --lift: #212124;
   --line: #38383b;
-  --red: #e31b23;
+  --red: #e61d16;
   --cream: #fff;
   --mute: #a1a1a6;
 }
@@ -54,7 +54,8 @@ html, body {
 .act { text-align: center; color: var(--mute); font-size: 12px; }
 .act i {
   width: 56px; height: 56px; border-radius: 28px; background: var(--lift);
-  display: grid; place-items: center; margin: 0 auto 8px; color: var(--cream); font-style: normal; font-size: 20px;
+  border: 1px solid var(--red);
+  display: grid; place-items: center; margin: 0 auto 8px; color: var(--red); font-style: normal; font-size: 20px;
 }
 .card {
   background: var(--panel);
@@ -88,6 +89,7 @@ html, body {
   display: grid; place-items: center; color: #111;
 }
 .field { width: 100%; background: transparent; border: 0; color: #fff; font-size: 20px; font-family: ui-monospace, Menlo, monospace; }
+.unit { color: var(--mute); font-weight: 650; font-size: 18px; }
 .small { font-size: 13px; }
 .empty { display: flex; gap: 12px; align-items: flex-start; }
 .title { font-size: 22px; font-weight: 650; margin: 10px 0 0; }
