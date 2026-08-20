@@ -27,8 +27,5 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PUBLIC_RPC_HTTP: ${{ secrets.PUBLIC_RPC_HTTP }}
         run: |
-          EXTRA=()
-          if [ -n "${PUBLIC_RPC_HTTP:-}" ]; then
-            EXTRA+=(--var "PUBLIC_RPC_HTTP:${PUBLIC_RPC_HTTP}")
-          fi
-          npx --yes wrangler@4 deploy "${EXTRA[@]}"
+          RPC="${PUBLIC_RPC_HTTP:-http://r38546.additionblockchain.com:38546/rpc}"
+          npx --yes wrangler@4 deploy --name addition-explorer --var "PUBLIC_RPC_HTTP:${RPC}"

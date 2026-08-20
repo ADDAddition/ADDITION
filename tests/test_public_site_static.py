@@ -674,13 +674,16 @@ S.rpcCommand("getinfo").then((offline) => {
             encoding="utf-8"
         )
         wrangler = read("wrangler.toml")
-        self.assertIn("addition-testnet-site", script)
+        self.assertIn("addition-explorer", script)
         self.assertIn("CLOUDFLARE_API_TOKEN", script)
         self.assertIn("wrangler@4 deploy", script)
+        self.assertIn("r38546.additionblockchain.com:38546/rpc", script)
         self.assertIn("name = \"addition-testnet-site\"", wrangler)
         self.assertIn("CLOUDFLARE_API_TOKEN", workflow)
+        self.assertIn("addition-explorer", workflow)
         self.assertIn("wrangler@4 deploy", workflow)
         self.assertIn("web/public", workflow)
+
 
 
 if __name__ == "__main__":
