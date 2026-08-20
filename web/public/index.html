@@ -11,6 +11,12 @@
 </head>
 <body>
   <header id="site-header"></header>
+  <div id="live-strip" class="status-strip pending" aria-live="polite">
+    <div class="status-strip-inner">
+      <span id="strip-flag" class="status-flag">…</span>
+      <dl id="strip-cells" class="status-cells"></dl>
+    </div>
+  </div>
   <main>
     <form id="search-form" class="search-form" action="/" method="get">
       <input id="q" name="q" type="search" autocomplete="off"

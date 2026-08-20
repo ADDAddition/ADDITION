@@ -114,7 +114,7 @@ nav a.active {
 }
 
 .status-strip {
-  background: #0c1016;
+  background: #f7f7f7;
   border-bottom: 1px solid var(--line);
 }
 .status-strip-inner {

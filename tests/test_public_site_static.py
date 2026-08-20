@@ -130,6 +130,8 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("<th>time</th>", index)
         self.assertIn("Latest Blocks", index)
         self.assertIn("/explorer.js", index)
+        self.assertIn('id="live-strip"', index)
+        self.assertIn("status-strip", index)
         self.assertNotIn("hero", index)
         self.assertNotIn("cards", index)
         self.assertNotIn("8545", index)
@@ -146,7 +148,7 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertNotIn("market cap", index.lower())
         self.assertNotIn("hashrate", index.lower())
         self.assertNotIn("mainnet", index.lower())
-        self.assertLess(len(index.splitlines()), 50)
+        self.assertLess(len(index.splitlines()), 60)
         self.assertNotIn("004d9744", index)
         self.assertNotIn("tx_status", explorer_js)
         self.assertNotIn("getblockraw", explorer_js)
@@ -247,7 +249,7 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("/apple-touch-icon.png", index)
         self.assertIn("/og.png", index)
         self.assertIn("twitter:card", index)
-        self.assertLess(len(index.splitlines()), 50)
+        self.assertLess(len(index.splitlines()), 60)
 
     def test_download_page_is_testnet_local_only(self) -> None:
         page = read("download/index.html")
@@ -402,6 +404,9 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("loadLatestBlockRows", explorer_js)
         self.assertIn("RPC offline", explorer_js)
         self.assertIn("Not found", explorer_js)
+        self.assertIn("renderStrip", explorer_js)
+        self.assertIn("stripFields", explorer_js)
+        self.assertIn("live getinfo", explorer_js)
         self.assertIn('return "getblock " + id', common)
         self.assertIn("explorerCommand", common)
         self.assertIn('url=/', redirect)
@@ -590,6 +595,9 @@ S.rpcCommand("getinfo").then((offline) => {
         self.assertIn("ADDITION_ADVERTISED_P2P=34.27.30.115:28545", join_md)
         self.assertIn("Research testnet", join_md)
         self.assertIn("contact@additionblockchain.com", join_md)
+        self.assertIn("/evm/", join_md)
+        self.assertIn("/local/", join_md)
+        self.assertIn("min_fee=0", join_md)
         self.assertNotIn("0.0.0.0:8545", join_md)
         self.assertNotIn("wallet-connect", join_md.lower())
         self.assertNotIn("token sale", join_md.lower())
@@ -659,6 +667,20 @@ S.rpcCommand("getinfo").then((offline) => {
         docs = read("docs/index.html")
         self.assertIn("SHA3 opening notes", docs)
         self.assertNotIn("ZK verifier contract", docs)
+
+    def test_deploy_script_targets_public_worker(self) -> None:
+        script = (ROOT / "scripts" / "deploy_public_site.sh").read_text(encoding="utf-8")
+        workflow = (ROOT / ".github" / "workflows" / "deploy-public-site.yml").read_text(
+            encoding="utf-8"
+        )
+        wrangler = read("wrangler.toml")
+        self.assertIn("addition-testnet-site", script)
+        self.assertIn("CLOUDFLARE_API_TOKEN", script)
+        self.assertIn("wrangler@4 deploy", script)
+        self.assertIn("name = \"addition-testnet-site\"", wrangler)
+        self.assertIn("CLOUDFLARE_API_TOKEN", workflow)
+        self.assertIn("wrangler@4 deploy", workflow)
+        self.assertIn("web/public", workflow)
 
 
 if __name__ == "__main__":

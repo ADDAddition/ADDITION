@@ -120,9 +120,45 @@
     return { kind: "block", fields: result.fields };
   }
 
+  function renderStrip(info) {
+    const strip = el("live-strip");
+    const flag = el("strip-flag");
+    const cells = el("strip-cells");
+    if (!strip || !flag || !cells) {
+      return;
+    }
+    clearRows(cells);
+    if (info.offline || !info.ok) {
+      strip.className = "status-strip offline";
+      flag.textContent = "RPC offline";
+      return;
+    }
+    const fields = S.stripFields(info.fields || {});
+    const keys = Object.keys(fields);
+    if (keys.length === 0) {
+      strip.className = "status-strip offline";
+      flag.textContent = "RPC offline";
+      return;
+    }
+    strip.className = "status-strip ok";
+    flag.textContent = "live getinfo";
+    for (let i = 0; i < keys.length; i += 1) {
+      const wrap = document.createElement("div");
+      const dt = document.createElement("dt");
+      dt.textContent = keys[i];
+      const dd = document.createElement("dd");
+      dd.textContent = fields[keys[i]];
+      wrap.appendChild(dt);
+      wrap.appendChild(dd);
+      cells.appendChild(wrap);
+    }
+  }
+
   async function loadLatest() {
     const state = el("rpc-state");
     const tbody = el("latest-blocks");
+    const info = await S.explorerCommand("getinfo");
+    renderStrip(info);
     const recent = await S.loadLatestBlockRows(10);
     if (recent.offline) {
       setText(state, "RPC offline", "offline");

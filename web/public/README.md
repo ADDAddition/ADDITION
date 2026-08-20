@@ -12,6 +12,7 @@ White explorer: search + latest `getblock` rows from live public read RPC. Heade
 - Explorer calls `/api/rpc?cmd=…` for `getinfo` / `getblock` / `getblockhash` only. No invented height, hash, tx_count, or time.
 - Optional `?rpc=https://HOST:38545/rpc`.
 - Worker var `PUBLIC_RPC_HTTP` is empty by default. Set it to the real `--public-rpc` HTTP URL. Do not commit trycloudflare URLs.
+- Deploy: `CLOUDFLARE_API_TOKEN=… ./scripts/deploy_public_site.sh` (or GitHub Action `deploy-public-site` when the secret is set).
 - Two local nodes: `docs/TWO_NODE_TESTNET.md`.
 - Contact: contact@additionblockchain.com
 - Source: https://github.com/ADDAddition/ADDITION
