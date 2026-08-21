@@ -376,6 +376,7 @@ class PublicSiteStaticTests(unittest.TestCase):
         wrangler = (PUBLIC / "wrangler.toml").read_text(encoding="utf-8")
         self.assertIn("run_worker_first", wrangler)
         self.assertIn('"/rpc*"', wrangler)
+        self.assertIn("rpc.additionblockchain.com/*", wrangler)
         commands = read("docs/commands/index.html")
         whitepaper = read("whitepaper/index.html")
         self.assertIn("token_transfer_wallet", commands)
