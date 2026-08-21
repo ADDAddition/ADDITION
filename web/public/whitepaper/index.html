@@ -27,7 +27,7 @@
     <h2>3. What the node does</h2>
     <ol>
       <li><strong>Quantum</strong> — ML-DSA-87 (FIPS 204). <code>getinfo</code> prints <code>pq_mode</code> when the process answers.</li>
-      <li><strong>Privacy</strong> — SHA3-512 commitment + nullifier opening (<code>privacy_mint_open</code> / <code>privacy_spend_open</code>). Hash relation. Not Groth16.</li>
+      <li><strong>Privacy</strong> — SHA3-512 commitment + nullifier opening (<code>privacy_mint_open</code> / <code>privacy_spend_open</code>). Hash relation. Not Groth16. <code>ADDITION_PRIVACY_MASTER_KEY</code> must be ≥32 characters. Notes are a side ledger, not a native ADD lock.</li>
       <li><strong>RPC</strong> — public read on :38545 (<code>getinfo</code>, <code>getblock</code>, …). Write RPC on <code>127.0.0.1:8545</code>.</li>
       <li><strong>Fees</strong> — spec <code>min_fee=0</code>. Congestion can raise <code>recommended_min_fee</code>.</li>
       <li><strong>Bridges</strong> — in-process <code>bridge_*</code> and <code>web/evm/evm_rpc_bridge.py</code> on localhost. <code>eth_sendRawTransaction</code> disabled.</li>
@@ -42,6 +42,7 @@
       <li>UTXO txs, PQ signatures, min fee. <code>createwallet</code> (ML-DSA-87), <code>wallet_send</code> / <code>tx_build</code>+<code>sendtx_signed</code>.</li>
       <li>In-process KV: <code>contract_deploy</code>, <code>contract_call</code> <code>set|add|get</code>.</li>
       <li>Token / NFT / swap engines in-process. Empty pool → <code>error: pool not found</code>.</li>
+      <li>Unsigned <code>token_transfer</code> stays for local research names. Prefer <code>token_transfer_wallet</code> / <code>token_transfer_signed</code> and <code>swap_exact_in_wallet</code> on loopback write RPC. Not a public DEX or token sale.</li>
     </ul>
 
     <h2>6. Constants in config</h2>

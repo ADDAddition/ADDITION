@@ -15,6 +15,10 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+      - name: Render docs from repo markdown
+        run: python3 web/render_docs.py
+      - name: Fail if rendered docs drifted
+        run: git diff --exit-code -- web/public/docs
       - uses: actions/setup-node@v4
         with:
           node-version: "22"

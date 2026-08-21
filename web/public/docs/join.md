@@ -42,6 +42,8 @@ curl 'http://34.27.30.115/rpc?cmd=getinfo'
 curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'
 ```
 
+Those curls succeed only when the operator seed answers. If they timeout, run your own `--network testnet` node. Height stays local until the seed answers.
+
 Allowlist includes `getblockraw`. Public `mine` / `createwallet` return `error: command disabled on public RPC`.
 
 Write RPC stays `127.0.0.1`. Do not publish port `8545`.

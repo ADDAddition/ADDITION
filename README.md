@@ -46,7 +46,7 @@
 | Flag | `additiond --network testnet` | `additiond --mainnet` |
 | `network_id` | `ADDITION_TESTNET_V1` | `ADDITION_MAINNET_V1` |
 | Genesis | [`genesis.json`](genesis.json) | [`genesis-mainnet.json`](genesis-mainnet.json) |
-| Public product | [additionblockchain.com](https://additionblockchain.com) and [rpc.additionblockchain.com](https://rpc.additionblockchain.com) | **Not the website.** Operator public-read: `http://34.27.30.115:38546/rpc?cmd=getinfo` (`network=mainnet`, `height=0`) |
+| Public product | [additionblockchain.com](https://additionblockchain.com) and [rpc.additionblockchain.com](https://rpc.additionblockchain.com) | **Not the website.** Local/operator `--mainnet` public-read on loopback (`--public-rpc-port 38546`). Not a live public network. |
 
 `--mainnet` is its own chain (`ADDITION_MAINNET_V1`), not a label flip on the testnet. It is not a live public mainnet product. See [docs/MAINNET_RUNBOOK.md](docs/MAINNET_RUNBOOK.md).
 

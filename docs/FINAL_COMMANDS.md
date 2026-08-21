@@ -38,6 +38,8 @@ curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'
 curl 'http://34.27.30.115:38545/jsonrpc?method=getinfo'
 ```
 
+Those curls succeed only when the operator seed answers. If they timeout, run a local `--public-rpc` node or `scripts/start_two_node_testnet.sh`. Do not treat a timeout as a secret second seed.
+
 Path is `/rpc?cmd=getinfo` or `/jsonrpc?method=getinfo`, not `/getinfo`. `:80` works when `38545` is filtered.
 
 Public-read JSON API (same allowlist, no writes). Not Ethereum JSON-RPC.
