@@ -39,6 +39,22 @@ function isRpcApi(url) {
   return path === "/rpc" && url.searchParams.has("cmd");
 }
 
+function rpcOffline() {
+  return new Response("RPC offline", {
+    status: 503,
+    headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+  });
+}
+
+function looksLikeHtml(text) {
+  const trimmed = String(text || "").trim();
+  if (!trimmed) {
+    return true;
+  }
+  const head = trimmed.slice(0, 15).toLowerCase();
+  return trimmed.charAt(0) === "<" || head.indexOf("<!doctype") === 0 || head.indexOf("<html") === 0;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -51,14 +67,31 @@ export default {
       }
       const upstream = env.PUBLIC_RPC_HTTP;
       if (!upstream) {
-        return new Response("RPC offline", {
-          status: 503,
-          headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
-        });
+        return rpcOffline();
       }
-      const dest = new URL(upstream);
-      dest.search = url.search;
-      return fetch(dest.toString(), { method: request.method, headers: request.headers, body: request.body });
+      try {
+        const dest = new URL(upstream);
+        dest.search = url.search;
+        const res = await fetch(dest.toString(), {
+          method: request.method,
+          headers: request.headers,
+          body: request.body,
+        });
+        const text = await res.text();
+        if (!res.ok || looksLikeHtml(text)) {
+          return rpcOffline();
+        }
+        return new Response(text, {
+          status: 200,
+          headers: {
+            "content-type": res.headers.get("content-type") || "text/plain; charset=utf-8",
+            "cache-control": "no-store",
+            "access-control-allow-origin": "*",
+          },
+        });
+      } catch (err) {
+        return rpcOffline();
+      }
     }
     const mapped = PAGE_ROUTES[url.pathname.replace(/\/$/, "") || "/"];
     if (mapped) {
