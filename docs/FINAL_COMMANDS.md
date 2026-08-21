@@ -68,7 +68,8 @@ See [TWO_NODE_TESTNET.md](TWO_NODE_TESTNET.md).
 Website `PUBLIC_RPC_HTTP` stays empty in `web/public/wrangler.toml` so a down node shows `RPC offline`. Set it only to a real public-rpc HTTP URL you operate. Do not commit trycloudflare URLs.
 
 ## Core chain
-- `getinfo`
+- `getinfo` — trusted extra fields include `require_privacy_pool` and `privacy_master_key=set|missing`
+- `fee_info` — `base_min_fee`, `recommended_min_fee`, `ai_fee_floor` (LAN-allowed read)
 - `monetary_info`
 - `crypto_selftest`
 - `createwallet [name] [scheme]` — default ML-DSA-87; optional `slh-dsa-shake-256s` only if this liboqs can `OQS_SIG_sign_with_ctx_str` with a non-empty context (otherwise rejected in strict mode). Unknown schemes rejected. Writes `data/wallets/<name>.wal` (0600); returns address/pub/name/path; `priv_printed=0`
@@ -215,7 +216,11 @@ Notes:
 ## Token & NFT runtime
 - `token_create <symbol> <owner> <max_supply> <initial_mint>`
 - `token_mint <symbol> <caller> <to> <amount>`
-- `token_transfer <symbol> <from> <to> <amount>`
+- `token_transfer <symbol> <from> <to> <amount>` — unsigned local research (opaque names)
+- `token_sign_payload <symbol> <from> <to> <amount>` — canonical `token_transfer|…` string
+- `token_transfer_signed <symbol> <from> <to> <amount> <pubkey_hex> <sig_hex>` — ML-DSA-87; `from` must be the hash-committed address of `pubkey`
+- `token_transfer_wallet <wallet> <symbol> <to> <amount>` — signs from the local `.wal`; `from` is the wallet address
+- `token_burn <symbol> <from> <amount>`
 - `token_balance <symbol> <owner>`
 - `token_info <symbol>`
 - `nft_mint <collection> <token_id> <owner> <metadata>` — metadata may be a URL or hash
@@ -228,6 +233,8 @@ Notes:
 - `add_liquidity` / `swap_add_liquidity <token_a> <token_b> <provider> <amount_a> <amount_b>`
 - `swap_quote <token_in> <token_out> <amount_in>`
 - `swap_exact_in <token_in> <token_out> <trader> <amount_in> <min_out>`
+- `swap_exact_in_wallet <wallet> <token_in> <token_out> <amount_in> <min_out>` — signs from the local `.wal`; trader is the wallet address
+- `swap_best_route_exact_in_signed` — existing PQ-signed multi-hop path
 - `swap_pool_info <token_a> <token_b>`
 - `swap_tvl` — sum of live pool reserves from `swap_pool_info`. `0` if no pools. Not a made-up TVL.
 
@@ -254,7 +261,7 @@ Notes:
 	- Daemon refuses startup if liboqs is not linked
 	- Staking requires sufficient on-chain balance
 	- `sendtx` is routed through decentralized gossip path (`ok:gossiped` on success)
-- Persistent state is stored under `--data-dir` (default `./data`). `blocks.dat` is written after each accepted block (not only on `quit` / SIGTERM), so a restart does not reset height to 0. Other files are still flushed on shutdown and restored on startup:
+- Persistent state is stored under `--data-dir` (default `./data`). `blocks.dat` is written after each accepted block (not only on `quit` / SIGTERM), so a restart does not reset height to 0. Side-state (`tokens.dat`, `privacy.dat`, `staking.dat`, `contracts.dat`, `bridge.dat`, PoUW, PM) is flushed after each successful write and again on shutdown:
 	- `blocks.dat` (headers + txs; UTXOs rebuilt by replay)
 	- `mempool.dat`
 	- `staking.dat`

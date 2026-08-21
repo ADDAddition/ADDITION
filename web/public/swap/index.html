@@ -54,13 +54,14 @@
       <div class="form-grid">
         <div><label for="tin">token_in</label><input id="tin" value="AAA"></div>
         <div><label for="tout">token_out</label><input id="tout" value="BBB"></div>
-        <div><label for="trader">trader</label><input id="trader" value="alice"></div>
+        <div><label for="trader">trader / wallet</label><input id="trader" value="alice"></div>
         <div><label for="amt-in">amount_in</label><input id="amt-in" value="10"></div>
         <div><label for="min-out">min_out</label><input id="min-out" value="1"></div>
       </div>
       <div class="btn-row">
         <button id="quote-btn" type="button" disabled>Quote</button>
         <button id="swap-btn" type="button" disabled>Exact in</button>
+        <button id="swap-wal-btn" type="button" disabled>Exact in (wallet)</button>
       </div>
       <div id="quote-fields"></div>
       <pre id="quote-raw" class="raw"></pre>
@@ -109,6 +110,12 @@
     document.getElementById("swap-btn").addEventListener("click", async function () {
       const r = await L.cmd("swap_exact_in " + L.val("tin") + " " + L.val("tout") + " " +
         L.val("trader") + " " + L.val("amt-in") + " " + L.val("min-out"));
+      L.showResult(document.getElementById("quote-raw"), document.getElementById("quote-fields"), r);
+      refreshTvl();
+    });
+    document.getElementById("swap-wal-btn").addEventListener("click", async function () {
+      const r = await L.cmd("swap_exact_in_wallet " + L.val("trader") + " " + L.val("tin") + " " +
+        L.val("tout") + " " + L.val("amt-in") + " " + L.val("min-out"));
       L.showResult(document.getElementById("quote-raw"), document.getElementById("quote-fields"), r);
       refreshTvl();
     });

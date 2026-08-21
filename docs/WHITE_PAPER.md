@@ -1,108 +1,98 @@
-# ADDITION: The Post-Quantum Layer 1 Protocol (White Paper V3.0)
+# ADDITION: The Post-Quantum Layer 1 Protocol (White Paper V3.1)
 
-**Date:** March 7, 2026  
-**Version:** 3.0-Final-Audit  
+**Date:** August 21, 2026  
+**Version:** 3.1  
 **Status:** Research prototype / testnet (not a live mainnet)
+
+The canonical public copy is [additionblockchain.com/whitepaper/](https://additionblockchain.com/whitepaper/). This file must not invent a parallel execution engine, a 70/25/5 reward split, satoshi subunits, or a live public mainnet.
 
 ---
 
 ## 1. Abstract
 
-ADDITION (ADD) is a Layer 1 blockchain architected for the era of quantum computing. Unlike legacy networks (Bitcoin, Ethereum) built on elliptic curve cryptography (ECC) which is vulnerable to Shor's algorithm, ADDITION natively integrates hybrid **ML-DSA (Dilithium)** signatures and a **deterministic parallel execution engine**. With a fixed supply of **50,000,000 ADD** and a deflationary reward schedule, ADDITION combines absolute digital scarcity with technological resilience capable of surviving the next 50 years of computational evolution.
+ADDITION is a C++20 Layer 1 node (`additiond`) that uses **ML-DSA-87** signatures and **SHA3-512** hashing. The public product today is the **testnet** at [additionblockchain.com](https://additionblockchain.com). Supply is a hard cap of **50,000,000** whole units. There is no 8-decimal subunit.
 
 ---
 
 ## 2. Problem Statement: The Quantum Threat
 
-Classic public-key cryptography (RSA, ECDSA) relies on the hardness of factoring large integers or solving discrete logarithms. Quantum computers, using Shor's algorithm, reduce the time complexity of breaking these keys from exponential to polynomial time.
+Classic public-key cryptography (RSA, ECDSA) is believed to fall to Shor's algorithm on a large quantum computer.
 
-**The Risk:** A sufficiently powerful quantum computer could derive private keys from public keys on Bitcoin and Ethereum, allowing an attacker to drain wallets and forge transactions.
-
-**The Solution:** ADDITION uses **Lattice-based cryptography** (ML-DSA / Dilithium), which is currently believed to be resistant to both classical and quantum attacks. By implementing this at the protocol layer (L1), ADDITION secures the entire network, not just a specific smart contract.
+ADDITION uses **ML-DSA-87** (FIPS 204) at the protocol layer. That is a lattice signature, not a claim that the chain is immune to every future cryptanalytic break. SLH-DSA (`slh-dsa-shake-256s`) is opt-in and stays disabled unless this liboqs build can sign with a non-empty context.
 
 ---
 
-## 3. Technical Architecture: The 4th Generation Core
+## 3. What ships
 
-### 3.1 Hybrid Post-Quantum Cryptography (PQ)
-ADDITION employs a hybrid signature scheme to ensure a smooth transition and maximum security:
+### 3.1 Cryptography
+- **Signatures:** ML-DSA-87 (`pq=` format) in `pq_mode=strict`
+- **Hash / PoW:** SHA3-512 of the header on testnet; `memory_hard` on the separate `--mainnet` profile
+- **Addresses:** SHA3-512(scheme_id || 0x00 || pubkey) — 128 hex
 
-*   **Primary Scheme:** ML-DSA (Module-Lattice-Based Digital Signature Algorithm) - NIST Standard.
-*   **Hashing:** SHA3-512 (Keccak) - Provides superior collision resistance compared to SHA-256.
-*   **Fail-Safe Design:** The `sign_message_hybrid` function allows the network to pivot between signature algorithms via soft forks without disrupting the chain state.
-
-### 3.2 Deterministic Parallel Execution
-Traditional blockchains process transactions sequentially (one after another) to avoid state conflicts. ADDITION introduces **Conflict-Aware Scheduling**:
-
-1.  **Conflict Analysis:** The node inspects the UTXO inputs of incoming transactions.
-2.  **Parallel Batching:** Transactions that do not touch the same funds are grouped into independent batches.
-3.  **Execution:** The `deterministic_schedule` engine processes these batches simultaneously across all available CPU cores.
-4.  **Result:** 100% hardware utilization and massive throughput scaling (TPS).
+### 3.2 What does not ship
+- No `deterministic_schedule` parallel execution engine
+- No measured Solana-scale TPS. `research_goal_tps=100000` is labeled `research_goal_is_not_a_measurement=true`
+- No public EVM. Local `/evm/` is a loopback probe; `eth_sendRawTransaction` stays disabled
+- No IBC / foreign-chain bridge. `BridgeEngine` is in-process counters
 
 ---
 
-## 4. Consensus Mechanism: Proof of Measurable Work (PoMW)
+## 4. Consensus
 
-ADDITION evolves the Proof-of-Work (PoW) concept into **Proof of Measurable Work (PoMW)**.
+Testnet PoW is SHA3-512 header work. The `--mainnet` profile is a **separate chain** (`ADDITION_MAINNET_V1`), not a label flip and not a live public network.
 
-*   **Work:** Miners perform SHA3-512 hashing to secure the ledger.
-*   **Measurability:** The protocol embeds real-time telemetry into the block headers (`latency_p50_ms`, `last_tps`).
-*   **Incentive:** The network favors nodes that provide not just security, but also high performance and low latency connectivity.
+Block reward goes to the miner address of that block. There is no 70/25/5 miner/staker/treasury split. Staking is a loopback side map (`stake` / `unstake` / `stake_claim`) with `economic_security=none`.
 
-**Reward Distribution:**
-*   **70% Miners:** To pay for hardware and electricity (Security).
-*   **25% Stakers:** To lock supply and stabilize the economy (PoS Layer).
-*   **5% Treasury:** For protocol development and ecosystem grants.
+`getinfo` may report `last_tps` from the last mined block. That is local telemetry, not a consensus incentive.
 
 ---
 
-## 5. Smart Contracts: Lightweight Deterministic Contract Engine (LDCE)
+## 5. Contracts, tokens, swap
 
-ADDITION eschews the complexity and vulnerability of the EVM (Ethereum Virtual Machine) for a safer alternative: **LDCE**.
+`contract_*` is a deterministic key-value store (`set` / `add` / `get`). It is not the EVM.
 
-*   **Architecture:** Deterministic Key-Value Store.
-*   **Capabilities:**
-    *   `deploy(owner, code, ttl)`: Create a contract with an optional Time-To-Live.
-    *   `set(key, value)`: Store state.
-    *   `get(key)`: Retrieve state.
-    *   `add(key, amount)`: Atomic counters (perfect for tokens).
-*   **Use Cases:** Tokenization (ADD-20), Voting Systems, Oracles, Decentralized Identity (DID).
+`token_*` and `swap_*` are an in-process ledger on trusted write RPC (`127.0.0.1`). Unsigned `token_transfer` remains for local research names (`alice` / `bob`). PQ-signed paths:
 
----
+- `token_transfer_wallet` / `token_transfer_signed`
+- `swap_exact_in_wallet`
+- `swap_best_route_exact_in_signed`
 
-## 6. Privacy & Messaging
-
-### 6.1 Privacy pool (SHA3-512 opening)
-The in-process `privacy.cpp` module checks a **SHA3-512 commitment + nullifier opening** (`privacy_mint_open` / `privacy_spend_open`). The node recomputes the hash relation and sees the trapdoor. This is not zero-knowledge, not Groth16, not Bulletproofs, and not a SNARK circuit.
-
-### 6.2 On-Chain Messaging
-ADDITION supports immutable messaging by utilizing the transaction `nonce` and `output` fields as data carriers. This allows for censorship-resistant communication and data anchoring directly on the blockchain.
+This is not a public DEX, Uniswap, or token sale.
 
 ---
 
-## 7. Monetary Policy (Tokenomics)
+## 6. Privacy
 
-The economic constants are immutable and inscribed in the C++ kernel (`config.hpp`).
+`privacy_mint_open` / `privacy_spend_open` check a SHA3-512 commitment + nullifier opening. The node sees the trapdoor. `claim=opening_not_zk`. Not Groth16, not Bulletproofs, not Monero, not Zcash.
 
-| Parameter | Value | Note |
-| :--- | :--- | :--- |
-| **Max Supply** | **50,000,000 ADD** | Fixed cap. No inflation after emission. |
-| **Initial Block Reward** | **50 ADD** | Emitted every block. |
-| **Halving Interval** | **210,000 Blocks** | ~5 months. Rapid deflationary schedule. |
-| **Target Block Time** | **60 Seconds** | Adjusted via `difficulty_window` (120 blocks). |
-| **Atomic Precision** | **10^8** | 1 ADD = 100,000,000 Satoshis. |
+`ADDITION_PRIVACY_MASTER_KEY` must be at least 32 characters or note writes fail. Notes are a side ledger, not a native ADD lock.
+
+---
+
+## 7. Monetary policy
+
+| Parameter | Value |
+| :--- | :--- |
+| Max supply | 50,000,000 whole units |
+| Block reward | 50 |
+| Halving interval | 210,000 blocks |
+| Target block time | 60 seconds |
+| Min fee | 0 (congestion can raise `recommended_min_fee`) |
+| Precision | whole integers only |
 
 ---
 
 ## 8. Research status
 
-This tree is a **research testnet** (`additiond --network testnet`). It is not a live public chain and not a shipping network. The experimental `--network mainnet` profile stays opt-in and is not a public chain.
+Public product: `additiond --network testnet`. Write RPC stays loopback. Public read is an allowlist.
+
+`--mainnet` is opt-in, local, and not the website.
 
 ---
 
 ## 9. Conclusion
 
-ADDITION is a research prototype: ML-DSA-87 signatures, SHA3-512 hashing, and a SHA3 opening privacy path. It does not claim production status or a live public L1.
+ADDITION is a research prototype: ML-DSA-87, SHA3-512, SHA3 opening privacy, local tokens/swap. It does not claim production status or a live public L1.
 
 ---
 *Research notes. Not an audit certificate.*

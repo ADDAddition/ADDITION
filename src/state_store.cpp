@@ -319,36 +319,9 @@ bool StateStore::save_all(const Chain& chain,
         }
     }
 
-    {
-        std::ostringstream st;
-        st << "T|" << staking.total_staked() << '\n';
-        for (const auto& [addr, amount] : staking.stakes_map()) {
-            st << "S|" << addr << '|' << amount << '\n';
-        }
-        for (const auto& [addr, amount] : staking.claimable_map()) {
-            st << "C|" << addr << '|' << amount << '\n';
-        }
-        if (!write_text(staking_path(), st.str(), error)) {
-            return false;
-        }
-    }
-
-    {
-        if (!write_text(contracts_path(), contracts.dump_state(), error)) {
-            return false;
-        }
-    }
-
-    {
-        if (!write_text(tokens_path(), tokens.dump_state(), error)) {
-            return false;
-        }
-    }
-
-    {
-        if (!write_text(bridge_path(), bridge.dump_state(), error)) {
-            return false;
-        }
+    if (!save_side_state(staking, contracts, tokens, bridge, privacy, pouw_storage, pouw_compute,
+                         private_messaging, error)) {
+        return false;
     }
 
     {
@@ -379,30 +352,55 @@ bool StateStore::save_all(const Chain& chain,
         }
     }
 
+    return true;
+}
+
+bool StateStore::save_side_state(const StakingEngine& staking,
+                                 const ContractEngine& contracts,
+                                 const TokenEngine& tokens,
+                                 const BridgeEngine& bridge,
+                                 const PrivacyPool& privacy,
+                                 const PoUWStorageEngine& pouw_storage,
+                                 const PoUWComputeEngine& pouw_compute,
+                                 const PrivateMessagingEngine& private_messaging,
+                                 std::string& error) const {
+    std::filesystem::create_directories(data_dir_);
+
     {
-        if (!write_text(privacy_path(), privacy.dump_state(), error)) {
+        std::ostringstream st;
+        st << "T|" << staking.total_staked() << '\n';
+        for (const auto& [addr, amount] : staking.stakes_map()) {
+            st << "S|" << addr << '|' << amount << '\n';
+        }
+        for (const auto& [addr, amount] : staking.claimable_map()) {
+            st << "C|" << addr << '|' << amount << '\n';
+        }
+        if (!write_text(staking_path(), st.str(), error)) {
             return false;
         }
     }
 
-    {
-        if (!write_text(pouw_storage_path(), pouw_storage.dump_state(), error)) {
-            return false;
-        }
+    if (!write_text(contracts_path(), contracts.dump_state(), error)) {
+        return false;
     }
-
-    {
-        if (!write_text(pouw_compute_path(), pouw_compute.dump_state(), error)) {
-            return false;
-        }
+    if (!write_text(tokens_path(), tokens.dump_state(), error)) {
+        return false;
     }
-
-    {
-        if (!write_text(private_messages_path(), private_messaging.dump_state(), error)) {
-            return false;
-        }
+    if (!write_text(bridge_path(), bridge.dump_state(), error)) {
+        return false;
     }
-
+    if (!write_text(privacy_path(), privacy.dump_state(), error)) {
+        return false;
+    }
+    if (!write_text(pouw_storage_path(), pouw_storage.dump_state(), error)) {
+        return false;
+    }
+    if (!write_text(pouw_compute_path(), pouw_compute.dump_state(), error)) {
+        return false;
+    }
+    if (!write_text(private_messages_path(), private_messaging.dump_state(), error)) {
+        return false;
+    }
     return true;
 }
 

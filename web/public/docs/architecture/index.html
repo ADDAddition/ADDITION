@@ -17,20 +17,19 @@
 <h2>Goals</h2>
 <ul><li>Production-oriented clean rewrite starting from zero</li><li>Single canonical codebase</li><li>Deterministic behavior and test coverage first</li></ul>
 <h2>Modules</h2>
-<ul><li><code>block.*</code>: data model and hashing helpers</li><li><code>chain.*</code>: canonical ledger state and block validation</li><li><code>mempool.*</code>: pending transaction queue</li><li><code>miner.*</code>: block template and simplified PoW loop</li><li><code>rpc_server.*</code>: text-command RPC handling</li><li><code>wallet.*</code>: transaction creation and submission</li></ul>
-<h2>Current status (v2 in progress)</h2>
+<ul><li><code>block.*</code>: data model and hashing helpers</li><li><code>chain.*</code>: canonical ledger state and block validation</li><li><code>mempool.*</code>: pending transaction queue; rejects unsigned / empty-input / duplicate-outpoint junk</li><li><code>miner.*</code>: block template and SHA3-512 PoW (testnet); <code>memory_hard</code> on the <code>--mainnet</code> profile</li><li><code>crypto.*</code>: default ML-DSA-87; addresses are SHA3-512(scheme_id || 0x00 || pubkey_bytes)</li><li><code>rpc_server.*</code>: text-command RPC handling</li><li><code>wallet.*</code> / <code>wallet_store.*</code>: <code>wallet_send</code> from local <code>.wal</code> files</li><li><code>token_engine.*</code>: in-process token / AMM ledger (loopback RPC; not a public DEX)</li><li><code>privacy.*</code>: SHA3-512 commitment + nullifier opening (<code>claim=opening_not_zk</code>)</li><li><code>p2p.*</code> / <code>decentralized_node.*</code>: peer handshake, gossip, sync</li></ul>
+<h2>Current status</h2>
 <p>1. SHA3-512 hashing implemented with OpenSSL (<code>src/crypto.cpp</code>)</p>
 <p>2. UTXO transaction model integrated (<code>TxInput</code>/<code>TxOutput</code> + <code>utxo_set_</code>)</p>
-<p>3. Wallet/RPC now build spends from available UTXOs</p>
-<p>4. Non-coinbase transactions now require signer + signature validation</p>
-<p>5. Chain persistence: <code>--data-dir/blocks.dat</code> (text headers + txs). UTXOs are</p>
-<p>   rebuilt by replay. Not LevelDB/RocksDB.</p>
+<p>3. Wallet/RPC build spends from available UTXOs (<code>wallet_send</code>, <code>tx_build</code> + <code>sendtx_signed*</code>)</p>
+<p>4. Spend transactions require ML-DSA-87 (<code>pq=</code> signatures) in <code>pq_mode=strict</code></p>
+<p>5. Chain persistence: <code>--data-dir/blocks.dat</code> after each accepted block. UTXOs rebuilt by replay</p>
+<p>6. Side-state (<code>tokens.dat</code>, <code>privacy.dat</code>, <code>staking.dat</code>) flushed after each successful write and on shutdown</p>
+<p>7. P2P + public-read allowlist shipped. Write RPC stays <code>127.0.0.1</code></p>
 <h2>Next hardening phases</h2>
-<p>1. Replace temporary deterministic signatures with real asymmetric keys</p>
-<p>2. Add p2p networking layer and peer sync</p>
-<p>3. Optional stronger on-disk format (LevelDB/RocksDB) — text <code>blocks.dat</code> already persists height across restart</p>
-<p>4. Add authenticated JSON-RPC server</p>
-<p>5. Add reproducible release pipeline</p>
+<p>1. Optional stronger on-disk format (LevelDB/RocksDB) — text <code>blocks.dat</code> already persists height across restart</p>
+<p>2. Native ADD lock into the privacy pool (notes are still a side ledger today)</p>
+<p>3. Add reproducible release pipeline</p>
     <p class="note">Source file in the repository: <a href="https://github.com/ADDAddition/ADDITION/blob/main/docs/ARCHITECTURE.md">docs/ARCHITECTURE.md</a></p>
   </main>
   <footer id="site-footer"></footer>

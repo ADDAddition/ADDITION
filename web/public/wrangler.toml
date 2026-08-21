@@ -1,4 +1,5 @@
-name = "addition-testnet-site"
+name = "addition-explorer"
+account_id = "c4ceeebc81b5a07252d4d4244e50a916"
 main = "worker.js"
 compatibility_date = "2026-03-03"
 

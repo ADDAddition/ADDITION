@@ -75,6 +75,7 @@ public:
                   std::string& error);
 
     bool verifier_configured() const;
+    static bool master_key_configured();
     std::size_t note_count() const;
     std::size_t used_nullifier_count() const;
     std::size_t spent_commitment_count() const;

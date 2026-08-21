@@ -35,7 +35,7 @@
 | **Privacy path** | **SHA3-512 opening (not ZK)** | public ledger | public ledger | public ledger |
 | **Public network today** | **testnet** | mainnet | mainnet | mainnet |
 | **Max supply** | **50,000,000** (whole units) | no fixed cap | no fixed cap | 21,000,000 |
-| **Min fee** | **1** (whole unit) | lamports | wei | satoshis |
+| **Min fee** | **0** (whole unit) | lamports | wei | satoshis |
 
 ---
 
@@ -63,7 +63,7 @@ What `main` ships:
 - **SLH-DSA** — opt-in vault (`slh-dsa-shake-256s`) when this liboqs can sign with a non-empty context; otherwise disabled
 - **RPC** — write on `127.0.0.1`; public read is an allowlist (`getinfo`, `getblockraw`, …). Public `mine` / `createwallet` stay disabled
 
-Whole integers. No 8-decimal subunit. Block reward `50`, `max_supply` `50000000`, min fee `1`.
+Whole integers. No 8-decimal subunit. Block reward `50`, `max_supply` `50000000`, min fee `0`.
 
 ---
 
