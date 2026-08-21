@@ -78,11 +78,11 @@ export default {
           body: request.body,
         });
         const text = await res.text();
-        if (!res.ok || looksLikeHtml(text)) {
+        if (looksLikeHtml(text)) {
           return rpcOffline();
         }
         return new Response(text, {
-          status: 200,
+          status: res.ok ? 200 : res.status,
           headers: {
             "content-type": res.headers.get("content-type") || "text/plain; charset=utf-8",
             "cache-control": "no-store",

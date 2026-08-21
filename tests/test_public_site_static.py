@@ -376,6 +376,7 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("function looksLikeHtml(text)", worker)
         self.assertIn("function rpcOffline()", worker)
         self.assertIn("catch (err)", worker)
+        self.assertIn("res.ok ? 200 : res.status", worker)
         wrangler = (PUBLIC / "wrangler.toml").read_text(encoding="utf-8")
         self.assertIn("run_worker_first", wrangler)
         self.assertIn('"/rpc*"', wrangler)
