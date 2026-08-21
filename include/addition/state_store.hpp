@@ -55,6 +55,17 @@ public:
     bool load_chain(Chain& chain, std::string& error) const;
     bool chain_file_exists() const;
 
+    // tokens/privacy/staking and other side ledgers. Call after a successful write.
+    bool save_side_state(const StakingEngine& staking,
+                         const ContractEngine& contracts,
+                         const TokenEngine& tokens,
+                         const BridgeEngine& bridge,
+                         const PrivacyPool& privacy,
+                         const PoUWStorageEngine& pouw_storage,
+                         const PoUWComputeEngine& pouw_compute,
+                         const PrivateMessagingEngine& private_messaging,
+                         std::string& error) const;
+
     // Sidecar so a height-0 data dir cannot be reused across networks.
     bool ensure_network_marker(const Chain& chain, std::string& error) const;
     bool write_network_marker(const Chain& chain, std::string& error) const;

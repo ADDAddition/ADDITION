@@ -17,6 +17,8 @@ On a reachable ADDITION node you control:
 - `wallet_balance` / `getbalance` — whole ADD units from write RPC
 - `wallet_send <name> <to> <amount> [fee]` — node signs; no private key on the wire
 
+Token, swap, and privacy commands stay on the local Linux node (`/tokens/`, `/swap/`, `/privacy/` via `/local-rpc`). This iOS app does not call `token_*`, `swap_*`, or `privacy_*`.
+
 If write RPC is down or returns `error:`, the app shows **RPC offline** / the node error. It does not invent a balance or height.
 
 ## Write RPC vs public read

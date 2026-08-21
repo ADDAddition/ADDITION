@@ -9,23 +9,25 @@
 - `block.*`: data model and hashing helpers
 - `chain.*`: canonical ledger state and block validation
 - `mempool.*`: pending transaction queue; rejects unsigned / empty-input / duplicate-outpoint junk
-- `miner.*`: block template and SHA3-512 PoW; drops leftover invalid mempool txs instead of failing the block
-- `crypto.*`: default ML-DSA-87 with thread-local OQS_SIG and parallel batch verify; opt-in `slh-dsa-shake-256s` (liboqs `SPHINCS+-SHAKE-256s-simple`) only if `OQS_SIG_sign_with_ctx_str` works with a non-empty context; addresses are SHA3-512(scheme_id || 0x00 || pubkey_bytes) (128 hex)
+- `miner.*`: block template and SHA3-512 PoW (testnet); `memory_hard` on the `--mainnet` profile
+- `crypto.*`: default ML-DSA-87 with thread-local OQS_SIG and parallel batch verify; opt-in `slh-dsa-shake-256s` only if `OQS_SIG_sign_with_ctx_str` works with a non-empty context; addresses are SHA3-512(scheme_id || 0x00 || pubkey_bytes) (128 hex)
 - `rpc_server.*`: text-command RPC handling
-- `wallet.*`: transaction creation and submission
+- `wallet.*` / `wallet_store.*`: transaction creation, local `.wal` files, `wallet_send`
+- `token_engine.*`: in-process token / AMM ledger (loopback RPC; not a public DEX)
+- `privacy.*`: SHA3-512 commitment + nullifier opening (`claim=opening_not_zk`)
+- `p2p.*` / `decentralized_node.*`: peer handshake, gossip, sync
 - `btc_hygiene.*`: offline Bitcoin script classifier and signed ADDITION hygiene receipt (attestation rehearsal; does not move Bitcoin; not BIP-360)
 
-## Current status (v2 in progress)
+## Current status
 1. SHA3-512 hashing implemented with OpenSSL (`src/crypto.cpp`)
 2. UTXO transaction model integrated (`TxInput`/`TxOutput` + `utxo_set_`)
-3. Wallet/RPC now build spends from available UTXOs
-4. Non-coinbase transactions now require signer + signature validation
-5. Chain persistence: `--data-dir/blocks.dat` (text headers + txs). UTXOs are
-   rebuilt by replay. Not LevelDB/RocksDB.
+3. Wallet/RPC build spends from available UTXOs (`wallet_send`, `tx_build` + `sendtx_signed*`)
+4. Spend transactions require ML-DSA-87 (`pq=` signatures) in `pq_mode=strict`
+5. Chain persistence: `--data-dir/blocks.dat` after each accepted block. UTXOs rebuilt by replay
+6. Side-state (`tokens.dat`, `privacy.dat`, `staking.dat`, …) flushed after each successful write and on shutdown
+7. P2P + public-read allowlist shipped. Write RPC stays `127.0.0.1`
 
 ## Next hardening phases
-1. Replace temporary deterministic signatures with real asymmetric keys
-2. Add p2p networking layer and peer sync
-3. Optional stronger on-disk format (LevelDB/RocksDB) — text `blocks.dat` already persists height across restart
-4. Add authenticated JSON-RPC server
-5. Add reproducible release pipeline
+1. Optional stronger on-disk format (LevelDB/RocksDB) — text `blocks.dat` already persists height across restart
+2. Native ADD lock into the privacy pool (notes are still a side ledger today)
+3. Add reproducible release pipeline

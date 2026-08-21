@@ -16,11 +16,14 @@
 #include "addition/rpc_server.hpp"
 #include "addition/staking.hpp"
 #include "addition/token_engine.hpp"
+#include "addition/crypto.hpp"
+#include "addition/state_store.hpp"
 #include "addition/wallet_keys.hpp"
 
 #include <exception>
 #include <filesystem>
 #include <iostream>
+#include <sstream>
 #include <string>
 
 namespace {
@@ -290,6 +293,92 @@ int test_rpc_amm_path() {
         return 1;
     }
     if (!expect_eq(rpc.handle_command("token_balance AAA alice"), "790", "AAA after swap")) {
+        return 1;
+    }
+
+    const auto created = rpc.handle_command("createwallet trader");
+    if (created.rfind("address=", 0) != 0) {
+        std::cerr << "test failed: createwallet: " << created << '\n';
+        return 1;
+    }
+    std::string trader_addr;
+    std::string trader_pub;
+    {
+        std::istringstream ks(created);
+        std::string tok;
+        while (ks >> tok) {
+            if (tok.rfind("address=", 0) == 0) {
+                trader_addr = tok.substr(8);
+            } else if (tok.rfind("pub=", 0) == 0) {
+                trader_pub = tok.substr(4);
+            }
+        }
+    }
+    if (trader_addr.empty() || trader_pub.empty()) {
+        std::cerr << "test failed: createwallet fields: " << created << '\n';
+        return 1;
+    }
+    if (!expect_eq(rpc.handle_command("token_create CCC " + trader_addr + " 100000 500"), "ok", "token_create CCC") ||
+        !expect_eq(rpc.handle_command("token_create DDD " + trader_addr + " 100000 500"), "ok", "token_create DDD")) {
+        return 1;
+    }
+    if (!expect_eq(rpc.handle_command("token_transfer_wallet trader CCC bob 25"), "ok", "token_transfer_wallet")) {
+        return 1;
+    }
+    if (!expect_eq(rpc.handle_command("token_balance CCC bob"), "25", "CCC bob after wallet transfer") ||
+        !expect_eq(rpc.handle_command("token_balance CCC " + trader_addr), "475", "CCC trader after wallet transfer")) {
+        return 1;
+    }
+    const auto payload = rpc.handle_command("token_sign_payload CCC " + trader_addr + " carol 10");
+    const auto want_payload = "token_transfer|CCC|" + trader_addr + "|carol|10";
+    if (!expect_eq(payload, want_payload, "token_sign_payload")) {
+        return 1;
+    }
+    const auto sig_full = rpc.handle_command("wallet_sign trader " + addition::bytes_to_hex(
+        std::vector<std::uint8_t>(payload.begin(), payload.end())));
+    if (sig_full.rfind("pq=", 0) != 0) {
+        std::cerr << "test failed: wallet_sign: " << sig_full << '\n';
+        return 1;
+    }
+    const auto signed_xfer = rpc.handle_command("token_transfer_signed CCC " + trader_addr + " carol 10 " +
+                                                trader_pub + " " + sig_full.substr(3));
+    if (!expect_eq(signed_xfer, "ok", "token_transfer_signed")) {
+        return 1;
+    }
+    if (!expect_eq(rpc.handle_command("token_balance CCC carol"), "10", "CCC carol after signed transfer")) {
+        return 1;
+    }
+    const auto bad_sig = rpc.handle_command("token_transfer_signed CCC " + trader_addr + " carol 10 " +
+                                            trader_pub + " deadbeef");
+    if (!expect_error(bad_sig, "token_transfer_signed bad sig")) {
+        return 1;
+    }
+    if (!expect_eq(rpc.handle_command("swap_pool_create CCC DDD 0"), "ok", "zero-bps pool") ||
+        !expect_eq(rpc.handle_command("add_liquidity CCC DDD " + trader_addr + " 100 100"), "ok",
+                   "trader liquidity")) {
+        return 1;
+    }
+    const auto wallet_swap = rpc.handle_command("swap_exact_in_wallet trader CCC DDD 5 1");
+    if (wallet_swap.rfind("ok:amount_out=", 0) != 0) {
+        std::cerr << "test failed: swap_exact_in_wallet: " << wallet_swap << '\n';
+        return 1;
+    }
+
+    addition::StateStore store((rpc_dir / "state").string());
+    std::string persist_error;
+    if (!store.save_side_state(staking, contracts, tokens, bridge, privacy, pouw_storage, pouw_compute,
+                               private_messaging, persist_error)) {
+        std::cerr << "test failed: save_side_state: " << persist_error << '\n';
+        return 1;
+    }
+    addition::TokenEngine restored;
+    std::string load_error;
+    if (!restored.load_state(tokens.dump_state(), load_error)) {
+        std::cerr << "test failed: reload dumped tokens: " << load_error << '\n';
+        return 1;
+    }
+    if (restored.balance_of("CCC", "carol") != 10) {
+        std::cerr << "test failed: persist dump lost signed transfer\n";
         return 1;
     }
     const auto tvl_after = rpc.handle_command("swap_tvl");

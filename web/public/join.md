@@ -42,6 +42,8 @@ curl 'http://34.27.30.115/rpc?cmd=getinfo'
 curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'
 ```
 
+Those curls succeed only when the operator seed answers. If they timeout, run your own `--network testnet` node. Height stays local until the seed answers.
+
 Allowlist includes `getblockraw`. Public `mine` / `createwallet` return `error: command disabled on public RPC`.
 
 Write RPC stays `127.0.0.1`. Do not publish port `8545`.
@@ -58,7 +60,7 @@ There is no public wallet UI. `createwallet`, balances, and swap commands exist 
 
 Pages under `/local/` (`/wallet/`, `/tokens/`, `/swap/`, `/privacy/`) talk to `/local-rpc` → `127.0.0.1:8545`. On the public host they stay **RPC offline**.
 
-Local forms: `/local/` hub, `/tokens/` (`token_create`), `/swap/` (`fee_bps=0` allowed), `/wallet/` (mine / stake), `/privacy/` (`claim=opening_not_zk`). Floor fee is `min_fee=0` on current `main`. Spend signatures are ML-DSA-87. Public read cannot write.
+Local forms: `/local/` hub, `/tokens/` (`token_create`, `token_transfer_wallet`), `/swap/` (`fee_bps=0` allowed, `swap_exact_in_wallet`), `/wallet/` (mine / stake), `/privacy/` (`claim=opening_not_zk`). Floor fee is `min_fee=0` on current `main`. Spend signatures are ML-DSA-87. Token/privacy/swap side-state is flushed after each successful write. Public read cannot write.
 
 Local desktop helper: [`/download/`](/download/) (testnet / local binary, loopback RPC only).
 

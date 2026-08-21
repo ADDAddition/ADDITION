@@ -1,0 +1,35 @@
+name: site-cloudflare
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/public/**"
+      - ".github/workflows/site-cloudflare.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Render docs from repo markdown
+        run: python3 web/render_docs.py
+      - name: Fail if rendered docs drifted
+        run: git diff --exit-code -- web/public/docs
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Deploy addition-explorer
+        working-directory: web/public
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: c4ceeebc81b5a07252d4d4244e50a916
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "CLOUDFLARE_API_TOKEN secret is not set; skip deploy"
+            exit 0
+          fi
+          npx --yes wrangler@4 deploy

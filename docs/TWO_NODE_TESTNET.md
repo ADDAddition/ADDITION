@@ -123,9 +123,10 @@ public port is up. If the daemon is down, pages show **RPC offline**.
 ## P2P limits
 
 - P2P transport is off unless `ADDITION_ENABLE_P2P_RPC=1`.
-- The live operator node sets that env and allows inbound TCP **28545**
-  (GCP rule `allow-addition-p2p`). Allow 28545 only while P2P is enabled.
-  Never open **8545** or **18545**.
+- When the operator seed answers, it sets that env and allows inbound TCP
+  **28545** (GCP rule `allow-addition-p2p`). Allow 28545 only while P2P is
+  enabled. Never open **8545** or **18545**. A timeout means the seed is
+  down — use this two-node script instead of inventing another peer.
 - Endpoints are IPv4 `ip:port` only (`inet_pton`). Docker DNS names do not work.
 - `bootstrap_peers` / `--bootstrap` skip this process’s own P2P port, `self` /
   `probe-self`, and `ADDITION_ADVERTISED_P2P` when set (seed must set that to
@@ -133,7 +134,7 @@ public port is up. If the daemon is down, pages show **RPC offline**.
 - `getinfo.peers` / `peers` list only non-loopback IPv4 endpoints. Loopback
   two-node peers stay in the internal set for `sync` and appear as
   `local=127.0.0.1:…`. Node ids and `self` are not an external peer count.
-- IPv4 only. The operator’s current public P2P is `34.27.30.115:28545`
+- IPv4 only. The configured operator public P2P is `34.27.30.115:28545`
   (`--bootstrap 34.27.30.115:28545`). Do not invent extra peers. Write RPC
   stays `127.0.0.1:8545`.
 - Seed operators set `ADDITION_ADVERTISED_P2P=34.27.30.115:28545` so public

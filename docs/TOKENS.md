@@ -18,6 +18,9 @@ commands:
 | `token_create_ex <symbol> <name> <owner> <max_supply> <initial_mint> <decimals> <burnable_0_1> <dev_wallet_or_dash> <dev_allocation>` | write | name has no spaces |
 | `token_mint <symbol> <caller> <to> <amount>` | write | caller must be the token owner |
 | `token_transfer <symbol> <from> <to> <amount>` | write | unsigned; local TEXT RPC only |
+| `token_sign_payload <symbol> <from> <to> <amount>` | read | canonical string to sign |
+| `token_transfer_signed <symbol> <from> <to> <amount> <pubkey> <sig>` | write | ML-DSA-87; `from` must bind the pubkey |
+| `token_transfer_wallet <wallet> <symbol> <to> <amount>` | write | signs from `data/wallets/<name>.wal` |
 | `token_balance <symbol> <owner>` | read | decimal string, `0` if missing |
 | `token_info <symbol>` | read | `key=value` fields |
 | `token_burn <symbol> <from> <amount>` | write | only if the token was created burnable |
@@ -29,14 +32,14 @@ commands:
 | `swap_exact_in <token_in> <token_out> <trader> <amount_in> <min_out>` | write | updates reserves; `ok:amount_out=N` |
 | `swap_tvl` | read | sum of live pool reserves, or `tvl=0` |
 
-State is persisted to `data/tokens.dat` when the daemon shuts down (`quit`)
-and reloaded on the next start.
+State is persisted to `data/tokens.dat` after each successful write and again
+on `quit`. It is reloaded on the next start.
 
-These commands are **not** signed chain transactions. Anyone who can talk to
-the trusted local TEXT RPC can create, mint, or transfer by naming addresses.
-There is no private key on the wire, and no PQ signature check on
-`token_transfer`. Treat this as a local research ledger, not a public token
-security.
+`token_transfer` stays an unsigned research command (opaque names). Prefer
+`token_transfer_wallet` or `token_transfer_signed` when the owner is a real
+hash-committed address. Anyone who can talk to the trusted local TEXT RPC can
+still call the unsigned path. Treat the unsigned ledger as local research, not
+a public token security.
 
 LAN / untrusted RPC (when enabled) already filters writes: `token_balance`,
 `token_info`, `nft_owner`, `swap_quote`, `swap_pool_info`, and `swap_tvl` are
@@ -71,6 +74,8 @@ python3 tools/addition_tokens.py getinfo
 python3 tools/addition_tokens.py create DEMO alice 1000000 1000
 python3 tools/addition_tokens.py mint DEMO alice bob 50
 python3 tools/addition_tokens.py transfer DEMO alice bob 10
+python3 tools/addition_tokens.py transfer-wallet trader DEMO bob 7
+python3 tools/addition_tokens.py sign-payload DEMO alice bob 10
 python3 tools/addition_tokens.py balance DEMO alice
 python3 tools/addition_tokens.py balance DEMO bob
 python3 tools/addition_tokens.py info DEMO

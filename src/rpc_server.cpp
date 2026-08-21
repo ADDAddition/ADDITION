@@ -287,8 +287,12 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " privacy_mode=sha3_opening"
             << " privacy_claim=opening_not_zk"
             << " privacy_ok=true"
+            << " require_privacy_pool=" << (net.require_privacy_pool ? "true" : "false")
             << " auto_mine=" << (auto_mine_enabled_ ? "on" : "off")
             << " auto_mine_interval_sec=" << auto_mine_interval_sec_;
+        if (trusted) {
+            out << " privacy_master_key=" << (PrivacyPool::master_key_configured() ? "set" : "missing");
+        }
         return out.str();
     }
 
@@ -1597,6 +1601,74 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         return "ok";
     }
 
+    if (cmd == "token_sign_payload") {
+        std::string symbol;
+        std::string from;
+        std::string to;
+        std::uint64_t amount = 0;
+        iss >> symbol >> from >> to >> amount;
+        if (symbol.empty() || from.empty() || to.empty() || amount == 0) {
+            return "error: usage token_sign_payload <symbol> <from> <to> <amount>";
+        }
+        return "token_transfer|" + symbol + "|" + from + "|" + to + "|" + std::to_string(amount);
+    }
+
+    if (cmd == "token_transfer_signed") {
+        std::string symbol;
+        std::string from;
+        std::string to;
+        std::uint64_t amount = 0;
+        std::string pubkey;
+        std::string sig;
+        iss >> symbol >> from >> to >> amount >> pubkey >> sig;
+        if (symbol.empty() || from.empty() || to.empty() || amount == 0 || pubkey.empty() || sig.empty()) {
+            return "error: usage token_transfer_signed <symbol> <from> <to> <amount> <pubkey_hex> <sig_hex>";
+        }
+        const std::string payload = "token_transfer|" + symbol + "|" + from + "|" + to + "|" + std::to_string(amount);
+        if (!verify_message_signature_hybrid(pubkey, payload, std::string("pq=") + sig)) {
+            return "error: invalid token transfer signature";
+        }
+        if (derive_address_from_pubkey(pubkey) != from) {
+            return "error: from address/pubkey mismatch";
+        }
+        std::string error;
+        if (!tokens_.transfer(symbol, from, to, amount, error)) {
+            return "error: " + error;
+        }
+        return "ok";
+    }
+
+    if (cmd == "token_transfer_wallet") {
+        std::string name;
+        std::string symbol;
+        std::string to;
+        std::uint64_t amount = 0;
+        iss >> name >> symbol >> to >> amount;
+        if (name.empty() || symbol.empty() || to.empty() || amount == 0) {
+            return "error: usage token_transfer_wallet <wallet> <symbol> <to> <amount>";
+        }
+        StoredWallet stored{};
+        std::string error;
+        if (!wallets_.load(name, stored, error, true)) {
+            return "error: " + error;
+        }
+        const std::string payload = "token_transfer|" + symbol + "|" + stored.address + "|" + to + "|" +
+                                    std::to_string(amount);
+        std::string sig;
+        try {
+            sig = sign_message_hybrid(stored.private_key, payload);
+        } catch (const std::exception& e) {
+            return std::string("error: token transfer sign failed: ") + e.what();
+        }
+        if (!verify_message_signature_hybrid(stored.public_key, payload, sig)) {
+            return "error: token transfer signature verify failed";
+        }
+        if (!tokens_.transfer(symbol, stored.address, to, amount, error)) {
+            return "error: " + error;
+        }
+        return "ok";
+    }
+
     if (cmd == "token_balance") {
         std::string symbol;
         std::string owner;
@@ -1819,6 +1891,41 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         std::uint64_t amount_out = 0;
         std::string error;
         if (!tokens_.swap_exact_in(token_in, token_out, trader, amount_in, min_out, amount_out, error)) {
+            return "error: " + error;
+        }
+        return std::string("ok:amount_out=") + std::to_string(amount_out);
+    }
+
+    if (cmd == "swap_exact_in_wallet") {
+        std::string name;
+        std::string token_in;
+        std::string token_out;
+        std::uint64_t amount_in = 0;
+        std::uint64_t min_out = 0;
+        iss >> name >> token_in >> token_out;
+        if (name.empty() || token_in.empty() || token_out.empty() ||
+            !parse_u64_token(iss, amount_in) || !parse_u64_token(iss, min_out) ||
+            amount_in == 0 || !no_trailing_token(iss)) {
+            return "error: usage swap_exact_in_wallet <wallet> <token_in> <token_out> <amount_in> <min_out>";
+        }
+        StoredWallet stored{};
+        std::string error;
+        if (!wallets_.load(name, stored, error, true)) {
+            return "error: " + error;
+        }
+        const std::string payload = "swap_exact_in|" + token_in + "|" + token_out + "|" + stored.address + "|" +
+                                    std::to_string(amount_in) + "|" + std::to_string(min_out);
+        std::string sig;
+        try {
+            sig = sign_message_hybrid(stored.private_key, payload);
+        } catch (const std::exception& e) {
+            return std::string("error: swap sign failed: ") + e.what();
+        }
+        if (!verify_message_signature_hybrid(stored.public_key, payload, sig)) {
+            return "error: swap signature verify failed";
+        }
+        std::uint64_t amount_out = 0;
+        if (!tokens_.swap_exact_in(token_in, token_out, stored.address, amount_in, min_out, amount_out, error)) {
             return "error: " + error;
         }
         return std::string("ok:amount_out=") + std::to_string(amount_out);

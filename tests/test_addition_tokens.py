@@ -27,6 +27,9 @@ class FakeTransport:
             "token_create DEMO alice 1000000 1000": "ok",
             "token_mint DEMO alice bob 50": "ok",
             "token_transfer DEMO alice bob 10": "ok",
+            "token_sign_payload DEMO alice bob 10": "payload=DEMO|alice|bob|10",
+            "token_transfer_signed DEMO alice bob 10 pub sig": "ok",
+            "token_transfer_wallet trader DEMO bob 7": "ok",
             "token_balance DEMO alice": "990",
             "token_balance DEMO bob": "60",
             "token_info DEMO": "symbol=DEMO owner=alice max_supply=1000000 total_supply=1050",
@@ -92,6 +95,25 @@ class TokenClientTests(unittest.TestCase):
         with self.assertRaises(TokenCliError) as ctx:
             self.client.balance("MISSING", "alice")
         self.assertIn("unknown command", str(ctx.exception))
+
+    def test_signed_transfer_paths(self) -> None:
+        self.assertEqual(
+            self.client.sign_payload("DEMO", "alice", "bob", 10),
+            "payload=DEMO|alice|bob|10",
+        )
+        self.assertEqual(
+            self.client.transfer_signed("DEMO", "alice", "bob", 10, "pub", "sig"),
+            "ok",
+        )
+        self.assertEqual(self.client.transfer_wallet("trader", "DEMO", "bob", 7), "ok")
+        self.assertEqual(
+            self.transport.commands[-3:],
+            [
+                "token_sign_payload DEMO alice bob 10",
+                "token_transfer_signed DEMO alice bob 10 pub sig",
+                "token_transfer_wallet trader DEMO bob 7",
+            ],
+        )
 
     def test_refuses_unlisted_command(self) -> None:
         with self.assertRaises(TokenCliError):

@@ -22,13 +22,14 @@ additiond --network testnet --public-rpc
 `additiond` always binds write RPC to `127.0.0.1`. Never publish **8545**.
 Never open LAN RPC (`18545`) from this unit.
 
-The live operator node enables P2P with `ADDITION_ENABLE_P2P_RPC=1` and
-advertises one IPv4 bootstrap: **34.27.30.115:28545**. That is the current
-public P2P of this testnet, not a peer-count claim and not a mainnet.
-`config.toml` / `getinfo.bootstrap_peers` list that single endpoint so
+When the operator seed answers, it enables P2P with `ADDITION_ENABLE_P2P_RPC=1`
+and advertises one IPv4 bootstrap: **34.27.30.115:28545**. That is the
+configured public P2P of this testnet, not a peer-count claim and not a
+mainnet. If `curl` to that host times out, the seed is down — run your own
+node. `config.toml` / `getinfo.bootstrap_peers` list that single endpoint so
 outsiders can `--bootstrap 34.27.30.115:28545`. Do not invent extra peers.
 The binary still leaves P2P off until that env is set; the public GCP
-node sets it.
+node sets it when that VM is running.
 
 ### Seed operator: advertise the public P2P, not `self`
 
@@ -110,7 +111,7 @@ Optional write-RPC token (loopback only):
 ```bash
 # /etc/addition/testnet.env  (mode 0640, owner root:addition)
 ADDITION_RPC_TOKEN=<strong_token>
-# Live operator public node (34.27.30.115): P2P on, write RPC stays loopback.
+# Operator public node (34.27.30.115, when that VM answers): P2P on, write RPC stays loopback.
 ADDITION_ENABLE_P2P_RPC=1
 # Seed only: do not count this process as an external peer.
 ADDITION_ADVERTISED_P2P=34.27.30.115:28545
@@ -133,10 +134,12 @@ After N seconds the daemon mines one testnet block and writes `blocks.dat`.
 ## Firewall: 38545 always; 28545 only if P2P is enabled
 
 Allow inbound **38545** for public-read RPC. Allow inbound **28545** only
-when `ADDITION_ENABLE_P2P_RPC=1` (the live operator node does this). Never
-open **8545** or **18545** on a public interface. 8545 stays localhost.
+when `ADDITION_ENABLE_P2P_RPC=1` (the operator seed does this when it is
+running). Never open **8545** or **18545** on a public interface. 8545 stays
+localhost.
 
-The live GCP node uses firewall rule `allow-addition-p2p` for TCP **28545**.
+The GCP seed uses firewall rule `allow-addition-p2p` for TCP **28545** when
+that VM is up.
 That matches `bootstrap_peers = ["34.27.30.115:28545"]`. If P2P is off,
 do not open 28545.
 

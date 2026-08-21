@@ -355,7 +355,7 @@ class WalletClient:
 
     def recommended_fee(self) -> int:
         info = parse_kv(self.fee_info())
-        raw = info.get("recommended_min_fee", "1")
+        raw = info.get("recommended_min_fee", "0")
         try:
             fee = int(raw)
         except ValueError as exc:

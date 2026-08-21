@@ -70,6 +70,47 @@ int main() {
         return 1;
     }
 
+    {
+        unsetenv("ADDITION_PRIVACY_MASTER_KEY");
+#ifdef _WIN32
+        _putenv_s("ADDITION_PRIVACY_MASTER_KEY", "");
+#endif
+        addition::PrivacyPool bare;
+        addition::OpeningNote short_prep{};
+        std::string short_err;
+        if (!addition::PrivacyPool::prepare_opening(1, short_prep, short_err)) {
+            std::cerr << "test failed: prepare_opening without key should still hash: " << short_err << '\n';
+            return 1;
+        }
+        if (bare.mint_open("alice", 1, short_prep.commitment, short_prep.nullifier, short_prep.trapdoor, short_err).size()) {
+            std::cerr << "test failed: mint_open must fail without master key\n";
+            return 1;
+        }
+        if (short_err.find("ADDITION_PRIVACY_MASTER_KEY") == std::string::npos ||
+            short_err.find("min 32") == std::string::npos) {
+            std::cerr << "test failed: short/missing key error: " << short_err << '\n';
+            return 1;
+        }
+        if (addition::PrivacyPool::master_key_configured()) {
+            std::cerr << "test failed: master_key_configured must be false when unset\n";
+            return 1;
+        }
+#ifdef _WIN32
+        _putenv_s("ADDITION_PRIVACY_MASTER_KEY", "too-short");
+#else
+        setenv("ADDITION_PRIVACY_MASTER_KEY", "too-short", 1);
+#endif
+        if (addition::PrivacyPool::master_key_configured()) {
+            std::cerr << "test failed: master_key_configured must reject <32 chars\n";
+            return 1;
+        }
+        set_master_key();
+        if (!addition::PrivacyPool::master_key_configured()) {
+            std::cerr << "test failed: master_key_configured after set\n";
+            return 1;
+        }
+    }
+
     addition::PrivacyPool pool;
     std::string mode_err;
     if (pool.set_native_verifier_mode("bulletproofs", mode_err) ||

@@ -9,7 +9,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="Join" data-sub="live testnet">
+<body data-title="Join" data-sub="research testnet">
   <header id="site-header"></header>
   <main class="prose">
     <div class="banner">
@@ -47,6 +47,7 @@
       <pre>curl 'https://rpc.additionblockchain.com/rpc?cmd=getinfo'
 curl 'http://34.27.30.115/rpc?cmd=getinfo'
 curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'</pre>
+      <p>Those curls succeed only when the operator seed answers. If they timeout, run your own <code>--network testnet</code> node. Height stays local until the seed answers.</p>
       <p>Allowlist includes <code>getblockraw</code>. Public <code>mine</code> / <code>createwallet</code> return <code>error: command disabled on public RPC</code>.</p>
       <p>Write RPC stays <code>127.0.0.1</code>. Do not publish port <code>8545</code>.</p>
     </section>
@@ -64,7 +65,7 @@ curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'</pre>
       <p>Local desktop helper: <a href="/download/">/download/</a> (testnet / local binary, loopback RPC only).</p>
       <div class="tool-grid">
         <a href="/local/"><strong>Local hub</strong>pair + pool, then the other forms</a>
-        <a href="/tokens/"><strong>Tokens</strong>token_create / mint / transfer</a>
+        <a href="/tokens/"><strong>Tokens</strong>token_create / mint / transfer_wallet</a>
         <a href="/swap/"><strong>Swap pool</strong>fee_bps=0 allowed. In-process math, not Uniswap</a>
         <a href="/wallet/"><strong>Mine / stake</strong>createwallet, mine, stake, unstake, claim</a>
         <a href="/privacy/"><strong>Privacy opening</strong>SHA3-512. claim=opening_not_zk. Not Monero</a>

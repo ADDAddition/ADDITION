@@ -58,6 +58,47 @@ std::string trim_copy(std::string s) {
     return s;
 }
 
+bool is_side_state_write(const std::string& cmd) {
+    if (cmd == "stake" || cmd == "unstake" || cmd == "stake_reward" || cmd == "stake_claim" ||
+        cmd == "stake_policy" || cmd == "consume_stake_credit" || cmd == "add_liquidity") {
+        return true;
+    }
+    if (cmd.rfind("token_", 0) == 0) {
+        return cmd != "token_balance" && cmd != "token_info" && cmd != "token_sign_payload";
+    }
+    if (cmd.rfind("swap_", 0) == 0) {
+        return cmd != "swap_quote" && cmd != "swap_quote_route" && cmd != "swap_best_route" &&
+               cmd != "swap_best_route_sign_payload" && cmd != "swap_pool_info" && cmd != "swap_tvl";
+    }
+    if (cmd.rfind("nft_", 0) == 0) {
+        return cmd != "nft_owner" && cmd != "nft_info";
+    }
+    if (cmd.rfind("privacy_", 0) == 0) {
+        return cmd == "privacy_mint_open" || cmd == "privacy_spend_open" ||
+               cmd == "privacy_mint_zk" || cmd == "privacy_spend_zk";
+    }
+    if (cmd.rfind("contract_", 0) == 0) {
+        return cmd != "contract_get";
+    }
+    if (cmd.rfind("bridge_", 0) == 0) {
+        return cmd != "bridge_balance" && cmd != "bridge_attestor";
+    }
+    if (cmd.rfind("pouw_", 0) == 0) {
+        return cmd.find("_status") == std::string::npos;
+    }
+    if (cmd.rfind("pm_", 0) == 0) {
+        return cmd == "pm_send_ttl" || cmd == "pm_destroy" || cmd == "pm_purge";
+    }
+    return false;
+}
+
+std::string first_command(const std::string& line) {
+    std::istringstream iss(line);
+    std::string cmd;
+    iss >> cmd;
+    return cmd;
+}
+
 bool parse_rpc_auth(const std::string& cmd,
                     const std::string& expected_token,
                     std::string& stripped,
@@ -361,16 +402,33 @@ int main(int argc, char** argv) {
     }
     const bool lan_rpc_auth_required = !lan_rpc_token.empty();
 
+    auto persist_side_after = [&](const std::string& cmd_line, const std::string& resp) {
+        if (resp.rfind("error:", 0) == 0) {
+            return;
+        }
+        if (!is_side_state_write(first_command(cmd_line))) {
+            return;
+        }
+        std::string persist_error;
+        if (!store.save_side_state(staking, contracts, tokens, bridge, privacy, pouw_storage,
+                                   pouw_compute, private_messaging, persist_error)) {
+            std::cout << "warning: side-state persist failed: " << persist_error << '\n';
+        }
+    };
+
     addition::RpcNetworkServer local_rpc("127.0.0.1", node_cfg.local_rpc_port, [&](const std::string& cmd) {
-        if (!local_rpc_auth_required) {
-            return rpc.handle_command(cmd, true);
+        std::string line = cmd;
+        if (local_rpc_auth_required) {
+            std::string stripped;
+            std::string error;
+            if (!parse_rpc_auth(cmd, local_rpc_token, stripped, error)) {
+                return error;
+            }
+            line = stripped;
         }
-        std::string stripped;
-        std::string error;
-        if (!parse_rpc_auth(cmd, local_rpc_token, stripped, error)) {
-            return error;
-        }
-        return rpc.handle_command(stripped, true);
+        const auto resp = rpc.handle_command(line, true);
+        persist_side_after(line, resp);
+        return resp;
     });
     addition::RpcNetworkServer lan_rpc("0.0.0.0", node_cfg.lan_rpc_port, [&](const std::string& cmd) {
         if (!lan_rpc_auth_required) {
@@ -512,7 +570,11 @@ int main(int argc, char** argv) {
                  "bridge_balance <chain> <user>,\n"
                  "token_create <symbol> <owner> <max_supply> <initial_mint>, token_mint <symbol> <caller> <to> <amount>,\n"
                  "token_create_ex <symbol> <name> <owner> <max_supply> <initial_mint> <decimals> <burnable_0_1> <dev_wallet_or_dash> <dev_allocation>,\n"
-                 "token_transfer <symbol> <from> <to> <amount>, token_balance <symbol> <owner>, token_info <symbol>, token_burn <symbol> <from> <amount>,\n"
+                 "token_transfer <symbol> <from> <to> <amount> (unsigned local research),\n"
+                 "token_sign_payload <symbol> <from> <to> <amount>,\n"
+                 "token_transfer_signed <symbol> <from> <to> <amount> <pubkey_hex> <sig_hex>,\n"
+                 "token_transfer_wallet <wallet> <symbol> <to> <amount>,\n"
+                 "token_balance <symbol> <owner>, token_info <symbol>, token_burn <symbol> <from> <amount>,\n"
                  "token_set_policy <symbol> <caller_owner> <treasury_wallet_or_dash> <transfer_fee_bps> <burn_fee_bps> <paused_0_1>,\n"
                  "token_blacklist <symbol> <caller_owner> <wallet> <blocked_0_1>,\n"
                  "token_fee_exempt <symbol> <caller_owner> <wallet> <exempt_0_1>,\n"
@@ -524,6 +586,7 @@ int main(int argc, char** argv) {
                  "swap_pool_info <token_a> <token_b>,\n"
                  "swap_quote <token_in> <token_out> <amount_in>,\n"
                  "swap_exact_in <token_in> <token_out> <trader> <amount_in> <min_out>,\n"
+                 "swap_exact_in_wallet <wallet> <token_in> <token_out> <amount_in> <min_out>,\n"
                  "swap_quote_route <A>B>C <amount_in>, swap_route_exact_in <A>B>C <trader> <amount_in> <min_out>,\n"
                  "swap_best_route <token_in> <token_out> <amount_in> [max_hops],\n"
                  "swap_best_route_exact_in <token_in> <token_out> <trader> <amount_in> <min_out> <deadline_unix> [max_hops],\n"
@@ -633,7 +696,9 @@ int main(int argc, char** argv) {
             continue;
         }
 
-        std::cout << rpc.handle_command(line, true) << '\n';
+        const auto resp = rpc.handle_command(line, true);
+        persist_side_after(line, resp);
+        std::cout << resp << '\n';
     }
 
     if (!requested_quit && !stdin_is_tty()) {

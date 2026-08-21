@@ -37,6 +37,7 @@ curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'
 curl 'http://34.27.30.115:38545/jsonrpc?method=getinfo'
 curl 'http://34.27.30.115:38545/jsonrpc?method=getblockraw&params=0'
 printf 'getinfo\n' | nc 34.27.30.115 38545</pre>
+      <p>Those curls succeed only when the operator seed answers. If they timeout, run a local <code>--public-rpc</code> node.</p>
       <p><code>:80</code> (nginx) works when <code>38545</code> is filtered. Path is <code>/rpc?cmd=getinfo</code> or <code>/jsonrpc?method=getinfo</code>, not <code>/getinfo</code>.</p>
       <p>Allowlist:</p>
       <ul>

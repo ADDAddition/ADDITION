@@ -21,8 +21,8 @@ std::string mk_note_id(const std::string& owner,
 
 bool get_privacy_master_key(std::string& out, std::string& error) {
     const char* mk = std::getenv("ADDITION_PRIVACY_MASTER_KEY");
-    if (mk == nullptr || std::string(mk).empty()) {
-        error = "ADDITION_PRIVACY_MASTER_KEY not set";
+    if (mk == nullptr || std::string(mk).size() < 32) {
+        error = "ADDITION_PRIVACY_MASTER_KEY not set or too short (min 32)";
         return false;
     }
     out = mk;
@@ -569,6 +569,11 @@ bool PrivacyPool::spend_zk(const std::string& owner,
 
 bool PrivacyPool::verifier_configured() const {
     return true;
+}
+
+bool PrivacyPool::master_key_configured() {
+    const char* mk = std::getenv("ADDITION_PRIVACY_MASTER_KEY");
+    return mk != nullptr && std::string(mk).size() >= 32;
 }
 
 std::size_t PrivacyPool::note_count() const {

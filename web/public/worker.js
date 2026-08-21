@@ -24,18 +24,26 @@ const PAGE_ROUTES = {
   "/legal": "/legal/index.html",
 };
 
+function rpcPath(url) {
+  return url.pathname.replace(/\/$/, "") || "/";
+}
+
 function isRpcApi(url) {
-  if (url.pathname === "/api/rpc" || url.pathname === "/local-rpc") {
+  const path = rpcPath(url);
+  if (path === "/api/rpc" || path === "/local-rpc") {
     return true;
   }
-  return url.pathname === "/rpc" && url.searchParams.has("cmd");
+  if (path === "/jsonrpc") {
+    return true;
+  }
+  return path === "/rpc" && url.searchParams.has("cmd");
 }
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (isRpcApi(url)) {
-      if (url.pathname === "/local-rpc") {
+      if (rpcPath(url) === "/local-rpc") {
         return new Response("error: local RPC proxy is not available on this host", {
           status: 403,
           headers: { "content-type": "text/plain; charset=utf-8" },

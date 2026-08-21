@@ -17,6 +17,9 @@
       <code>/local-rpc</code> → <code>127.0.0.1:8545</code>.
       In-process ledger. Not ERC-20, not a public sale, not Uniswap.
       Owner strings are opaque names (they do not need to be mined addresses).
+      Prefer <code>token_transfer_wallet</code> when the owner is a real
+      <code>createwallet</code> address (ML-DSA-87). Unsigned <code>token_transfer</code>
+      stays for local research names.
       The public host has no write RPC. Buttons stay disabled and panels stay <strong>RPC offline</strong>.
     </div>
     <p id="rpc-state" class="offline">Checking local RPC…</p>
@@ -62,6 +65,20 @@
       </div>
       <pre id="xfer-raw" class="raw"></pre>
     </section>
+
+    <section class="panel">
+      <h2>token_transfer_wallet</h2>
+      <div class="form-grid">
+        <div><label for="wal-name">wallet</label><input id="wal-name" value="alice"></div>
+        <div><label for="wal-to">to</label><input id="wal-to" value="bob"></div>
+        <div><label for="wal-amt">amount</label><input id="wal-amt" value="10"></div>
+      </div>
+      <div class="btn-row">
+        <button id="wal-xfer-btn" type="button" disabled>Signed transfer</button>
+        <button id="burn-btn" type="button" disabled>token_burn</button>
+      </div>
+      <pre id="wal-raw" class="raw"></pre>
+    </section>
   </main>
   <footer id="site-footer"></footer>
   <script src="/common.js"></script>
@@ -92,6 +109,14 @@
     document.getElementById("xfer-btn").addEventListener("click", async function () {
       const r = await L.cmd("token_transfer " + symbol() + " " + L.val("xfer-from") + " " + L.val("xfer-to") + " " + L.val("xfer-amt"));
       document.getElementById("xfer-raw").textContent = r.raw;
+    });
+    document.getElementById("wal-xfer-btn").addEventListener("click", async function () {
+      const r = await L.cmd("token_transfer_wallet " + L.val("wal-name") + " " + symbol() + " " + L.val("wal-to") + " " + L.val("wal-amt"));
+      document.getElementById("wal-raw").textContent = r.raw;
+    });
+    document.getElementById("burn-btn").addEventListener("click", async function () {
+      const r = await L.cmd("token_burn " + symbol() + " " + L.val("wal-name") + " " + L.val("wal-amt"));
+      document.getElementById("wal-raw").textContent = r.raw;
     });
   </script>
 </body>
