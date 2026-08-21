@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Local ADDITION testnet token CLI (TEXT RPC on 127.0.0.1:8545).
 
-Research testnet only. Token create/mint/transfer are unsigned in-process
-TokenEngine mutations on the running daemon — not signed chain transactions
-and not a DEX. Private keys are never placed on the RPC line.
+Research testnet only. `token_create` / `token_mint` / `token_transfer` are
+unsigned in-process TokenEngine mutations — not a DEX. Prefer
+`token_transfer_wallet` or `token_transfer_signed` when the owner is a real
+hash-committed address. Private keys are never placed on the RPC line.
 """
 
 from __future__ import annotations
@@ -28,6 +29,8 @@ TOKEN_WRITE_COMMANDS = {
     "token_create_ex",
     "token_mint",
     "token_transfer",
+    "token_transfer_signed",
+    "token_transfer_wallet",
     "token_burn",
     "nft_mint",
     "nft_transfer",
@@ -35,6 +38,7 @@ TOKEN_WRITE_COMMANDS = {
 TOKEN_READ_COMMANDS = {
     "token_balance",
     "token_info",
+    "token_sign_payload",
     "nft_owner",
     "nft_info",
     "getinfo",
@@ -132,6 +136,39 @@ class TokenClient:
         amount = _require_u64(amount, "amount")
         return self._call(f"token_transfer {symbol} {from_addr} {to} {amount}")
 
+    def sign_payload(self, symbol: str, from_addr: str, to: str, amount: int) -> str:
+        symbol = _require_token(symbol, "symbol")
+        from_addr = _require_token(from_addr, "from")
+        to = _require_token(to, "to")
+        amount = _require_u64(amount, "amount")
+        return self._call(f"token_sign_payload {symbol} {from_addr} {to} {amount}")
+
+    def transfer_signed(
+        self,
+        symbol: str,
+        from_addr: str,
+        to: str,
+        amount: int,
+        pubkey: str,
+        sig: str,
+    ) -> str:
+        symbol = _require_token(symbol, "symbol")
+        from_addr = _require_token(from_addr, "from")
+        to = _require_token(to, "to")
+        amount = _require_u64(amount, "amount")
+        pubkey = _require_token(pubkey, "pubkey")
+        sig = _require_token(sig, "sig")
+        return self._call(
+            f"token_transfer_signed {symbol} {from_addr} {to} {amount} {pubkey} {sig}"
+        )
+
+    def transfer_wallet(self, wallet: str, symbol: str, to: str, amount: int) -> str:
+        wallet = _require_token(wallet, "wallet")
+        symbol = _require_token(symbol, "symbol")
+        to = _require_token(to, "to")
+        amount = _require_u64(amount, "amount")
+        return self._call(f"token_transfer_wallet {wallet} {symbol} {to} {amount}")
+
     def burn(self, symbol: str, from_addr: str, amount: int) -> str:
         symbol = _require_token(symbol, "symbol")
         from_addr = _require_token(from_addr, "from")
@@ -217,11 +254,40 @@ def build_parser() -> argparse.ArgumentParser:
     mint.add_argument("to")
     mint.add_argument("amount", type=int)
 
-    transfer = sub.add_parser("transfer", help="token_transfer <symbol> <from> <to> <amount>")
+    transfer = sub.add_parser("transfer", help="token_transfer <symbol> <from> <to> <amount> (unsigned research)")
     transfer.add_argument("symbol")
     transfer.add_argument("from_addr")
     transfer.add_argument("to")
     transfer.add_argument("amount", type=int)
+
+    sign_payload = sub.add_parser(
+        "sign-payload",
+        help="token_sign_payload <symbol> <from> <to> <amount>",
+    )
+    sign_payload.add_argument("symbol")
+    sign_payload.add_argument("from_addr")
+    sign_payload.add_argument("to")
+    sign_payload.add_argument("amount", type=int)
+
+    transfer_signed = sub.add_parser(
+        "transfer-signed",
+        help="token_transfer_signed <symbol> <from> <to> <amount> <pubkey> <sig>",
+    )
+    transfer_signed.add_argument("symbol")
+    transfer_signed.add_argument("from_addr")
+    transfer_signed.add_argument("to")
+    transfer_signed.add_argument("amount", type=int)
+    transfer_signed.add_argument("pubkey")
+    transfer_signed.add_argument("sig")
+
+    transfer_wallet = sub.add_parser(
+        "transfer-wallet",
+        help="token_transfer_wallet <wallet> <symbol> <to> <amount>",
+    )
+    transfer_wallet.add_argument("wallet")
+    transfer_wallet.add_argument("symbol")
+    transfer_wallet.add_argument("to")
+    transfer_wallet.add_argument("amount", type=int)
 
     burn = sub.add_parser("burn", help="token_burn <symbol> <from> <amount> (token must be burnable)")
     burn.add_argument("symbol")
@@ -294,6 +360,24 @@ def main(argv: Optional[List[str]] = None) -> int:
             return 0
         if args.command == "transfer":
             print(client.transfer(args.symbol, args.from_addr, args.to, args.amount))
+            return 0
+        if args.command == "sign-payload":
+            print(client.sign_payload(args.symbol, args.from_addr, args.to, args.amount))
+            return 0
+        if args.command == "transfer-signed":
+            print(
+                client.transfer_signed(
+                    args.symbol,
+                    args.from_addr,
+                    args.to,
+                    args.amount,
+                    args.pubkey,
+                    args.sig,
+                )
+            )
+            return 0
+        if args.command == "transfer-wallet":
+            print(client.transfer_wallet(args.wallet, args.symbol, args.to, args.amount))
             return 0
         if args.command == "burn":
             print(client.burn(args.symbol, args.from_addr, args.amount))

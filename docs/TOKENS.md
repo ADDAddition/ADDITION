@@ -74,6 +74,8 @@ python3 tools/addition_tokens.py getinfo
 python3 tools/addition_tokens.py create DEMO alice 1000000 1000
 python3 tools/addition_tokens.py mint DEMO alice bob 50
 python3 tools/addition_tokens.py transfer DEMO alice bob 10
+python3 tools/addition_tokens.py transfer-wallet trader DEMO bob 7
+python3 tools/addition_tokens.py sign-payload DEMO alice bob 10
 python3 tools/addition_tokens.py balance DEMO alice
 python3 tools/addition_tokens.py balance DEMO bob
 python3 tools/addition_tokens.py info DEMO
