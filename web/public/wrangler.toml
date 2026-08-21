@@ -3,8 +3,13 @@ account_id = "c4ceeebc81b5a07252d4d4244e50a916"
 main = "worker.js"
 compatibility_date = "2026-03-03"
 
-# Join tour curls https://rpc.additionblockchain.com/rpc?cmd=getinfo.
-# Without this route, proxied DNS hits the dead GCP origin and times out.
+# wrangler deploy replaces zone routes for this Worker. Keep every public host.
+[[routes]]
+pattern = "additionblockchain.com/*"
+zone_name = "additionblockchain.com"
+[[routes]]
+pattern = "www.additionblockchain.com/*"
+zone_name = "additionblockchain.com"
 [[routes]]
 pattern = "rpc.additionblockchain.com/*"
 zone_name = "additionblockchain.com"

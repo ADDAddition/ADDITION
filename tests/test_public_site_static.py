@@ -377,6 +377,8 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("run_worker_first", wrangler)
         self.assertIn('"/rpc*"', wrangler)
         self.assertIn("rpc.additionblockchain.com/*", wrangler)
+        self.assertIn("additionblockchain.com/*", wrangler)
+        self.assertIn("www.additionblockchain.com/*", wrangler)
         commands = read("docs/commands/index.html")
         whitepaper = read("whitepaper/index.html")
         self.assertIn("token_transfer_wallet", commands)
