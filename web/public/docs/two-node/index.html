@@ -64,16 +64,15 @@ printf &#x27;createwallet\n&#x27; | nc 127.0.0.1 38545</pre>
 <p><code>OPTIONS</code> → <code>204</code>, and <code>Cache-Control: no-store</code>. <code>curl /rpc?cmd=getinfo</code> is</p>
 <p>unchanged. CORS <code>*</code> is not a wallet-connect surface.</p>
 <h2>Point the website at a real public RPC</h2>
-<p><code>web/public/wrangler.toml</code> ships with:</p>
-<pre>PUBLIC_RPC_HTTP = &quot;&quot;</pre>
-<p>Leave it empty. The worker and static pages show <strong>RPC offline</strong> when the node is down.</p>
-<p>They do not invent blocks, peers, or hashrate.</p>
+<p>Do not put <code>PUBLIC_RPC_HTTP</code> in <code>web/public/wrangler.toml</code>. A committed empty</p>
+<p>value wipes a live Worker binding on every deploy.</p>
+<p>Missing <code>PUBLIC_RPC_HTTP</code> → <strong>RPC offline</strong>. The worker and static pages do not</p>
+<p>invent blocks, peers, or hashrate.</p>
 <p>When an operator has a <strong>real</strong> public-rpc HTTP URL (this machine, a VPS, or a</p>
-<p>tunnel the operator created), set the worker variable to that URL:</p>
-<pre>PUBLIC_RPC_HTTP = &quot;http://127.0.0.1:38545/rpc&quot;</pre>
-<p>or, for a durable hostname the operator controls:</p>
+<p>tunnel the operator created), set a Worker secret:</p>
 <pre>npx wrangler secret put PUBLIC_RPC_HTTP
 # paste the real http(s) URL ending in /rpc</pre>
+<p>Example value: <code>http://127.0.0.1:38545/rpc</code></p>
 <p>Do <strong>not</strong> commit trycloudflare or other ephemeral tunnel URLs.</p>
 <p>Local site proxy (<code>python3 web/serve.py</code>) talks to <code>127.0.0.1:38545</code> when the</p>
 <p>public port is up. If the daemon is down, pages show <strong>RPC offline</strong>.</p>

@@ -111,8 +111,8 @@ Public checks:
   curl -s 'http://127.0.0.1:38545/rpc?cmd=getinfo'
   printf 'mine\\n' | nc 127.0.0.1 38545   # error: command disabled on public RPC
 
-Website worker/site: leave PUBLIC_RPC_HTTP empty unless you have a real URL.
-When this node is reachable, set the worker var PUBLIC_RPC_HTTP to the HTTP
+Website worker/site: leave PUBLIC_RPC_HTTP unset unless you have a real URL.
+When this node is reachable, set the Worker secret PUBLIC_RPC_HTTP to the HTTP
 adapter you actually run, for example:
   PUBLIC_RPC_HTTP=http://127.0.0.1:38545/rpc
 Do not commit trycloudflare or other ephemeral tunnel URLs.

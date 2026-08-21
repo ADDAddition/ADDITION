@@ -92,28 +92,21 @@ unchanged. CORS `*` is not a wallet-connect surface.
 
 ## Point the website at a real public RPC
 
-`web/public/wrangler.toml` ships with:
+Do not put `PUBLIC_RPC_HTTP` in `web/public/wrangler.toml`. A committed empty
+value wipes a live Worker binding on every deploy.
 
-```toml
-PUBLIC_RPC_HTTP = ""
-```
-
-Leave it empty. The worker and static pages show **RPC offline** when the node is down.
-They do not invent blocks, peers, or hashrate.
+Missing `PUBLIC_RPC_HTTP` → **RPC offline**. The worker and static pages do not
+invent blocks, peers, or hashrate.
 
 When an operator has a **real** public-rpc HTTP URL (this machine, a VPS, or a
-tunnel the operator created), set the worker variable to that URL:
-
-```toml
-PUBLIC_RPC_HTTP = "http://127.0.0.1:38545/rpc"
-```
-
-or, for a durable hostname the operator controls:
+tunnel the operator created), set a Worker secret:
 
 ```bash
 npx wrangler secret put PUBLIC_RPC_HTTP
 # paste the real http(s) URL ending in /rpc
 ```
+
+Example value: `http://127.0.0.1:38545/rpc`
 
 Do **not** commit trycloudflare or other ephemeral tunnel URLs.
 

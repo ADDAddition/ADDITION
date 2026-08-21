@@ -20,8 +20,7 @@ binding = "ASSETS"
 # Let the worker see /rpc?cmd= even after a trailing-slash redirect to /rpc/.
 run_worker_first = ["/rpc*", "/api/rpc*", "/jsonrpc*", "/local-rpc*"]
 
-[vars]
-# Leave empty: down node → "RPC offline".
-# Operator: set this to the real public-rpc HTTP URL (example http://127.0.0.1:38545/rpc).
-# Do not commit trycloudflare or other ephemeral tunnel URLs.
-PUBLIC_RPC_HTTP = ""
+# Do not put PUBLIC_RPC_HTTP in [vars]. A committed empty value wipes the live
+# Worker binding on every CI deploy. Set it with:
+#   npx wrangler secret put PUBLIC_RPC_HTTP
+# Missing secret → worker returns "RPC offline". Do not commit tunnel URLs.
