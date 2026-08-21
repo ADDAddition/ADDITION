@@ -87,8 +87,8 @@ Write RPC stays `127.0.0.1`. Contact:
 [contact@additionblockchain.com](mailto:contact@additionblockchain.com).
 
 Do not commit trycloudflare or other ephemeral tunnel URLs. Point a website
-`PUBLIC_RPC_HTTP` at a durable HTTP URL you operate, or leave it empty so the
-site stays **RPC offline**.
+`PUBLIC_RPC_HTTP` Worker secret at a durable HTTP URL you operate, or leave it
+unset so the site stays **RPC offline**.
 
 ## Enable the unit
 

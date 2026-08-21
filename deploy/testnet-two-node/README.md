@@ -12,5 +12,5 @@ P2P does not resolve Docker DNS names.
 Write RPC: `127.0.0.1:8545` (A) and `127.0.0.1:8546` (B).
 Public read RPC: node A `0.0.0.0:38545`.
 
-Leave website `PUBLIC_RPC_HTTP` empty until you set a real HTTP URL. Do not
-commit trycloudflare URLs.
+Leave website `PUBLIC_RPC_HTTP` unset until you set a real HTTP URL as a
+Worker secret. Do not commit trycloudflare URLs.

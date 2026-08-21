@@ -65,7 +65,7 @@ export default {
           headers: { "content-type": "text/plain; charset=utf-8" },
         });
       }
-      const upstream = env.PUBLIC_RPC_HTTP;
+      const upstream = env.PUBLIC_RPC_URL || env.PUBLIC_RPC_HTTP;
       if (!upstream) {
         return rpcOffline();
       }
