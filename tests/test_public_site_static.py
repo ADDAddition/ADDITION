@@ -369,6 +369,8 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn('["/tokens/", "Tokens"]', nav)
         self.assertIn('["/privacy/", "Privacy"]', nav)
         self.assertIn('"/local": "/local/index.html"', worker)
+        self.assertIn("function rpcPath(url)", worker)
+        self.assertIn('path === "/jsonrpc"', worker)
         self.assertIn('"/tokens": "/tokens/index.html"', worker)
         self.assertIn('"/privacy": "/privacy/index.html"', worker)
         self.assertIn("/local/", docs)
