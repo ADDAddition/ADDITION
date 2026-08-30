@@ -119,11 +119,25 @@ printf 'mine\n' | nc 127.0.0.1 38546
 
 That only means this process loaded the mainnet genesis. It does not mean a public mainnet is live.
 
-## P2P (optional)
+## P2P (public mainnet seed)
 
-P2P is off unless `ADDITION_ENABLE_P2P_RPC=1`. HELLO carries `ADDITION_MAINNET_V1`, so a testnet peer is rejected.
+P2P listen is off unless `ADDITION_ENABLE_P2P_RPC=1`. HELLO carries `ADDITION_MAINNET_V1`, so a testnet peer is rejected.
 
-If you enable P2P, allow TCP **28546** only, and list your own IPv4 `ip:port` peers. Do not use the public testnet seed.
+Default bootstrap is `34.27.30.115:28546` (not the testnet seed `…:28545`). A fresh home node:
+
+```bash
+export ADDITION_PRIVACY_MASTER_KEY='replace-with-32-or-more-chars____'
+export ADDITION_ENABLE_P2P_RPC=1
+./build/additiond --mainnet --data-dir $HOME/addition-mainnet \
+  --local-rpc-port 8546 --p2p-port 28547 \
+  --bootstrap 34.27.30.115:28546
+# then: sync   (HTTP :38546 getblockraw and/or P2P HELLO+REQBLK)
+# then: mine on 127.0.0.1:8546 only
+```
+
+Seed operators set `ADDITION_ADVERTISED_P2P=34.27.30.115:28546` so public `getinfo` / `peers` list that IPv4 endpoint and never `self`. After a local `mine`, the node announces `BLK|` and `gossip_flush` pushes to peers. Public RPC still refuses `mine` / `createwallet` / `send`.
+
+Do not loosen `memory_hard` / `0x000000FFFFFFFFFF`. Do not auto-mine. Do not bind write RPC to `0.0.0.0`.
 
 ## Rollback
 

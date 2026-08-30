@@ -176,6 +176,11 @@ int main() {
                 return 1;
             }
         }
+        if (ncfg.bootstrap_peers.empty() ||
+            ncfg.bootstrap_peers[0] != addition::kOperatorPublicMainnetP2p) {
+            std::cerr << "test failed: --mainnet default bootstrap must be the mainnet seed\n";
+            return 1;
+        }
     }
 
     {
