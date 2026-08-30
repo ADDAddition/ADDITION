@@ -1,6 +1,7 @@
 #include "addition/decentralized_node.hpp"
 
 #include "addition/block.hpp"
+#include "addition/config.hpp"
 #include "addition/crypto.hpp"
 #include "addition/net_io.hpp"
 
@@ -336,6 +337,21 @@ bool parse_info_u64(const std::string& text, const char* key, std::uint64_t& out
     }
 }
 
+bool parse_info_token(const std::string& text, const char* key, std::string& out) {
+    const std::string needle = std::string(key) + "=";
+    const auto pos = text.find(needle);
+    if (pos == std::string::npos) {
+        return false;
+    }
+    std::size_t i = pos + needle.size();
+    while (i < text.size() && text[i] != ' ' && text[i] != '\t' && text[i] != '\r' && text[i] != '\n' &&
+           text[i] != ',') {
+        ++i;
+    }
+    out = text.substr(pos + needle.size(), i - (pos + needle.size()));
+    return !out.empty();
+}
+
 std::string url_encode_cmd(const std::string& cmd) {
     static const char* hexd = "0123456789ABCDEF";
     std::string out;
@@ -394,11 +410,19 @@ std::vector<std::string> public_rpc_endpoints(const std::string& p2p_peer) {
     if (!parse_endpoint(p2p_peer, ip, port)) {
         return out;
     }
-    // Home ISPs often blackhole 28545/38545. nginx :80 is the working path.
-    push_unique_endpoint(out, ip, configured_public_http_port());
-    push_unique_endpoint(out, ip, 38545);
+    // Prefer the canonical public-read port for this P2P port (28546→38546,
+    // 28545→38545). :80 serves the public testnet only — never use it for
+    // mainnet IBD (would ingest ADDITION_TESTNET_V1 into MAINNET_V1).
     if (port <= 55535) {
         push_unique_endpoint(out, ip, static_cast<std::uint16_t>(port + 10000U));
+    }
+    const bool mainnet_p2p = (port == 28546);
+    if (mainnet_p2p) {
+        push_unique_endpoint(out, ip, 38546);
+    } else {
+        push_unique_endpoint(out, ip, configured_public_http_port());
+        push_unique_endpoint(out, ip, 38545);
+        push_unique_endpoint(out, ip, 38546);
     }
     return out;
 }
@@ -1076,6 +1100,12 @@ bool DecentralizedNode::ingest_from_public_rpc(const std::string& p2p_peer, std:
             last = "public-rpc getinfo: " + info;
             continue;
         }
+        std::string remote_id;
+        if (!parse_info_token(info, "network_id", remote_id) || remote_id != active_network_id(chain_)) {
+            last = "public-rpc network_id mismatch at " + ep + " (want " + active_network_id(chain_) +
+                   ", got " + (remote_id.empty() ? std::string("<missing>") : remote_id) + ")";
+            continue;
+        }
         std::uint64_t remote_h = 0;
         if (!parse_info_u64(info, "height", remote_h)) {
             last = "public-rpc getinfo missing height at " + ep;
@@ -1157,6 +1187,11 @@ bool DecentralizedNode::sync_once(std::string& error) {
             wire_id = self_id_;
         }
         any_handshake = true;
+
+        {
+            std::string learn_err;
+            learn_peers_from(peer, wire_id, learn_err);
+        }
 
         {
             std::string relay_err;
@@ -1273,6 +1308,114 @@ bool DecentralizedNode::sync_once(std::string& error) {
     return true;
 }
 
+bool DecentralizedNode::announce_tip(std::string& error) {
+    error.clear();
+    if (chain_.height() == 0) {
+        return true;
+    }
+    const auto& tip = chain_.tip();
+    const auto bh = hash_block_header(tip.header);
+    seen_block_hashes_.insert(bh);
+    for (const auto& tx : tip.transactions) {
+        seen_txids_.insert(hash_transaction(tx));
+    }
+    outbound_.push_back(encode_block_announce(tip));
+    return true;
+}
+
+bool DecentralizedNode::is_push_gossip_message(const std::string& message) const {
+    return message.rfind("TX|", 0) == 0 || message.rfind("BLK|", 0) == 0 ||
+           message.rfind("IDROTATE|", 0) == 0 || message.rfind("IDVOTE|", 0) == 0;
+}
+
+bool DecentralizedNode::flush_outbound_gossip(std::size_t& sent, std::string& error) {
+    error.clear();
+    sent = 0;
+    const auto msgs = pull_outbound_messages();
+    if (msgs.empty()) {
+        return true;
+    }
+    std::vector<std::string> pushable;
+    pushable.reserve(msgs.size());
+    for (const auto& msg : msgs) {
+        if (is_push_gossip_message(msg)) {
+            pushable.push_back(msg);
+        }
+    }
+    if (pushable.empty()) {
+        return true;
+    }
+
+    bool any_ok = false;
+    std::string last;
+    for (const auto& peer : peers_.peers()) {
+        if (peers_.is_banned(peer)) {
+            continue;
+        }
+        std::string wire_id;
+        std::string hs_err;
+        if (!handshake_with_peer(peer, wire_id, hs_err)) {
+            last = hs_err.empty() ? ("gossip handshake failed to " + peer) : hs_err;
+            continue;
+        }
+        if (wire_id.empty()) {
+            wire_id = self_id_;
+        }
+        for (const auto& msg : pushable) {
+            std::string resp;
+            if (!send_p2p_request(peer, wire_id + " " + msg, resp)) {
+                last = "gossip transport failed to " + peer;
+                peers_.mark_peer_bad(peer);
+                break;
+            }
+            if (resp.rfind("error:", 0) == 0) {
+                last = "gossip rejected by " + peer + ": " + resp;
+                // Duplicate / already-seen is fine; keep peer.
+                if (resp.find("duplicate") == std::string::npos &&
+                    resp.find("handshake") == std::string::npos) {
+                    peers_.mark_peer_good(peer);
+                }
+                continue;
+            }
+            ++sent;
+            any_ok = true;
+            peers_.mark_peer_good(peer);
+        }
+    }
+
+    if (!any_ok && !peers_.peers().empty() && sent == 0) {
+        error = last.empty() ? "gossip flush: no peer accepted push" : last;
+    }
+    return true;
+}
+
+bool DecentralizedNode::learn_peers_from(const std::string& peer, const std::string& wire_id, std::string& error) {
+    error.clear();
+    const std::string id = wire_id.empty() ? self_id_ : wire_id;
+    std::string resp;
+    if (!send_p2p_request(peer, id + " REQADDR|", resp)) {
+        error = "REQADDR transport failed";
+        return false;
+    }
+    if (resp.rfind("ok:ADDR|", 0) != 0) {
+        // Older peers may not speak REQADDR; not fatal for sync.
+        return true;
+    }
+    const auto body = resp.substr(8);
+    std::istringstream iss(body);
+    std::string item;
+    while (std::getline(iss, item, ',')) {
+        if (item.empty()) {
+            continue;
+        }
+        if (!is_external_advertised_peer(item)) {
+            continue;
+        }
+        peers_.add_peer(item);
+    }
+    return true;
+}
+
 std::vector<std::string> DecentralizedNode::pull_outbound_messages() {
     auto out = outbound_;
     outbound_.clear();
@@ -1334,6 +1477,7 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         (message.rfind("REQBLK|", 0) == 0) ||
         (message.rfind("REQINV|", 0) == 0) ||
         (message.rfind("BLKDATA|", 0) == 0) ||
+        (message.rfind("REQADDR|", 0) == 0) ||
         (message.rfind("IDROTATE|", 0) == 0) ||
         (message.rfind("IDVOTE|", 0) == 0);
     if (!allow_peer_message(peer, expensive, error)) {
@@ -1579,6 +1723,26 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
             out << h << ':' << hash;
         }
 
+        reply = out.str();
+        peers_.mark_peer_good(peer);
+        return true;
+    }
+
+    if (message.rfind("REQADDR|", 0) == 0) {
+        // IPv4 ip:port only. Never advertise self / node-id labels.
+        std::ostringstream out;
+        out << "ADDR|";
+        bool first = true;
+        for (const auto& p : peers_.peers()) {
+            if (!is_ipv4_endpoint(p) || is_self_peer_label(p)) {
+                continue;
+            }
+            if (!first) {
+                out << ',';
+            }
+            first = false;
+            out << p;
+        }
         reply = out.str();
         peers_.mark_peer_good(peer);
         return true;

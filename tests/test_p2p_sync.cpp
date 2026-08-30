@@ -740,7 +740,8 @@ int test_public_rpc_ingest() {
             }
             std::string resp = "error: command disabled on public RPC";
             if (cmd.rfind("getinfo", 0) == 0) {
-                resp = "network=testnet height=" + std::to_string(node_a.chain.height());
+                resp = "network=testnet network_id=ADDITION_TESTNET_V1 height=" +
+                       std::to_string(node_a.chain.height());
             } else if (cmd.rfind("getblockraw ", 0) == 0) {
                 try {
                     const auto h = std::stoull(cmd.substr(12));
@@ -889,7 +890,8 @@ int test_http_port80_ingest() {
             }
             std::string body = "error: command disabled on public RPC";
             if (cmd.rfind("getinfo", 0) == 0) {
-                body = "network=testnet height=" + std::to_string(node_a.chain.height());
+                body = "network=testnet network_id=ADDITION_TESTNET_V1 height=" +
+                       std::to_string(node_a.chain.height());
             } else if (cmd.rfind("getblockraw ", 0) == 0) {
                 try {
                     const auto h = std::stoull(cmd.substr(12));
@@ -938,6 +940,320 @@ int test_http_port80_ingest() {
     return 0;
 }
 
+addition::ChainConfig mainnet_sync_test_config() {
+    // Protocol/IBD coverage for ADDITION_MAINNET_V1. Easy target is test-only so
+    // mining finishes quickly; production knobs stay 0x000000FFFFFFFFFF.
+    addition::ChainConfig cfg = addition::mainnet_chain_config();
+    cfg.initial_difficulty_target = addition::kTestnetEasyDifficultyTarget;
+    cfg.min_difficulty_target = addition::kTestnetEasyDifficultyTarget;
+    cfg.max_difficulty_target = addition::kTestnetEasyDifficultyTarget;
+    return cfg;
+}
+
+int test_mainnet_two_node_socket_sync() {
+    std::cerr << "test_p2p_sync: mainnet two-node socket sync\n";
+    NodeKit node_a(mainnet_sync_test_config());
+    NodeKit node_b(mainnet_sync_test_config());
+
+    if (node_a.chain.config().network_id != addition::kMainnetNetworkId ||
+        node_b.chain.config().network_id != addition::kMainnetNetworkId) {
+        return fail("mainnet sync fixture network_id");
+    }
+    if (addition::hash_block_header(node_a.chain.genesis_block().header) !=
+        addition::hash_block_header(node_b.chain.genesis_block().header)) {
+        return fail("mainnet genesis hash mismatch");
+    }
+
+    std::string err;
+    for (int i = 0; i < 2; ++i) {
+        std::string mined;
+        if (!node_a.miner.mine_next_block("miner1", 8, 2, mined, err)) {
+            return fail("mainnet mine A: " + err);
+        }
+    }
+    if (node_a.chain.height() < 2 || node_b.chain.height() != 0) {
+        return fail("mainnet heights before sync");
+    }
+
+    std::uint16_t port = 0;
+    std::unique_ptr<addition::RpcNetworkServer> p2p_a;
+    for (std::uint16_t candidate : {std::uint16_t{29747}, std::uint16_t{29748}, std::uint16_t{29749}}) {
+        auto server = std::make_unique<addition::RpcNetworkServer>(
+            "127.0.0.1", candidate, [&](const std::string& line) { return node_a.node.handle_p2p_line(line); });
+        std::string start_err;
+        if (!server->start(start_err)) {
+            continue;
+        }
+        if (wait_port("127.0.0.1", candidate, 4000)) {
+            port = candidate;
+            p2p_a = std::move(server);
+            break;
+        }
+        server->stop();
+    }
+    if (!p2p_a) {
+        return fail("mainnet p2p port did not open");
+    }
+
+    if (!node_b.peers.add_peer("127.0.0.1:" + std::to_string(port))) {
+        p2p_a->stop();
+        return fail("mainnet addpeer");
+    }
+    if (!node_b.node.sync_once(err)) {
+        p2p_a->stop();
+        return fail("mainnet sync_once: " + err);
+    }
+    p2p_a->stop();
+
+    if (node_b.chain.height() != node_a.chain.height()) {
+        return fail("mainnet B height " + std::to_string(node_b.chain.height()) + " != A " +
+                    std::to_string(node_a.chain.height()));
+    }
+    if (addition::hash_block_header(node_b.chain.tip().header) !=
+        addition::hash_block_header(node_a.chain.tip().header)) {
+        return fail("mainnet tip hash mismatch after sync");
+    }
+    return 0;
+}
+
+int test_mainnet_http_ingest_skips_testnet() {
+    std::cerr << "test_p2p_sync: mainnet HTTP ingest prefers :38546 and skips testnet\n";
+    NodeKit node_a(mainnet_sync_test_config());
+    NodeKit node_b(mainnet_sync_test_config());
+    std::string err;
+    for (int i = 0; i < 2; ++i) {
+        std::string mined;
+        if (!node_a.miner.mine_next_block("miner1", 8, 2, mined, err)) {
+            return fail("mainnet http mine: " + err);
+        }
+    }
+
+    int p2p_fd = ::socket(AF_INET, SOCK_STREAM, 0);
+    int pub_fd = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (p2p_fd < 0 || pub_fd < 0) {
+        if (p2p_fd >= 0) {
+            close(p2p_fd);
+        }
+        if (pub_fd >= 0) {
+            close(pub_fd);
+        }
+        return fail("mainnet http sockets");
+    }
+    std::uint16_t p2p_port = 0;
+    const std::uint16_t p2p_candidates[] = {29847, 29848, 29849};
+    if (bind_listen(p2p_fd, p2p_port, p2p_candidates, 3) != 0) {
+        close(p2p_fd);
+        close(pub_fd);
+        return fail("mainnet http p2p bind");
+    }
+    // Mimic seed layout: public RPC = p2p + 10000 (28546→38546 pattern).
+    const std::uint16_t pub_port = static_cast<std::uint16_t>(p2p_port + 10000);
+    sockaddr_in pub_addr{};
+    pub_addr.sin_family = AF_INET;
+    pub_addr.sin_port = htons(pub_port);
+    inet_pton(AF_INET, "127.0.0.1", &pub_addr.sin_addr);
+    int opt = 1;
+    setsockopt(pub_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    if (::bind(pub_fd, reinterpret_cast<sockaddr*>(&pub_addr), sizeof(pub_addr)) != 0 ||
+        ::listen(pub_fd, 16) != 0) {
+        close(p2p_fd);
+        close(pub_fd);
+        return fail("mainnet http pub bind");
+    }
+
+    std::atomic<bool> running{true};
+    std::thread p2p_worker([&]() {
+        while (running.load()) {
+            sockaddr_in client_addr{};
+            socklen_t client_len = sizeof(client_addr);
+            const int client = ::accept(p2p_fd, reinterpret_cast<sockaddr*>(&client_addr), &client_len);
+            if (client >= 0) {
+                close(client);
+            }
+        }
+    });
+    std::thread pub_worker([&]() {
+        while (running.load()) {
+            sockaddr_in client_addr{};
+            socklen_t client_len = sizeof(client_addr);
+            const int client = ::accept(pub_fd, reinterpret_cast<sockaddr*>(&client_addr), &client_len);
+            if (client < 0) {
+                continue;
+            }
+            std::string req;
+            char buffer[4096];
+            while (req.find('\n') == std::string::npos && req.find("\r\n\r\n") == std::string::npos &&
+                   req.size() < 65536) {
+                const int n = static_cast<int>(::recv(client, buffer, sizeof(buffer), 0));
+                if (n <= 0) {
+                    break;
+                }
+                req.append(buffer, buffer + n);
+            }
+            while (!req.empty() && (req.back() == '\n' || req.back() == '\r')) {
+                req.pop_back();
+            }
+            std::string cmd = req;
+            if (cmd.rfind("GET ", 0) == 0) {
+                const auto q = cmd.find("cmd=");
+                if (q != std::string::npos) {
+                    auto rest = cmd.substr(q + 4);
+                    const auto sp = rest.find_first_of(" \r\n&");
+                    if (sp != std::string::npos) {
+                        rest.resize(sp);
+                    }
+                    const auto pct = rest.find("%20");
+                    if (pct != std::string::npos) {
+                        rest.replace(pct, 3, " ");
+                    }
+                    cmd = rest;
+                }
+            }
+            std::string resp = "error: command disabled on public RPC";
+            if (cmd.rfind("getinfo", 0) == 0) {
+                resp = "network=mainnet network_id=ADDITION_MAINNET_V1 height=" +
+                       std::to_string(node_a.chain.height());
+            } else if (cmd.rfind("getblockraw ", 0) == 0) {
+                try {
+                    const auto h = std::stoull(cmd.substr(12));
+                    std::string payload;
+                    std::string perr;
+                    if (node_a.node.get_block_payload(h, payload, perr)) {
+                        resp = "ok:BLKDATA|" + payload;
+                    } else {
+                        resp = "error: " + perr;
+                    }
+                } catch (const std::exception&) {
+                    resp = "error: invalid block height";
+                }
+            }
+            if (req.rfind("GET ", 0) == 0) {
+                resp = "HTTP/1.0 200 OK\r\nContent-Length: " + std::to_string(resp.size()) +
+                       "\r\nConnection: close\r\n\r\n" + resp;
+            } else if (resp.empty() || resp.back() != '\n') {
+                resp.push_back('\n');
+            }
+            ::send(client, resp.data(), resp.size(), 0);
+            close(client);
+        }
+    });
+
+    if (!node_b.peers.add_peer("127.0.0.1:" + std::to_string(p2p_port))) {
+        running = false;
+        poke_port(p2p_port);
+        poke_port(pub_port);
+        close(p2p_fd);
+        close(pub_fd);
+        p2p_worker.join();
+        pub_worker.join();
+        return fail("mainnet http addpeer");
+    }
+    if (!node_b.node.sync_once(err)) {
+        running = false;
+        poke_port(p2p_port);
+        poke_port(pub_port);
+        close(p2p_fd);
+        close(pub_fd);
+        p2p_worker.join();
+        pub_worker.join();
+        return fail("mainnet http sync_once: " + err);
+    }
+    running = false;
+    poke_port(p2p_port);
+    poke_port(pub_port);
+    close(p2p_fd);
+    close(pub_fd);
+    p2p_worker.join();
+    pub_worker.join();
+
+    if (node_b.chain.height() != node_a.chain.height() || node_b.chain.height() == 0) {
+        return fail("mainnet http height " + std::to_string(node_b.chain.height()) +
+                    " != " + std::to_string(node_a.chain.height()));
+    }
+    return 0;
+}
+
+int test_mainnet_block_gossip_push() {
+    std::cerr << "test_p2p_sync: mainnet BLK gossip push after announce_tip\n";
+    NodeKit node_a(mainnet_sync_test_config());
+    NodeKit node_b(mainnet_sync_test_config());
+    std::string err;
+    std::string mined;
+    if (!node_a.miner.mine_next_block("miner1", 8, 2, mined, err)) {
+        return fail("gossip mine: " + err);
+    }
+    if (!node_a.node.announce_tip(err)) {
+        return fail("announce_tip: " + err);
+    }
+
+    std::uint16_t port = 0;
+    std::unique_ptr<addition::RpcNetworkServer> p2p_b;
+    for (std::uint16_t candidate : {std::uint16_t{29947}, std::uint16_t{29948}, std::uint16_t{29949}}) {
+        auto server = std::make_unique<addition::RpcNetworkServer>(
+            "127.0.0.1", candidate, [&](const std::string& line) { return node_b.node.handle_p2p_line(line); });
+        std::string start_err;
+        if (!server->start(start_err)) {
+            continue;
+        }
+        if (wait_port("127.0.0.1", candidate, 4000)) {
+            port = candidate;
+            p2p_b = std::move(server);
+            break;
+        }
+        server->stop();
+    }
+    if (!p2p_b) {
+        return fail("gossip p2p B did not open");
+    }
+    // A must know B before flush; B learns A via inbound HELLO peer id (not needed for height).
+    if (!node_a.peers.add_peer("127.0.0.1:" + std::to_string(port))) {
+        p2p_b->stop();
+        return fail("gossip addpeer");
+    }
+    // B also lists A so handshake peer bookkeeping is mutual enough for REQADDR.
+    node_b.peers.add_peer("127.0.0.1:" + std::to_string(port));
+
+    std::size_t sent = 0;
+    if (!node_a.node.flush_outbound_gossip(sent, err)) {
+        p2p_b->stop();
+        return fail("flush_outbound_gossip: " + err);
+    }
+    p2p_b->stop();
+
+    if (sent == 0) {
+        return fail("expected gossip_sent > 0");
+    }
+    if (node_b.chain.height() != node_a.chain.height()) {
+        return fail("gossip B height " + std::to_string(node_b.chain.height()) +
+                    " != A " + std::to_string(node_a.chain.height()));
+    }
+    return 0;
+}
+
+int test_mainnet_hello_rejects_testnet() {
+    std::cerr << "test_p2p_sync: mainnet HELLO rejects testnet network_id\n";
+    NodeKit mainnet(mainnet_sync_test_config());
+    NodeKit testnet(addition::testnet_chain_config());
+
+    const auto ts = now_seconds();
+    const std::string nonce = "xnet";
+    const std::string hello_body = std::string("2|") + addition::kTestnetNetworkId + "|" + std::to_string(ts) +
+                                   "|" + nonce + "|" + testnet.keys.public_key;
+    const auto sig = addition::sign_message_hybrid(testnet.keys.private_key, hello_body);
+    const std::string hello = "HELLO|2|" + std::string(addition::kTestnetNetworkId) + "|" +
+                              std::to_string(ts) + "|" + nonce + "|" + testnet.keys.public_key + "|" + sig;
+
+    std::string reply;
+    std::string err;
+    if (mainnet.node.handle_inbound_message("n-testnet", hello, reply, err)) {
+        return fail("mainnet accepted testnet HELLO: " + reply);
+    }
+    if (err.find("handshake") == std::string::npos && err.find("mismatch") == std::string::npos) {
+        return fail("expected handshake mismatch, got: " + err);
+    }
+    return 0;
+}
+
 } // namespace
 
 int test_sync_requires_peer() {
@@ -979,6 +1295,18 @@ int main() {
         return rc;
     }
     if (int rc = test_http_port80_ingest()) {
+        return rc;
+    }
+    if (int rc = test_mainnet_two_node_socket_sync()) {
+        return rc;
+    }
+    if (int rc = test_mainnet_http_ingest_skips_testnet()) {
+        return rc;
+    }
+    if (int rc = test_mainnet_block_gossip_push()) {
+        return rc;
+    }
+    if (int rc = test_mainnet_hello_rejects_testnet()) {
         return rc;
     }
     std::cout << "test_p2p_sync ok\n";

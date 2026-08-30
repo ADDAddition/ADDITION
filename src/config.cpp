@@ -569,7 +569,7 @@ ChainConfig mainnet_chain_config() {
     cfg.pow_profile = "mainnet";
     cfg.confirmations_policy = 2;
     cfg.economic_security = "none";
-    cfg.bootstrap_peers = {"127.0.0.1:28546"};
+    cfg.bootstrap_peers = {kOperatorPublicMainnetP2p};
     return cfg;
 }
 
@@ -1312,7 +1312,7 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
     if (cfg.bootstrap_peers.empty()) {
         switch (mode) {
         case NetworkMode::Mainnet:
-            cfg.bootstrap_peers = {"127.0.0.1:28546"};
+            cfg.bootstrap_peers = {kOperatorPublicMainnetP2p};
             break;
         case NetworkMode::Regtest:
         case NetworkMode::Testnet:
@@ -1360,8 +1360,9 @@ std::string daemon_help_text() {
            "  getinfo reports confirmations_policy and economic_security=none.\n"
            "\n"
            "--mainnet (same as --network mainnet) starts ADDITION_MAINNET_V1 from genesis-mainnet.json.\n"
-           "  It is a separate chain, not a live public network, and must not use the testnet seed.\n"
-           "  Difficulty stays 0x000000FFFFFFFFFF. Default write RPC is 127.0.0.1:8546.\n"
+           "  Default bootstrap is the public mainnet seed 34.27.30.115:28546 (not the testnet seed).\n"
+           "  Override with --bootstrap IP:PORT. Write RPC stays 127.0.0.1:8546. Auto-mine refused.\n"
+           "  PoW memory_hard at 0x000000FFFFFFFFFF — do not loosen. Not the website product.\n"
            "\n"
            "Local trusted write RPC: 127.0.0.1 (never bound to 0.0.0.0; optional ADDITION_RPC_TOKEN)\n"
            "  Override port with --local-rpc-port or ADDITION_LOCAL_RPC_PORT (second node: 8546).\n"
@@ -1376,10 +1377,10 @@ std::string daemon_help_text() {
            "LAN RPC stays token-gated (ADDITION_ENABLE_LAN_RPC=1 + ADDITION_LAN_RPC_TOKEN).\n"
            "P2P stays off unless ADDITION_ENABLE_P2P_RPC=1. --p2p-port / ADDITION_P2P_PORT (second node: 28546).\n"
            "--bootstrap IP:PORT replaces bootstrap_peers (IPv4 only; hostnames are not resolved).\n"
-           "  Operator public P2P (current): 34.27.30.115:28545 — one IPv4 peer, not a peer list.\n"
-           "  Seed operators set ADDITION_ADVERTISED_P2P=34.27.30.115:28545 so public getinfo/peers\n"
-           "  do not list self. Public TCP 28545 can timeout or be filtered; HTTP :80 sync is the\n"
-           "  reliable join path. Write RPC stays 127.0.0.1.\n"
+           "  Testnet public P2P (current): 34.27.30.115:28545 — HTTP :80 sync is the reliable join path.\n"
+           "  Mainnet public P2P (current): 34.27.30.115:28546 — HTTP :38546 and/or P2P HELLO+REQBLK.\n"
+           "  Seed operators set ADDITION_ADVERTISED_P2P to the matching seed so public getinfo/peers\n"
+           "  do not list self. Write RPC stays 127.0.0.1.\n"
            "Auto-mine (testnet only, off by default, never on public RPC):\n"
            "  --auto-mine or ADDITION_AUTO_MINE=1\n"
            "  --auto-mine-interval SEC or ADDITION_AUTO_MINE_INTERVAL (default 60)\n"

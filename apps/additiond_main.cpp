@@ -662,6 +662,9 @@ int main(int argc, char** argv) {
         if (now - last_sync >= std::chrono::seconds(5)) {
             std::string sync_err;
             node.sync_once(sync_err);
+            std::size_t sent = 0;
+            std::string gossip_err;
+            node.flush_outbound_gossip(sent, gossip_err);
             last_sync = now;
         }
 
@@ -690,8 +693,14 @@ int main(int argc, char** argv) {
             if (!miner.mine_next_block(reward_address, 500, threads, mined_hash, error)) {
                 std::cout << "error: " << error << '\n';
             } else {
+                std::string announce_err;
+                node.announce_tip(announce_err);
+                std::size_t sent = 0;
+                std::string gossip_err;
+                node.flush_outbound_gossip(sent, gossip_err);
                 std::cout << "mined block " << chain.height() << " reward=" << reward_address
-                          << " threads=" << threads << " hash=" << mined_hash << '\n';
+                          << " threads=" << threads << " hash=" << mined_hash
+                          << " gossip_sent=" << sent << '\n';
             }
             continue;
         }
@@ -709,6 +718,9 @@ int main(int argc, char** argv) {
             if (now - last_sync >= std::chrono::seconds(5)) {
                 std::string sync_err;
                 node.sync_once(sync_err);
+                std::size_t sent = 0;
+                std::string gossip_err;
+                node.flush_outbound_gossip(sent, gossip_err);
                 last_sync = now;
             }
         }

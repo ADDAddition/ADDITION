@@ -1,6 +1,6 @@
 # ADDITION mainnet chain configuration.
 # This starts ADDITION_MAINNET_V1 from genesis-mainnet.json.
-# It is not a live public network. Do not point additionblockchain.com at it.
+# Do not point additionblockchain.com at it (site stays on testnet).
 # Do not bootstrap the public testnet seed 34.27.30.115:28545.
 
 network = "mainnet"
@@ -9,10 +9,11 @@ network_id = "ADDITION_MAINNET_V1"
 data_dir = "data-mainnet"
 genesis_file = "genesis-mainnet.json"
 
-# Local-only default. Replace with your own mainnet peers if you operate some.
-# P2P stays off unless ADDITION_ENABLE_P2P_RPC=1.
+# Public mainnet P2P seed (IPv4 only). Home miners: --bootstrap 34.27.30.115:28546.
+# P2P listen stays off unless ADDITION_ENABLE_P2P_RPC=1.
+# Seed operators also set ADDITION_ADVERTISED_P2P=34.27.30.115:28546 (never list self).
 bootstrap_peers = [
-  "127.0.0.1:28546"
+  "34.27.30.115:28546"
 ]
 
 # Public read RPC is off unless --public-rpc or ADDITION_ENABLE_PUBLIC_RPC=1.
@@ -25,6 +26,7 @@ auto_mine_reward = "miner1"
 
 [ports]
 # Write RPC is always 127.0.0.1. Default 8546 so a local testnet on 8545 can coexist.
+# Never bind write RPC to 0.0.0.0.
 local_rpc = 8546
 lan_rpc = 18546
 p2p = 28546
