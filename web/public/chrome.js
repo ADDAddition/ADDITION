@@ -23,7 +23,8 @@
       const label = NAV[i][1];
       const dest = hrefBase.replace(/\/+$/, "") || "/";
       let active = path === dest || (dest !== "/" && path.indexOf(dest) === 0);
-      if (dest === "/" && (path === "/" || path === "/explorer")) {
+      if (dest === "/" && (path === "/" || path === "/explorer"
+        || path === "/block" || path === "/tx" || path === "/address")) {
         active = true;
       }
       const href = hrefBase === "/" ? ("/" + q) : (hrefBase + q);
