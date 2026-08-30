@@ -10,13 +10,6 @@ Run `additiond --mainnet` (same as `--network mainnet`) like `bitcoind`: anyone 
 |-------------|------|
 | `34.27.30.115:28546` | P2P bootstrap |
 | `34.27.30.115:38546` | HTTP public read (`/rpc?cmd=getinfo`) |
-<<<<<<< HEAD
-=======
-
-That is a separate chain from the research testnet (`28545` / `38545` / HTTP `:80`). Not a label flip.
-
-The public website and explorer stay on testnet until the operator switches them. This runbook does not flip the explorer.
->>>>>>> 5eb651a (Tone: public ADDITION mainnet is the joinable chain, not a footnote.)
 
 That is a separate chain from the research testnet (`28545` / `38545` / HTTP `:80`). Not a label flip.
 
@@ -165,13 +158,9 @@ printf 'mine\n' | nc 127.0.0.1 38546
 
 P2P listen is off unless `ADDITION_ENABLE_P2P_RPC=1`. HELLO carries `ADDITION_MAINNET_V1`, so a testnet peer is rejected.
 
-<<<<<<< HEAD
 Public bootstrap is **34.27.30.115:28546**. Do not use the research testnet seed `34.27.30.115:28545`. If TCP 28546 is filtered on your path, use HTTP `:38546` for `getinfo` / ingest checks (`getblockraw`), then retry P2P (`HELLO`+`REQBLK`).
 
 Do not loosen `memory_hard` / `0x000000FFFFFFFFFF`. Do not auto-mine. Do not bind write RPC to `0.0.0.0`.
-=======
-Public bootstrap is **34.27.30.115:28546**. Do not use the research testnet seed `34.27.30.115:28545`. If TCP 28546 is filtered on your path, use HTTP `:38546` for `getinfo` / ingest checks, then retry P2P.
->>>>>>> 5eb651a (Tone: public ADDITION mainnet is the joinable chain, not a footnote.)
 
 ## Rollback
 
