@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION transaction</title>
+  <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body>
+  <header id="site-header"></header>
+  <main>
+    <form id="search-form" class="search-form" action="/tx/" method="get">
+      <input id="q" name="q" type="search" autocomplete="off" placeholder="tx hash">
+      <button type="submit">Load</button>
+    </form>
+    <p id="rpc-state"></p>
+    <section>
+      <h2>tx_status</h2>
+      <p class="note">Public-read command. Receipt detail beyond these fields is not on the public allowlist.</p>
+      <div id="tx-fields"></div>
+      <pre id="tx-raw" class="raw"></pre>
+    </section>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/common.js"></script>
+  <script src="/chrome.js"></script>
+  <script>
+    (function () {
+      const S = window.AdditionSite;
+      function el(id) { return document.getElementById(id); }
+      async function load(id) {
+        const state = el("rpc-state");
+        const fields = el("tx-fields");
+        const raw = el("tx-raw");
+        if (!id) {
+          state.textContent = "";
+          S.renderFields(fields, {}, "Enter a tx hash.");
+          raw.textContent = "";
+          return;
+        }
+        const result = await S.explorerCommand("tx_status " + id);
+        if (result.offline) {
+          state.className = "offline";
+          state.textContent = "RPC offline";
+          S.renderFields(fields, {}, "RPC offline");
+          raw.textContent = "RPC offline";
+          return;
+        }
+        if (!result.ok || !result.raw || result.raw.indexOf("error:") === 0) {
+          state.className = "empty";
+          state.textContent = "Not found";
+          S.renderFields(fields, {}, "Not found");
+          raw.textContent = result.raw || "Not found";
+          return;
+        }
+        state.textContent = "";
+        S.renderFields(fields, result.fields, "Not found");
+        raw.textContent = result.raw;
+      }
+      const params = new URLSearchParams(window.location.search);
+      const q = (params.get("q") || "").trim();
+      const input = el("q");
+      if (input && q) { input.value = q; }
+      el("search-form").addEventListener("submit", function (event) {
+        event.preventDefault();
+        const value = input.value.trim();
+        const next = new URL(window.location.href);
+        if (value) { next.searchParams.set("q", value); }
+        else { next.searchParams.delete("q"); }
+        window.history.replaceState({}, "", next.pathname + next.search);
+        load(value);
+      });
+      load(q);
+    }());
+  </script>
+</body>
+</html>

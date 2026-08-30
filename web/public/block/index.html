@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION block</title>
+  <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body>
+  <header id="site-header"></header>
+  <main>
+    <form id="search-form" class="search-form" action="/block/" method="get">
+      <input id="q" name="q" type="search" autocomplete="off" placeholder="block height or hash">
+      <button type="submit">Load</button>
+    </form>
+    <p id="rpc-state"></p>
+    <section>
+      <h2>Block</h2>
+      <div id="block-fields"></div>
+      <pre id="block-raw" class="raw"></pre>
+    </section>
+    <section>
+      <h2>Transactions</h2>
+      <p id="tx-state" class="note"></p>
+      <table class="blocks-table">
+        <thead>
+          <tr>
+            <th>index</th>
+            <th>tx_hash</th>
+          </tr>
+        </thead>
+        <tbody id="tx-rows"></tbody>
+      </table>
+    </section>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/common.js"></script>
+  <script src="/chrome.js"></script>
+  <script>
+    (function () {
+      const S = window.AdditionSite;
+      function el(id) { return document.getElementById(id); }
+      function clear(tbody) {
+        while (tbody.firstChild) { tbody.removeChild(tbody.firstChild); }
+      }
+      async function load(id) {
+        const state = el("rpc-state");
+        const fields = el("block-fields");
+        const raw = el("block-raw");
+        const txState = el("tx-state");
+        const rows = el("tx-rows");
+        clear(rows);
+        if (!id) {
+          state.textContent = "";
+          S.renderFields(fields, {}, "Enter a height or block hash.");
+          raw.textContent = "";
+          txState.textContent = "";
+          return;
+        }
+        const result = await S.explorerCommand("getblock " + id);
+        if (result.offline) {
+          state.className = "offline";
+          state.textContent = "RPC offline";
+          S.renderFields(fields, {}, "RPC offline");
+          raw.textContent = "RPC offline";
+          txState.textContent = "RPC offline";
+          return;
+        }
+        if (!result.ok || !result.raw || result.raw.indexOf("error:") === 0) {
+          state.className = "empty";
+          state.textContent = "Not found";
+          S.renderFields(fields, {}, "Not found");
+          raw.textContent = result.raw || "Not found";
+          txState.textContent = "";
+          return;
+        }
+        state.textContent = "";
+        S.renderFields(fields, result.fields, "Not found");
+        raw.textContent = result.raw;
+        const txs = S.txRowsFromBlock(S.blockRowFromFields(result.fields));
+        if (!txs.length) {
+          txState.textContent = "No tx_hashes in this getblock reply.";
+          return;
+        }
+        txState.textContent = "";
+        for (let i = 0; i < txs.length; i += 1) {
+          const tr = document.createElement("tr");
+          const tdIndex = document.createElement("td");
+          tdIndex.textContent = txs[i].index;
+          const tdHash = document.createElement("td");
+          tdHash.className = "hash-cell";
+          const a = document.createElement("a");
+          a.href = S.txHref(txs[i].tx_hash);
+          a.textContent = txs[i].tx_hash;
+          tdHash.appendChild(a);
+          tr.appendChild(tdIndex);
+          tr.appendChild(tdHash);
+          rows.appendChild(tr);
+        }
+      }
+      const params = new URLSearchParams(window.location.search);
+      const q = (params.get("q") || "").trim();
+      const input = el("q");
+      if (input && q) { input.value = q; }
+      el("search-form").addEventListener("submit", function (event) {
+        event.preventDefault();
+        const value = input.value.trim();
+        const next = new URL(window.location.href);
+        if (value) { next.searchParams.set("q", value); }
+        else { next.searchParams.delete("q"); }
+        window.history.replaceState({}, "", next.pathname + next.search);
+        load(value);
+      });
+      load(q);
+    }());
+  </script>
+</body>
+</html>

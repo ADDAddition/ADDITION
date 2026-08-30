@@ -1,4 +1,27 @@
 (function (global) {
+  const PUBLIC_READ_COMMANDS = {
+    getinfo: { args: "", usage: "getinfo" },
+    monetary_info: { args: "", usage: "monetary_info" },
+    crypto_selftest: { args: "", usage: "crypto_selftest" },
+    tx_status: { args: "<tx_hash>", usage: "tx_status <tx_hash>" },
+    peers: { args: "", usage: "peers" },
+    getblock: { args: "<height_or_hash>", usage: "getblock <height_or_hash>" },
+    getblockhash: { args: "<height>", usage: "getblockhash <height>" },
+    getblockraw: { args: "<height>", usage: "getblockraw <height>" }
+  };
+
+  const STRIP_KEYS = [
+    "network",
+    "height",
+    "peers",
+    "pq_mode",
+    "pow_algorithm",
+    "max_supply",
+    "emitted",
+    "remaining",
+    "next_reward"
+  ];
+
   function rpcUrlFromPage() {
     const params = new URLSearchParams(window.location.search);
     const fromQuery = params.get("rpc");
@@ -9,6 +32,23 @@
       return String(window.ADDITION_RPC_HTTP).replace(/\/$/, "");
     }
     return "/api/rpc";
+  }
+
+  function rpcQuerySuffix() {
+    const params = new URLSearchParams(window.location.search);
+    const rpc = params.get("rpc");
+    if (!rpc) {
+      return "";
+    }
+    return "rpc=" + encodeURIComponent(rpc);
+  }
+
+  function withRpc(href) {
+    const suffix = rpcQuerySuffix();
+    if (!suffix) {
+      return href;
+    }
+    return href.indexOf("?") === -1 ? href + "?" + suffix : href + "&" + suffix;
   }
 
   function parseFields(line) {
@@ -86,7 +126,36 @@
       const dt = document.createElement("dt");
       dt.textContent = keys[i];
       const dd = document.createElement("dd");
-      dd.textContent = fields[keys[i]];
+      const value = fields[keys[i]];
+      if (keys[i] === "tx_hashes" && value) {
+        const hashes = String(value).split(",").filter(Boolean);
+        for (let j = 0; j < hashes.length; j += 1) {
+          if (j > 0) {
+            dd.appendChild(document.createTextNode(", "));
+          }
+          const a = document.createElement("a");
+          a.href = txHref(hashes[j]);
+          a.textContent = hashes[j];
+          dd.appendChild(a);
+        }
+      } else if ((keys[i] === "hash" || keys[i] === "previous_hash") && value) {
+        const a = document.createElement("a");
+        a.href = blockHref(value);
+        a.textContent = value;
+        dd.appendChild(a);
+      } else if (keys[i] === "block_height" && value) {
+        const a = document.createElement("a");
+        a.href = blockHref(value);
+        a.textContent = value;
+        dd.appendChild(a);
+      } else if (keys[i] === "tx_hash" && value) {
+        const a = document.createElement("a");
+        a.href = txHref(value);
+        a.textContent = value;
+        dd.appendChild(a);
+      } else {
+        dd.textContent = value;
+      }
       dl.appendChild(dt);
       dl.appendChild(dd);
     }
@@ -179,15 +248,29 @@
   }
 
   function stripFields(fields) {
-    const keys = ["height", "peers", "network", "pq_mode"];
     const out = {};
     if (!fields) {
       return out;
     }
-    for (let i = 0; i < keys.length; i += 1) {
-      const key = keys[i];
+    for (let i = 0; i < STRIP_KEYS.length; i += 1) {
+      const key = STRIP_KEYS[i];
       if (Object.prototype.hasOwnProperty.call(fields, key)) {
         out[key] = fields[key];
+      }
+    }
+    return out;
+  }
+
+  function mergeFields() {
+    const out = {};
+    for (let i = 0; i < arguments.length; i += 1) {
+      const fields = arguments[i];
+      if (!fields) {
+        continue;
+      }
+      const keys = Object.keys(fields);
+      for (let j = 0; j < keys.length; j += 1) {
+        out[keys[j]] = fields[keys[j]];
       }
     }
     return out;
@@ -197,12 +280,37 @@
     return /^\d+$/.test(String(q || "").trim());
   }
 
+  function isHexQuery(q) {
+    return /^[0-9a-fA-F]+$/.test(String(q || "").trim());
+  }
+
+  function isAddressQuery(q) {
+    const id = String(q || "").trim();
+    return id.length === 128 && isHexQuery(id);
+  }
+
   function blockSearchCommand(q) {
     const id = String(q || "").trim();
     if (!id) {
       return "";
     }
     return "getblock " + id;
+  }
+
+  function blockHref(id) {
+    return withRpc("/block/?q=" + encodeURIComponent(String(id || "").trim()));
+  }
+
+  function txHref(id) {
+    return withRpc("/tx/?q=" + encodeURIComponent(String(id || "").trim()));
+  }
+
+  function addressHref(id) {
+    return withRpc("/address/?q=" + encodeURIComponent(String(id || "").trim()));
+  }
+
+  function explorerHref(id) {
+    return withRpc("/?q=" + encodeURIComponent(String(id || "").trim()));
   }
 
   function formatBlockTime(value) {
@@ -238,15 +346,31 @@
       row.timestamp = fields.timestamp;
       row.time = formatBlockTime(fields.timestamp);
     }
+    if (Object.prototype.hasOwnProperty.call(fields, "tx_hashes")) {
+      row.tx_hashes = fields.tx_hashes;
+    }
     return row;
+  }
+
+  function txRowsFromBlock(row) {
+    const out = [];
+    if (!row || !row.tx_hashes) {
+      return out;
+    }
+    const hashes = String(row.tx_hashes).split(",").filter(Boolean);
+    for (let i = 0; i < hashes.length; i += 1) {
+      out.push({
+        tx_hash: hashes[i],
+        height: row.height || "",
+        index: String(i)
+      });
+    }
+    return out;
   }
 
   function explorerAllowed(cmd) {
     const token = String(cmd || "").trim().split(/\s+/)[0];
-    return token === "getinfo"
-      || token === "getblock"
-      || token === "getblockhash"
-      || token === "getblockraw";
+    return Object.prototype.hasOwnProperty.call(PUBLIC_READ_COMMANDS, token);
   }
 
   async function explorerCommand(cmd) {
@@ -260,18 +384,18 @@
     const max = typeof count === "number" && count > 0 ? count : 10;
     const info = await explorerCommand("getinfo");
     if (info.offline || !info.ok) {
-      return { offline: true, blocks: [] };
+      return { offline: true, blocks: [], info: info };
     }
     const height = parseHeight(info.fields);
     if (height === null) {
-      return { offline: false, blocks: [] };
+      return { offline: false, blocks: [], info: info };
     }
     const start = Math.max(0, height - (max - 1));
     const blocks = [];
     for (let h = height; h >= start; h -= 1) {
       const result = await explorerCommand("getblock " + h);
       if (result.offline) {
-        return { offline: true, blocks: [] };
+        return { offline: true, blocks: [], info: info };
       }
       if (!result.ok || !result.raw || result.raw.indexOf("error:") === 0) {
         continue;
@@ -283,7 +407,110 @@
       }
       blocks.push(row);
     }
-    return { offline: false, blocks: blocks };
+    return { offline: false, blocks: blocks, info: info };
+  }
+
+  async function loadLatestTxRows(blockCount, txLimit) {
+    const maxBlocks = typeof blockCount === "number" && blockCount > 0 ? blockCount : 10;
+    const maxTx = typeof txLimit === "number" && txLimit > 0 ? txLimit : 20;
+    const recent = await loadLatestBlockRows(maxBlocks);
+    if (recent.offline) {
+      return { offline: true, txs: [] };
+    }
+    const txs = [];
+    for (let i = 0; i < (recent.blocks || []).length; i += 1) {
+      const fromBlock = txRowsFromBlock(recent.blocks[i]);
+      for (let j = 0; j < fromBlock.length; j += 1) {
+        txs.push(fromBlock[j]);
+        if (txs.length >= maxTx) {
+          return { offline: false, txs: txs };
+        }
+      }
+    }
+    return { offline: false, txs: txs };
+  }
+
+  async function loadChainStatus() {
+    const info = await explorerCommand("getinfo");
+    if (info.offline || !info.ok) {
+      return { offline: true, ok: false, fields: {}, raw: info.raw || "RPC offline" };
+    }
+    const monetary = await explorerCommand("monetary_info");
+    if (monetary.offline) {
+      return { offline: true, ok: false, fields: {}, raw: "RPC offline" };
+    }
+    const fields = mergeFields(info.fields || {}, monetary.ok ? monetary.fields : {});
+    return {
+      offline: false,
+      ok: true,
+      fields: fields,
+      raw: info.raw,
+      strip: stripFields(fields)
+    };
+  }
+
+  async function resolveSearch(q) {
+    const id = String(q || "").trim();
+    if (!id) {
+      return { kind: "empty" };
+    }
+    if (isHeightQuery(id)) {
+      const block = await explorerCommand("getblock " + id);
+      if (block.offline) {
+        return { kind: "offline" };
+      }
+      if (block.ok && block.raw && block.raw.indexOf("error:") !== 0
+        && block.fields && Object.keys(block.fields).length > 0) {
+        return { kind: "block", id: id, fields: block.fields, raw: block.raw };
+      }
+      return { kind: "notfound" };
+    }
+    if (!isHexQuery(id)) {
+      return { kind: "notfound" };
+    }
+    const block = await explorerCommand("getblock " + id);
+    if (block.offline) {
+      return { kind: "offline" };
+    }
+    if (block.ok && block.raw && block.raw.indexOf("error:") !== 0
+      && block.fields && Object.keys(block.fields).length > 0) {
+      return { kind: "block", id: id, fields: block.fields, raw: block.raw };
+    }
+    const tx = await explorerCommand("tx_status " + id);
+    if (tx.offline) {
+      return { kind: "offline" };
+    }
+    if (tx.ok && tx.fields && tx.fields.status && tx.fields.status !== "unknown") {
+      return { kind: "tx", id: id, fields: tx.fields, raw: tx.raw };
+    }
+    if (isAddressQuery(id)) {
+      return { kind: "address", id: id };
+    }
+    if (tx.ok && tx.fields && tx.fields.status === "unknown") {
+      return { kind: "tx", id: id, fields: tx.fields, raw: tx.raw };
+    }
+    return { kind: "notfound" };
+  }
+
+  function routeForSearch(result) {
+    if (!result || !result.kind || result.kind === "empty" || result.kind === "offline"
+      || result.kind === "notfound") {
+      return "";
+    }
+    if (result.kind === "block") {
+      return blockHref(result.id);
+    }
+    if (result.kind === "tx") {
+      return txHref(result.id);
+    }
+    if (result.kind === "address") {
+      return addressHref(result.id);
+    }
+    return "";
+  }
+
+  function publicReadCommands() {
+    return PUBLIC_READ_COMMANDS;
   }
 
   global.AdditionSite = {
@@ -293,15 +520,30 @@
     rpcCommand: rpcCommand,
     loadRecentBlocks: loadRecentBlocks,
     loadLatestBlockRows: loadLatestBlockRows,
+    loadLatestTxRows: loadLatestTxRows,
+    loadChainStatus: loadChainStatus,
     renderRecentBlocks: renderRecentBlocks,
     renderFields: renderFields,
     setStatus: setStatus,
     stripFields: stripFields,
+    mergeFields: mergeFields,
     isHeightQuery: isHeightQuery,
+    isHexQuery: isHexQuery,
+    isAddressQuery: isAddressQuery,
     blockSearchCommand: blockSearchCommand,
     formatBlockTime: formatBlockTime,
     blockRowFromFields: blockRowFromFields,
+    txRowsFromBlock: txRowsFromBlock,
     explorerAllowed: explorerAllowed,
-    explorerCommand: explorerCommand
+    explorerCommand: explorerCommand,
+    resolveSearch: resolveSearch,
+    routeForSearch: routeForSearch,
+    blockHref: blockHref,
+    txHref: txHref,
+    addressHref: addressHref,
+    explorerHref: explorerHref,
+    withRpc: withRpc,
+    publicReadCommands: publicReadCommands,
+    STRIP_KEYS: STRIP_KEYS
   };
 }(window));

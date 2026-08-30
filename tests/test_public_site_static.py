@@ -123,13 +123,25 @@ class PublicSiteStaticTests(unittest.TestCase):
         chrome = read("chrome.js")
         status = read("status/index.html")
         explorer_js = read("explorer.js")
+        block = read("block/index.html")
+        tx = read("tx/index.html")
+        address = read("address/index.html")
         self.assertIn('placeholder="block height, block hash, tx hash, address"', index)
         self.assertIn("<th>height</th>", index)
         self.assertIn("<th>hash</th>", index)
         self.assertIn("<th>tx_count</th>", index)
         self.assertIn("<th>time</th>", index)
         self.assertIn("Latest Blocks", index)
+        self.assertIn("Latest Transactions", index)
+        self.assertIn("live-strip", index)
         self.assertIn("/explorer.js", index)
+        self.assertIn("/block/", index)
+        self.assertIn("/tx/", index)
+        self.assertIn("/address/", index)
+        self.assertIn("getblock", block)
+        self.assertIn("tx_status", tx)
+        self.assertIn("not on public-read allowlist", address)
+        self.assertIn("127.0.0.1:8545", address)
         self.assertNotIn("hero", index)
         self.assertNotIn("cards", index)
         self.assertNotIn("8545", index)
@@ -146,9 +158,9 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertNotIn("market cap", index.lower())
         self.assertNotIn("hashrate", index.lower())
         self.assertNotIn("mainnet", index.lower())
-        self.assertLess(len(index.splitlines()), 50)
+        self.assertLess(len(index.splitlines()), 80)
         self.assertNotIn("004d9744", index)
-        self.assertNotIn("tx_status", explorer_js)
+        self.assertIn("resolveSearch", explorer_js)
         self.assertNotIn("getblockraw", explorer_js)
 
     def test_rpc_page_documents_allowlist_and_json(self) -> None:
@@ -159,6 +171,11 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn(":80", rpc)
         self.assertIn(":38545", rpc)
         self.assertIn("127.0.0.1:8545", rpc)
+        self.assertIn("Command explorer", rpc)
+        self.assertIn("publicReadCommands", rpc)
+        self.assertIn("explorerCommand", rpc)
+        self.assertNotIn("eth_call", rpc)
+        self.assertNotIn("erc-20", rpc.lower())
         self.assertNotIn("labreche_jeremy", rpc)
         self.assertNotIn("outlook.com", rpc)
 
@@ -249,7 +266,7 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("/apple-touch-icon.png", index)
         self.assertIn("/og.png", index)
         self.assertIn("twitter:card", index)
-        self.assertLess(len(index.splitlines()), 50)
+        self.assertLess(len(index.splitlines()), 80)
 
     def test_download_page_is_testnet_local_only(self) -> None:
         page = read("download/index.html")
@@ -419,21 +436,38 @@ class PublicSiteStaticTests(unittest.TestCase):
         common = read("common.js")
         self.assertIn('raw: "RPC offline"', common)
         self.assertIn("looksLikeHtml", common)
-        self.assertIn('const keys = ["height", "peers", "network", "pq_mode"]', common)
+        self.assertIn("STRIP_KEYS", common)
+        self.assertIn('"network"', common)
+        self.assertIn('"height"', common)
+        self.assertIn('"peers"', common)
+        self.assertIn('"pq_mode"', common)
+        self.assertIn('"pow_algorithm"', common)
+        self.assertIn('"max_supply"', common)
+        self.assertIn('"next_reward"', common)
         self.assertIn("stripFields", common)
+        self.assertIn("tx_status", common)
+        self.assertIn("monetary_info", common)
+        self.assertIn("resolveSearch", common)
+        self.assertIn("loadChainStatus", common)
 
     def test_explorer_still_calls_getblock(self) -> None:
         index = read("index.html")
         explorer_js = read("explorer.js")
         common = read("common.js")
         redirect = read("explorer/index.html")
+        worker = read("worker.js")
         self.assertIn("/explorer.js", index)
         self.assertIn("loadLatestBlockRows", explorer_js)
+        self.assertIn("loadChainStatus", explorer_js)
         self.assertIn("RPC offline", explorer_js)
         self.assertIn("Not found", explorer_js)
         self.assertIn('return "getblock " + id', common)
         self.assertIn("explorerCommand", common)
+        self.assertIn("tx_status", common)
         self.assertIn('url=/', redirect)
+        self.assertIn('"/block": "/block/index.html"', worker)
+        self.assertIn('"/tx": "/tx/index.html"', worker)
+        self.assertIn('"/address": "/address/index.html"', worker)
 
     def test_no_hardcoded_live_stats(self) -> None:
         index = read("index.html")
@@ -461,12 +495,15 @@ function run(fetchImpl) {
   return window.AdditionSite;
 }
 const S = run(async () => { throw new Error("offline"); });
-const fields = S.parseFields("network=testnet height=20 peers=1 pq_mode=strict pow_algorithm=sha3_512 last_tps=9.99");
+const fields = S.parseFields("network=testnet height=20 peers=1 pq_mode=strict pow_algorithm=sha3_512 max_supply=50000000 next_reward=50 last_tps=9.99");
 const strip = S.stripFields(fields);
 if (strip.height !== "20" || strip.peers !== "1" || strip.network !== "testnet" || strip.pq_mode !== "strict") {
   throw new Error("missing live strip fields");
 }
-if (Object.prototype.hasOwnProperty.call(strip, "last_tps") || Object.prototype.hasOwnProperty.call(strip, "pow_algorithm")) {
+if (strip.pow_algorithm !== "sha3_512" || strip.max_supply !== "50000000" || strip.next_reward !== "50") {
+  throw new Error("strip must include pow/supply/reward when present");
+}
+if (Object.prototype.hasOwnProperty.call(strip, "last_tps")) {
   throw new Error("strip leaked non-strip getinfo fields");
 }
 if (!S.isHeightQuery("200") || S.isHeightQuery("00ab") || S.blockSearchCommand("200") !== "getblock 200") {
@@ -475,16 +512,26 @@ if (!S.isHeightQuery("200") || S.isHeightQuery("00ab") || S.blockSearchCommand("
 if (S.blockSearchCommand("004d") !== "getblock 004d") {
   throw new Error("hash search must use getblock");
 }
-const row = S.blockRowFromFields({ height: "200", hash: "abc", tx_count: "1", timestamp: "1786877815" });
-if (row.height !== "200" || row.hash !== "abc" || row.tx_count !== "1" || !row.time) {
+if (!S.isAddressQuery("a".repeat(128)) || S.isAddressQuery("abcd")) {
+  throw new Error("address query must be 128 hex");
+}
+const row = S.blockRowFromFields({ height: "200", hash: "abc", tx_count: "1", timestamp: "1786877815", tx_hashes: "t1,t2" });
+if (row.height !== "200" || row.hash !== "abc" || row.tx_count !== "1" || !row.time || row.tx_hashes !== "t1,t2") {
   throw new Error("block row must copy live getblock fields only");
+}
+const txs = S.txRowsFromBlock(row);
+if (txs.length !== 2 || txs[0].tx_hash !== "t1" || txs[1].height !== "200") {
+  throw new Error("tx rows must come from getblock tx_hashes");
 }
 const emptyRow = S.blockRowFromFields({});
 if (Object.keys(emptyRow).length !== 0) {
   throw new Error("empty getblock fields must not invent a row");
 }
-if (S.explorerAllowed("tx_status abc") || S.explorerAllowed("peers")) {
-  throw new Error("explorer must not call extra RPC commands");
+if (!S.explorerAllowed("tx_status abc") || !S.explorerAllowed("peers") || !S.explorerAllowed("monetary_info")) {
+  throw new Error("explorer must allow public-read commands");
+}
+if (S.explorerAllowed("mine") || S.explorerAllowed("getbalance abc") || S.explorerAllowed("eth_blockNumber")) {
+  throw new Error("explorer must reject non-public commands");
 }
 S.rpcCommand("getinfo").then((offline) => {
   if (!offline.offline || offline.raw !== "RPC offline" || Object.keys(offline.fields).length !== 0) {
@@ -506,10 +553,27 @@ S.rpcCommand("getinfo").then((offline) => {
     throw new Error("offline latest blocks must be empty");
   }
   const blocked = run(async () => ({ ok: true, status: 200, text: async () => "ok" }));
-  return blocked.explorerCommand("tx_status abc");
+  return blocked.explorerCommand("mine 1");
 }).then((denied) => {
   if (denied.ok || denied.raw !== "Not found") {
     throw new Error("disallowed explorer command must be Not found");
+  }
+  const live = run(async (url) => {
+    if (String(url).indexOf("getblock%20deadbeef") !== -1 || String(url).indexOf("cmd=getblock%20deadbeef") !== -1) {
+      return { ok: true, status: 200, text: async () => "error: block not found" };
+    }
+    if (String(url).indexOf("tx_status") !== -1) {
+      return { ok: true, status: 200, text: async () => "status=mined tx_hash=deadbeef block_height=3 confirmations=1" };
+    }
+    return { ok: true, status: 200, text: async () => "error: unknown" };
+  });
+  return live.resolveSearch("deadbeef");
+}).then((resolved) => {
+  if (resolved.kind !== "tx" || resolved.fields.status !== "mined") {
+    throw new Error("resolveSearch must route tx hashes via tx_status");
+  }
+  if (S.routeForSearch(resolved).indexOf("/tx/") === -1) {
+    throw new Error("tx route must point at /tx/");
   }
   console.log("helpers-ok");
 }).catch((err) => {

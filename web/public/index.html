@@ -11,6 +11,12 @@
 </head>
 <body>
   <header id="site-header"></header>
+  <div id="live-strip" class="status-strip pending" aria-live="polite">
+    <div class="status-strip-inner">
+      <span id="strip-flag" class="status-flag">…</span>
+      <dl id="strip-cells" class="status-cells"></dl>
+    </div>
+  </div>
   <main>
     <form id="search-form" class="search-form" action="/" method="get">
       <input id="q" name="q" type="search" autocomplete="off"
@@ -18,10 +24,7 @@
       <button type="submit">Search</button>
     </form>
     <p id="search-status" hidden></p>
-    <section id="block-result" hidden>
-      <h2>Block</h2>
-      <div id="block-fields"></div>
-    </section>
+    <p class="note">Public read: <a href="/rpc/">RPC commands</a> · <a href="/status/">getinfo</a> · <a href="/block/">block</a> · <a href="/tx/">tx</a> · <a href="/address/">address</a></p>
     <section>
       <h2>Latest Blocks</h2>
       <p id="rpc-state"></p>
@@ -35,6 +38,20 @@
           </tr>
         </thead>
         <tbody id="latest-blocks"></tbody>
+      </table>
+    </section>
+    <section>
+      <h2>Latest Transactions</h2>
+      <p id="tx-state" class="note">From recent <code>getblock</code> <code>tx_hashes</code> when present.</p>
+      <table class="blocks-table">
+        <thead>
+          <tr>
+            <th>tx_hash</th>
+            <th>height</th>
+            <th>index</th>
+          </tr>
+        </thead>
+        <tbody id="latest-txs"></tbody>
       </table>
     </section>
   </main>
