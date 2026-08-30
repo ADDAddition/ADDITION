@@ -941,9 +941,12 @@ int test_http_port80_ingest() {
 }
 
 addition::ChainConfig mainnet_sync_test_config() {
-    // Protocol/IBD coverage for ADDITION_MAINNET_V1. Easy target is test-only so
-    // mining finishes quickly; production knobs stay 0x000000FFFFFFFFFF.
+    // Protocol/IBD coverage for ADDITION_MAINNET_V1 HELLO/sync/gossip only.
+    // Use SHA3 + easy target so the suite finishes quickly. Production
+    // --mainnet keeps memory_hard @ 0x000000FFFFFFFFFF (see test_mainnet_two_node.py).
     addition::ChainConfig cfg = addition::mainnet_chain_config();
+    cfg.pow_algorithm = addition::PowAlgorithm::Sha3_512;
+    cfg.pow_profile = "mainnet-sync-test";
     cfg.initial_difficulty_target = addition::kTestnetEasyDifficultyTarget;
     cfg.min_difficulty_target = addition::kTestnetEasyDifficultyTarget;
     cfg.max_difficulty_target = addition::kTestnetEasyDifficultyTarget;
