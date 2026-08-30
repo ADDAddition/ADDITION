@@ -73,7 +73,9 @@ Raw markdown siblings:
 
 # Join the ADDITION mainnet
 
-Separate chain: `network_id=ADDITION_MAINNET_V1`. Not a label flip on the testnet above. Public P2P bootstrap in the same spirit as a Bitcoin seed. The public site / explorer stay on testnet until the operator switches them.
+This is the public ADDITION mainnet (`network_id=ADDITION_MAINNET_V1`). Anyone can run a home node, sync from the public seed, and mine locally — the same model as `bitcoind` against a known bootstrap peer.
+
+Public seed: **34.27.30.115:28546** (P2P) and **34.27.30.115:38546** (HTTP read). Separate chain from the research testnet above (`28545` / `38545` / `:80`). Not a label flip. The public website explorer stays on testnet in this change; join the chain with `additiond`, not the explorer UI.
 
 Binary from [this repo](https://github.com/ADDAddition/ADDITION) on `main`. Full runbook: [docs/MAINNET_RUNBOOK.md](https://github.com/ADDAddition/ADDITION/blob/main/docs/MAINNET_RUNBOOK.md).
 
@@ -95,9 +97,9 @@ export ADDITION_ENABLE_P2P_RPC=1
 additiond --mainnet --data-dir $HOME/addition-mainnet --local-rpc-port 8546 --p2p-port 28547 --bootstrap 34.27.30.115:28546
 ```
 
-Type `sync` on the daemon stdin (or send it to write RPC on `127.0.0.1:8546`), then `getinfo`.
+Type `sync` on the daemon stdin (or send it to write RPC on `127.0.0.1:8546`), then `getinfo`. Mine on that same loopback write RPC when you want to produce blocks (`memory_hard`, no 30s mine timeout).
 
-Never `--bootstrap 34.27.30.115:28545` for mainnet (that is the testnet seed). Never publish port `8546`. Auto-mine is refused on mainnet.
+Never `--bootstrap 34.27.30.115:28545` for mainnet (that is the research testnet seed). Never publish port `8546`. Auto-mine is refused on mainnet.
 
 ## Mainnet public read
 

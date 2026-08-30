@@ -1,5 +1,5 @@
 [Unit]
-Description=ADDITION mainnet node (ADDITION_MAINNET_V1; public P2P seed uses 28546)
+Description=ADDITION public mainnet node (ADDITION_MAINNET_V1; seed P2P 28546 / HTTP 38546)
 Documentation=file:///opt/addition/docs/MAINNET_RUNBOOK.md
 After=network-online.target
 Wants=network-online.target

@@ -41,15 +41,16 @@
 
 ## Networks
 
-| | Public testnet | Separate `--mainnet` chain |
+| | Research testnet | Public mainnet |
 | :--- | :--- | :--- |
 | Flag | `additiond --network testnet` | `additiond --mainnet` |
 | `network_id` | `ADDITION_TESTNET_V1` | `ADDITION_MAINNET_V1` |
 | Genesis | [`genesis.json`](genesis.json) | [`genesis-mainnet.json`](genesis-mainnet.json) |
 | Bootstrap | `34.27.30.115:28545` | `34.27.30.115:28546` |
-| Public product | [additionblockchain.com](https://additionblockchain.com) and [rpc.additionblockchain.com](https://rpc.additionblockchain.com) | Public P2P join (seed `28546`, read HTTP `38546`). Site / explorer stay on testnet until the operator switches them. |
+| Public read | `:80` / `38545` / [rpc.additionblockchain.com](https://rpc.additionblockchain.com) | `34.27.30.115:38546` |
+| Role | Research testnet; website explorer still points here | Public P2P chain — run a node, sync, mine locally like `bitcoind` |
 
-`--mainnet` is its own chain (`ADDITION_MAINNET_V1`), not a label flip on the testnet. Home nodes sync and mine locally against the public seed. See [docs/MAINNET_RUNBOOK.md](docs/MAINNET_RUNBOOK.md) and the mainnet section in [`join.md`](web/public/join.md).
+`--mainnet` is the public ADDITION mainnet (`ADDITION_MAINNET_V1`), a separate chain from the research testnet. See [docs/MAINNET_RUNBOOK.md](docs/MAINNET_RUNBOOK.md) and the mainnet section in [`join.md`](web/public/join.md).
 
 ---
 

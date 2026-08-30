@@ -2,7 +2,7 @@
   "network_name": "addition-mainnet",
   "network_id": "ADDITION_MAINNET_V1",
   "network_mode": "mainnet",
-  "comment": "Separate mainnet genesis (ADDITION_MAINNET_V1). Do not mix with ADDITION_TESTNET_V1. Public P2P bootstrap is 34.27.30.115:28546.",
+  "comment": "Public ADDITION mainnet genesis (ADDITION_MAINNET_V1). Do not mix with research testnet ADDITION_TESTNET_V1. Seed P2P 34.27.30.115:28546 / HTTP 38546.",
   "genesis_timestamp": 1770000000,
   "max_supply": 50000000,
   "block_reward": 50,
