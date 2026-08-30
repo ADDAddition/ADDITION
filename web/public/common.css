@@ -116,6 +116,7 @@ nav a.active {
 .status-strip {
   background: #0c1016;
   border-bottom: 1px solid var(--line);
+  color: #e8e8e8;
 }
 .status-strip-inner {
   max-width: 1040px;
@@ -132,9 +133,9 @@ nav a.active {
   text-transform: uppercase;
   font-weight: 700;
 }
-.status-strip.offline .status-flag { color: var(--bad); }
-.status-strip.ok .status-flag { color: var(--ok); }
-.status-strip.pending .status-flag { color: var(--muted); }
+.status-strip.offline .status-flag { color: #ff8a8a; }
+.status-strip.ok .status-flag { color: #6dce8a; }
+.status-strip.pending .status-flag { color: #9a9a9a; }
 .status-cells {
   display: flex;
   flex-wrap: wrap;
@@ -149,12 +150,12 @@ nav a.active {
 }
 .status-cells dt {
   margin: 0;
-  color: var(--muted);
+  color: #9a9a9a;
   text-transform: uppercase;
 }
 .status-cells dd {
   margin: 0;
-  color: var(--ink);
+  color: #f2f2f2;
   min-width: 1.2ch;
 }
 
