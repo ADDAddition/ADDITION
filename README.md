@@ -46,9 +46,10 @@
 | Flag | `additiond --network testnet` | `additiond --mainnet` |
 | `network_id` | `ADDITION_TESTNET_V1` | `ADDITION_MAINNET_V1` |
 | Genesis | [`genesis.json`](genesis.json) | [`genesis-mainnet.json`](genesis-mainnet.json) |
-| Public product | [additionblockchain.com](https://additionblockchain.com) and [rpc.additionblockchain.com](https://rpc.additionblockchain.com) | **Not the website.** Local/operator `--mainnet` public-read on loopback (`--public-rpc-port 38546`). Not a live public network. |
+| Bootstrap | `34.27.30.115:28545` | `34.27.30.115:28546` |
+| Public product | [additionblockchain.com](https://additionblockchain.com) and [rpc.additionblockchain.com](https://rpc.additionblockchain.com) | Public P2P join (seed `28546`, read HTTP `38546`). Site / explorer stay on testnet until the operator switches them. |
 
-`--mainnet` is its own chain (`ADDITION_MAINNET_V1`), not a label flip on the testnet. It is not a live public mainnet product. See [docs/MAINNET_RUNBOOK.md](docs/MAINNET_RUNBOOK.md).
+`--mainnet` is its own chain (`ADDITION_MAINNET_V1`), not a label flip on the testnet. Home nodes sync and mine locally against the public seed. See [docs/MAINNET_RUNBOOK.md](docs/MAINNET_RUNBOOK.md) and the mainnet section in [`join.md`](web/public/join.md).
 
 ---
 

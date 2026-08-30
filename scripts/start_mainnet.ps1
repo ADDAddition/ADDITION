@@ -46,5 +46,5 @@ if (-not $env:ADDITION_ALLOW_INSECURE_TX_COMMANDS) {
     Write-Host "[mainnet] ADDITION_ALLOW_INSECURE_TX_COMMANDS defaulted to 0"
 }
 
-Write-Host "[mainnet] starting ADDITION_MAINNET_V1 (not a live public network)..."
+Write-Host "[mainnet] starting ADDITION_MAINNET_V1 (bootstrap 34.27.30.115:28546)..."
 & $exe --mainnet --config config-mainnet.toml --genesis genesis-mainnet.json --data-dir $dataDir
