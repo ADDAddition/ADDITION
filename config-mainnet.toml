@@ -1,7 +1,8 @@
-# ADDITION mainnet chain configuration.
-# This starts ADDITION_MAINNET_V1 from genesis-mainnet.json.
-# Do not point additionblockchain.com at it (site stays on testnet).
-# Do not bootstrap the public testnet seed 34.27.30.115:28545.
+# ADDITION public mainnet (ADDITION_MAINNET_V1) from genesis-mainnet.json.
+# Public seed: P2P 34.27.30.115:28546, HTTP read 34.27.30.115:38546.
+# Anyone can join, sync, and mine locally (bitcoind-style). Write RPC stays 127.0.0.1:8546.
+# Do not bootstrap the research testnet seed 34.27.30.115:28545.
+# Do not flip the public website explorer in a docs/config-only change.
 
 network = "mainnet"
 network_name = "addition-mainnet"
@@ -9,7 +10,8 @@ network_id = "ADDITION_MAINNET_V1"
 data_dir = "data-mainnet"
 genesis_file = "genesis-mainnet.json"
 
-# Public mainnet P2P seed (IPv4 only). Home miners: --bootstrap 34.27.30.115:28546.
+# Public mainnet P2P seed (IPv4 only). Home miners: --bootstrap 34.27.30.115:28546
+# and a different local --p2p-port (e.g. 28547).
 # P2P listen stays off unless ADDITION_ENABLE_P2P_RPC=1.
 # Seed operators also set ADDITION_ADVERTISED_P2P=34.27.30.115:28546 (never list self).
 bootstrap_peers = [

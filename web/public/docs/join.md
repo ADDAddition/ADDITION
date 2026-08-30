@@ -68,3 +68,45 @@ Raw markdown siblings:
 
 * [`/docs/testnet-rpc-runbook.md`](/docs/testnet-rpc-runbook.md) — public-read RPC systemd runbook
 * [`/docs/wallet.md`](/docs/wallet.md) — local loopback wallet
+
+---
+
+# Join the ADDITION mainnet
+
+This is the public ADDITION mainnet (`network_id=ADDITION_MAINNET_V1`). Anyone can run a home node, sync from the public seed, and mine locally — the same model as `bitcoind` against a known bootstrap peer.
+
+Public seed: **34.27.30.115:28546** (P2P) and **34.27.30.115:38546** (HTTP read). Separate chain from the research testnet above (`28545` / `38545` / `:80`). Not a label flip. The public website explorer stays on testnet in this change; join the chain with `additiond`, not the explorer UI.
+
+Binary from [this repo](https://github.com/ADDAddition/ADDITION) on `main`. Full runbook: [docs/MAINNET_RUNBOOK.md](https://github.com/ADDAddition/ADDITION/blob/main/docs/MAINNET_RUNBOOK.md).
+
+## Mainnet ports
+
+| port | role |
+|------|------|
+| 38546 | public read HTTP on the seed (`/rpc?cmd=getinfo`) |
+| 28546 | public P2P bootstrap on the seed |
+| 8546 | write RPC on `127.0.0.1` only — never publish |
+
+## Start a mainnet node
+
+Set `ADDITION_PRIVACY_MASTER_KEY` (32+ characters), build `additiond` from `main`, then:
+
+```text
+export ADDITION_PRIVACY_MASTER_KEY='replace-with-32-or-more-chars____'
+export ADDITION_ENABLE_P2P_RPC=1
+additiond --mainnet --data-dir $HOME/addition-mainnet --local-rpc-port 8546 --p2p-port 28547 --bootstrap 34.27.30.115:28546
+```
+
+Type `sync` on the daemon stdin (or send it to write RPC on `127.0.0.1:8546`), then `getinfo`. Mine on that same loopback write RPC when you want to produce blocks (`memory_hard`, no 30s mine timeout).
+
+Never `--bootstrap 34.27.30.115:28545` for mainnet (that is the research testnet seed). Never publish port `8546`. Auto-mine is refused on mainnet.
+
+## Mainnet public read
+
+```bash
+curl -s 'http://34.27.30.115:38546/rpc?cmd=getinfo'
+```
+
+Expect `network=mainnet` and `network_id=ADDITION_MAINNET_V1`. Height may still be `0`; copy only fields the node prints. Do not invent peer counts or TPS.
+
+Seed operator: `ADDITION_ADVERTISED_P2P=34.27.30.115:28546` so public `getinfo` / `peers` list that IPv4 endpoint and do not list `self`.

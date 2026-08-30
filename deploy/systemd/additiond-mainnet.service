@@ -1,5 +1,5 @@
 [Unit]
-Description=ADDITION mainnet node (separate chain; not a live public network)
+Description=ADDITION public mainnet node (ADDITION_MAINNET_V1; seed P2P 28546 / HTTP 38546)
 Documentation=file:///opt/addition/docs/MAINNET_RUNBOOK.md
 After=network-online.target
 Wants=network-online.target
@@ -11,7 +11,7 @@ Group=addition
 WorkingDirectory=/opt/addition
 # Public-read listener: 0.0.0.0:38546 (not 8545, not the testnet 38545).
 # Write/admin RPC stays 127.0.0.1:8546 (hardcoded loopback in additiond).
-# P2P stays off unless ADDITION_ENABLE_P2P_RPC=1 in the env file.
+# Seed P2P: ADDITION_ENABLE_P2P_RPC=1 and ADDITION_ADVERTISED_P2P=34.27.30.115:28546.
 ExecStart=/opt/addition/build/additiond --mainnet --public-rpc --public-rpc-port 38546 --public-rpc-bind 0.0.0.0 --local-rpc-port 8546 --p2p-port 28546 --data-dir /var/lib/addition/mainnet --config /opt/addition/config-mainnet.toml --genesis /opt/addition/genesis-mainnet.json
 StandardInput=null
 StandardOutput=journal
@@ -25,7 +25,7 @@ EnvironmentFile=-/etc/addition/mainnet.env
 # This unit is the ADDITION_MAINNET_V1 chain only. Do not bootstrap 34.27.30.115:28545.
 # Leave LAN RPC off (do not set ADDITION_ENABLE_LAN_RPC). Never open 8546/18546.
 # Auto-mine is refused on mainnet. Do not set ADDITION_AUTO_MINE.
-# Optional P2P: ADDITION_ENABLE_P2P_RPC=1 and allow TCP 28546. Off by default.
+# Public seed: ADDITION_ENABLE_P2P_RPC=1, allow TCP 28546, advertise 34.27.30.115:28546.
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
