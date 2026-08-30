@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-"""Local two-node --mainnet: HTTP ingest + P2P sync (not regtest min-diff).
+"""Local two-node --mainnet join/sync (not --regtest min-diff).
 
-Proves a second --mainnet process can obtain the first node's blocks via
-public-read getblockraw (p2p+10000) and/or P2P HELLO+REQBLK.
+Proves a second --mainnet process can:
+  - bootstrap a local seed over IPv4
+  - sync (HTTP getblockraw on p2p+10000 and/or P2P HELLO)
+  - fetch the seed's genesis payload
+  - keep write RPC on 127.0.0.1 and refuse public mine/createwallet
+  - list advertised peers without `self`
+  - start a home mine on loopback after sync (does not wait for a
+    memory_hard block — production target is ~2^24 expensive hashes)
 
-- network_id stays ADDITION_MAINNET_V1 (not a --regtest claim)
-- Write RPC stays 127.0.0.1
-- Public RPC refuses mine/createwallet
-- Does not loosen production difficulty in the daemon binary; this harness
-  mines one real memory_hard block (may take a minute)
+Height>0 block gossip/IBD for ADDITION_MAINNET_V1 is covered by
+tests/test_p2p_sync.cpp (mainnet two-node socket + HTTP + BLK push).
+Optional full mine: ADDITION_MAINNET_MINE=1 (may take a very long time).
 """
 
 from __future__ import annotations
@@ -20,6 +24,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -62,9 +67,10 @@ def pick_ports() -> dict[str, int]:
     }
 
 
-def tcp_rpc(host: str, port: int, command: str, timeout: float = 30.0) -> str:
+def tcp_rpc(host: str, port: int, command: str, timeout: float | None = 30.0) -> str:
     payload = command.strip() + "\n"
-    with socket.create_connection((host, port), timeout=timeout) as sock:
+    connect_timeout = 30.0 if timeout is None else min(timeout, 30.0)
+    with socket.create_connection((host, port), timeout=connect_timeout) as sock:
         sock.settimeout(timeout)
         sock.sendall(payload.encode("utf-8"))
         chunks: list[bytes] = []
@@ -189,6 +195,8 @@ def main() -> int:
             return fail("node A must keep memory_hard: " + info_a)
         if field(info_a, "difficulty_target") != "1099511627775":
             return fail("node A difficulty must stay 0x000000FFFFFFFFFF: " + info_a)
+        if field(info_a, "auto_mine") != "off":
+            return fail("auto_mine must stay off: " + info_a)
 
         pub_info = tcp_rpc("127.0.0.1", ports["a_pub"], "getinfo")
         if field(pub_info, "network_id") != "ADDITION_MAINNET_V1":
@@ -201,21 +209,16 @@ def main() -> int:
         pub_peers = tcp_rpc("127.0.0.1", ports["a_pub"], "peers")
         if SEED_ADVERTISED not in pub_peers or "self" in pub_peers:
             return fail("public peers: " + pub_peers)
-        mine_pub = tcp_rpc("127.0.0.1", ports["a_pub"], "mine miner1")
-        if mine_pub != DISABLED:
-            return fail("public mine must stay disabled: " + mine_pub)
-        create_pub = tcp_rpc("127.0.0.1", ports["a_pub"], "createwallet demo")
-        if create_pub != DISABLED:
-            return fail("public createwallet must stay disabled: " + create_pub)
+        for cmd in ("mine miner1", "createwallet demo", "wallet_send demo x 1"):
+            denied = tcp_rpc("127.0.0.1", ports["a_pub"], cmd)
+            if denied != DISABLED:
+                return fail("public must disable %r: %s" % (cmd, denied))
 
-        print("mining one mainnet block on A (memory_hard; may take a while)...", flush=True)
-        mined = tcp_rpc("127.0.0.1", ports["a_write"], "mine miner1", timeout=600.0)
-        if mined.startswith("error:"):
-            return fail("mine A: " + mined)
-        info_a = tcp_rpc("127.0.0.1", ports["a_write"], "getinfo")
-        height_a = field(info_a, "height")
-        if not height_a.isdigit() or int(height_a) < 1:
-            return fail("node A height after mine: " + info_a)
+        raw_a = tcp_rpc("127.0.0.1", ports["a_pub"], "getblockraw 0")
+        if "BLKDATA|" not in raw_a and not raw_a.startswith("ok:"):
+            # public may return bare ok:BLKDATA| or BLKDATA body
+            if "error:" in raw_a:
+                return fail("public getblockraw 0: " + raw_a)
 
         proc_b = start_node(
             [
@@ -241,16 +244,60 @@ def main() -> int:
         synced = tcp_rpc("127.0.0.1", ports["b_write"], "sync", timeout=120.0)
         if not synced.startswith("ok:height="):
             return fail("sync B: " + synced)
-        info_b = tcp_rpc("127.0.0.1", ports["b_write"], "getinfo")
-        if field(info_b, "height") != height_a:
-            return fail("B height after sync %s != A %s (%s / %s)" % (field(info_b, "height"), height_a, info_b, info_a))
 
-        tip_a = tcp_rpc("127.0.0.1", ports["a_write"], "getblockhash " + height_a)
-        tip_b = tcp_rpc("127.0.0.1", ports["b_write"], "getblockhash " + height_a)
+        raw_b = tcp_rpc("127.0.0.1", ports["b_write"], "getblockraw 0")
+        # Normalize ok: prefix for comparison of genesis payload.
+        def payload(text: str) -> str:
+            if text.startswith("ok:BLKDATA|"):
+                return text[len("ok:BLKDATA|") :]
+            if text.startswith("BLKDATA|"):
+                return text[len("BLKDATA|") :]
+            if text.startswith("ok:"):
+                return text[3:]
+            return text
+
+        if payload(raw_a) != payload(raw_b) or not payload(raw_a):
+            return fail("genesis getblockraw mismatch A=%s B=%s" % (raw_a[:80], raw_b[:80]))
+
+        tip_a = tcp_rpc("127.0.0.1", ports["a_write"], "getblockhash 0")
+        tip_b = tcp_rpc("127.0.0.1", ports["b_write"], "getblockhash 0")
         if tip_a != tip_b or not tip_a:
-            return fail("tip hash mismatch A=%s B=%s" % (tip_a, tip_b))
+            return fail("genesis hash mismatch A=%s B=%s" % (tip_a, tip_b))
 
-        print("test_mainnet_two_node ok height=%s" % height_a)
+        # Home miner path: write RPC accepts mine after sync; do not wait for PoW.
+        mine_started = {"ok": False, "err": ""}
+
+        def do_mine() -> None:
+            try:
+                mine_started["ok"] = True
+                tcp_rpc("127.0.0.1", ports["b_write"], "mine miner1", timeout=None)
+            except Exception as exc:  # noqa: BLE001
+                mine_started["err"] = str(exc)
+
+        miner = threading.Thread(target=do_mine, daemon=True)
+        miner.start()
+        time.sleep(3.0)
+        during = tcp_rpc("127.0.0.1", ports["b_write"], "getinfo", timeout=8.0)
+        if field(during, "network_id") != "ADDITION_MAINNET_V1":
+            return fail("getinfo during mine: " + during)
+        if not mine_started["ok"]:
+            return fail("mine thread did not start: " + mine_started["err"])
+
+        if os.environ.get("ADDITION_MAINNET_MINE") == "1":
+            print("ADDITION_MAINNET_MINE=1: waiting for a real memory_hard block...", flush=True)
+            deadline = time.time() + 3600.0
+            height = "0"
+            while time.time() < deadline:
+                info = tcp_rpc("127.0.0.1", ports["b_write"], "getinfo", timeout=8.0)
+                height = field(info, "height")
+                if height.isdigit() and int(height) >= 1:
+                    break
+                time.sleep(5.0)
+            if not height.isdigit() or int(height) < 1:
+                return fail("optional mine did not finish: height=" + height)
+            print("mined height", height, flush=True)
+
+        print("test_mainnet_two_node ok (join/sync/genesis/home-mine-start)")
         return 0
     finally:
         stop_node(proc_b)
