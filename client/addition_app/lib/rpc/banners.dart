@@ -1,5 +1,8 @@
-/// Durable live banner MP4s hosted on additionblockchain.com (#67 leftovers).
-/// Do not invent alternate URLs or commit fake binaries.
+/// Durable live banner MP4s hosted on additionblockchain.com.
+///
+/// Desktop uses these only for sober About/splash chrome (one muted clip).
+/// Do not invent URLs, do not dual-tile autoplay, and do not wire Jeremy's
+/// website logo stinger into Addition Core.
 class AdditionBanners {
   static const banner1Url =
       'https://additionblockchain.com/banners/addition-banner-1.mp4';

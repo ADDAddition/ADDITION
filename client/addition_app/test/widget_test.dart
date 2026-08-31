@@ -67,5 +67,12 @@ void main() {
     await tester.tap(find.text('Console').first);
     await tester.pump();
     expect(find.textContaining('TEXT RPC'), findsWidgets);
+
+    // About: sober single muted banner (not dual tiles / not stinger).
+    await tester.tap(find.byTooltip('About Addition Core'));
+    await tester.pumpAndSettle();
+    expect(find.text('About Addition Core'), findsOneWidget);
+    expect(find.textContaining('loopback-only'), findsOneWidget);
+    expect(find.textContaining('stinger'), findsNothing);
   });
 }

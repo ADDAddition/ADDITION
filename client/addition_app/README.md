@@ -26,14 +26,14 @@ Height / peers / `last_tps` / `next_reward` come from live `getinfo` only —
 never invented. Public read (`/api/rpc` → `34.27.30.115:38546`) is status-only;
 `wallet_send` stays off the public port.
 
-## Banners (desktop chrome only)
+## Banners (desktop About only)
 
-Muted looping banner band in the Addition Core window — one durable live MP4
-at a time, rotating the two official URLs. Not dual autoplay tiles, and not
-wired into the public website hero.
+Sober muted clip in **About Addition Core** — one durable live MP4
+(`addition-banner-1.mp4`), not dual autoplay tiles and not the website logo
+stinger. Main window chrome stays Bitcoin Core-style (operator nav + status).
 
 - https://additionblockchain.com/banners/addition-banner-1.mp4
-- https://additionblockchain.com/banners/addition-banner-2.mp4
+- https://additionblockchain.com/banners/addition-banner-2.mp4 (reserved durable URL; not dual-played in the GUI)
 
 Poster frames ship as assets for first paint / offline fallback. No invented
 MP4 paths and no committed video binaries.

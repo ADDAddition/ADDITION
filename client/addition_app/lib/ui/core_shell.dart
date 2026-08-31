@@ -87,18 +87,14 @@ class _CoreShellState extends State<CoreShell> {
         child: Column(
           children: [
             _titleBar(),
-            CoreBannerBand(enableVideo: widget.enableVideo),
             Expanded(
-              child: CoreBannerBackground(
-                enableVideo: false, // band owns the muted player; avoid dual play
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _navRail(),
-                    const VerticalDivider(width: 1, color: AdditionTheme.line),
-                    Expanded(child: _pageBody()),
-                  ],
-                ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _navRail(),
+                  const VerticalDivider(width: 1, color: AdditionTheme.line),
+                  Expanded(child: _pageBody()),
+                ],
               ),
             ),
             _statusBar(),
@@ -152,6 +148,14 @@ class _CoreShellState extends State<CoreShell> {
                 ),
               ),
               const Spacer(),
+              IconButton(
+                tooltip: 'About Addition Core',
+                onPressed: () => AboutAdditionCoreDialog.show(
+                  context,
+                  enableVideo: widget.enableVideo,
+                ),
+                icon: const Icon(Icons.info_outline, color: AdditionTheme.mute),
+              ),
               IconButton(
                 tooltip: 'Node settings',
                 onPressed: () => setState(() => _showNode = !_showNode),
