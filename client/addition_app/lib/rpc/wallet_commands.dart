@@ -116,6 +116,18 @@ String buildGetinfo() => 'getinfo';
 
 String buildFeeInfo() => 'fee_info';
 
+String buildMine(String address, {int? threads}) {
+  final addr = validateAddress(address);
+  if (threads == null || threads <= 0) {
+    return 'mine $addr';
+  }
+  return 'mine $addr $threads';
+}
+
+String buildPeers() => 'peers';
+
+String buildMonetaryInfo() => 'monetary_info';
+
 bool _looksLikeHex(String value) {
   if (value.isEmpty || value.length.isOdd) return false;
   for (var i = 0; i < value.length; i++) {

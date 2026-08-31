@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import 'kv_parser.dart';
 import 'write_rpc_policy.dart';
 
 typedef RpcTransport = Future<String> Function(String wire);
@@ -100,6 +101,39 @@ class TextRpcClient {
 
   Future<String> call(String command, {bool write = true}) async {
     WriteRpcPolicy.assertCommand(command, write: write);
+    return _dispatch(command);
+  }
+
+  /// Operator console: any single-line TEXT RPC on loopback except insecure /
+  /// foreign-chain commands. Still refuses non-loopback hosts.
+  Future<String> consoleCall(String command) async {
+    WriteRpcPolicy.assertWriteEndpoint(endpoint.host);
+    if (command.contains('\n') || command.contains('\r')) {
+      throw AdditionRpcException('RPC command must be a single line');
+    }
+    final token = firstCommandToken(command);
+    if (token.isEmpty) {
+      throw AdditionRpcException('empty RPC command');
+    }
+    final lowered = token.toLowerCase();
+    if (WriteRpcPolicy.insecureCommands.contains(lowered)) {
+      throw AdditionRpcException('refusing insecure RPC command: $token');
+    }
+    final parts = lowered.split('_').toSet();
+    if (WriteRpcPolicy.foreignChainTokens.contains(lowered) ||
+        parts.any(WriteRpcPolicy.foreignChainTokens.contains) ||
+        WriteRpcPolicy.foreignChainTokens.any(lowered.contains)) {
+      throw AdditionRpcException('ADDITION RPC only');
+    }
+    if (command.length > WriteRpcPolicy.maxRpcLine) {
+      throw AdditionRpcException(
+        'RPC command exceeds ${WriteRpcPolicy.maxRpcLine}-byte TEXT RPC limit',
+      );
+    }
+    return _dispatch(command);
+  }
+
+  Future<String> _dispatch(String command) async {
     final wire =
         endpoint.token.isEmpty ? command : '${endpoint.token} $command';
     if (wire.length > WriteRpcPolicy.maxRpcLine) {

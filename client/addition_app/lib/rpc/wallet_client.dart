@@ -113,6 +113,31 @@ class WalletRpcClient {
     return parseKv(line);
   }
 
+  /// Local trusted mine. Coinbase is 50 ADD, 100% to finding miner.
+  Future<String> mine(String address, {int? threads}) async {
+    final line = await rpc.call(buildMine(address, threads: threads));
+    if (line.startsWith('error:')) throw AdditionRpcException(line);
+    return line;
+  }
+
+  /// Honest peer list from the node (`peers` TEXT RPC).
+  Future<String> peers() async {
+    final line = await rpc.call(buildPeers());
+    if (line.startsWith('error:')) throw AdditionRpcException(line);
+    return line;
+  }
+
+  Future<Map<String, String>> monetaryInfo() async {
+    final line = await rpc.call(buildMonetaryInfo());
+    if (line.startsWith('error:')) throw AdditionRpcException(line);
+    return parseKv(line);
+  }
+
+  /// Console: issue one TEXT RPC line to the local loopback node.
+  Future<String> console(String command) async {
+    return rpc.consoleCall(command);
+  }
+
   /// Allow `priv_printed=0` (honest node flag). Refuse actual key fields.
   static void _assertNoPrivateKeyMaterial(Map<String, String> values) {
     const allowedFlags = {'priv_printed'};

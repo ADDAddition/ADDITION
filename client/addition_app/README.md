@@ -1,63 +1,75 @@
-# ADDITION desktop wallet (Flutter)
+# Addition Core (Flutter desktop)
 
-Local/testnet desktop wallet for Windows and Linux. Talks **TEXT write RPC** on
-loopback (`127.0.0.1:8545` by default). Keys stay in the node
+Bitcoin Core-style full-node desktop GUI for **ADDITION** /
+`ADDITION_MAINNET_V1`. One window for operators: wallet, receive, send, mine,
+peers, and a TEXT RPC console. Talks to a local `additiond` over **loopback
+write RPC** (`127.0.0.1:8546` by default). Keys stay in the node
 `data/wallets/<name>.wal` store via `createwallet` / `wallet_send`. This app
 never prints or exports private keys.
 
-Public product today is **testnet**. If `getinfo` reports mainnet, the UI labels
-it as local/operator only — not a live public network. No token sale, no
-multi-chain browser.
+Not SmartChain. Not a DEX. Not a hosted custodial wallet.
 
 Contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com)
 
-## What it does
+## Nav (real destinations)
 
-| Action | RPC |
-|---|---|
-| Create / list / load wallet | `createwallet`, `wallet_list`, `wallet_info` |
-| Balance / address | `wallet_balance` |
-| Send | `wallet_send` (node signs) |
-| Node status | `getinfo` (height, network, peers) |
-| Optional public status | `GET https://rpc.additionblockchain.com/rpc?cmd=getinfo` (read-only) |
+| Nav | Role | RPC |
+|---|---|---|
+| Wallet / balance | Create / load / list wallets; live getinfo stats | `createwallet`, `wallet_*`, `getinfo` |
+| Receive | Address + copy | `wallet_info` / `wallet_balance` |
+| Send | Loopback `wallet_send` only | `wallet_send` |
+| Mine | Local trusted mine; coinbase 50 ADD (100% finder) | `mine` |
+| Peers | Honest peer count/list from the node | `getinfo` / `peers` |
+| Console | Issue one TEXT RPC line to local node | any safe TEXT command |
 
-Write RPC is **loopback-only**. Public read cannot create wallets or send.
+Height / peers / `last_tps` / `next_reward` come from live `getinfo` only —
+never invented. Public read (`/api/rpc` → `34.27.30.115:38546`) is status-only;
+`wallet_send` stays off the public port.
+
+## Banners (desktop chrome only)
+
+Muted looping banner band in the Addition Core window — one durable live MP4
+at a time, rotating the two official URLs. Not dual autoplay tiles, and not
+wired into the public website hero.
+
+- https://additionblockchain.com/banners/addition-banner-1.mp4
+- https://additionblockchain.com/banners/addition-banner-2.mp4
+
+Poster frames ship as assets for first paint / offline fallback. No invented
+MP4 paths and no committed video binaries.
+
+## RPC honesty
+
+- Default local write: `127.0.0.1:8546` (loopback only; also `::1` / `localhost`)
+- Refuse non-loopback send (including `0.0.0.0` and public seed IPs)
+- Do not bind write RPC to `0.0.0.0:8545`
+- Public read remains `34.27.30.115:38546` / site `/api/rpc`
 
 ## Prerequisites
 
 1. Flutter stable (3.35+ / Dart 3.9+) with desktop enabled:
    - Linux: `flutter config --enable-linux-desktop`
-   - Windows: `flutter config --enable-windows-desktop`
-2. A local `additiond` listening for write RPC on `127.0.0.1:8545`, e.g.:
+2. A local `additiond` listening for write RPC on loopback, e.g.:
 
 ```bash
-./build/additiond --network testnet
+./build/additiond --mainnet
+# or testnet on :8545 — change Host:port in Node settings
 ```
 
-Linux desktop build also needs GTK/CMake tooling (`clang`, `cmake`, `ninja-build`,
-`pkg-config`, `libgtk-3-dev`).
+Linux desktop build needs GTK/CMake tooling (`clang`, `cmake`, `ninja-build`,
+`pkg-config`, `libgtk-3-dev`). Video banners need a working `video_player`
+backend (GStreamer on Linux).
 
 ## Run (development)
 
 From this directory (`client/addition_app`):
-
-### Linux
 
 ```bash
 flutter pub get
 flutter run -d linux
 ```
 
-### Windows
-
-```powershell
-flutter pub get
-flutter run -d windows
-```
-
-## Build release binaries
-
-### Linux
+## Build release binary (Linux first-class)
 
 ```bash
 flutter pub get
@@ -67,40 +79,11 @@ flutter build linux --release
 Binary (typical path):
 
 ```text
-build/linux/x64/release/bundle/addition_wallet
+build/linux/x64/release/bundle/addition_core
 ```
 
-### Windows
-
-```powershell
-flutter pub get
-flutter build windows --release
-```
-
-Binary (typical path):
-
-```text
-build\windows\x64\runner\Release\addition_wallet.exe
-```
-
-## First-run helper scripts
-
-From the repo root (keeps write RPC on loopback; does not change the #55 wallet UI):
-
-```bash
-./scripts/setup_desktop.sh --mode testnet --run-wallet
-./scripts/setup_desktop.sh --start-only --mode testnet
-./scripts/setup_desktop.sh --stop --mode testnet
-```
-
-Windows: start the node in WSL via `setup_desktop.sh`, then
-`powershell -ExecutionPolicy Bypass -File scripts\setup_desktop.ps1 -Mode testnet -RunWallet`.
-
-Optional loopback tools:
-- EVM bridge: `python3 web/evm/evm_rpc_bridge.py` (`127.0.0.1:9545`, send disabled)
-- Local mining pool: `python3 tools/mining_pool.py coordinator` (not NiceHash; refuses public/LAN mine ports)
-
-`lib/rpc/evm_jsonrpc_client.dart` is a loopback client for that EVM bridge (additive; not wired into a separate Status wizard).
+This host/CI path publishes the Linux bundle. Do not claim a Windows `.exe`
+unless that package was actually produced.
 
 ## Tests
 
@@ -109,12 +92,7 @@ flutter test
 python3 scripts/rpc_smoke.py   # needs a live local additiond
 ```
 
-Unit tests cover write-RPC loopback policy, command builders, getinfo network
-labels, and refuse private-key / insecure-command paths. They do not invent
-balances or claim a live mainnet.
-
 ## Out of scope
 
-DEX/swap UI, token sale, public write RPC, BIP wallets, and exporting private
-keys. No #56 Status/first-run wizard overlay — the #55 wallet screen remains
-the product UI.
+SmartChain, fake ZK, fake TPS, fake DEX / Swap-to-BTC / Solidity IDE, public
+send, binding `0.0.0.0:8545`, and store shipping claims without real packages.

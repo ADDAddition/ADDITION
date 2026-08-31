@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'ui/core_shell.dart';
 import 'ui/theme.dart';
-import 'ui/wallet_screen.dart';
 
 void main() {
   runApp(const AdditionApp());
@@ -13,10 +13,10 @@ class AdditionApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'ADDITION Wallet',
+      title: 'Addition Core',
       debugShowCheckedModeBanner: false,
       theme: AdditionTheme.dark(),
-      home: const WalletScreen(),
+      home: const CoreShell(),
     );
   }
 }
