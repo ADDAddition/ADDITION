@@ -13,30 +13,47 @@
   <header id="site-header"></header>
   <main class="prose">
     <div class="banner">From <code>docs/MAINNET_RUNBOOK.md</code>. Separate chain. Default remains <code>additiond --network testnet</code>. Not a live public network.</div>
-    <h2>Mainnet node runbook (not a live public network)</h2>
+    <h2>ADDITION mainnet runbook (public chain)</h2>
 <p>Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
-<p><code>additiond --mainnet</code> (same as <code>--network mainnet</code>) starts a <strong>separate</strong> chain: <code>network_id=ADDITION_MAINNET_V1</code>, genesis file <code>genesis-mainnet.json</code>, default data dir <code>data-mainnet</code>.</p>
-<p>That is not a label flip on the public testnet, and it is <strong>not</strong> a live public network.</p>
-<p>The public site and <code>https://rpc.additionblockchain.com</code> stay on <code>ADDITION_TESTNET_V1</code>.</p>
-<p>Do not point additionblockchain.com at this process. Do not open write RPC <code>8545</code>/<code>8546</code> to the internet. Do not bootstrap <code>34.27.30.115:28545</code>.</p>
+<p>This is the <strong>public ADDITION mainnet</strong>: <code>network_id=ADDITION_MAINNET_V1</code>, genesis <code>genesis-mainnet.json</code>, default data dir <code>data-mainnet</code>.</p>
+<p>Run <code>additiond --mainnet</code> (same as <code>--network mainnet</code>) like <code>bitcoind</code>: anyone can join the P2P network, sync from the public seed, and mine locally on loopback write RPC.</p>
+<table><tr><th>Public seed</th><th>Role</th></tr><tr><td><code>34.27.30.115:28546</code></td><td>P2P bootstrap</td></tr><tr><td><code>34.27.30.115:38546</code></td><td>HTTP public read (<code>/rpc?cmd=getinfo</code>)</td></tr></table>
+<p>That is a separate chain from the research testnet (<code>28545</code> / <code>38545</code> / HTTP <code>:80</code>). Not a label flip.</p>
+<p>The public website and explorer stay on testnet until the operator switches them. This runbook does not flip the explorer.</p>
+<p>Do not open write RPC <code>8545</code>/<code>8546</code> to the internet. Never bind write RPC to <code>0.0.0.0</code>. Do not bootstrap <code>34.27.30.115:28545</code> for mainnet.</p>
 <p>Unit file: <a href="../deploy/systemd/additiond-mainnet.service"><code>deploy/systemd/additiond-mainnet.service</code></a></p>
+<h2>Join mainnet (home node)</h2>
+<p>Build <code>additiond</code> from this repository on <code>main</code>. Set <code>ADDITION_PRIVACY_MASTER_KEY</code> to at least 32 characters. Then:</p>
+<pre>export ADDITION_PRIVACY_MASTER_KEY=&#x27;replace-with-32-or-more-chars____&#x27;
+export ADDITION_ENABLE_P2P_RPC=1
+./build/additiond --mainnet \
+  --data-dir $HOME/addition-mainnet \
+  --local-rpc-port 8546 \
+  --p2p-port 28547 \
+  --bootstrap 34.27.30.115:28546
+# then: sync   (HTTP :38546 getblockraw and/or P2P HELLO+REQBLK)
+# then: mine on 127.0.0.1:8546 only</pre>
+<p>Type <code>sync</code> on the daemon stdin (or send it to write RPC on <code>127.0.0.1:8546</code>), then <code>getinfo</code>.</p>
+<p>Never pass <code>--bootstrap 34.27.30.115:28545</code> on mainnet (research testnet seed only). Never publish port <code>8546</code>.</p>
+<h3>Public read (HTTP ingest)</h3>
+<pre>curl -s &#x27;http://34.27.30.115:38546/rpc?cmd=getinfo&#x27;</pre>
+<p>Expect <code>network=mainnet</code> and <code>network_id=ADDITION_MAINNET_V1</code>. Height may still be <code>0</code>; copy only what <code>getinfo</code> prints. Auto-mine stays off on mainnet. Do not invent peer counts or TPS.</p>
+<p><code>config-mainnet.toml</code> lists bootstrap peer <code>34.27.30.115:28546</code>. Seed operators set <code>ADDITION_ADVERTISED_P2P=34.27.30.115:28546</code> so public <code>getinfo</code> / <code>peers</code> advertise that IPv4 endpoint and never list <code>self</code>.</p>
 <h2>What <code>--mainnet</code> changes</h2>
-<table><tr><th>Item</th><th>Testnet (unchanged)</th><th>Mainnet</th></tr><tr><td>Flag</td><td><code>--network testnet</code></td><td><code>--mainnet</code> or <code>--network mainnet</code></td></tr><tr><td><code>network</code> / <code>network_id</code></td><td><code>testnet</code> / <code>ADDITION_TESTNET_V1</code></td><td><code>mainnet</code> / <code>ADDITION_MAINNET_V1</code></td></tr><tr><td>Genesis</td><td><code>genesis.json</code> timestamp <code>1763000000</code></td><td><code>genesis-mainnet.json</code> timestamp <code>1770000000</code></td></tr><tr><td>Data dir</td><td><code>data</code></td><td><code>data-mainnet</code></td></tr><tr><td>Write RPC</td><td><code>127.0.0.1:8545</code></td><td><code>127.0.0.1:8546</code></td></tr><tr><td>Public read</td><td><code>0.0.0.0:38545</code> (opt-in)</td><td><code>0.0.0.0:38546</code> (opt-in)</td></tr><tr><td>P2P</td><td><code>28545</code> (off unless env)</td><td><code>28546</code> (off unless env)</td></tr><tr><td>PoW</td><td>SHA3-512</td><td>memory_hard (1 MiB × 16 rounds)</td></tr><tr><td>Difficulty</td><td>easy <code>0x0000FFFFFFFFFFFF</code> (~4 ms observed)</td><td>hard floor <code>0x000000FFFFFFFFFF</code></td></tr></table>
+<table><tr><th>Item</th><th>Research testnet</th><th>Public mainnet</th></tr><tr><td>Flag</td><td><code>--network testnet</code></td><td><code>--mainnet</code> or <code>--network mainnet</code></td></tr><tr><td><code>network</code> / <code>network_id</code></td><td><code>testnet</code> / <code>ADDITION_TESTNET_V1</code></td><td><code>mainnet</code> / <code>ADDITION_MAINNET_V1</code></td></tr><tr><td>Genesis</td><td><code>genesis.json</code> timestamp <code>1763000000</code></td><td><code>genesis-mainnet.json</code> timestamp <code>1770000000</code></td></tr><tr><td>Data dir</td><td><code>data</code></td><td><code>data-mainnet</code></td></tr><tr><td>Write RPC</td><td><code>127.0.0.1:8545</code></td><td><code>127.0.0.1:8546</code></td></tr><tr><td>Public read</td><td><code>0.0.0.0:38545</code> (opt-in)</td><td><code>0.0.0.0:38546</code> (seed: <code>34.27.30.115:38546</code>)</td></tr><tr><td>P2P</td><td><code>28545</code> (research seed)</td><td><code>28546</code> public seed; home nodes use another port (e.g. <code>28547</code>)</td></tr><tr><td>PoW</td><td>SHA3-512</td><td>memory_hard (1 MiB × 16 rounds)</td></tr><tr><td>Difficulty</td><td>easy <code>0x0000FFFFFFFFFFFF</code> (~4 ms observed)</td><td>hard floor <code>0x000000FFFFFFFFFF</code></td></tr></table>
 <p><code>getinfo</code> reports <code>network=mainnet</code> and <code>network_id=ADDITION_MAINNET_V1</code> only when this chain is actually running.</p>
 <p>A testnet process still reports <code>network=testnet</code>. Mixing a testnet <code>blocks.dat</code> or <code>network.dat</code> into a mainnet <code>--data-dir</code> is refused.</p>
 <p><code>ADDITION_PRIVACY_MASTER_KEY</code> (min 32 characters) is required to start <code>--mainnet</code>. Auto-mine is refused.</p>
 <h2>Mine (local write RPC only)</h2>
-<p>The 30s <code>mine</code> deadline is a <strong>testnet leftover</strong>. On <code>--mainnet</code> the search</p>
-<p>runs until it finds a block (<code>mine_deadline_sec=0</code> in <code>getinfo</code>). Testnet</p>
-<p>keeps the 30s bound.</p>
+<p>On <code>--mainnet</code> the search runs until it finds a block (<code>mine_deadline_sec=0</code> in <code>getinfo</code>). There is no 30s mine timeout (that bound is testnet-only).</p>
 <p><code>mine</code> uses a multi-thread <code>memory_hard</code> miner (one 1 MiB scratch buffer per</p>
 <p>thread, <code>hardware_concurrency</code> workers by default) against the existing</p>
 <p>target <code>0x000000FFFFFFFFFF</code>. That is about 2^24 hashes. Do not loosen it.</p>
 <p>Do not invent TPS.</p>
-<p>Write RPC stays <code>127.0.0.1:8546</code>. Public read cannot mine. This is a local</p>
-<p>profile, not a live public network.</p>
+<p>Write RPC stays <code>127.0.0.1:8546</code>. Public read cannot mine. Public RPC still refuses <code>mine</code> / <code>createwallet</code> / <code>send</code>.</p>
 <pre>printf &#x27;mine miner1\n&#x27; | nc 127.0.0.1 8546
 # waits until a nonce meets the target; clients must not use a 30s timeout</pre>
+<p>After a local <code>mine</code>, the node announces <code>BLK|</code> and <code>gossip_flush</code> pushes to peers.</p>
 <h2>Difficulty (what we picked and why)</h2>
 <p>The existing retarget in <code>src/chain.cpp</code> compares the last <code>retarget_window</code> (30) block timestamps to <code>window * target_block_time_sec</code> (30 × 60s).</p>
 <p>If blocks arrive early, the target is multiplied by <code>9/10</code> (harder). If they arrive late, the target is scaled up, then clamped to <code>[min_difficulty_target, max_difficulty_target]</code>.</p>
@@ -62,22 +79,23 @@ sudo chown -R addition:addition /var/lib/addition/mainnet
 # /etc/addition/mainnet.env  (mode 0640, owner root:addition)
 # ADDITION_PRIVACY_MASTER_KEY=&lt;32+ chars&gt;
 # ADDITION_RPC_TOKEN=&lt;optional write-RPC token&gt;
-# ADDITION_ENABLE_P2P_RPC=1   # optional; off by default
+# ADDITION_ENABLE_P2P_RPC=1
+# ADDITION_ADVERTISED_P2P=34.27.30.115:28546   # public seed operator
 sudo install -m 0644 deploy/systemd/additiond-mainnet.service /etc/systemd/system/additiond-mainnet.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now additiond-mainnet.service</pre>
-<table><tr><th>Listener</th><th>Bind</th><th>Port</th><th>Role</th></tr><tr><td>Public read RPC</td><td><code>0.0.0.0</code></td><td><strong>38546</strong></td><td>Allowlisted reads only</td></tr><tr><td>Write / admin RPC</td><td><code>127.0.0.1</code></td><td><strong>8546</strong></td><td>Trusted local only; never public</td></tr><tr><td>P2P</td><td><code>0.0.0.0</code></td><td><strong>28546</strong></td><td>Off unless <code>ADDITION_ENABLE_P2P_RPC=1</code></td></tr></table>
+<table><tr><th>Listener</th><th>Bind</th><th>Port</th><th>Role</th></tr><tr><td>Public read RPC</td><td><code>0.0.0.0</code></td><td><strong>38546</strong></td><td>Allowlisted reads only (seed: <code>34.27.30.115:38546</code>)</td></tr><tr><td>Write / admin RPC</td><td><code>127.0.0.1</code></td><td><strong>8546</strong></td><td>Trusted local only; never public</td></tr><tr><td>P2P</td><td><code>0.0.0.0</code></td><td><strong>28546</strong></td><td>Public seed; home nodes use another port (e.g. 28547). Needs <code>ADDITION_ENABLE_P2P_RPC=1</code></td></tr></table>
 <p>Never publish <strong>8545</strong> or <strong>8546</strong>. Never enable LAN RPC (<code>18546</code>) on a public interface.</p>
-<p>If you also run the testnet unit, keep its ports (38545 / 8545 / 28545) and its <code>/var/lib/addition/testnet</code> data dir.</p>
+<p>If you also run the research testnet unit, keep its ports (38545 / 8545 / 28545) and its <code>/var/lib/addition/testnet</code> data dir.</p>
 <pre>printf &#x27;getinfo\n&#x27; | nc 127.0.0.1 38546
 curl -s &#x27;http://127.0.0.1:38546/rpc?cmd=getinfo&#x27;
 printf &#x27;mine\n&#x27; | nc 127.0.0.1 38546
 # error: command disabled on public RPC</pre>
 <p><code>getinfo</code> must include <code>network=mainnet</code> and <code>network_id=ADDITION_MAINNET_V1</code>.</p>
-<p>That only means this process loaded the mainnet genesis. It does not mean a public mainnet is live.</p>
-<h2>P2P (optional)</h2>
-<p>P2P is off unless <code>ADDITION_ENABLE_P2P_RPC=1</code>. HELLO carries <code>ADDITION_MAINNET_V1</code>, so a testnet peer is rejected.</p>
-<p>If you enable P2P, allow TCP <strong>28546</strong> only, and list your own IPv4 <code>ip:port</code> peers. Do not use the public testnet seed.</p>
+<h2>P2P (public mainnet seed)</h2>
+<p>P2P listen is off unless <code>ADDITION_ENABLE_P2P_RPC=1</code>. HELLO carries <code>ADDITION_MAINNET_V1</code>, so a testnet peer is rejected.</p>
+<p>Public bootstrap is <strong>34.27.30.115:28546</strong>. Do not use the research testnet seed <code>34.27.30.115:28545</code>. If TCP 28546 is filtered on your path, use HTTP <code>:38546</code> for <code>getinfo</code> / ingest checks (<code>getblockraw</code>), then retry P2P (<code>HELLO</code>+<code>REQBLK</code>).</p>
+<p>Do not loosen <code>memory_hard</code> / <code>0x000000FFFFFFFFFF</code>. Do not auto-mine. Do not bind write RPC to <code>0.0.0.0</code>.</p>
 <h2>Rollback</h2>
 <p>Stop the unit (<code>systemctl stop additiond-mainnet</code>). Snapshot <code>/var/lib/addition/mainnet</code>.</p>
 <p>Restore that directory if you need the same genesis and height. A testnet <code>data</code> / <code>blocks.dat</code> will not load here.</p>
