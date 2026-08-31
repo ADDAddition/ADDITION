@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Download — ADDITION</title>
-  <meta name="description" content="ADDITION desktop wallet helper. Loopback write RPC only.">
+  <meta name="description" content="ADDITION desktop wallet helper for mainnet. Loopback write RPC only.">
   <meta name="theme-color" content="#f3f6fa">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/favicon.ico">
@@ -14,60 +14,63 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="Download" data-sub="testnet / local">
+<body data-title="Download" data-sub="mainnet / local">
   <header id="site-header"></header>
   <main class="prose">
     <section class="product-hero" style="padding-top:1rem;padding-bottom:0.25rem">
       <p class="eyebrow">Desktop helper</p>
       <h1>Download</h1>
       <p class="lede">
-        Testnet / local wallet helper. Write RPC stays on this machine.
+        Mainnet / local wallet helper for <code>ADDITION_MAINNET_V1</code>.
+        Write RPC stays on this machine (<code>127.0.0.1:8546</code>).
         Prefer the in-browser <a href="/wallet/">Wallet</a> PWA when
-        <code>python3 web/serve.py</code> sits next to your node.
+        <code>ADDITION_NETWORK=mainnet python3 web/serve.py</code> sits next to your node
+        (spend path: <code>/local-rpc</code>).
       </p>
     </section>
 
     <div class="banner">
       Not a hosted custodial wallet. Keys stay on disk. The helper refuses any RPC host other than loopback.
+      Public read <code>34.27.30.115:38546</code> has no <code>wallet_send</code>.
     </div>
 
     <section class="panel">
       <h2>What this is</h2>
       <ul>
         <li>A desktop helper packaged from <code>web/addition_wallet_gui.py</code> and <code>web/addition_wallet.py</code></li>
-        <li>Talks only to <code>127.0.0.1:8545</code> (or <code>::1</code> / <code>localhost</code>)</li>
+        <li>Talks only to <code>127.0.0.1:8546</code> by default (or <code>::1</code> / <code>localhost</code>)</li>
         <li>Refuses any other RPC host — including public <code>38545</code> / <code>38546</code> / <code>:80</code></li>
         <li>Never prints a private key</li>
-        <li>Needs a local <code>additiond --network testnet</code></li>
+        <li>Needs a local <code>additiond --mainnet</code> with write RPC on loopback</li>
       </ul>
-      <p class="note">additionblockchain.com has no write RPC. The public <a href="/wallet/">/wallet/</a> page stays fail-closed there and explains how to connect a home node.</p>
+      <p class="note">additionblockchain.com has no write RPC. The public <a href="/wallet/">/wallet/</a> page stays fail-closed there and explains how to connect a home node. PWA spend is <code>/local-rpc</code> → loopback only.</p>
     </section>
 
     <section class="panel">
       <h2>Cashiers / Windows</h2>
       <p>Download the live wallet files on this page. Do not compile. There is no Windows compile path here. This host does not publish a <code>.exe</code>.</p>
-      <p><a href="/download/addition-wallet-testnet">addition-wallet-testnet</a> — GUI + <code>--cli</code></p>
-      <p><a href="/download/addition-wallet-cli-testnet">addition-wallet-cli-testnet</a> — caller-disk CLI</p>
-      <p>Run against a local <code>additiond --network testnet</code> on <code>127.0.0.1:8545</code>.</p>
+      <p><a href="/download/addition-wallet-mainnet">addition-wallet-mainnet</a> — GUI + <code>--cli</code></p>
+      <p><a href="/download/addition-wallet-cli-mainnet">addition-wallet-cli-mainnet</a> — caller-disk CLI</p>
+      <p>Run against a local <code>additiond --mainnet</code> on <code>127.0.0.1:8546</code>.</p>
     </section>
 
     <section class="panel">
-      <h2>Linux (testnet / local)</h2>
+      <h2>Linux (mainnet / local)</h2>
       <p>These are Linux commands. Do not paste them into PowerShell.</p>
-      <p><a href="/download/addition-wallet-testnet">addition-wallet-testnet</a> — GUI + <code>--cli</code></p>
-      <p><a href="/download/addition-wallet-cli-testnet">addition-wallet-cli-testnet</a> — caller-disk CLI</p>
-      <pre>chmod +x addition-wallet-testnet
+      <p><a href="/download/addition-wallet-mainnet">addition-wallet-mainnet</a> — GUI + <code>--cli</code></p>
+      <p><a href="/download/addition-wallet-cli-mainnet">addition-wallet-cli-mainnet</a> — caller-disk CLI</p>
+      <pre>chmod +x addition-wallet-mainnet
 # terminal 1
-additiond --network testnet --data-dir $HOME/addition-testnet
+additiond --mainnet --data-dir $HOME/addition-mainnet --local-rpc-port 8546
 # terminal 2
-./addition-wallet-testnet --cli getinfo
+./addition-wallet-mainnet --cli getinfo
 # optional GUI (needs a display)
-./addition-wallet-testnet</pre>
+./addition-wallet-mainnet</pre>
     </section>
 
     <section class="panel">
       <h2>Install the website as an app</h2>
-      <p>On iPhone: Safari → Share → Add to Home Screen. On Android: Chrome → Install app / Add to Home screen. That installs this PWA; spending still needs your local node.</p>
+      <p>On iPhone: Safari → Share → Add to Home Screen. On Android: Chrome → Install app / Add to Home screen. That installs this PWA; spending still needs your local node via <code>/local-rpc</code>.</p>
       <p>Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
     </section>
   </main>

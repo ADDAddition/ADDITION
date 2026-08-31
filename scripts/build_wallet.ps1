@@ -1,4 +1,4 @@
-# Build Windows testnet/local wallet executables.
+# Build Windows mainnet/local wallet executables.
 # Run on Windows with Python 3.10+.
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
@@ -26,10 +26,10 @@ function Build-One([string]$Name, [string]$Src) {
   if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed for $Name" }
 }
 
-Build-One "addition-wallet-testnet" (Join-Path $Root "web\addition_wallet_gui.py")
-Build-One "addition-wallet-cli-testnet" (Join-Path $Root "web\addition_wallet.py")
+Build-One "addition-wallet-mainnet" (Join-Path $Root "web\addition_wallet_gui.py")
+Build-One "addition-wallet-cli-mainnet" (Join-Path $Root "web\addition_wallet.py")
 
-$Gui = Join-Path $Out "addition-wallet-testnet.exe"
-$Cli = Join-Path $Out "addition-wallet-cli-testnet.exe"
+$Gui = Join-Path $Out "addition-wallet-mainnet.exe"
+$Cli = Join-Path $Out "addition-wallet-cli-mainnet.exe"
 python (Join-Path $Root "scripts\smoke_wallet_binary.py") $Gui $Cli
 Write-Host "wallet binaries ready in $Out"

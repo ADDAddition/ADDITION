@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Local ADDITION testnet wallet (TEXT RPC on 127.0.0.1:8545).
+"""Local ADDITION mainnet wallet helper (TEXT RPC on 127.0.0.1:8546).
 
-Research testnet only. Keys stay in a gitignored file and are never placed
-on the RPC line for spend. Signing is ML-DSA-87 via liboqs.
+Mainnet / local helper. Keys stay in a gitignored file and are never placed
+on the RPC line for spend. Signing is ML-DSA-87 via liboqs. Not a hosted
+custodial wallet. Public 38546 has no wallet_send.
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
 DEFAULT_RPC_HOST = "127.0.0.1"
-DEFAULT_RPC_PORT = 8545
+DEFAULT_RPC_PORT = 8546
 DEFAULT_WALLET_PATH = Path("data") / "addition.wallet"
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 ML_DSA_87 = "ml-dsa-87"
@@ -132,7 +133,7 @@ class LiboqsMlDsa87:
             pub_hex = bytes(public_key).hex()
             priv_hex = bytes(secret_key).hex()
             return WalletRecord(
-                network="testnet",
+                network="mainnet",
                 algorithm=ML_DSA_87,
                 address=derive_address(pub_hex),
                 public_key=pub_hex,
@@ -228,7 +229,7 @@ class WalletStore:
     def save(self, record: WalletRecord) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         body = (
-            "# ADDITION research testnet wallet. Keep this file private.\n"
+            "# ADDITION mainnet local wallet. Keep this file private.\n"
             "# Never commit it. Never paste the private key into RPC.\n"
             f"network={record.network}\n"
             f"algorithm={record.algorithm}\n"
@@ -428,7 +429,7 @@ class WalletClient:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="ADDITION local testnet wallet. Research prototype only.",
+        description="ADDITION local mainnet wallet. Loopback write RPC only.",
     )
     parser.add_argument(
         "--wallet",

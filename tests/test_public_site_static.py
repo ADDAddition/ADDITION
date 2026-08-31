@@ -103,11 +103,34 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("latest-blocks", index)
         self.assertIn("/wallet/", index)
         self.assertIn("/explorer.js", index)
+        self.assertIn("<h1>ADDITION</h1>", index)
+        self.assertIn("hero-banners", index)
+        self.assertIn("/banners/addition-banner-1.mp4", index)
+        self.assertIn("/banners/addition-banner-2.mp4", index)
+        self.assertIn("muted", index)
+        self.assertIn("autoplay", index)
+        self.assertIn("playsinline", index)
         self.assertNotIn('net-badge">TESTNET</span>', index)
         self.assertNotIn("ADDITION_TESTNET_V1", index)
         self.assertNotIn("0.0.0.0:8545", index)
+        self.assertNotIn("SmartChain", index)
         self.assertNotIn("DEX", index)
         self.assertNotIn("token sale", index.lower())
+
+    def test_download_is_mainnet_helper(self) -> None:
+        download = read("download/index.html")
+        self.assertIn('data-sub="mainnet / local"', download)
+        self.assertIn("addition-wallet-mainnet", download)
+        self.assertIn("addition-wallet-cli-mainnet", download)
+        self.assertIn("additiond --mainnet", download)
+        self.assertIn("127.0.0.1:8546", download)
+        self.assertIn("/local-rpc", download)
+        self.assertIn("wallet_send", download)
+        self.assertIn("does not publish a <code>.exe</code>", download)
+        self.assertNotIn("addition-wallet-testnet", download)
+        self.assertNotIn('data-sub="testnet / local"', download)
+        self.assertNotIn("0.0.0.0:8545", download)
+        self.assertIn("Not a hosted custodial wallet", download)
 
     def test_status_and_manifest_are_mainnet(self) -> None:
         status = read("status/index.html")
@@ -200,10 +223,18 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("ADDITION_MAINNET_V1", readme)
         self.assertIn("34.27.30.115:38546", readme)
         self.assertIn("100% to finding miner", readme)
+        self.assertIn("addition-wallet-mainnet", readme)
+        self.assertIn("127.0.0.1:8546", readme)
+        self.assertNotIn("addition-wallet-testnet", readme)
         self.assertNotIn("public product: testnet", readme)
         self.assertIn("MAINNET", site_readme)
         self.assertIn("38546", site_readme)
         self.assertNotRegex(readme.lower(), r"\bhonest\b")
+
+    def test_chrome_brand_stays_addition(self) -> None:
+        chrome = read("chrome.js")
+        self.assertIn('class="brand-name">ADDITION</span>', chrome)
+        self.assertNotIn("SmartChain", chrome)
 
     def test_serve_defaults_to_mainnet_public_port(self) -> None:
         spec = importlib.util.spec_from_file_location("addition_serve", ROOT / "web" / "serve.py")

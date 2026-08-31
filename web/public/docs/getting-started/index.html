@@ -47,8 +47,8 @@
 <p>Whole integers. No 8-decimal subunit. Block reward <code>50</code> (100% to finding miner), <code>max_supply</code> <code>50000000</code>, min fee <code>0</code>.</p>
 <hr>
 <h2>Cashiers / Windows</h2>
-<p>Cashiers and Windows users download the live testnet / local wallet from <a href="https://additionblockchain.com/download/">https://additionblockchain.com/download/</a> only (<code>addition-wallet-testnet</code> and <code>addition-wallet-cli-testnet</code>). Do not compile liboqs. There is no Windows compile path in this README. This host does not publish a <code>.exe</code>.</p>
-<p>The helper talks to write RPC on <code>127.0.0.1:8545</code> on the machine that already runs <code>additiond --network testnet</code>. additionblockchain.com has no public write RPC.</p>
+<p>Cashiers and Windows users download the live mainnet / local wallet from <a href="https://additionblockchain.com/download/">https://additionblockchain.com/download/</a> only (<code>addition-wallet-mainnet</code> and <code>addition-wallet-cli-mainnet</code>). Do not compile liboqs. There is no Windows compile path in this README. This host does not publish a <code>.exe</code>.</p>
+<p>The helper talks to write RPC on <code>127.0.0.1:8546</code> on the machine that already runs <code>additiond --mainnet</code>. additionblockchain.com has no public write RPC (<code>38546</code> has no <code>wallet_send</code>; PWA spend is <code>/local-rpc</code> → loopback).</p>
 <h3>Flutter desktop + local operator tools (loopback)</h3>
 <p>Linux operators can also use the Flutter desktop wallet from this repo (<code>client/addition_app</code>, shipped in #55) and optional loopback helpers:</p>
 <pre># Linux: deps + build + start testnet write on 127.0.0.1:8545

@@ -116,16 +116,17 @@ sendtx_signed_hash <from> <pub> <to> <amount> <fee> <nonce> <sig_hex>
 
 The client refuses to emit `sendtx`, `sendtx_hash`, or `sign_message`.
 
-## Packaged desktop binary (testnet / local)
+## Packaged desktop binary (mainnet / local)
 
 ```bash
 ./scripts/build_wallet.sh
-./web/public/download/addition-wallet-testnet --cli getinfo
+./web/public/download/addition-wallet-mainnet --cli getinfo
 ```
 
 Windows: `powershell -File scripts\build_wallet.ps1`. Details in
 [`packaging/README.md`](../packaging/README.md). The public `/download/` page
-links those files. RPC stays loopback-only.
+links those files as mainnet helpers (default write `127.0.0.1:8546`). RPC stays
+loopback-only. Public `38546` has no `wallet_send`.
 
 ### Tests without a running daemon
 

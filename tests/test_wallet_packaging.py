@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Packaging and loopback checks for the testnet/local wallet binaries."""
+"""Packaging and loopback checks for the mainnet/local wallet binaries."""
 
 from __future__ import annotations
 
@@ -50,14 +50,16 @@ class WalletPackagingTests(unittest.TestCase):
         self.assertTrue(readme.is_file())
         text = readme.read_text(encoding="utf-8")
         self.assertIn("./scripts/build_wallet.sh", text)
-        self.assertIn("testnet", text.lower())
+        self.assertIn("mainnet", text.lower())
+        self.assertIn("addition-wallet-mainnet", text)
         self.assertIn("127.0.0.1", text)
+        self.assertNotIn("addition-wallet-testnet", text)
         self.assertNotIn("wallet-connect", text.lower())
         self.assertNotRegex(text.lower(), r"\bhonest\b")
 
     def test_packaged_binary_smoke_when_present(self) -> None:
-        gui = ROOT / "web" / "public" / "download" / "addition-wallet-testnet"
-        cli = ROOT / "web" / "public" / "download" / "addition-wallet-cli-testnet"
+        gui = ROOT / "web" / "public" / "download" / "addition-wallet-mainnet"
+        cli = ROOT / "web" / "public" / "download" / "addition-wallet-cli-mainnet"
         if not gui.is_file():
             self.skipTest("run ./scripts/build_wallet.sh to produce the Linux binary")
         cmd = [sys.executable, str(ROOT / "scripts" / "smoke_wallet_binary.py"), str(gui)]

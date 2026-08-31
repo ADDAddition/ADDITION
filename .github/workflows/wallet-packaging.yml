@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Build and smoke the testnet/local wallet binary
+      - name: Build and smoke the mainnet/local wallet binary
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-tk
@@ -31,7 +31,7 @@ jobs:
         run: python3 -m unittest tests.test_wallet_packaging tests.test_wallet_client
       - uses: actions/upload-artifact@v4
         with:
-          name: addition-wallet-testnet-linux
+          name: addition-wallet-mainnet-linux
           path: |
-            web/public/download/addition-wallet-testnet
-            web/public/download/addition-wallet-cli-testnet
+            web/public/download/addition-wallet-mainnet
+            web/public/download/addition-wallet-cli-mainnet
