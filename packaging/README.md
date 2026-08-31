@@ -1,8 +1,8 @@
-# ADDITION wallet packaging (testnet / local)
+# ADDITION wallet packaging (mainnet / local)
 
 Package the local wallet helpers into a file a stranger can download and run.
-This is **testnet / local** only. It is not a hosted web wallet and not a live
-mainnet product.
+This is a **mainnet / local** helper for `ADDITION_MAINNET_V1`. It is not a hosted
+web wallet and not a custodial product. Write RPC stays loopback.
 
 Public contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com)
 
@@ -16,7 +16,7 @@ This packaging path still uses PyInstaller around:
 * `web/addition_wallet.py` — caller-disk CLI (keys on the caller, loopback RPC)
 
 Both refuse non-loopback RPC hosts (`127.0.0.1`, `::1`, `localhost`). Neither
-prints a private key.
+prints a private key. Default write port is `8546` (mainnet).
 
 ## One-command Linux build + smoke
 
@@ -28,8 +28,8 @@ From the repository root:
 
 That installs PyInstaller if needed, writes:
 
-* `web/public/download/addition-wallet-testnet`
-* `web/public/download/addition-wallet-cli-testnet`
+* `web/public/download/addition-wallet-mainnet`
+* `web/public/download/addition-wallet-cli-mainnet`
 
 then runs `scripts/smoke_wallet_binary.py` (binary starts; non-loopback RPC is
 refused).
@@ -45,21 +45,22 @@ On a Windows machine with Python 3.10+:
 powershell -File scripts\build_wallet.ps1
 ```
 
-Output: `web\public\download\addition-wallet-testnet.exe` and
-`addition-wallet-cli-testnet.exe`.
+Output: `web\public\download\addition-wallet-mainnet.exe` and
+`addition-wallet-cli-mainnet.exe`. This Linux packaging host does not publish a
+`.exe`.
 
 ## Run
 
 ```bash
-additiond --network testnet
-./web/public/download/addition-wallet-testnet --cli getinfo
+additiond --mainnet --local-rpc-port 8546
+./web/public/download/addition-wallet-mainnet --cli getinfo
 ```
 
 Override loopback only:
 
 ```bash
-ADDITION_LOCAL_RPC_HOST=127.0.0.1 ADDITION_LOCAL_RPC_PORT=8545 \
-  ./web/public/download/addition-wallet-testnet --cli getinfo
+ADDITION_LOCAL_RPC_HOST=127.0.0.1 ADDITION_LOCAL_RPC_PORT=8546 \
+  ./web/public/download/addition-wallet-mainnet --cli getinfo
 ```
 
 `ADDITION_LOCAL_RPC_HOST=8.8.8.8` must exit non-zero with
@@ -67,5 +68,5 @@ ADDITION_LOCAL_RPC_HOST=127.0.0.1 ADDITION_LOCAL_RPC_PORT=8545 \
 
 ## Site
 
-`/download/` on the public site links these files and stays labeled
-testnet / local. The public host has no write RPC.
+`/download/` on the public site links these files and is labeled mainnet / local.
+The public host has no write RPC. Research testnet remains a separate chain.

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Local/testnet ADDITION wallet helper.
+"""Local mainnet ADDITION wallet helper.
 
-Talks only to trusted RPC on 127.0.0.1:8545 (override with ADDITION_LOCAL_RPC_HOST/PORT).
+Talks only to trusted RPC on 127.0.0.1:8546 (override with ADDITION_LOCAL_RPC_HOST/PORT).
 Does not print or transmit private keys. createwallet stores ML-DSA-87 keys in
 <data-dir>/wallets/<name>.wal on the node. This is a Bitcoin-like user model
-(keys, UTXOs, send/receive, fee) — not BIP compatibility and not a BTC fork.
+(keys, UTXOs, send/receive, fee) — not BIP compatibility and not a custodial wallet.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ def env_int(name: str, default: int) -> int:
 
 def rpc(command: str, timeout: float = 30.0) -> str:
     host = os.environ.get("ADDITION_LOCAL_RPC_HOST", "127.0.0.1")
-    port = env_int("ADDITION_LOCAL_RPC_PORT", 8545)
+    port = env_int("ADDITION_LOCAL_RPC_PORT", 8546)
     if host not in {"127.0.0.1", "::1", "localhost"}:
         raise RuntimeError("wallet helper refuses non-loopback RPC hosts")
     payload = command.strip() + "\n"
@@ -135,7 +135,7 @@ def run_gui() -> int:
         return 2
 
     root = tk.Tk()
-    root.title("ADDITION local wallet (testnet)")
+    root.title("ADDITION local wallet (mainnet)")
     root.geometry("720x640")
 
     status = tk.StringVar(value="Checking local RPC…")
@@ -178,7 +178,7 @@ def run_gui() -> int:
     ttk.Label(frm, textvariable=status, wraplength=680).pack(anchor="w")
     ttk.Label(
         frm,
-        text="Loopback RPC only. Keys stay in the node wallet file. Not BIP-compatible. Not a live mainnet.",
+        text="Loopback RPC only (default 127.0.0.1:8546). Keys stay in the node wallet file. Not BIP-compatible. Not a hosted custodial wallet.",
         wraplength=680,
     ).pack(anchor="w", pady=(0, 8))
 
@@ -240,7 +240,7 @@ def run_gui() -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="ADDITION local/testnet wallet (127.0.0.1 RPC only)")
+    parser = argparse.ArgumentParser(description="ADDITION local mainnet wallet (127.0.0.1:8546 RPC only)")
     parser.add_argument("--cli", dest="cli_cmd", help="createwallet|list|info|balance|send|mine|getinfo|stake|unstake|claim")
     parser.add_argument("--name", default="default")
     parser.add_argument("--to")

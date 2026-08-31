@@ -21,12 +21,12 @@ def smoke_gui(binary: Path) -> None:
     if help_proc.returncode != 0:
         raise SystemExit("gui --help failed:\n%s\n%s" % (help_proc.stdout, help_proc.stderr))
     blob = (help_proc.stdout + help_proc.stderr).lower()
-    if "testnet" not in blob and "127.0.0.1" not in blob:
-        raise SystemExit("gui --help must mention testnet or 127.0.0.1")
+    if "mainnet" not in blob and "127.0.0.1" not in blob:
+        raise SystemExit("gui --help must mention mainnet or 127.0.0.1")
 
     refused = run(
         [str(binary), "--cli", "getinfo"],
-        env={"ADDITION_LOCAL_RPC_HOST": "8.8.8.8", "ADDITION_LOCAL_RPC_PORT": "8545"},
+        env={"ADDITION_LOCAL_RPC_HOST": "8.8.8.8", "ADDITION_LOCAL_RPC_PORT": "8546"},
     )
     text = (refused.stdout + refused.stderr).lower()
     if refused.returncode == 0:

@@ -71,9 +71,9 @@ Whole integers. No 8-decimal subunit. Block reward `50` (100% to finding miner),
 
 ## Cashiers / Windows
 
-Cashiers and Windows users download the live testnet / local wallet from [https://additionblockchain.com/download/](https://additionblockchain.com/download/) only (`addition-wallet-testnet` and `addition-wallet-cli-testnet`). Do not compile liboqs. There is no Windows compile path in this README. This host does not publish a `.exe`.
+Cashiers and Windows users download the live mainnet / local wallet from [https://additionblockchain.com/download/](https://additionblockchain.com/download/) only (`addition-wallet-mainnet` and `addition-wallet-cli-mainnet`). Do not compile liboqs. There is no Windows compile path in this README. This host does not publish a `.exe`.
 
-The helper talks to write RPC on `127.0.0.1:8545` on the machine that already runs `additiond --network testnet`. additionblockchain.com has no public write RPC.
+The helper talks to write RPC on `127.0.0.1:8546` on the machine that already runs `additiond --mainnet`. additionblockchain.com has no public write RPC (`38546` has no `wallet_send`; PWA spend is `/local-rpc` → loopback).
 
 ### Flutter desktop + local operator tools (loopback)
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build Linux testnet/local wallet binaries and smoke-test them.
+# Build Linux mainnet/local wallet binaries and smoke-test them.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -26,11 +26,11 @@ build_one() {
     "$src"
 }
 
-build_one "addition-wallet-testnet" "$ROOT/web/addition_wallet_gui.py"
-build_one "addition-wallet-cli-testnet" "$ROOT/web/addition_wallet.py"
+build_one "addition-wallet-mainnet" "$ROOT/web/addition_wallet_gui.py"
+build_one "addition-wallet-cli-mainnet" "$ROOT/web/addition_wallet.py"
 
-chmod +x "$OUT/addition-wallet-testnet" "$OUT/addition-wallet-cli-testnet"
+chmod +x "$OUT/addition-wallet-mainnet" "$OUT/addition-wallet-cli-mainnet"
 python3 "$ROOT/scripts/smoke_wallet_binary.py" \
-  "$OUT/addition-wallet-testnet" \
-  "$OUT/addition-wallet-cli-testnet"
+  "$OUT/addition-wallet-mainnet" \
+  "$OUT/addition-wallet-cli-mainnet"
 echo "wallet binaries ready in $OUT"
