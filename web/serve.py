@@ -80,8 +80,16 @@ def public_http_rpc(host: str, port: int, command: str, timeout: float = 4.0) ->
     else:
         url = "http://%s:%s/rpc?cmd=%s" % (host, port, encoded)
     req = urllib.request.Request(url, method="GET")
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.read().decode("utf-8", errors="replace").strip()
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.read().decode("utf-8", errors="replace").strip()
+    except urllib.error.HTTPError as exc:
+        # Public nodes return 403 + "error: command disabled…" for non-allowlisted cmds.
+        # Keep that body so callers can classify disabled vs offline vs unknown.
+        body = exc.read().decode("utf-8", errors="replace").strip()
+        if body:
+            return body
+        raise
 
 
 def public_rpc(host: str, port: int, command: str, timeout: float = 4.0) -> str:
@@ -131,6 +139,180 @@ def content_type(path: Path) -> str:
     return "text/plain; charset=utf-8"
 
 
+def parse_kv_fields(line: str) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    text = (line or "").strip()
+    if not text or "=" not in text:
+        return fields
+    for part in text.split():
+        eq = part.find("=")
+        if eq <= 0:
+            continue
+        key = part[:eq]
+        value = part[eq + 1 :]
+        if key:
+            fields[key] = value
+    return fields
+
+
+def parse_height_value(fields: dict[str, str]) -> int | None:
+    raw = fields.get("height")
+    if raw is None:
+        return None
+    try:
+        n = int(raw)
+    except ValueError:
+        return None
+    if n < 0:
+        return None
+    return n
+
+
+LAUNCH_PROBE_COMMANDS = (
+    ("create_token", "create_token"),
+    ("token_create", "token_create"),
+    ("token_mint", "token_mint"),
+    ("swap_pool_create", "swap_pool_create"),
+    ("create_pool", "create_pool"),
+    ("presale", "presale"),
+    ("airdrop", "airdrop"),
+    ("farm", "farm"),
+)
+
+
+def classify_probe(raw: str, offline: bool) -> tuple[bool, str]:
+    if offline:
+        return False, "offline"
+    text = (raw or "").strip()
+    if "command disabled on public RPC" in text:
+        return False, "disabled_on_public_rpc"
+    if "unknown command" in text:
+        return False, "unknown_command"
+    if text.startswith("error: usage"):
+        return True, "usage"
+    if text.startswith("error:"):
+        return True, "error_response"
+    if text:
+        return True, "ok"
+    return False, "unavailable"
+
+
+def public_json_info(host: str, port: int, symbol: str | None = None) -> tuple[int, dict[str, Any]]:
+    try:
+        info_raw = public_rpc(host, port, "getinfo", 4.0)
+    except OSError:
+        return 503, {
+            "ok": False,
+            "offline": True,
+            "brand": "ADDITION",
+            "error": "RPC offline",
+            "price_available": False,
+            "price_usd": None,
+        }
+    if info_raw == "RPC offline" or info_raw.startswith("error: public read RPC"):
+        return 503, {
+            "ok": False,
+            "offline": True,
+            "brand": "ADDITION",
+            "error": "RPC offline",
+            "price_available": False,
+            "price_usd": None,
+        }
+    if info_raw.startswith("error:"):
+        return 502, {
+            "ok": False,
+            "offline": False,
+            "brand": "ADDITION",
+            "error": info_raw,
+            "price_available": False,
+            "price_usd": None,
+        }
+    fields = parse_kv_fields(info_raw)
+    monetary_ok = False
+    try:
+        monetary_raw = public_rpc(host, port, "monetary_info", 4.0)
+        if monetary_raw and not monetary_raw.startswith("error:"):
+            fields.update(parse_kv_fields(monetary_raw))
+            monetary_ok = True
+    except OSError:
+        monetary_ok = False
+    body: dict[str, Any] = {
+        "ok": True,
+        "offline": False,
+        "brand": "ADDITION",
+        "network": fields.get("network"),
+        "network_name": fields.get("network_name"),
+        "network_id": fields.get("network_id"),
+        "height": parse_height_value(fields),
+        "peers": fields.get("peers"),
+        "pq_mode": fields.get("pq_mode"),
+        "pow_algorithm": fields.get("pow_algorithm"),
+        "max_supply": fields.get("max_supply"),
+        "emitted": fields.get("emitted"),
+        "remaining": fields.get("remaining"),
+        "next_reward": fields.get("next_reward"),
+        "next_halving_height": fields.get("next_halving_height"),
+        "price_available": False,
+        "price_usd": None,
+        "price_note": "No market price RPC on this node",
+        "source": {"getinfo": True, "monetary_info": monetary_ok},
+        "raw_fields": fields,
+        "token": None,
+    }
+    if symbol:
+        try:
+            token_raw = public_rpc(host, port, "token_info " + symbol, 4.0)
+            offline = token_raw == "RPC offline"
+            available, reason = classify_probe(token_raw, offline)
+            token_fields = parse_kv_fields(token_raw) if available and not token_raw.startswith("error:") else {}
+            body["token"] = {
+                "symbol": symbol,
+                "available": bool(available and token_fields),
+                "reason": reason,
+                "fields": token_fields,
+                "raw": token_raw,
+            }
+            if not available:
+                body["token"]["note"] = "token_info is not available on the public read path"
+        except OSError:
+            body["token"] = {"symbol": symbol, "available": False, "reason": "offline"}
+    return 200, body
+
+
+def public_json_capabilities(host: str, port: int) -> tuple[int, dict[str, Any]]:
+    probes: dict[str, Any] = {}
+    any_available = False
+    for probe_id, cmd in LAUNCH_PROBE_COMMANDS:
+        try:
+            raw = public_rpc(host, port, cmd, 4.0)
+            offline = raw == "RPC offline"
+        except OSError:
+            raw = "RPC offline"
+            offline = True
+        available, reason = classify_probe(raw, offline)
+        probes[probe_id] = {
+            "command": cmd,
+            "available": available,
+            "reason": reason,
+            "raw": raw,
+        }
+        if available:
+            any_available = True
+    return 200, {
+        "ok": True,
+        "brand": "ADDITION",
+        "network_id": "ADDITION_MAINNET_V1",
+        "public_write": False,
+        "launch_tabs_enabled": any_available,
+        "note": (
+            "At least one launch command answered on the public path"
+            if any_available
+            else "Create Token / Presale / Airdrop / Farm are not available on public mainnet RPC"
+        ),
+        "probes": probes,
+    }
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "addition-site/0.1"
 
@@ -169,6 +351,16 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError:
                 req_id = req_id_raw
             self._jsonrpc({"jsonrpc": "2.0", "id": req_id, "method": method, "params": params})
+            return
+        if path in {"/api", "/api/", "/api/info", "/api/info/", "/api/token", "/api/token/", "/api/capabilities", "/api/capabilities/"}:
+            host = os.environ.get("ADDITION_PUBLIC_RPC_HOST", "127.0.0.1")
+            port = env_int("ADDITION_PUBLIC_RPC_PORT", 38546)
+            if path.rstrip("/").endswith("capabilities"):
+                status, body = public_json_capabilities(host, port)
+            else:
+                symbol = (query.get("symbol") or query.get("token") or [""])[0].strip() or None
+                status, body = public_json_info(host, port, symbol)
+            self._send(status, json.dumps(body), "application/json; charset=utf-8")
             return
         is_api = path in {"/api/rpc", "/local-rpc"} or (path == "/rpc" and "cmd" in query)
         if is_api:
@@ -324,7 +516,7 @@ def main() -> None:
     port = env_int("ADDITION_SITE_PORT", 8080)
     httpd = ThreadingHTTPServer((bind, port), Handler)
     print(
-        "ADDITION site on http://%s:%s (/api/rpc allowlist, /jsonrpc public-read, /local-rpc loopback-only)"
+        "ADDITION site on http://%s:%s (/api/info JSON, /api/rpc allowlist, /jsonrpc public-read, /local-rpc loopback-only)"
         % (bind, port)
     )
     httpd.serve_forever()

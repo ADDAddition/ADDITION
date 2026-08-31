@@ -87,6 +87,10 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn('["/wallet/", "Wallet"', chrome)
         self.assertIn('["/join/", "Get started"', chrome)
         self.assertIn('["/status/", "Status"', chrome)
+        self.assertIn('["/download/", "Download"]', chrome)
+        self.assertIn('["/launch/", "Launch"]', chrome)
+        self.assertIn('["/embed/", "Embed"]', chrome)
+        self.assertIn('["/rpc/", "Public RPC"]', chrome)
         self.assertIn(">MAINNET</span>", chrome)
         self.assertIn("public product is <strong>MAINNET</strong>", chrome)
         self.assertIn("contact@additionblockchain.com", chrome)
@@ -112,14 +116,29 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn(".footer-banner", css)
         self.assertIn("object-fit: contain", css)
         self.assertIn("@media (max-width: 840px)", css)
-        # Homepage video IS .hero-stinger; mobile contain must hit that class.
-        self.assertRegex(
+        # Live phone hotfix (CoS curl): exact ≤840px stinger block; 56vw×2; no max-height:none.
+        self.assertIn(
+            """@media (max-width: 840px) {
+  .hero-stinger,
+  video.hero-stinger,
+  .hero-stinger video {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    max-height: 56vw;
+    object-fit: contain;
+    object-position: center;
+  }
+  .hero-stinger {
+    overflow: hidden;
+    margin: 0.5rem 0 1rem;
+  }
+}""",
             css,
-            re.compile(
-                r"@media\s*\(max-width:\s*840px\)\s*\{[^}]*\.hero-stinger\s*\{[^}]*object-fit:\s*contain",
-                re.DOTALL,
-            ),
         )
+        self.assertEqual(css.count("max-height: 56vw"), 2)
+        self.assertNotIn("max-height: none", css)
 
     def test_homepage_is_mainnet_product(self) -> None:
         index = read("index.html")
@@ -412,6 +431,44 @@ S.rpcCommand("getinfo").then((offline) => {
         legal = read("legal/index.html")
         self.assertIn("ADDITION_MAINNET_V1", legal)
         self.assertIn("MIT", legal)
+
+    def test_embed_and_launch_are_mainnet_honest(self) -> None:
+        embed = read("embed/index.html")
+        launch = read("launch/index.html")
+        worker = read("worker.js")
+        self.assertIn("ADDITION", embed)
+        self.assertIn("/api/info", embed)
+        self.assertIn("Price unavailable", embed)
+        self.assertNotIn("USDT", embed)
+        self.assertNotIn("ghost", embed.lower())
+        self.assertNotIn("SmartChain", embed)
+        self.assertNotIn("0.0.0.0:8545", embed)
+        self.assertIn("Create Token", launch)
+        self.assertIn("Presale", launch)
+        self.assertIn("Airdrop", launch)
+        self.assertIn("Farm", launch)
+        self.assertIn("/api/capabilities", launch)
+        self.assertIn("does not expose", launch)
+        self.assertIn("Panel stays empty.", launch)
+        self.assertIn("disabled", launch)
+        self.assertNotIn("SmartChain", launch)
+        self.assertNotIn("0.0.0.0:8545", launch)
+        self.assertIn('"/embed"', worker)
+        self.assertIn('"/launch"', worker)
+        self.assertIn("/api/info", worker)
+        self.assertIn("/api/capabilities", worker)
+        self.assertIn("price_available: false", worker)
+        self.assertIn("price_usd: null", worker)
+        self.assertIn("/api*", (PUBLIC / "wrangler.toml").read_text(encoding="utf-8"))
+
+    def test_public_json_api_from_live_fields(self) -> None:
+        serve_src = (ROOT / "web" / "serve.py").read_text(encoding="utf-8")
+        self.assertIn("def public_json_info", serve_src)
+        self.assertIn("def public_json_capabilities", serve_src)
+        self.assertIn('"price_available": False', serve_src)
+        self.assertIn('"price_usd": None', serve_src)
+        self.assertIn("ADDITION_MAINNET_V1", serve_src)
+        self.assertNotIn("0.0.0.0:8545", serve_src)
 
 
 if __name__ == "__main__":

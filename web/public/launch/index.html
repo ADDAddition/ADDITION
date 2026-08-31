@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Launch tools — ADDITION</title>
+  <meta name="description" content="Create Token, Presale, Airdrop, and Farm tabs for ADDITION. Enabled only when public mainnet RPC exposes those commands.">
+  <meta name="theme-color" content="#f3f6fa">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:image" content="https://additionblockchain.com/og.png">
+  <meta name="twitter:image" content="https://additionblockchain.com/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body>
+  <header id="site-header"></header>
+  <main>
+    <section class="product-hero" style="padding-top:1rem;padding-bottom:0.25rem">
+      <p class="eyebrow"><span class="net-badge">MAINNET</span> Launch desk</p>
+      <h1>ADDITION</h1>
+      <p class="lede">
+        Create Token, Presale, Airdrop, and Farm stay off unless the public
+        <code>ADDITION_MAINNET_V1</code> read path actually answers those RPCs.
+        No fake factory UI. Local in-process token tools remain under
+        <a href="/tokens/">/tokens/</a> (loopback only).
+      </p>
+    </section>
+
+    <p id="caps-state" class="note">Checking public RPC capabilities…</p>
+
+    <div class="launch-tabs" role="tablist" aria-label="Launch tools">
+      <button type="button" class="launch-tab active" role="tab" aria-selected="true" data-tab="create" disabled>Create Token</button>
+      <button type="button" class="launch-tab" role="tab" aria-selected="false" data-tab="presale" disabled>Presale</button>
+      <button type="button" class="launch-tab" role="tab" aria-selected="false" data-tab="airdrop" disabled>Airdrop</button>
+      <button type="button" class="launch-tab" role="tab" aria-selected="false" data-tab="farm" disabled>Farm</button>
+    </div>
+
+    <section id="panel-create" class="panel launch-panel" role="tabpanel">
+      <h2>Create Token</h2>
+      <p id="create-empty" class="empty">
+        Public mainnet RPC does not expose <code>create_token</code> /
+        <code>token_create</code>. No token factory form on this page.
+      </p>
+      <div id="create-live" hidden>
+        <p class="note">Public path answered a create-token command. Use a local write node to mint — this site never opens public send.</p>
+      </div>
+    </section>
+
+    <section id="panel-presale" class="panel launch-panel" role="tabpanel" hidden>
+      <h2>Presale</h2>
+      <p id="presale-empty" class="empty">
+        No <code>presale</code> RPC on public mainnet. Panel stays empty.
+      </p>
+      <div id="presale-live" hidden></div>
+    </section>
+
+    <section id="panel-airdrop" class="panel launch-panel" role="tabpanel" hidden>
+      <h2>Airdrop</h2>
+      <p id="airdrop-empty" class="empty">
+        No <code>airdrop</code> RPC on public mainnet. Panel stays empty.
+      </p>
+      <div id="airdrop-live" hidden></div>
+    </section>
+
+    <section id="panel-farm" class="panel launch-panel" role="tabpanel" hidden>
+      <h2>Farm</h2>
+      <p id="farm-empty" class="empty">
+        No <code>farm</code> / pool-create RPC on public mainnet. No pool factory UI here.
+      </p>
+      <div id="farm-live" hidden></div>
+    </section>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/common.js"></script>
+  <script src="/chrome.js"></script>
+  <script>
+    (function () {
+      const tabs = Array.prototype.slice.call(document.querySelectorAll(".launch-tab"));
+      const panels = {
+        create: document.getElementById("panel-create"),
+        presale: document.getElementById("panel-presale"),
+        airdrop: document.getElementById("panel-airdrop"),
+        farm: document.getElementById("panel-farm")
+      };
+
+      function showTab(id) {
+        tabs.forEach(function (btn) {
+          const on = btn.getAttribute("data-tab") === id;
+          btn.classList.toggle("active", on);
+          btn.setAttribute("aria-selected", on ? "true" : "false");
+        });
+        Object.keys(panels).forEach(function (key) {
+          panels[key].hidden = key !== id;
+        });
+      }
+
+      tabs.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          if (btn.disabled) {
+            return;
+          }
+          showTab(btn.getAttribute("data-tab"));
+        });
+      });
+
+      function enableTab(id, enabled) {
+        const btn = tabs.find(function (el) { return el.getAttribute("data-tab") === id; });
+        if (!btn) {
+          return;
+        }
+        btn.disabled = !enabled;
+        const empty = document.getElementById(id + "-empty");
+        const live = document.getElementById(id + "-live");
+        if (empty) {
+          empty.hidden = !!enabled;
+        }
+        if (live) {
+          live.hidden = !enabled;
+        }
+      }
+
+      async function loadCaps() {
+        const state = document.getElementById("caps-state");
+        try {
+          const res = await fetch("/api/capabilities", { cache: "no-store" });
+          const data = await res.json();
+          if (!data || !data.ok) {
+            state.className = "offline";
+            state.textContent = "RPC offline — launch tabs stay disabled";
+            return;
+          }
+          const probes = data.probes || {};
+          const createOn = !!(probes.create_token && probes.create_token.available)
+            || !!(probes.token_create && probes.token_create.available);
+          const presaleOn = !!(probes.presale && probes.presale.available);
+          const airdropOn = !!(probes.airdrop && probes.airdrop.available);
+          const farmOn = !!(probes.farm && probes.farm.available)
+            || !!(probes.swap_pool_create && probes.swap_pool_create.available)
+            || !!(probes.create_pool && probes.create_pool.available);
+
+          enableTab("create", createOn);
+          enableTab("presale", presaleOn);
+          enableTab("airdrop", airdropOn);
+          enableTab("farm", farmOn);
+
+          // Keep tabs clickable for navigation even when disabled content is shown.
+          tabs.forEach(function (btn) { btn.disabled = false; });
+          if (!createOn && !presaleOn && !airdropOn && !farmOn) {
+            state.className = "note";
+            state.textContent = data.note
+              || "Create Token / Presale / Airdrop / Farm are not available on public mainnet RPC";
+          } else {
+            state.className = "note";
+            state.textContent = data.note || "Public path answered one or more launch commands";
+          }
+
+          // Mark disabled-looking tabs visually when their feature is off.
+          tabs.forEach(function (btn) {
+            const id = btn.getAttribute("data-tab");
+            const on = (id === "create" && createOn)
+              || (id === "presale" && presaleOn)
+              || (id === "airdrop" && airdropOn)
+              || (id === "farm" && farmOn);
+            btn.classList.toggle("is-disabled", !on);
+            btn.title = on ? "" : "Not available on public mainnet RPC";
+          });
+        } catch (err) {
+          state.className = "offline";
+          state.textContent = "RPC offline — launch tabs stay disabled";
+        }
+      }
+
+      showTab("create");
+      loadCaps();
+    }());
+  </script>
+</body>
+</html>

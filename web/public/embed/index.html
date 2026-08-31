@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ADDITION embed widget</title>
+  <meta name="description" content="Embeddable ADDITION mainnet widget. Height and supply from live getinfo only — no invented USD price.">
+  <meta name="theme-color" content="#f3f6fa">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="/common.css">
+  <style>
+    body.embed-body {
+      margin: 0;
+      padding: 0;
+      min-height: 0;
+      background: transparent;
+    }
+    body.embed-body .site-bg,
+    body.embed-body #site-header,
+    body.embed-body #site-footer,
+    body.embed-body #bottom-tabs { display: none !important; }
+    body.embed-body { padding-bottom: 0; }
+    .embed-shell {
+      max-width: 28rem;
+      margin: 0 auto;
+      padding: 0.75rem;
+    }
+    .embed-card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .embed-card[data-theme="compact"] { border-radius: 12px; box-shadow: none; }
+    .embed-card[data-theme="bare"] {
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      background: transparent;
+    }
+    .embed-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.85rem 1rem 0.35rem;
+    }
+    .embed-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      min-width: 0;
+      text-decoration: none;
+      color: inherit;
+    }
+    .embed-brand img { height: 28px; width: auto; flex-shrink: 0; }
+    .embed-brand strong {
+      font-size: 0.95rem;
+      letter-spacing: 0.12em;
+    }
+    .embed-body-copy { padding: 0.35rem 1rem 1rem; }
+    .embed-metric {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.65rem;
+      margin: 0.65rem 0 0;
+    }
+    .embed-metric div {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0.65rem 0.7rem;
+      background: var(--panel-2);
+    }
+    .embed-metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .embed-metric strong {
+      display: block;
+      margin-top: 0.2rem;
+      font-family: var(--mono);
+      font-size: 0.95rem;
+      word-break: break-all;
+    }
+    .embed-price {
+      margin: 0.75rem 0 0;
+      padding: 0.7rem 0.8rem;
+      border-radius: 12px;
+      background: var(--warn-bg);
+      color: var(--warn);
+      font-size: 0.9rem;
+    }
+    .embed-note {
+      margin: 0.65rem 0 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+    .embed-docs {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 1.2rem;
+    }
+  </style>
+</head>
+<body class="embed-body">
+  <header id="site-header" hidden></header>
+  <main>
+    <div id="embed-root" class="embed-shell" aria-live="polite">
+      <div class="embed-card" data-theme="modern">
+        <div class="embed-head">
+          <a class="embed-brand" href="/" target="_blank" rel="noopener">
+            <img src="/logo-transparent.png" alt="">
+            <strong>ADDITION</strong>
+          </a>
+          <span class="net-badge">MAINNET</span>
+        </div>
+        <div class="embed-body-copy">
+          <p id="embed-status" class="empty">Loading live getinfo…</p>
+          <div id="embed-metrics" class="embed-metric" hidden></div>
+          <p id="embed-price" class="embed-price" hidden></p>
+          <p id="embed-token" class="embed-note" hidden></p>
+        </div>
+      </div>
+    </div>
+    <section id="embed-docs" class="embed-docs" hidden>
+      <h1>Public embed</h1>
+      <p>
+        Widget for <strong>ADDITION</strong> / <code>ADDITION_MAINNET_V1</code>.
+        Data comes from <code>/api/info</code> (live <code>getinfo</code> + <code>monetary_info</code>).
+        There is no USD ticker on this node — the widget says price is unavailable.
+      </p>
+      <pre class="raw">&lt;iframe src="https://additionblockchain.com/embed/?theme=modern" width="360" height="260" style="border:0"&gt;&lt;/iframe&gt;</pre>
+      <p class="note">Query: <code>theme=modern|compact|bare</code>, optional <code>symbol=ADD</code> (only if the node returns <code>token_info</code>).</p>
+    </section>
+  </main>
+  <footer id="site-footer" hidden></footer>
+  <script>
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const theme = (params.get("theme") || "modern").toLowerCase();
+      const symbol = (params.get("symbol") || params.get("token") || "").trim();
+      const framed = window.self !== window.top || params.get("embed") === "1";
+      const card = document.querySelector(".embed-card");
+      if (card && (theme === "compact" || theme === "bare" || theme === "modern")) {
+        card.setAttribute("data-theme", theme);
+      }
+      if (!framed) {
+        document.body.classList.remove("embed-body");
+        document.getElementById("embed-docs").hidden = false;
+        document.getElementById("site-header").hidden = false;
+        document.getElementById("site-footer").hidden = false;
+      }
+
+      function setText(id, text, hidden) {
+        const el = document.getElementById(id);
+        if (!el) {
+          return;
+        }
+        el.textContent = text || "";
+        el.hidden = !!hidden;
+      }
+
+      function metric(label, value) {
+        const wrap = document.createElement("div");
+        const span = document.createElement("span");
+        span.textContent = label;
+        const strong = document.createElement("strong");
+        strong.textContent = value == null || value === "" ? "—" : String(value);
+        wrap.appendChild(span);
+        wrap.appendChild(strong);
+        return wrap;
+      }
+
+      async function load() {
+        const status = document.getElementById("embed-status");
+        const metrics = document.getElementById("embed-metrics");
+        const url = "/api/info" + (symbol ? ("?symbol=" + encodeURIComponent(symbol)) : "");
+        try {
+          const res = await fetch(url, { cache: "no-store" });
+          const data = await res.json();
+          if (!data || data.offline || !data.ok) {
+            status.className = "offline";
+            status.textContent = "RPC offline";
+            metrics.hidden = true;
+            setText("embed-price", "Price unavailable", false);
+            return;
+          }
+          status.className = "";
+          status.textContent = (data.network_id || "ADDITION_MAINNET_V1") + " · live public read";
+          metrics.hidden = false;
+          metrics.innerHTML = "";
+          metrics.appendChild(metric("Height", data.height));
+          metrics.appendChild(metric("Supply", data.emitted != null ? data.emitted + " / " + (data.max_supply || "—") : (data.max_supply || "—")));
+          metrics.appendChild(metric("Next reward", data.next_reward != null ? data.next_reward + " ADD" : "—"));
+          metrics.appendChild(metric("Peers", data.peers));
+          setText(
+            "embed-price",
+            data.price_available && data.price_usd != null
+              ? ("USD " + data.price_usd)
+              : "Price unavailable — no market price RPC on this node",
+            false
+          );
+          if (symbol) {
+            if (data.token && data.token.available) {
+              setText("embed-token", "token_info " + symbol + ": " + (data.token.raw || "ok"), false);
+            } else {
+              const reason = (data.token && data.token.reason) || "unavailable";
+              setText(
+                "embed-token",
+                "Token " + symbol + " unavailable on public read (" + reason + ")",
+                false
+              );
+            }
+          } else {
+            setText("embed-token", "", true);
+          }
+        } catch (err) {
+          status.className = "offline";
+          status.textContent = "RPC offline";
+          setText("embed-price", "Price unavailable", false);
+        }
+      }
+
+      load();
+    }());
+  </script>
+  <script src="/chrome.js"></script>
+</body>
+</html>
