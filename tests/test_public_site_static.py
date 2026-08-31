@@ -94,6 +94,24 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertNotIn("0.0.0.0:8545", chrome)
         self.assertIn('path === "/wallet"', chrome)
 
+    def test_chrome_footer_has_banner_2_video(self) -> None:
+        chrome = read("chrome.js")
+        videos = re.findall(r"<video\b[^>]*>", chrome, flags=re.IGNORECASE)
+        self.assertEqual(len(videos), 1, "site footer must have exactly one <video>")
+        footer_video = videos[0]
+        self.assertIn("addition-banner-2.mp4", footer_video)
+        self.assertIn("footer-banner", footer_video)
+        self.assertRegex(footer_video, re.compile(r"\bmuted\b", re.IGNORECASE))
+        self.assertRegex(footer_video, re.compile(r"\bautoplay\b", re.IGNORECASE))
+        self.assertRegex(footer_video, re.compile(r"\bloop\b", re.IGNORECASE))
+        self.assertRegex(footer_video, re.compile(r"\bplaysinline\b", re.IGNORECASE))
+        self.assertNotRegex(footer_video, re.compile(r"\bcontrols\b", re.IGNORECASE))
+        self.assertNotIn("addition-stinger.mp4", chrome)
+        self.assertNotIn("addition-banner-1.mp4", chrome)
+        css = read("common.css")
+        self.assertIn(".footer-banner", css)
+        self.assertIn("object-fit: contain", css)
+
     def test_homepage_is_mainnet_product(self) -> None:
         index = read("index.html")
         self.assertIn('net-badge">MAINNET</span>', index)

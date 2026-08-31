@@ -375,9 +375,38 @@ footer.site-footer-wrap {
   color: var(--muted);
   font-size: 0.82rem;
   margin-bottom: 0.5rem;
+  max-width: none;
+  width: 100%;
+  padding-left: 0;
+  padding-right: 0;
+}
+footer.site-footer-wrap .footer-banner {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  max-height: 22rem;
+  object-fit: contain;
+  object-position: center;
+  margin: 0 0 1rem;
+  background: #0b1220;
+  border: none;
+  border-radius: 0;
+}
+footer.site-footer-wrap .site-footer-copy {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 0 1.2rem;
 }
 footer.site-footer-wrap p { margin: 0.25rem 0; }
 footer.site-footer-wrap strong { color: var(--net); font-weight: 600; }
+@media (max-width: 720px) {
+  footer.site-footer-wrap .footer-banner {
+    max-height: none;
+    aspect-ratio: auto;
+  }
+}
 
 /* Product hero */
 .product-hero {

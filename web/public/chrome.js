@@ -221,9 +221,19 @@
   function fillFooter(el) {
     el.className = "site-footer-wrap";
     el.innerHTML =
+      '<video' +
+      ' class="footer-banner"' +
+      ' muted' +
+      ' autoplay' +
+      ' loop' +
+      ' playsinline' +
+      ' preload="metadata"' +
+      ' src="https://additionblockchain.com/banners/addition-banner-2.mp4"></video>' +
+      '<div class="site-footer-copy">' +
       '<p>ADDITION · public product is <strong>MAINNET</strong> · keys stay on your device or local node</p>' +
       '<p><a href="/download/">Download</a> · <a href="/docs/">Docs</a> · ' +
-      '<a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>';
+      '<a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>' +
+      "</div>";
   }
 
   injectHead();
