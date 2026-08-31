@@ -2,76 +2,128 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Join the ADDITION testnet</title>
-  <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Get started — ADDITION</title>
+  <meta name="description" content="Join the ADDITION research testnet or run a mainnet home node. Bitcoin-like self-custody.">
+  <meta name="theme-color" content="#0a0e14">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:image" content="https://additionblockchain.com/og.png">
+  <meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="Join" data-sub="research testnet">
+<body data-title="Get started" data-sub="home node">
   <header id="site-header"></header>
   <main class="prose">
+    <section class="product-hero" style="padding-top:1rem">
+      <p class="eyebrow">Home node</p>
+      <h1>Get started</h1>
+      <p class="lede">
+        Run <code>additiond</code> on your machine — the same model as Bitcoin.
+        The public website explorer stays on the research <strong>testnet</strong>.
+        Mainnet is a separate chain you join with a node, not by flipping this site.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#testnet">Testnet node</a>
+        <a class="btn btn-secondary" href="#mainnet">Mainnet node</a>
+        <a class="btn btn-ghost" href="/wallet/">Open wallet</a>
+      </div>
+    </section>
+
     <div class="banner">
       Binary from <a href="https://github.com/ADDAddition/ADDITION">this repo</a> on <code>main</code>.
       Public read is <code>/rpc?cmd=getinfo</code>, not <code>/getinfo</code>.
+      Write RPC stays on <code>127.0.0.1</code> — never publish <code>8545</code> / <code>8546</code>.
     </div>
 
-    <section class="panel">
-      <h2>Ports</h2>
-      <p>Research testnet. Not a production L1.</p>
+    <section class="panel" id="testnet">
+      <h2>Research testnet</h2>
+      <p>Public product today. Explorer, <code>:80</code>, <code>38545</code>, and <code>rpc.additionblockchain.com</code> are <code>ADDITION_TESTNET_V1</code>.</p>
       <table>
-        <tr><th>port</th><th>role</th></tr>
-        <tr><td>80</td><td>public HTTP. Reliable join path. Sync uses :80 first.</td></tr>
-        <tr><td>38545</td><td>public RPC, optional/filtered</td></tr>
+        <tr><th>Port</th><th>Role</th></tr>
+        <tr><td>80</td><td>Public HTTP (nginx → testnet read). Reliable join path. Sync uses :80 first.</td></tr>
+        <tr><td>38545</td><td>Public read RPC, optional/filtered. Allowlisted reads only.</td></tr>
         <tr><td>28545</td><td>P2P, optional/filtered. Can timeout. Do not assume it always works.</td></tr>
+        <tr><td>8545</td><td>Write RPC on <code>127.0.0.1</code> only. Public 8545 times out — keep it that way.</td></tr>
       </table>
-    </section>
 
-    <section class="panel">
-      <h2>Start a node</h2>
+      <h3>Start a testnet node</h3>
       <p>Build <code>additiond</code> from <code>main</code>, then:</p>
       <pre>additiond --network testnet --data-dir $HOME/addition-testnet --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545</pre>
       <p>Type <code>sync</code> on the daemon stdin (or send it to write RPC on <code>127.0.0.1</code>). Height should move.</p>
       <p><code>addpeer</code> after <code>--bootstrap</code> is <code>invalid/duplicate</code> (the seed is already listed).</p>
-    </section>
 
-    <section class="panel">
-      <h2>What <code>sync</code> does</h2>
+      <h3>What <code>sync</code> does</h3>
       <p>Current <code>main</code> tries public-read HTTP <code>:80</code> first, then <code>:38545</code>, then P2P <code>HELLO</code>.</p>
       <p><code>:80</code> is the reliable join path when <code>38545</code> or <code>28545</code> is filtered or times out. Ingest uses <code>getinfo</code> plus <code>getblockraw</code> (<code>ok:BLKDATA</code>). Do not claim public P2P 28545 always works.</p>
-    </section>
 
-    <section class="panel">
-      <h2>Public read</h2>
+      <h3>Public read (testnet)</h3>
       <pre>curl 'https://rpc.additionblockchain.com/rpc?cmd=getinfo'
 curl 'http://34.27.30.115/rpc?cmd=getinfo'
 curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'</pre>
       <p>Those curls succeed only when the operator seed answers. If they timeout, run your own <code>--network testnet</code> node. Height stays local until the seed answers.</p>
-      <p>Allowlist includes <code>getblockraw</code>. Public <code>mine</code> / <code>createwallet</code> return <code>error: command disabled on public RPC</code>.</p>
-      <p>Write RPC stays <code>127.0.0.1</code>. Do not publish port <code>8545</code>.</p>
-    </section>
+      <p>Allowlist includes <code>getblockraw</code>. Public <code>mine</code> / <code>createwallet</code> return disabled / 403 on public read. Write RPC stays <code>127.0.0.1</code>.</p>
 
-    <section class="panel">
-      <h2>Seed operator</h2>
+      <h3>Seed operator (testnet)</h3>
       <p>On the public seed, set <code>ADDITION_ADVERTISED_P2P=34.27.30.115:28545</code> so public <code>getinfo</code> / <code>peers</code> list that IPv4 endpoint and do not list <code>self</code>.</p>
       <p>That env is advertisement only. Public TCP 28545 can still timeout or be filtered. Joiners should <code>sync</code> over HTTP <code>:80</code>.</p>
     </section>
 
+    <section class="panel" id="mainnet">
+      <h2>Public mainnet (home node)</h2>
+      <p>
+        This is the public ADDITION mainnet (<code>network_id=ADDITION_MAINNET_V1</code>).
+        Anyone can run a home node, sync from the public seed, and mine locally —
+        the same model as <code>bitcoind</code> against a known bootstrap peer.
+      </p>
+      <p>
+        Public seed: <strong>34.27.30.115:28546</strong> (P2P) and
+        <strong>34.27.30.115:38546</strong> (HTTP read).
+        Separate chain from the research testnet (<code>28545</code> / <code>38545</code> / <code>:80</code>).
+        Not a label flip. The public website explorer stays on testnet; join this chain with <code>additiond</code>, not the explorer UI.
+        Do not use <code>mainnet-rpc.additionblockchain.com</code> from this site.
+      </p>
+      <p>Full runbook: <a href="https://github.com/ADDAddition/ADDITION/blob/main/docs/MAINNET_RUNBOOK.md">docs/MAINNET_RUNBOOK.md</a>.</p>
+
+      <h3>Mainnet ports</h3>
+      <table>
+        <tr><th>Port</th><th>Role</th></tr>
+        <tr><td>38546</td><td>Public read HTTP on the seed (<code>/rpc?cmd=getinfo</code>)</td></tr>
+        <tr><td>28546</td><td>Public P2P bootstrap on the seed</td></tr>
+        <tr><td>8546</td><td>Write RPC on <code>127.0.0.1</code> only — never publish</td></tr>
+      </table>
+
+      <h3>Start a mainnet node</h3>
+      <p>Set <code>ADDITION_PRIVACY_MASTER_KEY</code> (32+ characters), build <code>additiond</code> from <code>main</code>, then:</p>
+      <pre>export ADDITION_PRIVACY_MASTER_KEY='replace-with-32-or-more-chars____'
+export ADDITION_ENABLE_P2P_RPC=1
+additiond --mainnet --data-dir $HOME/addition-mainnet --local-rpc-port 8546 --p2p-port 28547 --bootstrap 34.27.30.115:28546</pre>
+      <p>Type <code>sync</code> on the daemon stdin (or send it to write RPC on <code>127.0.0.1:8546</code>), then <code>getinfo</code>. Mine on that same loopback write RPC when you want to produce blocks (<code>memory_hard</code>, no 30s mine timeout).</p>
+      <p>Never <code>--bootstrap 34.27.30.115:28545</code> for mainnet (that is the research testnet seed). Never publish port <code>8546</code>. Auto-mine is refused on mainnet.</p>
+
+      <h3>Mainnet public read</h3>
+      <pre>curl -s 'http://34.27.30.115:38546/rpc?cmd=getinfo'</pre>
+      <p>Expect <code>network=mainnet</code> and <code>network_id=ADDITION_MAINNET_V1</code>. Height may still be <code>0</code>; copy only fields the node prints. Do not invent peer counts or TPS.</p>
+      <p>Seed operator: <code>ADDITION_ADVERTISED_P2P=34.27.30.115:28546</code> so public <code>getinfo</code> / <code>peers</code> list that IPv4 endpoint and do not list <code>self</code>.</p>
+    </section>
+
     <section class="panel">
-      <h2>Local write RPC</h2>
-      <p>There is no public wallet UI. <code>createwallet</code>, balances, and swap commands exist on localhost write RPC only.</p>
-      <p>Pages under <a href="/local/"><code>/local/</code></a> (<code>/wallet/</code>, <code>/tokens/</code>, <code>/swap/</code>, <code>/privacy/</code>) talk to <code>/local-rpc</code> → <code>127.0.0.1:8545</code>. On this host they stay <strong>RPC offline</strong>.</p>
-      <p>Local desktop helper: <a href="/download/">/download/</a> (testnet / local binary, loopback RPC only).</p>
+      <h2>Local wallet after your node is up</h2>
+      <p>
+        The <a href="/wallet/">Wallet</a> page talks only to <code>/local-rpc</code> → <code>127.0.0.1:8545</code> (testnet)
+        when you run <code>python3 web/serve.py</code> next to the node.
+        On additionblockchain.com, local write is unavailable and the wallet explains how to connect a home node.
+        Public <code>mine</code> / <code>createwallet</code> stay disabled on <code>38545</code> and <code>38546</code>.
+      </p>
       <div class="tool-grid">
-        <a href="/local/"><strong>Local hub</strong>pair + pool, then the other forms</a>
-        <a href="/tokens/"><strong>Tokens</strong>token_create / mint / transfer_wallet</a>
-        <a href="/swap/"><strong>Swap pool</strong>fee_bps=0 allowed. In-process math, not Uniswap</a>
-        <a href="/wallet/"><strong>Mine / stake</strong>createwallet, mine, stake, unstake, claim</a>
-        <a href="/privacy/"><strong>Privacy opening</strong>SHA3-512. claim=opening_not_zk. Not Monero</a>
-        <a href="/evm/"><strong>EVM probe</strong>send stays disabled</a>
+        <a href="/wallet/"><strong>Wallet</strong><span>Receive, send, activity — local node required to spend</span></a>
+        <a href="/download/"><strong>Download</strong><span>Desktop helper, loopback RPC only</span></a>
+        <a href="/local/"><strong>Local tools</strong><span>Operator forms (tokens, swap, privacy)</span></a>
+        <a href="/status/"><strong>Status</strong><span>Public testnet getinfo</span></a>
       </div>
-      <p class="note">Floor fee is <code>min_fee=0</code> on current <code>main</code>. Spend signatures are ML-DSA-87. Public read cannot write.</p>
+      <p class="note">Privacy is ML-DSA / SHA3 opening (<code>opening_not_zk</code>), not a ZK circuit. Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
     </section>
   </main>
   <footer id="site-footer"></footer>

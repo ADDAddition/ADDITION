@@ -56,13 +56,13 @@ That env is advertisement only. Public TCP 28545 can still timeout or be filtere
 
 ## Local write RPC
 
-There is no public wallet UI. `createwallet`, balances, and swap commands exist on localhost write RPC only.
+The `/wallet/` page is a product UI (balance, receive, send, activity). It still only spends via `/local-rpc` → `127.0.0.1:8545`. On the public host that proxy is unavailable — the page explains how to connect a home node. It never POSTs `createwallet` / `wallet_send` / `mine` to public `:80`, `38545`, `38546`, or public `8545`.
 
-Pages under `/local/` (`/wallet/`, `/tokens/`, `/swap/`, `/privacy/`) talk to `/local-rpc` → `127.0.0.1:8545`. On the public host they stay **RPC offline**.
+Pages under `/local/` (`/tokens/`, `/swap/`, `/privacy/`, …) are the operator toolbox on the same loopback path.
 
-Local forms: `/local/` hub, `/tokens/` (`token_create`, `token_transfer_wallet`), `/swap/` (`fee_bps=0` allowed, `swap_exact_in_wallet`), `/wallet/` (mine / stake), `/privacy/` (`claim=opening_not_zk`). Floor fee is `min_fee=0` on current `main`. Spend signatures are ML-DSA-87. Token/privacy/swap side-state is flushed after each successful write. Public read cannot write.
+Local forms: `/wallet/` (primary), `/local/` hub, `/tokens/`, `/swap/` (`fee_bps=0` allowed), `/privacy/` (`claim=opening_not_zk`). Floor fee is `min_fee=0` on current `main`. Spend signatures are ML-DSA-87. Public read cannot write.
 
-Local desktop helper: [`/download/`](/download/) (testnet / local binary, loopback RPC only).
+Local desktop helper: [`/download/`](/download/) (testnet / local binary, loopback RPC only). PWA: Add to Home Screen installs the site; spending still needs a local node.
 
 Raw markdown siblings:
 
