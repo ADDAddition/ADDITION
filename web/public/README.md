@@ -10,7 +10,8 @@ Primary nav (desktop + mobile bottom tabs): **Explore · Wallet · Get started �
 - `/status/` is public mainnet `getinfo` via `/api/rpc` (Worker `PUBLIC_RPC_HTTP` → `http://34.27.30.115:38546/rpc`). Height from live getinfo only.
 - PWA: `manifest.webmanifest`, `sw.js`, theme `#f3f6fa` (light), icons 192/512 for Add to Home Screen.
 - Brand: `logo-transparent.png`, `favicon.ico`, `apple-touch-icon.png`, `og.png`. Light teal-slate theme — no private-zone / gold / dark-privacy graphics.
-- `/download/` desktop helper (loopback only). `/local/` operator toolbox.
+- `/download/` desktop helper for mainnet / local (`addition-wallet-mainnet`, loopback `8546` only). `/local/` operator toolbox.
+- Hero banners: muted autoplay loop `<video>` at `/banners/addition-banner-1.mp4` and `/banners/addition-banner-2.mp4` (binary mp4s may land separately).
 - Explorer calls `/api/rpc?cmd=…` for public-read. No consensus / economy code changes in this surface.
 - Contact: contact@additionblockchain.com
 - Source: https://github.com/ADDAddition/ADDITION
