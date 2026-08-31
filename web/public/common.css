@@ -94,7 +94,8 @@ a:hover { color: var(--accent-hover); }
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
 }
 .net-badge {
   display: inline-flex;
@@ -836,6 +837,13 @@ code { font-family: var(--mono); font-size: 0.9em; }
   .menu-toggle { display: inline-flex; align-items: center; }
   .bottom-tabs { display: grid; }
   .brand-tag { display: none; }
+  .brand-name { display: none; }
+  .site-chrome-inner {
+    flex-wrap: nowrap;
+    padding: 0.55rem 0.85rem;
+  }
+  .brand { min-width: 0; flex: 1 1 auto; }
+  .brand-logo { height: 28px; }
   .product-hero { padding-top: 1.1rem; }
   .wallet-shell { max-width: none; }
   dl { grid-template-columns: 1fr; gap: 0.15rem 0; }
