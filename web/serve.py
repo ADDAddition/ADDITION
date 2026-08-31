@@ -74,10 +74,11 @@ def tcp_rpc(host: str, port: int, command: str, timeout: float = 4.0) -> str:
 def public_http_rpc(host: str, port: int, command: str, timeout: float = 4.0) -> str:
     """Proxy public-read allowlist over HTTP /rpc?cmd= (matches Cloudflare Worker upstream)."""
     base = os.environ.get("ADDITION_PUBLIC_RPC_HTTP", "").strip().rstrip("/")
+    encoded = urllib.parse.quote(command.strip(), safe="")
     if base:
-        url = base + "?cmd=" + urllib.parse.quote(command, safe=" ")
+        url = base + "?cmd=" + encoded
     else:
-        url = "http://%s:%s/rpc?cmd=%s" % (host, port, urllib.parse.quote(command, safe=" "))
+        url = "http://%s:%s/rpc?cmd=%s" % (host, port, encoded)
     req = urllib.request.Request(url, method="GET")
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.read().decode("utf-8", errors="replace").strip()
