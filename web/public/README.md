@@ -12,6 +12,7 @@ Primary nav (desktop + mobile bottom tabs): **Explore · Wallet · Get started �
 - Brand: `logo-transparent.png`, `favicon.ico`, `apple-touch-icon.png`, `og.png`. Light teal-slate theme — no private-zone / gold / dark-privacy graphics.
 - `/download/` desktop helper for mainnet / local (`addition-wallet-mainnet`, loopback `8546` only). `/local/` operator toolbox.
 - Homepage hero: one muted autoplay loop `<video>` (no controls) at `https://additionblockchain.com/banners/addition-stinger.mp4` — not dual banner-1/banner-2 tiles.
+- Site footer (`chrome.js`): one muted autoplay loop `playsinline` `<video>` (no controls) at `https://additionblockchain.com/banners/addition-banner-2.mp4` — full-width `object-fit: contain`. Banner-1 stays reserved for Addition Core About.
 - Explorer calls `/api/rpc?cmd=…` for public-read. No consensus / economy code changes in this surface.
 - Contact: contact@additionblockchain.com
 - Source: https://github.com/ADDAddition/ADDITION
