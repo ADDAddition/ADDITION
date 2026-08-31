@@ -54,47 +54,48 @@ body {
   pointer-events: none;
   overflow: hidden;
   background:
-    linear-gradient(180deg, #f5f8fc 0%, var(--bg) 45%, #e8eef6 100%);
+    linear-gradient(165deg, #eef4fa 0%, #f5f8fc 38%, #e8f1f6 72%, #edf2f8 100%);
 }
 .site-bg-mesh,
 .site-bg-mesh-2 {
   position: absolute;
-  inset: -25%;
+  inset: -30%;
   will-change: transform;
 }
 .site-bg-mesh {
   background:
-    radial-gradient(ellipse 52% 44% at 16% 24%, rgba(15, 122, 146, 0.22), transparent 58%),
-    radial-gradient(ellipse 46% 38% at 84% 16%, rgba(47, 95, 138, 0.2), transparent 55%),
-    radial-gradient(ellipse 40% 42% at 58% 82%, rgba(90, 140, 190, 0.16), transparent 58%);
-  animation: site-bg-drift 28s ease-in-out infinite alternate;
+    radial-gradient(ellipse 55% 48% at 12% 20%, rgba(15, 122, 146, 0.34), transparent 60%),
+    radial-gradient(ellipse 48% 42% at 88% 12%, rgba(47, 95, 138, 0.3), transparent 58%),
+    radial-gradient(ellipse 44% 46% at 55% 88%, rgba(80, 145, 195, 0.26), transparent 60%);
+  animation: site-bg-drift 18s ease-in-out infinite alternate;
 }
 .site-bg-mesh-2 {
   background:
-    radial-gradient(ellipse 38% 34% at 10% 78%, rgba(70, 130, 175, 0.16), transparent 55%),
-    radial-gradient(ellipse 46% 40% at 90% 68%, rgba(15, 122, 146, 0.14), transparent 58%);
-  animation: site-bg-drift-2 38s ease-in-out infinite alternate;
-  opacity: 0.95;
+    radial-gradient(ellipse 42% 38% at 8% 82%, rgba(60, 125, 175, 0.28), transparent 58%),
+    radial-gradient(ellipse 50% 44% at 92% 70%, rgba(15, 122, 146, 0.24), transparent 60%),
+    radial-gradient(ellipse 36% 32% at 48% 48%, rgba(100, 150, 190, 0.14), transparent 55%);
+  animation: site-bg-drift-2 24s ease-in-out infinite alternate;
+  opacity: 1;
 }
 .site-bg-dots {
   position: absolute;
   inset: 0;
-  opacity: 0.45;
-  background-image: radial-gradient(circle, rgba(47, 95, 138, 0.28) 1.1px, transparent 1.7px);
-  background-size: 48px 48px;
-  animation: site-bg-dots 55s linear infinite;
+  opacity: 0.5;
+  background-image: radial-gradient(circle, rgba(47, 95, 138, 0.32) 1.15px, transparent 1.8px);
+  background-size: 44px 44px;
+  animation: site-bg-dots 40s linear infinite;
 }
 @keyframes site-bg-drift {
-  0% { transform: translate3d(0, 0, 0) scale(1); }
-  100% { transform: translate3d(4.5%, -3.5%, 0) scale(1.08); }
+  0% { transform: translate3d(-2%, 1%, 0) scale(1); }
+  100% { transform: translate3d(5%, -4%, 0) scale(1.1); }
 }
 @keyframes site-bg-drift-2 {
-  0% { transform: translate3d(0, 0, 0) scale(1.05); }
-  100% { transform: translate3d(-4%, 3.5%, 0) scale(1); }
+  0% { transform: translate3d(2%, -1%, 0) scale(1.08); }
+  100% { transform: translate3d(-5%, 4%, 0) scale(1); }
 }
 @keyframes site-bg-dots {
   0% { background-position: 0 0; }
-  100% { background-position: 48px 24px; }
+  100% { background-position: 44px 22px; }
 }
 a { color: var(--accent); text-decoration: none; }
 a:hover { color: var(--accent-hover); }
