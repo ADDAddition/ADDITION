@@ -78,9 +78,9 @@
 
     ensureLink("manifest", "/manifest.webmanifest");
     ensureLink("apple-touch-icon", "/apple-touch-icon.png");
-    ensureMeta("theme-color", "#0a0e14");
+    ensureMeta("theme-color", "#f3f6fa");
     ensureMeta("apple-mobile-web-app-capable", "yes");
-    ensureMeta("apple-mobile-web-app-status-bar-style", "black-translucent");
+    ensureMeta("apple-mobile-web-app-status-bar-style", "default");
     ensureMeta("apple-mobile-web-app-title", "ADDITION");
     ensureMeta("mobile-web-app-capable", "yes");
 
@@ -194,6 +194,26 @@
     document.body.classList.add("has-bottom-tabs");
   }
 
+  function ensureAnimatedBackground() {
+    if (document.getElementById("site-bg")) {
+      return;
+    }
+    const bg = document.createElement("div");
+    bg.id = "site-bg";
+    bg.className = "site-bg";
+    bg.setAttribute("aria-hidden", "true");
+    bg.innerHTML =
+      '<div class="site-bg-mesh"></div>' +
+      '<div class="site-bg-mesh-2"></div>' +
+      '<div class="site-bg-dots"></div>';
+    const root = document.body;
+    if (root.firstChild) {
+      root.insertBefore(bg, root.firstChild);
+    } else {
+      root.appendChild(bg);
+    }
+  }
+
   function fillFooter(el) {
     el.className = "site-footer-wrap";
     el.innerHTML =
@@ -203,6 +223,7 @@
   }
 
   injectHead();
+  ensureAnimatedBackground();
 
   const header = document.getElementById("site-header");
   const footer = document.getElementById("site-footer");
