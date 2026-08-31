@@ -136,7 +136,7 @@
       '<div class="site-chrome-inner">' +
       '<a class="brand" href="' + withQ("/") + '">' +
       '<img class="brand-logo" src="/logo-transparent.png" alt="ADDITION">' +
-      '<span class="brand-text"><span class="brand-name">ADDITION</span>' +
+      '<span class="brand-text"><span class="brand-name">SmartChain</span>' +
       '<span class="brand-tag">Layer 1 · ML-DSA-87</span></span></a>' +
       '<div class="chrome-right">' +
       '<span class="net-badge" title="Public product is ADDITION_MAINNET_V1">MAINNET</span>' +
