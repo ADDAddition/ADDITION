@@ -837,7 +837,7 @@ code { font-family: var(--mono); font-size: 0.9em; }
   .menu-toggle { display: inline-flex; align-items: center; }
   .bottom-tabs { display: grid; }
   .brand-tag { display: none; }
-  .brand-name { display: none; }
+  .brand-text { display: none; }
   .site-chrome-inner {
     flex-wrap: nowrap;
     padding: 0.55rem 0.85rem;
