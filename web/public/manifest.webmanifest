@@ -1,7 +1,7 @@
 {
   "name": "ADDITION",
   "short_name": "ADDITION",
-  "description": "ADDITION blockchain — explore the research testnet, manage a local wallet, join as a home node.",
+  "description": "ADDITION blockchain — explore ADDITION_MAINNET_V1, manage a local wallet, join as a home node.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

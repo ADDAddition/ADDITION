@@ -10,7 +10,8 @@
     name: "default",
     address: "",
     balance: null,
-    activity: []
+    activity: [],
+    screen: "home"
   };
 
   function el(id) {
@@ -33,6 +34,62 @@
     if (target) {
       target.hidden = false;
       target.classList.add("active");
+    }
+  }
+
+  function setTabActive(screen) {
+    const tabs = document.querySelectorAll("#wallet-tabs .bottom-tab");
+    for (let i = 0; i < tabs.length; i += 1) {
+      const go = tabs[i].getAttribute("data-go");
+      if (go === screen) {
+        tabs[i].classList.add("active");
+      } else {
+        tabs[i].classList.remove("active");
+      }
+    }
+  }
+
+  function goScreen(screen) {
+    state.screen = screen;
+    if (!state.online) {
+      showPanel("panel-offline");
+      setTabActive("home");
+      return;
+    }
+    if (!state.hasWallet && screen !== "home") {
+      showPanel("panel-setup");
+      setTabActive("home");
+      return;
+    }
+    if (screen === "home") {
+      if (state.hasWallet) {
+        showPanel("panel-home");
+        renderHome();
+      } else {
+        showPanel("panel-setup");
+      }
+      setTabActive("home");
+      return;
+    }
+    if (screen === "receive") {
+      showPanel("panel-receive");
+      setTabActive("receive");
+      return;
+    }
+    if (screen === "send") {
+      showPanel("panel-send");
+      setTabActive("send");
+      return;
+    }
+    if (screen === "activity") {
+      renderActivity();
+      showPanel("panel-activity");
+      setTabActive("activity");
+      return;
+    }
+    if (screen === "more") {
+      showPanel("panel-more");
+      setTabActive("home");
     }
   }
 
@@ -139,12 +196,7 @@
 
   async function enterApp() {
     await refreshBalance();
-    if (state.hasWallet) {
-      showPanel("panel-home");
-      renderHome();
-    } else {
-      showPanel("panel-setup");
-    }
+    goScreen(state.screen === "more" ? "home" : state.screen);
   }
 
   async function ping() {
@@ -158,6 +210,11 @@
       if (retry) {
         retry.disabled = false;
       }
+      const tabs = document.querySelectorAll("#wallet-tabs .bottom-tab");
+      for (let i = 0; i < tabs.length; i += 1) {
+        tabs[i].disabled = false;
+      }
+      goScreen("home");
       showPanel("panel-offline");
       return;
     }
@@ -173,32 +230,25 @@
     for (let i = 0; i < goers.length; i += 1) {
       goers[i].addEventListener("click", function () {
         const dest = this.getAttribute("data-go");
-        if (dest === "receive") {
-          showPanel("panel-receive");
-        } else if (dest === "send") {
-          showPanel("panel-send");
-        } else if (dest === "activity") {
-          renderActivity();
-          showPanel("panel-activity");
-        } else if (dest === "more") {
-          showPanel("panel-more");
-        }
+        goScreen(dest);
       });
     }
     const backs = document.querySelectorAll("[data-back]");
     for (let j = 0; j < backs.length; j += 1) {
       backs[j].addEventListener("click", function () {
-        showPanel("panel-home");
+        goScreen("home");
       });
     }
     const moreLink = el("go-more");
     if (moreLink) {
       moreLink.addEventListener("click", function (e) {
         e.preventDefault();
-        showPanel("panel-more");
+        goScreen("more");
       });
     }
   }
+
+  document.body.classList.add("has-bottom-tabs");
 
   el("retry-btn").addEventListener("click", function () {
     ping();
@@ -216,7 +266,7 @@
       state.hasWallet = true;
       state.address = r.fields.address || L.field(r.raw, "address") || "";
       await refreshBalance();
-      showPanel("panel-home");
+      goScreen("home");
     }
   });
   el("open-btn").addEventListener("click", async function () {
@@ -228,7 +278,7 @@
       state.hasWallet = true;
       state.address = info.fields.address || L.field(info.raw, "address") || "";
       await refreshBalance();
-      showPanel("panel-home");
+      goScreen("home");
     }
   });
   el("list-btn").addEventListener("click", async function () {
@@ -278,31 +328,6 @@
     pushActivity("Mine", r.ok ? "block mined" : r.raw);
     await refreshBalance();
     ping();
-  });
-
-  async function stakeCmd(line, label) {
-    const info = await walletInfo();
-    if (info.offline || !info.ok) {
-      el("stake-raw").textContent = info.raw;
-      return;
-    }
-    const addr = info.fields.address || L.field(info.raw, "address");
-    const r = await L.cmd(line.replace("%ADDR%", addr));
-    el("stake-raw").textContent = r.raw;
-    pushActivity(label, r.ok ? "ok" : r.raw);
-  }
-
-  el("stake-btn").addEventListener("click", function () {
-    stakeCmd("stake %ADDR% " + L.val("stake-amt"), "Stake");
-  });
-  el("unstake-btn").addEventListener("click", function () {
-    stakeCmd("unstake %ADDR% " + L.val("stake-amt"), "Unstake");
-  });
-  el("staked-btn").addEventListener("click", function () {
-    stakeCmd("staked %ADDR%", "Staked");
-  });
-  el("claim-btn").addEventListener("click", function () {
-    stakeCmd("stake_claim %ADDR%", "Claim");
   });
 
   bindNav();

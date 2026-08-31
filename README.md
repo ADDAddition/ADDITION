@@ -3,12 +3,12 @@
 </p>
 
 <h1 align="center">ADDITION</h1>
-<p align="center"><b>C++20 Layer 1 · ML-DSA-87 · SHA3-512 · public product: testnet</b></p>
+<p align="center"><b>C++20 Layer 1 · ML-DSA-87 · SHA3-512 · public product: mainnet</b></p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT">
   <img src="https://img.shields.io/badge/C%2B%2B-20-00599C?style=for-the-badge" alt="C++20">
-  <img src="https://img.shields.io/badge/public_product-testnet-orange?style=for-the-badge" alt="Public product: testnet">
+  <img src="https://img.shields.io/badge/public_product-mainnet-brightgreen?style=for-the-badge" alt="Public product: mainnet">
   <img src="https://img.shields.io/badge/crypto-ML--DSA--87-red?style=for-the-badge" alt="ML-DSA-87">
   <img src="https://img.shields.io/badge/Supply-50M_Hard_Cap-gold?style=for-the-badge" alt="Supply 50M">
 </p>
@@ -23,7 +23,7 @@
 
 ---
 
-**ADDITION** is a C++20 Layer 1 node (`additiond`): SHA3-512 hashing, ML-DSA-87 signatures, hash-committed addresses, and SHA3 commitment openings. The public site [additionblockchain.com](https://additionblockchain.com) and [rpc.additionblockchain.com](https://rpc.additionblockchain.com) are the **testnet** product until the operator switches them.
+**ADDITION** is a C++20 Layer 1 node (`additiond`): SHA3-512 hashing, ML-DSA-87 signatures, hash-committed addresses, and SHA3 commitment openings. The public site [additionblockchain.com](https://additionblockchain.com) presents **ADDITION_MAINNET_V1** (public read `34.27.30.115:38546` / site `/api/rpc`). Research testnet remains a separate chain.
 
 ### Technical matrix
 
@@ -33,7 +33,7 @@
 | **Hash** | **SHA3-512** | SHA-256 | Keccak-256 | SHA-256 |
 | **Addresses** | **SHA3-512 commitment (128 hex)** | Ed25519 pubkey | keccak | HASH160 |
 | **Privacy path** | **SHA3-512 opening (not ZK)** | public ledger | public ledger | public ledger |
-| **Public network today** | **testnet** | mainnet | mainnet | mainnet |
+| **Public network today** | **mainnet** | mainnet | mainnet | mainnet |
 | **Max supply** | **50,000,000** (whole units) | no fixed cap | no fixed cap | 21,000,000 |
 | **Min fee** | **0** (whole unit) | lamports | wei | satoshis |
 
@@ -47,8 +47,8 @@
 | `network_id` | `ADDITION_TESTNET_V1` | `ADDITION_MAINNET_V1` |
 | Genesis | [`genesis.json`](genesis.json) | [`genesis-mainnet.json`](genesis-mainnet.json) |
 | Bootstrap | `34.27.30.115:28545` | `34.27.30.115:28546` |
-| Public read | `:80` / `38545` / [rpc.additionblockchain.com](https://rpc.additionblockchain.com) | `34.27.30.115:38546` |
-| Role | Research testnet; website explorer still points here | Public P2P chain — run a node, sync, mine locally like `bitcoind` |
+| Public read | `34.27.30.115:38545` | `34.27.30.115:38546` / site `/api/rpc` |
+| Role | Research chain (separate) | Public product — explorer, join, wallet PWA |
 
 `--mainnet` is the public ADDITION mainnet (`ADDITION_MAINNET_V1`), a separate chain from the research testnet. See [docs/MAINNET_RUNBOOK.md](docs/MAINNET_RUNBOOK.md) and the mainnet section in [`join.md`](web/public/join.md).
 
@@ -63,9 +63,9 @@ What `main` ships:
 - **Addresses** — hash-committed: `SHA3-512(scheme_id || 0x00 || pubkey)` (128 hex)
 - **Privacy** — SHA3-512 commitment + nullifier **opening** (`privacy_mint_open` / `privacy_spend_open`). A hash relation, not ZK
 - **SLH-DSA** — opt-in vault (`slh-dsa-shake-256s`) when this liboqs can sign with a non-empty context; otherwise disabled
-- **RPC** — write on `127.0.0.1`; public read is an allowlist (`getinfo`, `getblockraw`, …). Public `mine` / `createwallet` stay disabled
+- **RPC** — write on `127.0.0.1`; public read allowlist (`getinfo`, `getblockraw`, …). Site wallet spend stays on `/local-rpc` → loopback. Public `wallet_send` / keys stay off `38546`. Seed `createwallet` / `mine` may answer on `38546`.
 
-Whole integers. No 8-decimal subunit. Block reward `50`, `max_supply` `50000000`, min fee `0`.
+Whole integers. No 8-decimal subunit. Block reward `50` (100% to finding miner), `max_supply` `50000000`, min fee `0`.
 
 ---
 
@@ -96,22 +96,28 @@ Optional loopback-only tools (never public write):
 
 ---
 
-## Join the testnet
+## Join the mainnet
 
 Build `additiond` on Linux from this repository on `main`, then:
 
 ```bash
-additiond --network testnet --data-dir $HOME/addition-testnet --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545
+export ADDITION_PRIVACY_MASTER_KEY='replace-with-32-or-more-chars____'
+export ADDITION_ENABLE_P2P_RPC=1
+additiond --mainnet --data-dir $HOME/addition-mainnet --local-rpc-port 8546 --p2p-port 28547 --bootstrap 34.27.30.115:28546
 ```
 
-Type `sync` on the daemon stdin, or send it to write RPC on `127.0.0.1`. Height should move. Write RPC stays loopback.
+Type `sync` on the daemon stdin, or send it to write RPC on `127.0.0.1:8546`. Height should move. Write RPC stays loopback.
 
 ```bash
-curl 'https://rpc.additionblockchain.com/rpc?cmd=getinfo'
+curl -s 'http://34.27.30.115:38546/rpc?cmd=getinfo'
+curl -s 'https://additionblockchain.com/api/rpc?cmd=getinfo'
 ```
 
-Desktop wallet (loopback RPC): [additionblockchain.com/download/](https://additionblockchain.com/download/)
+Expect `network=mainnet` / `ADDITION_MAINNET_V1`. Height may be `0` — copy only live fields.
 
+Desktop wallet (loopback RPC): [additionblockchain.com/download/](https://additionblockchain.com/download/) · in-browser PWA: [additionblockchain.com/wallet/](https://additionblockchain.com/wallet/)
+
+Research testnet (separate): `additiond --network testnet … --bootstrap 34.27.30.115:28545` (write `8545`, read `38545`).
 ---
 
 ## Build on Linux (Ubuntu EliteDesk)

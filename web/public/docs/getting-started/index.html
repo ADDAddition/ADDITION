@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Build and run ADDITION testnet</title>
+  <title>Build and run ADDITION</title>
   <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
@@ -17,11 +17,11 @@
 <p>  &lt;img src=&quot;docs/assets/logo-transparent.png&quot; alt=&quot;ADDITION&quot; width=&quot;280&quot;&gt;</p>
 <p>&lt;/p&gt;</p>
 <p>&lt;h1 align=&quot;center&quot;&gt;ADDITION&lt;/h1&gt;</p>
-<p>&lt;p align=&quot;center&quot;&gt;&lt;b&gt;C++20 Layer 1 · ML-DSA-87 · SHA3-512 · public product: testnet&lt;/b&gt;&lt;/p&gt;</p>
+<p>&lt;p align=&quot;center&quot;&gt;&lt;b&gt;C++20 Layer 1 · ML-DSA-87 · SHA3-512 · public product: mainnet&lt;/b&gt;&lt;/p&gt;</p>
 <p>&lt;p align=&quot;center&quot;&gt;</p>
 <p>  &lt;img src=&quot;https://img.shields.io/badge/license-MIT-blue?style=for-the-badge&quot; alt=&quot;MIT&quot;&gt;</p>
 <p>  &lt;img src=&quot;https://img.shields.io/badge/C%2B%2B-20-00599C?style=for-the-badge&quot; alt=&quot;C++20&quot;&gt;</p>
-<p>  &lt;img src=&quot;https://img.shields.io/badge/public_product-testnet-orange?style=for-the-badge&quot; alt=&quot;Public product: testnet&quot;&gt;</p>
+<p>  &lt;img src=&quot;https://img.shields.io/badge/public_product-mainnet-brightgreen?style=for-the-badge&quot; alt=&quot;Public product: mainnet&quot;&gt;</p>
 <p>  &lt;img src=&quot;https://img.shields.io/badge/crypto-ML--DSA--87-red?style=for-the-badge&quot; alt=&quot;ML-DSA-87&quot;&gt;</p>
 <p>  &lt;img src=&quot;https://img.shields.io/badge/Supply-50M_Hard_Cap-gold?style=for-the-badge&quot; alt=&quot;Supply 50M&quot;&gt;</p>
 <p>&lt;/p&gt;</p>
@@ -33,18 +33,18 @@
 <p>  &lt;a href=&quot;mailto:contact@additionblockchain.com&quot;&gt;contact@additionblockchain.com&lt;/a&gt;</p>
 <p>&lt;/p&gt;</p>
 <hr>
-<p><strong>ADDITION</strong> is a C++20 Layer 1 node (<code>additiond</code>): SHA3-512 hashing, ML-DSA-87 signatures, hash-committed addresses, and SHA3 commitment openings. The public site <a href="https://additionblockchain.com">additionblockchain.com</a> and <a href="https://rpc.additionblockchain.com">rpc.additionblockchain.com</a> are the <strong>testnet</strong> product until the operator switches them.</p>
+<p><strong>ADDITION</strong> is a C++20 Layer 1 node (<code>additiond</code>): SHA3-512 hashing, ML-DSA-87 signatures, hash-committed addresses, and SHA3 commitment openings. The public site <a href="https://additionblockchain.com">additionblockchain.com</a> presents <strong>ADDITION_MAINNET_V1</strong> (public read <code>34.27.30.115:38546</code> / site <code>/api/rpc</code>). Research testnet remains a separate chain.</p>
 <h3>Technical matrix</h3>
-<table><tr><th>Feature</th><th>ADDITION</th><th>Solana</th><th>Ethereum</th><th>Bitcoin</th></tr><tr><td><strong>Signatures</strong></td><td><strong>ML-DSA-87</strong></td><td>Ed25519</td><td>ECDSA</td><td>ECDSA</td></tr><tr><td><strong>Hash</strong></td><td><strong>SHA3-512</strong></td><td>SHA-256</td><td>Keccak-256</td><td>SHA-256</td></tr><tr><td><strong>Addresses</strong></td><td><strong>SHA3-512 commitment (128 hex)</strong></td><td>Ed25519 pubkey</td><td>keccak</td><td>HASH160</td></tr><tr><td><strong>Privacy path</strong></td><td><strong>SHA3-512 opening (not ZK)</strong></td><td>public ledger</td><td>public ledger</td><td>public ledger</td></tr><tr><td><strong>Public network today</strong></td><td><strong>testnet</strong></td><td>mainnet</td><td>mainnet</td><td>mainnet</td></tr><tr><td><strong>Max supply</strong></td><td><strong>50,000,000</strong> (whole units)</td><td>no fixed cap</td><td>no fixed cap</td><td>21,000,000</td></tr><tr><td><strong>Min fee</strong></td><td><strong>0</strong> (whole unit)</td><td>lamports</td><td>wei</td><td>satoshis</td></tr></table>
+<table><tr><th>Feature</th><th>ADDITION</th><th>Solana</th><th>Ethereum</th><th>Bitcoin</th></tr><tr><td><strong>Signatures</strong></td><td><strong>ML-DSA-87</strong></td><td>Ed25519</td><td>ECDSA</td><td>ECDSA</td></tr><tr><td><strong>Hash</strong></td><td><strong>SHA3-512</strong></td><td>SHA-256</td><td>Keccak-256</td><td>SHA-256</td></tr><tr><td><strong>Addresses</strong></td><td><strong>SHA3-512 commitment (128 hex)</strong></td><td>Ed25519 pubkey</td><td>keccak</td><td>HASH160</td></tr><tr><td><strong>Privacy path</strong></td><td><strong>SHA3-512 opening (not ZK)</strong></td><td>public ledger</td><td>public ledger</td><td>public ledger</td></tr><tr><td><strong>Public network today</strong></td><td><strong>mainnet</strong></td><td>mainnet</td><td>mainnet</td><td>mainnet</td></tr><tr><td><strong>Max supply</strong></td><td><strong>50,000,000</strong> (whole units)</td><td>no fixed cap</td><td>no fixed cap</td><td>21,000,000</td></tr><tr><td><strong>Min fee</strong></td><td><strong>0</strong> (whole unit)</td><td>lamports</td><td>wei</td><td>satoshis</td></tr></table>
 <hr>
 <h2>Networks</h2>
-<table><tr><th></th><th>Research testnet</th><th>Public mainnet</th></tr><tr><td>Flag</td><td><code>additiond --network testnet</code></td><td><code>additiond --mainnet</code></td></tr><tr><td><code>network_id</code></td><td><code>ADDITION_TESTNET_V1</code></td><td><code>ADDITION_MAINNET_V1</code></td></tr><tr><td>Genesis</td><td><a href="genesis.json"><code>genesis.json</code></a></td><td><a href="genesis-mainnet.json"><code>genesis-mainnet.json</code></a></td></tr><tr><td>Bootstrap</td><td><code>34.27.30.115:28545</code></td><td><code>34.27.30.115:28546</code></td></tr><tr><td>Public read</td><td><code>:80</code> / <code>38545</code> / <a href="https://rpc.additionblockchain.com">rpc.additionblockchain.com</a></td><td><code>34.27.30.115:38546</code></td></tr><tr><td>Role</td><td>Research testnet; website explorer still points here</td><td>Public P2P chain — run a node, sync, mine locally like <code>bitcoind</code></td></tr></table>
+<table><tr><th></th><th>Research testnet</th><th>Public mainnet</th></tr><tr><td>Flag</td><td><code>additiond --network testnet</code></td><td><code>additiond --mainnet</code></td></tr><tr><td><code>network_id</code></td><td><code>ADDITION_TESTNET_V1</code></td><td><code>ADDITION_MAINNET_V1</code></td></tr><tr><td>Genesis</td><td><a href="genesis.json"><code>genesis.json</code></a></td><td><a href="genesis-mainnet.json"><code>genesis-mainnet.json</code></a></td></tr><tr><td>Bootstrap</td><td><code>34.27.30.115:28545</code></td><td><code>34.27.30.115:28546</code></td></tr><tr><td>Public read</td><td><code>34.27.30.115:38545</code></td><td><code>34.27.30.115:38546</code> / site <code>/api/rpc</code></td></tr><tr><td>Role</td><td>Research chain (separate)</td><td>Public product — explorer, join, wallet PWA</td></tr></table>
 <p><code>--mainnet</code> is the public ADDITION mainnet (<code>ADDITION_MAINNET_V1</code>), a separate chain from the research testnet. See <a href="docs/MAINNET_RUNBOOK.md">docs/MAINNET_RUNBOOK.md</a> and the mainnet section in <a href="web/public/join.md"><code>join.md</code></a>.</p>
 <hr>
 <h2>Architecture</h2>
 <p>What <code>main</code> ships:</p>
-<ul><li><strong>Hash / PoW</strong> — SHA3-512 of the header on testnet; <code>memory_hard</code> on <code>--mainnet</code></li><li><strong>Signatures</strong> — ML-DSA-87 (FIPS 204) in <code>pq_mode=strict</code></li><li><strong>Addresses</strong> — hash-committed: <code>SHA3-512(scheme_id || 0x00 || pubkey)</code> (128 hex)</li><li><strong>Privacy</strong> — SHA3-512 commitment + nullifier <strong>opening</strong> (<code>privacy_mint_open</code> / <code>privacy_spend_open</code>). A hash relation, not ZK</li><li><strong>SLH-DSA</strong> — opt-in vault (<code>slh-dsa-shake-256s</code>) when this liboqs can sign with a non-empty context; otherwise disabled</li><li><strong>RPC</strong> — write on <code>127.0.0.1</code>; public read is an allowlist (<code>getinfo</code>, <code>getblockraw</code>, …). Public <code>mine</code> / <code>createwallet</code> stay disabled</li></ul>
-<p>Whole integers. No 8-decimal subunit. Block reward <code>50</code>, <code>max_supply</code> <code>50000000</code>, min fee <code>0</code>.</p>
+<ul><li><strong>Hash / PoW</strong> — SHA3-512 of the header on testnet; <code>memory_hard</code> on <code>--mainnet</code></li><li><strong>Signatures</strong> — ML-DSA-87 (FIPS 204) in <code>pq_mode=strict</code></li><li><strong>Addresses</strong> — hash-committed: <code>SHA3-512(scheme_id || 0x00 || pubkey)</code> (128 hex)</li><li><strong>Privacy</strong> — SHA3-512 commitment + nullifier <strong>opening</strong> (<code>privacy_mint_open</code> / <code>privacy_spend_open</code>). A hash relation, not ZK</li><li><strong>SLH-DSA</strong> — opt-in vault (<code>slh-dsa-shake-256s</code>) when this liboqs can sign with a non-empty context; otherwise disabled</li><li><strong>RPC</strong> — write on <code>127.0.0.1</code>; public read allowlist (<code>getinfo</code>, <code>getblockraw</code>, …). Site wallet spend stays on <code>/local-rpc</code> → loopback. Public <code>wallet_send</code> / keys stay off <code>38546</code>. Seed <code>createwallet</code> / <code>mine</code> may answer on <code>38546</code>.</li></ul>
+<p>Whole integers. No 8-decimal subunit. Block reward <code>50</code> (100% to finding miner), <code>max_supply</code> <code>50000000</code>, min fee <code>0</code>.</p>
 <hr>
 <h2>Cashiers / Windows</h2>
 <p>Cashiers and Windows users download the live testnet / local wallet from <a href="https://additionblockchain.com/download/">https://additionblockchain.com/download/</a> only (<code>addition-wallet-testnet</code> and <code>addition-wallet-cli-testnet</code>). Do not compile liboqs. There is no Windows compile path in this README. This host does not publish a <code>.exe</code>.</p>
@@ -57,12 +57,17 @@
 <p>Optional loopback-only tools (never public write):</p>
 <ul><li>EVM: <code>python3 web/evm/evm_rpc_bridge.py</code> (JSON-RPC <code>127.0.0.1:9545</code>, send disabled)</li><li>Mining pool: <code>python3 tools/mining_pool.py coordinator</code> then <code>… worker --once</code> — serializes one loopback <code>mine</code> at a time (prefer testnet <code>:8545</code>; refuses <code>38545</code>/<code>38546</code>/<code>18545</code> and non-loopback; <strong>not NiceHash</strong>). See <a href="tools/mining_pool_README.md"><code>tools/mining_pool_README.md</code></a>.</li></ul>
 <hr>
-<h2>Join the testnet</h2>
+<h2>Join the mainnet</h2>
 <p>Build <code>additiond</code> on Linux from this repository on <code>main</code>, then:</p>
-<pre>additiond --network testnet --data-dir $HOME/addition-testnet --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545</pre>
-<p>Type <code>sync</code> on the daemon stdin, or send it to write RPC on <code>127.0.0.1</code>. Height should move. Write RPC stays loopback.</p>
-<pre>curl &#x27;https://rpc.additionblockchain.com/rpc?cmd=getinfo&#x27;</pre>
-<p>Desktop wallet (loopback RPC): <a href="https://additionblockchain.com/download/">additionblockchain.com/download/</a></p>
+<pre>export ADDITION_PRIVACY_MASTER_KEY=&#x27;replace-with-32-or-more-chars____&#x27;
+export ADDITION_ENABLE_P2P_RPC=1
+additiond --mainnet --data-dir $HOME/addition-mainnet --local-rpc-port 8546 --p2p-port 28547 --bootstrap 34.27.30.115:28546</pre>
+<p>Type <code>sync</code> on the daemon stdin, or send it to write RPC on <code>127.0.0.1:8546</code>. Height should move. Write RPC stays loopback.</p>
+<pre>curl -s &#x27;http://34.27.30.115:38546/rpc?cmd=getinfo&#x27;
+curl -s &#x27;https://additionblockchain.com/api/rpc?cmd=getinfo&#x27;</pre>
+<p>Expect <code>network=mainnet</code> / <code>ADDITION_MAINNET_V1</code>. Height may be <code>0</code> — copy only live fields.</p>
+<p>Desktop wallet (loopback RPC): <a href="https://additionblockchain.com/download/">additionblockchain.com/download/</a> · in-browser PWA: <a href="https://additionblockchain.com/wallet/">additionblockchain.com/wallet/</a></p>
+<p>Research testnet (separate): <code>additiond --network testnet … --bootstrap 34.27.30.115:28545</code> (write <code>8545</code>, read <code>38545</code>).</p>
 <hr>
 <h2>Build on Linux (Ubuntu EliteDesk)</h2>
 <p>Compile path is <strong>Linux only</strong> (Ubuntu on the EliteDesk). <code>chmod</code>, <code>sudo</code>, <code>apt</code>, and <code>cmake</code> are Linux commands. Do not paste them into PowerShell. There is no Windows compile path and no MSVC recipe.</p>

@@ -139,7 +139,7 @@
       '<span class="brand-text"><span class="brand-name">ADDITION</span>' +
       '<span class="brand-tag">Layer 1 · ML-DSA-87</span></span></a>' +
       '<div class="chrome-right">' +
-      '<span class="net-badge" title="Public explorer is the research testnet">TESTNET</span>' +
+      '<span class="net-badge" title="Public product is ADDITION_MAINNET_V1">MAINNET</span>' +
       '<nav class="site-nav-desktop" id="site-nav" aria-label="Primary">' + desktopNav + "</nav>" +
       '<details class="more-menu">' +
       '<summary aria-label="More pages">More</summary>' +
@@ -173,6 +173,10 @@
       return;
     }
     const path = currentPath();
+    // Wallet page owns its Trust-like Home / Receive / Send / Activity tabs.
+    if (path === "/wallet") {
+      return;
+    }
     const nav = document.createElement("nav");
     nav.id = "bottom-tabs";
     nav.className = "bottom-tabs";
@@ -217,7 +221,7 @@
   function fillFooter(el) {
     el.className = "site-footer-wrap";
     el.innerHTML =
-      '<p>ADDITION · public explorer is <strong>TESTNET</strong> · keys stay on your device or local node</p>' +
+      '<p>ADDITION · public product is <strong>MAINNET</strong> · keys stay on your device or local node</p>' +
       '<p><a href="/download/">Download</a> · <a href="/docs/">Docs</a> · ' +
       '<a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>';
   }

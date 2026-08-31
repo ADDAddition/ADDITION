@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>ADDITION — Quantum-ready Layer 1</title>
-  <meta name="description" content="ADDITION is a C++20 Layer 1 with ML-DSA-87 signatures and SHA3-512 hashing. Explore the research testnet, run a home node, and use a local wallet.">
+  <meta name="description" content="ADDITION is a C++20 Layer 1 with ML-DSA-87 signatures and SHA3-512 hashing. Public product: ADDITION_MAINNET_V1. Explore the chain, run a home node, use a local wallet.">
   <meta name="theme-color" content="#f3f6fa">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/favicon.ico">
@@ -24,13 +24,14 @@
   </div>
   <main>
     <section class="product-hero">
-      <p class="eyebrow"><span class="net-badge">TESTNET</span> Public product</p>
+      <p class="eyebrow"><span class="net-badge">MAINNET</span> Public product</p>
       <h1>ADDITION</h1>
       <p class="lede">
         A C++20 Layer 1 with ML-DSA-87 signatures and SHA3-512 hashing.
-        The public explorer on this site is the research testnet
-        (<code>ADDITION_TESTNET_V1</code>). Keys stay on your device or home node —
-        hosted pages cannot spend.
+        This site’s public explorer is <code>ADDITION_MAINNET_V1</code>
+        (seed read <code>34.27.30.115:38546</code> / <code>/api/rpc</code>).
+        Height comes from live <code>getinfo</code> only — no invented TPS figures.
+        Keys stay on your device or home node; hosted pages cannot spend.
       </p>
       <div class="cta-row">
         <a class="btn btn-primary" href="/wallet/">Open wallet</a>
@@ -42,7 +43,7 @@
     <section class="explorer-panel">
       <div class="section-head">
         <h2>Explore the chain</h2>
-        <p>Search blocks, transactions, and addresses on testnet.</p>
+        <p>Search blocks, transactions, and addresses on mainnet.</p>
       </div>
       <form id="search-form" class="search-form" action="/" method="get">
         <input id="q" name="q" type="search" autocomplete="off"
@@ -51,7 +52,7 @@
         <button type="submit">Search</button>
       </form>
       <p id="search-status" hidden></p>
-      <p class="note">Public read only via <code>/api/rpc</code> (testnet). Write RPC is never public.</p>
+      <p class="note">Public read via <code>/api/rpc</code> → <code>34.27.30.115:38546</code>. Write/send stays off the public path.</p>
 
       <div class="section-head">
         <h2>Latest blocks</h2>
@@ -91,8 +92,8 @@
 
     <section class="cards" aria-label="Primary destinations">
       <a href="/wallet/"><strong>Wallet</strong><span>Balance, receive, send — needs a local node to spend</span></a>
-      <a href="/join/"><strong>Get started</strong><span>Run a home node on testnet or mainnet</span></a>
-      <a href="/status/"><strong>Status</strong><span>Live getinfo from the public testnet read RPC</span></a>
+      <a href="/join/"><strong>Get started</strong><span>Run a home node on mainnet (P2P 28546)</span></a>
+      <a href="/status/"><strong>Status</strong><span>Live getinfo from the public mainnet read RPC</span></a>
       <a href="/download/"><strong>Download</strong><span>Desktop helper for loopback write RPC</span></a>
     </section>
   </main>

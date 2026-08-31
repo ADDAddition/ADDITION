@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ADDITION testnet site + RPC HTTP proxy (stdlib only)."""
+"""ADDITION site + RPC HTTP proxy (stdlib only)."""
 
 from __future__ import annotations
 
@@ -212,7 +212,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(403, "error: command disabled on public RPC")
                 return
             host = os.environ.get("ADDITION_PUBLIC_RPC_HOST", "127.0.0.1")
-            port = env_int("ADDITION_PUBLIC_RPC_PORT", 38545)
+            port = env_int("ADDITION_PUBLIC_RPC_PORT", 38546)
         try:
             reply = tcp_rpc(host, port, command, timeout if path == "/local-rpc" else 4.0)
         except OSError:
@@ -273,7 +273,7 @@ class Handler(BaseHTTPRequestHandler):
                 parts.append(str(item))
         command = " ".join(parts)
         host = os.environ.get("ADDITION_PUBLIC_RPC_HOST", "127.0.0.1")
-        port = env_int("ADDITION_PUBLIC_RPC_PORT", 38545)
+        port = env_int("ADDITION_PUBLIC_RPC_PORT", 38546)
         try:
             reply = tcp_rpc(host, port, command, 4.0)
         except OSError:

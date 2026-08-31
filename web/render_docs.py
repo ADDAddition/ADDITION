@@ -180,7 +180,7 @@ def main() -> None:
     write_doc(
         "README.md",
         OUT / "docs" / "getting-started" / "index.html",
-        "Build and run ADDITION testnet",
+        "Build and run ADDITION",
         "Build and run",
         "Build <code>additiond</code> (liboqs + OpenSSL). From the repository README.",
     )

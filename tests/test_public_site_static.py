@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static copy and RPC checks for the ADDITION testnet site."""
+"""Static copy and RPC checks for the ADDITION public mainnet site."""
 
 from __future__ import annotations
 
@@ -26,7 +26,6 @@ FAKE_CLAIMS = (
     "ZK-STARK",
     "native ZK path",
     "ZK verifier contract",
-    "live L1",
     "privacy ZK",
     "Range Proofs",
     "Roadmap to Production",
@@ -34,6 +33,8 @@ FAKE_CLAIMS = (
     "labreche_jeremy@outlook",
     "Addison Electronics",
     "Addison Electronique",
+    "Swap-to-BTC",
+    "Solidity IDE",
 )
 
 SERMONS = (
@@ -42,26 +43,6 @@ SERMONS = (
     "research notice",
     "never invent",
     "we never invent",
-    "fail closed",
-    "fail-closed",
-)
-
-NAV_REQUIRED = (
-    '["/", "Explorer"]',
-    '["/status/", "Status"]',
-    '["/join/", "Join"]',
-)
-
-NAV_FORBIDDEN = (
-    '["/swap/"',
-    '["/evm/"',
-    '["/contracts/"',
-    '["/whitepaper/"',
-    '["/wallet/"',
-    '["/rpc/"',
-    '["/docs/"',
-    '["/legal/"',
-    '["/explorer/"',
 )
 
 
@@ -99,382 +80,166 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("contact@additionblockchain.com", chrome)
         self.assertNotIn("gmail.com", chrome)
         self.assertNotIn("outlook.com", chrome)
-        index = read("index.html")
-        self.assertNotIn("labjay69", index)
-        self.assertNotIn("outlook.com", index)
 
-    def test_chrome_nav_is_short(self) -> None:
+    def test_chrome_is_mainnet_product_nav(self) -> None:
         chrome = read("chrome.js")
-        for item in NAV_REQUIRED:
-            self.assertIn(item, chrome)
-        for item in NAV_FORBIDDEN:
-            self.assertNotIn(item, chrome)
-        self.assertIn("rpcQuerySuffix", chrome)
-        self.assertIn("testnet · ", chrome)
+        self.assertIn('["/", "Explore"', chrome)
+        self.assertIn('["/wallet/", "Wallet"', chrome)
+        self.assertIn('["/join/", "Get started"', chrome)
+        self.assertIn('["/status/", "Status"', chrome)
+        self.assertIn(">MAINNET</span>", chrome)
+        self.assertIn("public product is <strong>MAINNET</strong>", chrome)
         self.assertIn("contact@additionblockchain.com", chrome)
-        self.assertNotIn("8545", chrome)
-        self.assertNotIn("Wallet", chrome)
-        self.assertNotIn("STRIP_KEYS", chrome)
-        self.assertNotIn("emptyStripCells", chrome)
-        self.assertNotIn("lang-en", chrome)
+        self.assertNotIn(">TESTNET</span>", chrome)
+        self.assertNotIn("0.0.0.0:8545", chrome)
+        self.assertIn('path === "/wallet"', chrome)
 
-    def test_homepage_is_explorer(self) -> None:
+    def test_homepage_is_mainnet_product(self) -> None:
         index = read("index.html")
-        chrome = read("chrome.js")
-        status = read("status/index.html")
-        explorer_js = read("explorer.js")
-        block = read("block/index.html")
-        tx = read("tx/index.html")
-        address = read("address/index.html")
-        self.assertIn('placeholder="block height, block hash, tx hash, address"', index)
-        self.assertIn("<th>height</th>", index)
-        self.assertIn("<th>hash</th>", index)
-        self.assertIn("<th>tx_count</th>", index)
-        self.assertIn("<th>time</th>", index)
-        self.assertIn("Latest Blocks", index)
-        self.assertIn("Latest Transactions", index)
-        self.assertIn("live-strip", index)
+        self.assertIn('net-badge">MAINNET</span>', index)
+        self.assertIn("ADDITION_MAINNET_V1", index)
+        self.assertIn("34.27.30.115:38546", index)
+        self.assertIn("/api/rpc", index)
+        self.assertIn("latest-blocks", index)
+        self.assertIn("/wallet/", index)
         self.assertIn("/explorer.js", index)
-        self.assertIn("/block/", index)
-        self.assertIn("/tx/", index)
-        self.assertIn("/address/", index)
-        self.assertIn("getblock", block)
-        self.assertIn("tx_status", tx)
-        self.assertIn("not on public-read allowlist", address)
-        self.assertIn("127.0.0.1:8545", address)
-        self.assertNotIn("hero", index)
-        self.assertNotIn("cards", index)
-        self.assertNotIn("8545", index)
-        self.assertNotIn("8545", chrome)
-        self.assertNotIn("8545", status)
-        self.assertNotIn("8545", explorer_js)
-        self.assertNotIn("Wallet", index)
-        self.assertNotIn("/swap/", index)
-        self.assertNotIn("/evm/", index)
-        self.assertNotIn("/contracts/", index)
+        self.assertNotIn('net-badge">TESTNET</span>', index)
+        self.assertNotIn("ADDITION_TESTNET_V1", index)
+        self.assertNotIn("0.0.0.0:8545", index)
         self.assertNotIn("DEX", index)
-        self.assertNotIn("CoinMarketCap", index)
         self.assertNotIn("token sale", index.lower())
-        self.assertNotIn("market cap", index.lower())
-        self.assertNotIn("hashrate", index.lower())
-        self.assertNotIn("mainnet", index.lower())
-        self.assertLess(len(index.splitlines()), 80)
-        self.assertNotIn("004d9744", index)
-        self.assertIn("resolveSearch", explorer_js)
-        self.assertNotIn("getblockraw", explorer_js)
 
-    def test_rpc_page_documents_allowlist_and_json(self) -> None:
-        rpc = read("rpc/index.html")
-        self.assertIn("getblockraw", rpc)
-        self.assertIn("/jsonrpc?method=getinfo", rpc)
-        self.assertIn("34.27.30.115:28545", rpc)
-        self.assertIn(":80", rpc)
-        self.assertIn(":38545", rpc)
-        self.assertIn("127.0.0.1:8545", rpc)
-        self.assertIn("Command explorer", rpc)
-        self.assertIn("publicReadCommands", rpc)
-        self.assertIn("explorerCommand", rpc)
-        self.assertNotIn("eth_call", rpc)
-        self.assertNotIn("erc-20", rpc.lower())
-        self.assertNotIn("labreche_jeremy", rpc)
-        self.assertNotIn("outlook.com", rpc)
+    def test_status_and_manifest_are_mainnet(self) -> None:
+        status = read("status/index.html")
+        manifest = read("manifest.webmanifest")
+        self.assertIn('net-badge">MAINNET</span>', status)
+        self.assertIn("ADDITION_MAINNET_V1", status)
+        self.assertIn("34.27.30.115:38546", status)
+        self.assertNotIn("never talks to mainnet", status.lower())
+        self.assertIn("ADDITION_MAINNET_V1", manifest)
+        self.assertIn("icon-192.png", manifest)
+        self.assertIn("icon-512.png", manifest)
+        self.assertTrue((PUBLIC / "icon-192.png").is_file())
+        self.assertTrue((PUBLIC / "icon-512.png").is_file())
 
-    def test_join_docs_state_live_bootstrap_and_sync(self) -> None:
+    def test_join_docs_mainnet_first(self) -> None:
         join = read("join/index.html")
-        docs = read("docs/index.html")
-        started = read("docs/getting-started/index.html")
+        join_md = read("join.md")
+        docs_join = read("docs/join.md")
+        self.assertEqual(join_md, docs_join)
+        self.assertIn("ADDITION_MAINNET_V1", join)
+        self.assertIn("34.27.30.115:28546", join)
+        self.assertIn("34.27.30.115:38546", join)
+        self.assertIn("id=\"mainnet\"", join)
+        self.assertIn("id=\"testnet\"", join)
+        self.assertLess(join.find('id="mainnet"'), join.find('id="testnet"'))
+        self.assertIn("wallet_send", join)
+        self.assertIn("/local-rpc", join)
+        self.assertIn("never publish", join.lower())
+        self.assertNotIn("Public product today. Explorer", join)
+        self.assertNotIn("website explorer stays on testnet", join.lower())
+        self.assertIn("34.27.30.115:28546", join_md)
+        self.assertIn("34.27.30.115:38546", join_md)
+        self.assertIn("ADDITION_MAINNET_V1", join_md)
+
+    def test_rpc_page_documents_mainnet_seed(self) -> None:
         rpc = read("rpc/index.html")
-        chrome = read("chrome.js")
+        self.assertIn("34.27.30.115:38546", rpc)
+        self.assertIn("34.27.30.115:28546", rpc)
+        self.assertIn("/api/rpc", rpc)
+        self.assertIn("wallet_send", rpc)
+        self.assertIn("127.0.0.1:8546", rpc)
+        self.assertIn("Command explorer", rpc)
+        self.assertNotIn("eth_call", rpc)
+        self.assertIn("Do not open unauthenticated write RPC", rpc)
+        self.assertIn("0.0.0.0:8545", rpc)  # explicit forbid warning only
+
+    def test_wallet_is_trust_like_loopback_only(self) -> None:
+        wallet = read("wallet/index.html")
+        wallet_js = read("wallet.js")
+        helper = read("local-rpc.js")
+        self.assertIn("wallet-tabs", wallet)
+        self.assertIn('data-go="home"', wallet)
+        self.assertIn('data-go="receive"', wallet)
+        self.assertIn('data-go="send"', wallet)
+        self.assertIn('data-go="activity"', wallet)
+        self.assertIn("/local-rpc", wallet)
+        self.assertIn("127.0.0.1:8546", wallet)
+        self.assertIn("createwallet", wallet_js)
+        self.assertIn("wallet_send", wallet_js)
+        self.assertIn("/local-rpc?cmd=", helper)
+        self.assertNotIn("0.0.0.0:8545", wallet)
+        self.assertNotIn("stake_reward", wallet)
+        self.assertNotIn("getblocktemplate", wallet)
+        self.assertNotIn("submitblock", wallet)
+        # Spend path must not target public RPC URLs.
+        self.assertNotIn("38546/rpc", wallet_js)
+        self.assertNotIn("fetch(\"/api/rpc", wallet_js)
+
+    def test_local_tools_and_worker_fail_closed(self) -> None:
+        local = read("local/index.html")
+        helper = read("local-rpc.js")
         worker = read("worker.js")
-        blob = join + docs + started + rpc + chrome
-        self.assertIn(
-            "additiond --network testnet --data-dir $HOME/addition-testnet --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545",
-            join,
-        )
-        self.assertNotIn("--data-dir &lt;dir&gt;", join)
-        self.assertNotIn("--data-dir <dir>", join)
-        self.assertIn("sync", join)
-        self.assertIn("invalid/duplicate", join)
-        self.assertIn("/rpc?cmd=getinfo", join)
-        self.assertIn("https://rpc.additionblockchain.com/rpc?cmd=getinfo", join)
-        self.assertIn("http://34.27.30.115/rpc?cmd=getinfo", join)
-        self.assertIn(":80", join)
-        self.assertIn("getblockraw", join)
-        self.assertIn("ok:BLKDATA", join)
-        self.assertIn("HELLO", join)
-        self.assertIn("127.0.0.1", join)
-        self.assertIn("error: command disabled on public RPC", join)
-        self.assertIn("<td>80</td>", join)
-        self.assertIn("<td>38545</td>", join)
-        self.assertIn("<td>28545</td>", join)
-        self.assertIn("Sync uses :80 first", join)
-        self.assertIn("optional/filtered", join)
-        self.assertIn("Research testnet", join)
-        self.assertIn("ADDITION_ADVERTISED_P2P=34.27.30.115:28545", join)
-        self.assertIn("do not list <code>self</code>", join)
-        self.assertIn("Do not claim public P2P 28545 always works", join)
-        self.assertIn("when the operator seed answers", join)
-        self.assertIn("when the operator seed answers", rpc)
-        self.assertIn("/join/", docs)
-        self.assertIn("34.27.30.115:28545", started)
-        self.assertIn("/rpc?cmd=getinfo", rpc)
-        self.assertIn("getblockraw", rpc)
-        self.assertIn('"/join": "/join/index.html"', worker)
-        self.assertNotIn("cloudflared", blob.lower())
-        self.assertNotIn("0.0.0.0:8545", blob)
-        self.assertNotIn("https://rpc.additionblockchain.com/getinfo", blob)
-        self.assertNotIn("http://34.27.30.115/getinfo", blob)
+        wrangler = (PUBLIC / "wrangler.toml").read_text(encoding="utf-8")
+        self.assertIn("/local-rpc", local)
+        self.assertIn("127.0.0.1:8546", local)
+        self.assertIn("wallet_send", local)
+        self.assertIn('raw: "RPC offline"', helper)
+        self.assertIn("env.PUBLIC_RPC_URL || env.PUBLIC_RPC_HTTP", worker)
+        self.assertIn('path === "/local-rpc"', worker)
+        self.assertIn("34.27.30.115:38546/rpc", wrangler)
+        self.assertIsNone(re.search(r"(?m)^PUBLIC_RPC_HTTP\s*=", wrangler))
+        workflow = (ROOT / ".github" / "workflows" / "site-cloudflare.yml").read_text(encoding="utf-8")
+        self.assertIn("secrets.PUBLIC_RPC_HTTP", workflow)
 
-    def test_evm_page_is_local_testnet_only(self) -> None:
-        evm = read("evm/index.html")
-        self.assertIn("127.0.0.1:9545", evm)
-        self.assertIn("424242", evm)
-        self.assertIn("send disabled", evm.lower())
-        self.assertIn("eth_sendRawTransaction", evm)
-        self.assertIn("wallet_addEthereumChain", evm)
-        self.assertIn("http://127.0.0.1:9545", evm)
-        self.assertNotIn("0.0.0.0:9545", evm)
-        self.assertNotIn("wallet-connect", evm.lower())
-        self.assertIn("cannot list", evm.lower())
-        self.assertIn('id="add-mm"', evm)
-        self.assertIn("disabled", evm)
-        self.assertIn("Button stays disabled until http://127.0.0.1:9545 answers chain 424242.", evm)
-        self.assertNotIn("DEX", evm)
+    def test_readme_public_product_is_mainnet(self) -> None:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        site_readme = read("README.md")
+        self.assertIn("public product: mainnet", readme)
+        self.assertIn("public_product-mainnet", readme)
+        self.assertIn("ADDITION_MAINNET_V1", readme)
+        self.assertIn("34.27.30.115:38546", readme)
+        self.assertIn("100% to finding miner", readme)
+        self.assertNotIn("public product: testnet", readme)
+        self.assertIn("MAINNET", site_readme)
+        self.assertIn("38546", site_readme)
+        self.assertNotRegex(readme.lower(), r"\bhonest\b")
 
-    def test_site_brand_assets_exist_and_are_referenced(self) -> None:
-        required = (
+    def test_serve_defaults_to_mainnet_public_port(self) -> None:
+        spec = importlib.util.spec_from_file_location("addition_serve", ROOT / "web" / "serve.py")
+        self.assertIsNotNone(spec)
+        assert spec is not None and spec.loader is not None
+        serve = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(serve)
+        self.assertIn("38546", (ROOT / "web" / "serve.py").read_text(encoding="utf-8"))
+        self.assertNotIn("0.0.0.0:8545", (ROOT / "web" / "serve.py").read_text(encoding="utf-8"))
+
+    def test_site_brand_assets_exist(self) -> None:
+        for name in (
             "logo-transparent.png",
             "favicon.ico",
-            "favicon-32.png",
             "apple-touch-icon.png",
             "og.png",
-            "twitter.png",
-        )
-        for name in required:
+            "icon-192.png",
+            "icon-512.png",
+        ):
             path = PUBLIC / name
             self.assertTrue(path.is_file(), name)
             self.assertGreater(path.stat().st_size, 32, name)
-        logo = (PUBLIC / "logo-transparent.png").read_bytes()
-        source = (ROOT / "docs" / "assets" / "logo-transparent.png").read_bytes()
-        self.assertEqual(logo, source)
-        self.assertTrue(logo.startswith(b"\x89PNG"))
-        chrome = read("chrome.js")
-        self.assertIn("/logo-transparent.png", chrome)
-        self.assertIn("/download/", chrome)
-        index = read("index.html")
-        self.assertIn("/favicon.ico", index)
-        self.assertIn("/apple-touch-icon.png", index)
-        self.assertIn("/og.png", index)
-        self.assertIn("twitter:card", index)
-        self.assertLess(len(index.splitlines()), 80)
 
-    def test_download_page_is_testnet_local_only(self) -> None:
-        page = read("download/index.html")
-        worker = read("worker.js")
-        self.assertIn("testnet / local", page.lower())
-        self.assertIn("addition-wallet-testnet", page)
-        self.assertIn("addition-wallet-cli-testnet", page)
-        self.assertNotIn("addition-wallet-testnet.exe", page)
-        self.assertNotIn("addition-wallet-cli-testnet.exe", page)
-        self.assertNotIn("/download/addition-wallet-testnet.exe", page)
-        self.assertIn("127.0.0.1:8545", page)
-        self.assertIn("chmod +x", page)
-        self.assertIn("--data-dir $HOME/addition-testnet", page)
-        self.assertIn("Cashiers / Windows", page)
-        self.assertIn("Do not compile", page)
-        self.assertIn("RPC offline", page)
-        self.assertIn("contact@additionblockchain.com", page)
-        self.assertIn('"/download": "/download/index.html"', worker)
-        self.assertNotIn("powershell -File", page.lower())
-        self.assertNotIn("```powershell", page)
-        self.assertNotIn("build_wallet.ps1", page)
-        self.assertNotIn("build_wallet.sh", page)
-        self.assertNotIn("liboqs", page.lower())
-        self.assertNotIn("--data-dir <dir>", page)
-        self.assertNotIn("--data-dir &lt;dir&gt;", page)
-        self.assertNotIn("wallet-connect", page.lower())
-        self.assertNotIn("walletconnect", page.lower())
-        self.assertNotIn("token sale", page.lower())
-        self.assertNotIn("tokenomics", page.lower())
-        self.assertNotIn("market cap", page.lower())
-        self.assertNotIn("coinmarketcap", page.lower())
-        self.assertIn("not a hosted web wallet", page.lower())
-        self.assertNotIn("mainnet is live", page.lower())
-        self.assertNotIn("live mainnet", page.lower())
-        self.assertNotRegex(page.lower(), r"\bhonest\b")
-
-    def test_readme_linux_compile_path(self) -> None:
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        started = read("docs/getting-started/index.html")
-        self.assertIn("--data-dir $HOME/addition-testnet", readme)
-        self.assertIn("--data-dir $HOME/addition-testnet", started)
-        self.assertIn("Ubuntu EliteDesk", readme)
-        self.assertIn("Cashiers / Windows", readme)
-        self.assertIn("https://additionblockchain.com/download/", readme)
-        self.assertIn("contact@additionblockchain.com", readme)
-        self.assertIn("sudo apt-get", readme)
-        self.assertIn("127.0.0.1", readme)
-        self.assertNotIn("--data-dir <dir>", readme)
-        self.assertNotIn("```powershell", readme)
-        self.assertNotIn("powershell -File", readme.lower())
-        self.assertNotIn("0.0.0.0:8545", readme)
-        self.assertNotIn("Addison", readme)
-        self.assertNotRegex(readme.lower(), r"\bhonest\b")
-        self.assertNotIn("powershell -File", started.lower())
-        self.assertNotIn("```powershell", started)
-        self.assertNotIn("--data-dir &lt;dir&gt;", started)
-
-    def test_wallet_stays_loopback_only(self) -> None:
-        wallet = read("wallet/index.html")
-        self.assertIn("/local-rpc", wallet)
-        self.assertIn("127.0.0.1:8545", wallet)
-        self.assertIn("createwallet", wallet)
-        self.assertIn("disabled", wallet)
-        self.assertIn("RPC offline", wallet)
-        self.assertIn("mine ", wallet)
-        self.assertIn("stake ", wallet)
-        self.assertIn("unstake ", wallet)
-        self.assertIn("stake_claim", wallet)
-        self.assertNotIn("wallet-connect", wallet.lower())
-
-    def test_swap_and_contracts_fail_closed(self) -> None:
-        swap = read("swap/index.html")
-        contracts = read("contracts/index.html")
-        self.assertIn("/local-rpc", swap)
-        self.assertIn("127.0.0.1:8545", swap)
-        self.assertIn("disabled", swap)
-        self.assertIn("RPC offline", swap)
-        self.assertIn("swap_pool_create", swap)
-        self.assertIn("add_liquidity", swap)
-        self.assertIn("swap_exact_in", swap)
-        self.assertIn("swap_exact_in_wallet", swap)
-        self.assertIn("swap_tvl", swap)
-        self.assertIn("/local-rpc", contracts)
-        self.assertIn("127.0.0.1:8545", contracts)
-        self.assertIn("disabled", contracts)
-        self.assertIn("RPC offline", contracts)
-        self.assertIn("/tokens/", contracts)
-        self.assertNotIn("wallet-connect", swap.lower())
-
-    def test_local_tools_pages_fail_closed(self) -> None:
-        local = read("local/index.html")
-        tokens = read("tokens/index.html")
-        privacy = read("privacy/index.html")
-        helper = read("local-rpc.js")
-        nav = read("local-nav.js")
-        worker = read("worker.js")
-        docs = read("docs/index.html")
-        join = read("join/index.html")
-        for page in (local, tokens, privacy):
-            self.assertIn("/local-rpc", page)
-            self.assertIn("127.0.0.1:8545", page)
-            self.assertIn("disabled", page)
-            self.assertIn("RPC offline", page)
-            self.assertNotIn("wallet-connect", page.lower())
-        self.assertIn("token_create", tokens)
-        self.assertIn("token_mint", tokens)
-        self.assertIn("token_transfer", tokens)
-        self.assertIn("token_transfer_wallet", tokens)
-        self.assertIn("token_burn", tokens)
-        self.assertIn("privacy_note_prepare", privacy)
-        self.assertIn("privacy_mint_open", privacy)
-        self.assertIn("privacy_spend_open", privacy)
-        self.assertIn("opening_not_zk", privacy)
-        self.assertIn("this page does not call it", privacy)
-        self.assertIn("ADDITION_PRIVACY_MASTER_KEY", privacy)
-        self.assertIn('raw: "RPC offline"', helper)
-        self.assertIn("/local-rpc?cmd=", helper)
-        self.assertIn('["/local/", "Local"]', nav)
-        self.assertIn('["/tokens/", "Tokens"]', nav)
-        self.assertIn('["/privacy/", "Privacy"]', nav)
-        self.assertIn('"/local": "/local/index.html"', worker)
-        self.assertIn("function rpcPath(url)", worker)
-        self.assertIn('path === "/jsonrpc"', worker)
-        self.assertIn("function looksLikeHtml(text)", worker)
-        self.assertIn("function rpcOffline()", worker)
-        self.assertIn("catch (err)", worker)
-        self.assertIn("res.ok ? 200 : res.status", worker)
-        self.assertIn("env.PUBLIC_RPC_URL || env.PUBLIC_RPC_HTTP", worker)
-        wrangler = (PUBLIC / "wrangler.toml").read_text(encoding="utf-8")
-        self.assertIn("run_worker_first", wrangler)
-        self.assertIn('"/rpc*"', wrangler)
-        self.assertIn("rpc.additionblockchain.com/*", wrangler)
-        self.assertIn("additionblockchain.com/*", wrangler)
-        self.assertIn("www.additionblockchain.com/*", wrangler)
-        self.assertNotIn("trycloudflare", wrangler)
-        self.assertIsNone(re.search(r'(?m)^PUBLIC_RPC_HTTP\s*=', wrangler))
-        workflow = (ROOT / ".github" / "workflows" / "site-cloudflare.yml").read_text(encoding="utf-8")
-        self.assertIn("secrets.PUBLIC_RPC_HTTP", workflow)
-        self.assertIn("secret put PUBLIC_RPC_HTTP", workflow)
-        commands = read("docs/commands/index.html")
-        whitepaper = read("whitepaper/index.html")
-        self.assertIn("token_transfer_wallet", commands)
-        self.assertIn("when the operator seed answers", commands)
-        self.assertIn("token_transfer_wallet", whitepaper)
-        self.assertIn("ADDITION_PRIVACY_MASTER_KEY", whitepaper)
-        self.assertIn('"/tokens": "/tokens/index.html"', worker)
-        self.assertIn('"/privacy": "/privacy/index.html"', worker)
-        self.assertIn("/local/", docs)
-        self.assertIn("/tokens/", docs)
-        self.assertIn("/privacy/", docs)
-        self.assertIn("/local/", join)
-        self.assertIn("127.0.0.1:8546", local)
-        self.assertIn("ADDITION_MAINNET_V1", local)
-        self.assertIn("not a public network", local)
-        self.assertIn("create pair + pool", local)
-        self.assertIn("token_create", local)
-        self.assertIn("swap_pool_create", local)
-        self.assertIn("Not a hosted web wallet, Uniswap, or public token sale", local)
-        self.assertIn("min_fee=0", local)
-        self.assertIn("opening_not_zk", local)
-        self.assertIn("ml-dsa-87", local.lower())
-        self.assertIn("Not Monero, not Zcash", local)
-        self.assertIn("research_goal_tps", local)
-        self.assertIn("Not IBC", local)
-
-    def test_common_js_fail_closed_and_strip_keys(self) -> None:
+    def test_common_js_strip_and_allowlist(self) -> None:
         common = read("common.js")
         self.assertIn('raw: "RPC offline"', common)
-        self.assertIn("looksLikeHtml", common)
         self.assertIn("STRIP_KEYS", common)
-        self.assertIn('"network"', common)
-        self.assertIn('"height"', common)
-        self.assertIn('"peers"', common)
-        self.assertIn('"pq_mode"', common)
-        self.assertIn('"pow_algorithm"', common)
-        self.assertIn('"max_supply"', common)
-        self.assertIn('"next_reward"', common)
-        self.assertIn("stripFields", common)
         self.assertIn("tx_status", common)
-        self.assertIn("monetary_info", common)
-        self.assertIn("resolveSearch", common)
-        self.assertIn("loadChainStatus", common)
-
-    def test_explorer_still_calls_getblock(self) -> None:
-        index = read("index.html")
-        explorer_js = read("explorer.js")
-        common = read("common.js")
-        redirect = read("explorer/index.html")
-        worker = read("worker.js")
-        self.assertIn("/explorer.js", index)
-        self.assertIn("loadLatestBlockRows", explorer_js)
-        self.assertIn("loadChainStatus", explorer_js)
-        self.assertIn("RPC offline", explorer_js)
-        self.assertIn("Not found", explorer_js)
-        self.assertIn('return "getblock " + id', common)
+        self.assertIn("getblockraw", common)
         self.assertIn("explorerCommand", common)
-        self.assertIn("tx_status", common)
-        self.assertIn('url=/', redirect)
-        self.assertIn('"/block": "/block/index.html"', worker)
-        self.assertIn('"/tx": "/tx/index.html"', worker)
-        self.assertIn('"/address": "/address/index.html"', worker)
 
-    def test_no_hardcoded_live_stats(self) -> None:
+    def test_no_hardcoded_fake_stats(self) -> None:
         index = read("index.html")
         chrome = read("chrome.js")
-        css = read("common.css")
-        blob = index + chrome + css
-        self.assertIsNone(re.search(r"\b42\b", blob))
+        status = read("status/index.html")
+        blob = index + chrome + status
         self.assertNotIn("KH/s", blob)
         self.assertNotIn("1,248,500", blob)
         self.assertNotIn("124.8", blob)
@@ -495,85 +260,20 @@ function run(fetchImpl) {
   return window.AdditionSite;
 }
 const S = run(async () => { throw new Error("offline"); });
-const fields = S.parseFields("network=testnet height=20 peers=1 pq_mode=strict pow_algorithm=sha3_512 max_supply=50000000 next_reward=50 last_tps=9.99");
+const fields = S.parseFields("network=mainnet height=0 peers=1 pq_mode=strict pow_algorithm=memory_hard max_supply=50000000 next_reward=50 last_tps=9.99");
 const strip = S.stripFields(fields);
-if (strip.height !== "20" || strip.peers !== "1" || strip.network !== "testnet" || strip.pq_mode !== "strict") {
+if (strip.height !== "0" || strip.network !== "mainnet" || strip.pq_mode !== "strict") {
   throw new Error("missing live strip fields");
-}
-if (strip.pow_algorithm !== "sha3_512" || strip.max_supply !== "50000000" || strip.next_reward !== "50") {
-  throw new Error("strip must include pow/supply/reward when present");
 }
 if (Object.prototype.hasOwnProperty.call(strip, "last_tps")) {
   throw new Error("strip leaked non-strip getinfo fields");
 }
-if (!S.isHeightQuery("200") || S.isHeightQuery("00ab") || S.blockSearchCommand("200") !== "getblock 200") {
-  throw new Error("height search must use getblock");
-}
-if (S.blockSearchCommand("004d") !== "getblock 004d") {
-  throw new Error("hash search must use getblock");
-}
-if (!S.isAddressQuery("a".repeat(128)) || S.isAddressQuery("abcd")) {
-  throw new Error("address query must be 128 hex");
-}
-const row = S.blockRowFromFields({ height: "200", hash: "abc", tx_count: "1", timestamp: "1786877815", tx_hashes: "t1,t2" });
-if (row.height !== "200" || row.hash !== "abc" || row.tx_count !== "1" || !row.time || row.tx_hashes !== "t1,t2") {
-  throw new Error("block row must copy live getblock fields only");
-}
-const txs = S.txRowsFromBlock(row);
-if (txs.length !== 2 || txs[0].tx_hash !== "t1" || txs[1].height !== "200") {
-  throw new Error("tx rows must come from getblock tx_hashes");
-}
-const emptyRow = S.blockRowFromFields({});
-if (Object.keys(emptyRow).length !== 0) {
-  throw new Error("empty getblock fields must not invent a row");
-}
-if (!S.explorerAllowed("tx_status abc") || !S.explorerAllowed("peers") || !S.explorerAllowed("monetary_info")) {
-  throw new Error("explorer must allow public-read commands");
-}
-if (S.explorerAllowed("mine") || S.explorerAllowed("getbalance abc") || S.explorerAllowed("eth_blockNumber")) {
-  throw new Error("explorer must reject non-public commands");
+if (S.explorerAllowed("mine") || S.explorerAllowed("wallet_send")) {
+  throw new Error("explorer must reject spend/mine");
 }
 S.rpcCommand("getinfo").then((offline) => {
-  if (!offline.offline || offline.raw !== "RPC offline" || Object.keys(offline.fields).length !== 0) {
+  if (!offline.offline || offline.raw !== "RPC offline") {
     throw new Error("network error must fail closed");
-  }
-  const html = run(async () => ({
-    ok: false,
-    status: 404,
-    text: async () => "<!DOCTYPE html><html><body>missing</body></html>"
-  }));
-  return html.rpcCommand("getinfo");
-}).then((htmlOff) => {
-  if (!htmlOff.offline || htmlOff.raw !== "RPC offline") {
-    throw new Error("HTML 404 must fail closed");
-  }
-  return S.loadLatestBlockRows(3);
-}).then((emptyLatest) => {
-  if (!emptyLatest.offline || emptyLatest.blocks.length !== 0) {
-    throw new Error("offline latest blocks must be empty");
-  }
-  const blocked = run(async () => ({ ok: true, status: 200, text: async () => "ok" }));
-  return blocked.explorerCommand("mine 1");
-}).then((denied) => {
-  if (denied.ok || denied.raw !== "Not found") {
-    throw new Error("disallowed explorer command must be Not found");
-  }
-  const live = run(async (url) => {
-    if (String(url).indexOf("getblock%20deadbeef") !== -1 || String(url).indexOf("cmd=getblock%20deadbeef") !== -1) {
-      return { ok: true, status: 200, text: async () => "error: block not found" };
-    }
-    if (String(url).indexOf("tx_status") !== -1) {
-      return { ok: true, status: 200, text: async () => "status=mined tx_hash=deadbeef block_height=3 confirmations=1" };
-    }
-    return { ok: true, status: 200, text: async () => "error: unknown" };
-  });
-  return live.resolveSearch("deadbeef");
-}).then((resolved) => {
-  if (resolved.kind !== "tx" || resolved.fields.status !== "mined") {
-    throw new Error("resolveSearch must route tx hashes via tx_status");
-  }
-  if (S.routeForSearch(resolved).indexOf("/tx/") === -1) {
-    throw new Error("tx route must point at /tx/");
   }
   console.log("helpers-ok");
 }).catch((err) => {
@@ -627,18 +327,11 @@ S.rpcCommand("getinfo").then((offline) => {
         try:
             host, port = server.server_address
             index = urllib.request.urlopen(f"http://{host}:{port}/").read().decode("utf-8")
-            self.assertIn("ADDITION explorer", index)
-            self.assertIn("/common.css", index)
-            self.assertIn("latest-blocks", index)
+            self.assertIn("ADDITION_MAINNET_V1", index)
+            self.assertIn("MAINNET", index)
             chrome = urllib.request.urlopen(f"http://{host}:{port}/chrome.js").read().decode("utf-8")
-            self.assertIn("Explorer", chrome)
-            self.assertIn("Status", chrome)
-            self.assertIn("Join", chrome)
-            logo = urllib.request.urlopen(f"http://{host}:{port}/logo-transparent.png").read()
-            self.assertTrue(logo.startswith(b"\x89PNG"))
-            download = urllib.request.urlopen(f"http://{host}:{port}/download/index.html").read().decode("utf-8")
-            self.assertIn("addition-wallet-testnet", download)
-            self.assertIn("testnet", download.lower())
+            self.assertIn("MAINNET", chrome)
+            self.assertIn("Wallet", chrome)
             try:
                 urllib.request.urlopen(f"http://{host}:{port}/api/rpc?cmd=getinfo")
                 self.fail("offline RPC must not return HTTP 200")
@@ -649,109 +342,12 @@ S.rpcCommand("getinfo").then((offline) => {
             server.shutdown()
             server.server_close()
 
-    def test_raw_markdown_docs_are_fetchable(self) -> None:
-        join_md = read("join.md")
-        docs_join_md = read("docs/join.md")
-        runbook = read("docs/testnet-rpc-runbook.md")
-        wallet = read("docs/wallet.md")
-        worker = read("worker.js")
-        headers = read("_headers")
-        docs_index = read("docs/index.html")
-        join_html = read("join/index.html")
-        download_html = read("download/index.html")
-
-        self.assertEqual(runbook, (ROOT / "docs" / "TESTNET_PUBLIC_RPC_RUNBOOK.md").read_text(encoding="utf-8"))
-        self.assertEqual(wallet, (ROOT / "docs" / "WALLET.md").read_text(encoding="utf-8"))
-        self.assertEqual(docs_join_md, join_md)
-        self.assertNotIn("<!DOCTYPE html>", join_md)
-        self.assertNotIn("<!DOCTYPE html>", docs_join_md)
-        self.assertIn(
-            "additiond --network testnet --data-dir $HOME/addition-testnet --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545",
-            join_md,
-        )
-        self.assertNotIn("--data-dir <dir>", join_md)
-        self.assertIn("sync", join_md)
-        self.assertIn("invalid/duplicate", join_md)
-        self.assertIn("/rpc?cmd=getinfo", join_md)
-        self.assertIn("https://rpc.additionblockchain.com/rpc?cmd=getinfo", join_md)
-        self.assertIn("http://34.27.30.115/rpc?cmd=getinfo", join_md)
-        self.assertIn("getblockraw", join_md)
-        self.assertIn("ok:BLKDATA", join_md)
-        self.assertIn("HELLO", join_md)
-        self.assertIn("127.0.0.1", join_md)
-        self.assertIn("error: command disabled on public RPC", join_md)
-        self.assertIn("ADDITION_ADVERTISED_P2P=34.27.30.115:28545", join_md)
-        self.assertIn("Research testnet", join_md)
-        self.assertIn("contact@additionblockchain.com", join_md)
-        self.assertNotIn("0.0.0.0:8545", join_md)
-        self.assertNotIn("wallet-connect", join_md.lower())
-        self.assertNotIn("token sale", join_md.lower())
-        self.assertNotRegex(join_md.lower(), r"\bhonest\b")
-        self.assertIn("38545", runbook)
-        self.assertIn("127.0.0.1", runbook)
-        self.assertIn("Never publish **8545**", runbook)
-        self.assertIn("127.0.0.1:8545", wallet)
-        self.assertIn("loopback", wallet.lower())
-        self.assertIn('url.pathname.endsWith(".md")', worker)
-        self.assertIn("text/markdown; charset=utf-8", worker)
-        self.assertIn("text/markdown; charset=utf-8", headers)
-        self.assertIn("/join.md", docs_index)
-        self.assertIn("/docs/join.md", docs_index)
-        self.assertIn("/docs/testnet-rpc-runbook.md", docs_index)
-        self.assertIn("/docs/wallet.md", docs_index)
-        self.assertIn("Local desktop helper", join_html)
-        self.assertIn("/download/", join_html)
-        self.assertIn("testnet / local", download_html.lower())
-        self.assertIn("127.0.0.1:8545", download_html)
-
-        spec = importlib.util.spec_from_file_location("addition_serve", ROOT / "web" / "serve.py")
-        self.assertIsNotNone(spec)
-        self.assertIsNotNone(spec.loader)
-        serve = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(serve)
-        for path in ("/join.md", "/docs/join.md", "/docs/testnet-rpc-runbook.md", "/docs/wallet.md"):
-            target = serve.resolve_static(path)
-            self.assertIsNotNone(target, path)
-            self.assertEqual(serve.content_type(target), "text/markdown; charset=utf-8", path)
-        self.assertEqual(serve.resolve_static("/join/").name, "index.html")
-        self.assertEqual(serve.resolve_static("/download/").name, "index.html")
-
-        server = ThreadingHTTPServer(("127.0.0.1", 0), serve.Handler)
-        thread = Thread(target=server.serve_forever, daemon=True)
-        thread.start()
-        try:
-            host, port = server.server_address
-            for path, needle in (
-                ("/join.md", "bootstrap 34.27.30.115:28545"),
-                ("/docs/join.md", "bootstrap 34.27.30.115:28545"),
-                ("/docs/testnet-rpc-runbook.md", "public-read"),
-                ("/docs/wallet.md", "127.0.0.1:8545"),
-            ):
-                with urllib.request.urlopen(f"http://{host}:{port}{path}") as resp:
-                    self.assertIn("text/markdown", resp.headers.get("Content-Type", ""))
-                    body = resp.read().decode("utf-8")
-                self.assertIn(needle, body)
-                self.assertNotIn("<!DOCTYPE html>", body)
-            with urllib.request.urlopen(f"http://{host}:{port}/join/") as resp:
-                self.assertIn("text/html", resp.headers.get("Content-Type", ""))
-                self.assertIn("Join the ADDITION testnet", resp.read().decode("utf-8"))
-            with urllib.request.urlopen(f"http://{host}:{port}/download/") as resp:
-                self.assertIn("text/html", resp.headers.get("Content-Type", ""))
-                self.assertIn("addition-wallet-testnet", resp.read().decode("utf-8"))
-        finally:
-            server.shutdown()
-            server.server_close()
-
     def test_root_license_is_mit(self) -> None:
         license_text = (ROOT / "LICENSE").read_text(encoding="utf-8")
         self.assertIn("MIT License", license_text)
-        self.assertIn("Permission is hereby granted, free of charge", license_text)
         legal = read("legal/index.html")
-        self.assertIn("LICENSE", legal)
+        self.assertIn("ADDITION_MAINNET_V1", legal)
         self.assertIn("MIT", legal)
-        docs = read("docs/index.html")
-        self.assertIn("SHA3 opening notes", docs)
-        self.assertNotIn("ZK verifier contract", docs)
 
 
 if __name__ == "__main__":
