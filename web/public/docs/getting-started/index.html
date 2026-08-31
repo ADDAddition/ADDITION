@@ -49,6 +49,13 @@
 <h2>Cashiers / Windows</h2>
 <p>Cashiers and Windows users download the live testnet / local wallet from <a href="https://additionblockchain.com/download/">https://additionblockchain.com/download/</a> only (<code>addition-wallet-testnet</code> and <code>addition-wallet-cli-testnet</code>). Do not compile liboqs. There is no Windows compile path in this README. This host does not publish a <code>.exe</code>.</p>
 <p>The helper talks to write RPC on <code>127.0.0.1:8545</code> on the machine that already runs <code>additiond --network testnet</code>. additionblockchain.com has no public write RPC.</p>
+<h3>Flutter desktop + local operator tools (loopback)</h3>
+<p>Linux operators can also use the Flutter desktop wallet from this repo (<code>client/addition_app</code>, shipped in #55) and optional loopback helpers:</p>
+<pre># Linux: deps + build + start testnet write on 127.0.0.1:8545
+./scripts/setup_desktop.sh --mode testnet --run-wallet</pre>
+<table><tr><th>Mode</th><th>Write RPC</th><th>Notes</th></tr><tr><td>testnet (default)</td><td><code>127.0.0.1:8545</code></td><td>Prefer for demos / pool</td></tr><tr><td>mainnet</td><td><code>127.0.0.1:8546</code></td><td>Local/operator; height from live <code>getinfo</code></td></tr><tr><td>regtest</td><td><code>127.0.0.1:8547</code></td><td>Local min-diff</td></tr></table>
+<p>Optional loopback-only tools (never public write):</p>
+<ul><li>EVM: <code>python3 web/evm/evm_rpc_bridge.py</code> (JSON-RPC <code>127.0.0.1:9545</code>, send disabled)</li><li>Mining pool: <code>python3 tools/mining_pool.py coordinator</code> then <code>… worker --once</code> — serializes one loopback <code>mine</code> at a time (prefer testnet <code>:8545</code>; refuses <code>38545</code>/<code>38546</code>/<code>18545</code> and non-loopback; <strong>not NiceHash</strong>). See <a href="tools/mining_pool_README.md"><code>tools/mining_pool_README.md</code></a>.</li></ul>
 <hr>
 <h2>Join the testnet</h2>
 <p>Build <code>additiond</code> on Linux from this repository on <code>main</code>, then:</p>
