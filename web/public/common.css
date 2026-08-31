@@ -54,7 +54,7 @@ body {
   pointer-events: none;
   overflow: hidden;
   background:
-    linear-gradient(180deg, #f7fafc 0%, var(--bg) 42%, #eef3f8 100%);
+    linear-gradient(180deg, #f5f8fc 0%, var(--bg) 45%, #e8eef6 100%);
 }
 .site-bg-mesh,
 .site-bg-mesh-2 {
@@ -64,37 +64,37 @@ body {
 }
 .site-bg-mesh {
   background:
-    radial-gradient(ellipse 48% 42% at 18% 28%, rgba(15, 122, 146, 0.16), transparent 58%),
-    radial-gradient(ellipse 42% 36% at 82% 18%, rgba(47, 95, 138, 0.14), transparent 55%),
-    radial-gradient(ellipse 38% 40% at 62% 78%, rgba(90, 130, 170, 0.12), transparent 58%);
-  animation: site-bg-drift 34s ease-in-out infinite alternate;
+    radial-gradient(ellipse 52% 44% at 16% 24%, rgba(15, 122, 146, 0.22), transparent 58%),
+    radial-gradient(ellipse 46% 38% at 84% 16%, rgba(47, 95, 138, 0.2), transparent 55%),
+    radial-gradient(ellipse 40% 42% at 58% 82%, rgba(90, 140, 190, 0.16), transparent 58%);
+  animation: site-bg-drift 28s ease-in-out infinite alternate;
 }
 .site-bg-mesh-2 {
   background:
-    radial-gradient(ellipse 36% 32% at 12% 78%, rgba(70, 120, 160, 0.1), transparent 55%),
-    radial-gradient(ellipse 44% 38% at 88% 70%, rgba(15, 122, 146, 0.1), transparent 58%);
-  animation: site-bg-drift-2 46s ease-in-out infinite alternate;
-  opacity: 0.9;
+    radial-gradient(ellipse 38% 34% at 10% 78%, rgba(70, 130, 175, 0.16), transparent 55%),
+    radial-gradient(ellipse 46% 40% at 90% 68%, rgba(15, 122, 146, 0.14), transparent 58%);
+  animation: site-bg-drift-2 38s ease-in-out infinite alternate;
+  opacity: 0.95;
 }
 .site-bg-dots {
   position: absolute;
   inset: 0;
-  opacity: 0.4;
-  background-image: radial-gradient(circle, rgba(47, 95, 138, 0.22) 1px, transparent 1.6px);
-  background-size: 52px 52px;
-  animation: site-bg-dots 70s linear infinite;
+  opacity: 0.45;
+  background-image: radial-gradient(circle, rgba(47, 95, 138, 0.28) 1.1px, transparent 1.7px);
+  background-size: 48px 48px;
+  animation: site-bg-dots 55s linear infinite;
 }
 @keyframes site-bg-drift {
   0% { transform: translate3d(0, 0, 0) scale(1); }
-  100% { transform: translate3d(3.5%, -2.5%, 0) scale(1.06); }
+  100% { transform: translate3d(4.5%, -3.5%, 0) scale(1.08); }
 }
 @keyframes site-bg-drift-2 {
-  0% { transform: translate3d(0, 0, 0) scale(1.04); }
-  100% { transform: translate3d(-3%, 3%, 0) scale(1); }
+  0% { transform: translate3d(0, 0, 0) scale(1.05); }
+  100% { transform: translate3d(-4%, 3.5%, 0) scale(1); }
 }
 @keyframes site-bg-dots {
   0% { background-position: 0 0; }
-  100% { background-position: 52px 26px; }
+  100% { background-position: 48px 24px; }
 }
 a { color: var(--accent); text-decoration: none; }
 a:hover { color: var(--accent-hover); }
