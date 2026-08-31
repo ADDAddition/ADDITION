@@ -11,7 +11,7 @@ Primary nav (desktop + mobile bottom tabs): **Explore · Wallet · Get started �
 - PWA: `manifest.webmanifest`, `sw.js`, theme `#f3f6fa` (light), icons 192/512 for Add to Home Screen.
 - Brand: `logo-transparent.png`, `favicon.ico`, `apple-touch-icon.png`, `og.png`. Light teal-slate theme — no private-zone / gold / dark-privacy graphics.
 - `/download/` desktop helper for mainnet / local (`addition-wallet-mainnet`, loopback `8546` only). `/local/` operator toolbox.
-- Hero banners: muted autoplay loop `<video>` srcs point at durable `https://additionblockchain.com/banners/addition-banner-1.mp4` and `…/addition-banner-2.mp4`.
+- Homepage hero: one muted autoplay loop `<video>` (no controls) at `https://additionblockchain.com/banners/addition-stinger.mp4` — not dual banner-1/banner-2 tiles.
 - Explorer calls `/api/rpc?cmd=…` for public-read. No consensus / economy code changes in this surface.
 - Contact: contact@additionblockchain.com
 - Source: https://github.com/ADDAddition/ADDITION
