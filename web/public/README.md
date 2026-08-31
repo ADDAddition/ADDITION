@@ -14,3 +14,4 @@ Primary nav (desktop + mobile bottom tabs): **Explore · Wallet · Get started �
 - Explorer calls `/api/rpc?cmd=…` for public-read only. nginx `:80` stays proxy to testnet read (`127.0.0.1:38545`). No consensus / RPC allowlist changes in this surface.
 - Contact: contact@additionblockchain.com
 - Source: https://github.com/ADDAddition/ADDITION
+<!-- deploy-trigger: light-theme-live -->
