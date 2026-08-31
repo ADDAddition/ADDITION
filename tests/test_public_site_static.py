@@ -111,6 +111,15 @@ class PublicSiteStaticTests(unittest.TestCase):
         css = read("common.css")
         self.assertIn(".footer-banner", css)
         self.assertIn("object-fit: contain", css)
+        self.assertIn("@media (max-width: 840px)", css)
+        # Homepage video IS .hero-stinger; mobile contain must hit that class.
+        self.assertRegex(
+            css,
+            re.compile(
+                r"@media\s*\(max-width:\s*840px\)\s*\{[^}]*\.hero-stinger\s*\{[^}]*object-fit:\s*contain",
+                re.DOTALL,
+            ),
+        )
 
     def test_homepage_is_mainnet_product(self) -> None:
         index = read("index.html")
