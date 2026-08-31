@@ -6,8 +6,11 @@ mainnet product.
 
 Public contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com)
 
-Flutter under `client/addition_app` is still a stub, so this path uses
-PyInstaller around:
+Flutter under `client/addition_app` is the desktop wallet (Windows + Linux; #55).
+See [`client/addition_app/README.md`](../client/addition_app/README.md) and
+`scripts/setup_desktop.sh` / `scripts/setup_desktop.ps1` for first-run helpers.
+
+This packaging path still uses PyInstaller around:
 
 * `web/addition_wallet_gui.py` — GUI + `--cli` (node wallet files, loopback RPC)
 * `web/addition_wallet.py` — caller-disk CLI (keys on the caller, loopback RPC)
