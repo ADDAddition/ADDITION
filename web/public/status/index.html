@@ -2,33 +2,48 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ADDITION status</title>
-  <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Network status — ADDITION</title>
+  <meta name="description" content="Live getinfo from the ADDITION research testnet public read RPC.">
+  <meta name="theme-color" content="#0a0e14">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:image" content="https://additionblockchain.com/og.png">
+  <meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/common.css">
 </head>
 <body>
   <header id="site-header"></header>
   <main>
-    <p class="note">Public read only. Values come from the node. If it does not answer: <strong>RPC offline</strong>. <code>last_tps</code> is measured. <code>privacy_claim</code> is whatever the node prints (SHA3 opening is <code>opening_not_zk</code>).</p>
+    <section class="product-hero" style="padding-top:1rem;padding-bottom:0.25rem">
+      <p class="eyebrow"><span class="net-badge">TESTNET</span> Public read</p>
+      <h1>Network status</h1>
+      <p class="lede">
+        Values come from the public testnet read path (<code>/api/rpc</code> →
+        <code>rpc.additionblockchain.com</code> / <code>ADDITION_TESTNET_V1</code>).
+        If the node does not answer: <strong>RPC offline</strong>.
+        This page never talks to mainnet <code>38546</code>.
+      </p>
+    </section>
+    <p class="note"><code>last_tps</code> is measured when present. <code>privacy_claim</code> is whatever the node prints (SHA3 opening is <code>opening_not_zk</code>).</p>
     <p id="rpc-state"></p>
-    <section>
+    <section class="panel">
       <h2>getinfo</h2>
       <div id="info-fields"></div>
       <pre id="info-raw" class="raw"></pre>
     </section>
-    <section>
+    <section class="panel">
       <h2>monetary_info</h2>
       <div id="monetary-fields"></div>
       <pre id="monetary-raw" class="raw"></pre>
     </section>
-    <section>
+    <section class="panel">
       <h2>peers</h2>
       <pre id="peers-raw" class="raw"></pre>
     </section>
-    <section>
+    <section class="panel">
       <h2>crypto_selftest</h2>
       <pre id="selftest-raw" class="raw"></pre>
     </section>

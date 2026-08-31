@@ -2,169 +2,183 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ADDITION wallet</title>
-  <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Wallet — ADDITION</title>
+  <meta name="description" content="ADDITION wallet. Keys stay on your local node. Public hosted pages cannot spend.">
+  <meta name="theme-color" content="#0a0e14">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:image" content="https://additionblockchain.com/og.png">
+  <meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="Wallet" data-sub="127.0.0.1:8545">
+<body data-title="Wallet" data-sub="local node">
   <header id="site-header"></header>
   <main>
-    <div class="banner">
-      <code>createwallet</code>, <code>wallet_send</code>, <code>mine</code>, and <code>stake</code> go to
-      <code>/local-rpc</code> → <code>127.0.0.1:8545</code>.
-      Run <code>python3 web/serve.py</code> next to a local node.
-      The public read port does not accept those commands.
-      Keys stay in <code>data/wallets/&lt;name&gt;.wal</code> (ML-DSA-87).
+    <div class="wallet-shell">
+      <div class="section-head" style="margin-top:0.35rem">
+        <h2 style="font-size:1.35rem;text-transform:none;letter-spacing:-0.02em;color:var(--ink)">Wallet</h2>
+        <span id="conn-pill" class="pill pill-warn">Checking…</span>
+      </div>
+      <p class="note" style="margin-top:0">
+        Keys stay in your local node file. This page only talks to
+        <code>127.0.0.1:8545</code> through <code>/local-rpc</code>.
+        Public read ports cannot create wallets or send.
+      </p>
+
+      <!-- Offline / connect home node -->
+      <section id="panel-offline" class="panel wallet-panel" hidden>
+        <h2>Connect your home node</h2>
+        <p class="note">Spending needs a node on this device (or LAN loopback). Public sites never hold your keys.</p>
+        <ol class="connect-steps">
+          <li>
+            <strong>Run additiond locally</strong>
+            <span>Start a testnet node with write RPC on <code>127.0.0.1:8545</code> only — never bind write on <code>0.0.0.0</code>.</span>
+          </li>
+          <li>
+            <strong>Serve this site next to the node</strong>
+            <span>From the repo: <code>python3 web/serve.py</code> so <code>/local-rpc</code> can reach loopback.</span>
+          </li>
+          <li>
+            <strong>Refresh this page</strong>
+            <span>When the node answers, Create wallet or Open existing appears here. Public <code>:80</code> / <code>38545</code> stay read-only.</span>
+          </li>
+        </ol>
+        <div class="cta-row" style="margin-top:1rem">
+          <a class="btn btn-primary" href="/join/">How to run a node</a>
+          <a class="btn btn-secondary" href="/download/">Desktop helper</a>
+          <button type="button" class="btn btn-ghost" id="retry-btn">Check again</button>
+        </div>
+      </section>
+
+      <!-- Setup: create / open -->
+      <section id="panel-setup" class="panel wallet-panel" hidden>
+        <h2>Set up this wallet</h2>
+        <p class="note">Pick a name for the wallet file on your node. No seed phrase UI — the node stores ML-DSA-87 keys in <code>data/wallets/&lt;name&gt;.wal</code>.</p>
+        <label for="name">Wallet name</label>
+        <input id="name" value="default" autocomplete="off" spellcheck="false">
+        <div class="wallet-setup">
+          <button type="button" class="btn btn-primary" id="create-btn">Create wallet — make a new key file on this node</button>
+          <button type="button" class="btn btn-secondary" id="open-btn">Open existing — load balance for this name</button>
+          <button type="button" class="btn btn-ghost" id="list-btn">Show wallets on this node</button>
+        </div>
+        <div id="setup-fields"></div>
+        <pre id="setup-raw" class="raw" hidden></pre>
+      </section>
+
+      <!-- Home: balance + actions -->
+      <section id="panel-home" class="wallet-panel" hidden>
+        <div class="wallet-balance-card">
+          <p class="wallet-balance-label">Available balance</p>
+          <p class="wallet-balance"><span id="bal-value">—</span><span class="wallet-balance-unit">ADD</span></p>
+          <p class="wallet-addr" id="addr-line">No address yet</p>
+          <p class="note" id="home-meta" style="margin:0.5rem 0 0"></p>
+        </div>
+        <div class="wallet-actions" role="group" aria-label="Primary actions">
+          <button type="button" class="wallet-action" data-go="receive" id="go-receive">
+            <span class="wa-icon" aria-hidden="true">↓</span>
+            <strong>Receive</strong>
+            <span>Show your address so others can pay you</span>
+          </button>
+          <button type="button" class="wallet-action" data-go="send" id="go-send">
+            <span class="wa-icon" aria-hidden="true">↑</span>
+            <strong>Send</strong>
+            <span>Pay an address from this wallet</span>
+          </button>
+          <button type="button" class="wallet-action" data-go="activity" id="go-activity">
+            <span class="wa-icon" aria-hidden="true">⇄</span>
+            <strong>Activity</strong>
+            <span>Recent actions from this session</span>
+          </button>
+        </div>
+        <button type="button" class="btn btn-ghost" id="refresh-btn" style="width:100%">Refresh balance</button>
+        <a class="wallet-more-link" href="#more" id="go-more">More — mine, stake, tokens, swap</a>
+      </section>
+
+      <!-- Receive -->
+      <section id="panel-receive" class="panel wallet-panel" hidden>
+        <h2>Receive</h2>
+        <p class="note">Share this address. Anyone can send ADD to it on the network your node follows.</p>
+        <label for="recv-addr">Your address</label>
+        <textarea id="recv-addr" rows="3" readonly></textarea>
+        <div class="btn-row">
+          <button type="button" class="btn btn-primary" id="copy-addr">Copy address</button>
+          <button type="button" class="btn btn-ghost" data-back>Back</button>
+        </div>
+      </section>
+
+      <!-- Send -->
+      <section id="panel-send" class="panel wallet-panel" hidden>
+        <h2>Send</h2>
+        <p class="note">Signs and broadcasts from your local node only. Never goes to public <code>:80</code>, <code>38545</code>, or <code>38546</code>.</p>
+        <label for="to">Recipient address</label>
+        <input id="to" autocomplete="off" spellcheck="false" placeholder="128-hex address">
+        <label for="amount">Amount (whole ADD)</label>
+        <input id="amount" inputmode="numeric" value="1">
+        <label for="fee">Fee (0 allowed when floor is 0)</label>
+        <input id="fee" inputmode="numeric" value="0">
+        <div class="btn-row">
+          <button type="button" class="btn btn-primary" id="send-btn">Send ADD</button>
+          <button type="button" class="btn btn-ghost" data-back>Back</button>
+        </div>
+        <pre id="send-raw" class="raw"></pre>
+      </section>
+
+      <!-- Activity -->
+      <section id="panel-activity" class="panel wallet-panel" hidden>
+        <h2>Activity</h2>
+        <p class="note">Session log on this device. Not a full chain history index.</p>
+        <ul class="activity-list" id="activity-list">
+          <li class="empty">No activity yet.</li>
+        </ul>
+        <div class="btn-row">
+          <button type="button" class="btn btn-ghost" data-back>Back</button>
+        </div>
+      </section>
+
+      <!-- More (secondary) -->
+      <section id="panel-more" class="panel wallet-panel" hidden>
+        <h2 id="more">More</h2>
+        <p class="note">Secondary tools for operators. Not required for everyday receive/send.</p>
+
+        <h3>Mine to this wallet</h3>
+        <p class="note">Testnet-local only: SHA3-512 via <code>127.0.0.1:8545</code>. Not mainnet (<code>memory_hard</code> / <code>8546</code> — see <a href="/join/#mainnet">Get started</a>). Public mine stays disabled (403).</p>
+        <div class="btn-row">
+          <button type="button" class="btn btn-secondary" id="mine-btn">Mine one block</button>
+        </div>
+        <pre id="mine-raw" class="raw"></pre>
+
+        <h3>Stake</h3>
+        <p class="note">Locks ADD on your address. Needs unlocked balance (mine first on a fresh node).</p>
+        <label for="stake-amt">Amount</label>
+        <input id="stake-amt" value="1" inputmode="numeric">
+        <div class="btn-row">
+          <button type="button" class="btn btn-ghost" id="stake-btn">Stake</button>
+          <button type="button" class="btn btn-ghost" id="unstake-btn">Unstake</button>
+          <button type="button" class="btn btn-ghost" id="staked-btn">Staked balance</button>
+          <button type="button" class="btn btn-ghost" id="claim-btn">Claim rewards</button>
+        </div>
+        <pre id="stake-raw" class="raw"></pre>
+
+        <h3>Other local tools</h3>
+        <div class="tool-grid">
+          <a href="/tokens/"><strong>Tokens</strong><span>Create and transfer on your node</span></a>
+          <a href="/swap/"><strong>Swap</strong><span>Local in-process pool, not Uniswap</span></a>
+          <a href="/privacy/"><strong>Privacy</strong><span>SHA3 opening — not ZK</span></a>
+          <a href="/local/"><strong>Local hub</strong><span>Operator toolbox</span></a>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="btn btn-ghost" data-back>Back to wallet</button>
+        </div>
+      </section>
     </div>
-    <p id="rpc-state" class="offline">Checking local RPC…</p>
-    <p id="height-line" class="note"></p>
-
-    <section class="panel">
-      <h2>createwallet / balance</h2>
-      <div class="form-grid">
-        <div><label for="name">wallet name</label><input id="name" value="default"></div>
-      </div>
-      <div class="btn-row">
-        <button id="create-btn" type="button" disabled>createwallet</button>
-        <button id="list-btn" type="button" disabled>wallet_list</button>
-        <button id="info-btn" type="button" disabled>wallet_info</button>
-        <button id="bal-btn" type="button" disabled>wallet_balance</button>
-      </div>
-      <div id="wallet-fields"></div>
-      <pre id="wallet-raw" class="raw"></pre>
-    </section>
-
-    <section class="panel">
-      <h2>wallet_send</h2>
-      <div class="form-grid">
-        <div><label for="to">to address</label><input id="to"></div>
-        <div><label for="amount">amount</label><input id="amount" value="1"></div>
-        <div><label for="fee">fee (0 allowed when floor is 0)</label><input id="fee" value="0"></div>
-      </div>
-      <div class="btn-row">
-        <button id="send-btn" type="button" disabled>Send</button>
-      </div>
-      <pre id="send-raw" class="raw"></pre>
-    </section>
-
-    <section class="panel" id="mine">
-      <h2>mine to this wallet</h2>
-      <p class="note">Testnet SHA3-512, 30s deadline. Reward is the node’s <code>next_reward</code> (50 on a fresh testnet). Local trusted RPC only.</p>
-      <div class="btn-row">
-        <button id="mine-btn" type="button" disabled>mine</button>
-      </div>
-      <pre id="mine-raw" class="raw"></pre>
-    </section>
-
-    <section class="panel" id="stake">
-      <h2>stake / unstake / claim</h2>
-      <p class="note">Uses the wallet address from <code>wallet_info</code>. Needs unlocked on-chain ADD (mine first). Whole units.</p>
-      <div class="form-grid">
-        <div><label for="stake-amt">amount</label><input id="stake-amt" value="1"></div>
-      </div>
-      <div class="btn-row">
-        <button id="stake-btn" type="button" disabled>stake</button>
-        <button id="unstake-btn" type="button" disabled>unstake</button>
-        <button id="staked-btn" type="button" disabled>staked</button>
-        <button id="claim-btn" type="button" disabled>stake_claim</button>
-      </div>
-      <pre id="stake-raw" class="raw"></pre>
-    </section>
   </main>
   <footer id="site-footer"></footer>
   <script src="/common.js"></script>
   <script src="/local-rpc.js"></script>
   <script src="/chrome.js"></script>
-  <script src="/local-nav.js"></script>
-  <script>
-    const L = window.AdditionLocal;
-    function name() { return L.val("name"); }
-    async function walletAddress() {
-      const info = await L.cmd("wallet_info " + name());
-      if (info.offline || !info.ok) {
-        return info;
-      }
-      return info;
-    }
-    async function ping() {
-      const r = await L.ping(document.getElementById("rpc-state"));
-      const height = document.getElementById("height-line");
-      if (r.offline) {
-        height.textContent = "No node on 127.0.0.1:8545. Start additiond, then python3 web/serve.py.";
-        document.getElementById("wallet-raw").textContent = "RPC offline";
-        document.getElementById("send-raw").textContent = "RPC offline";
-        document.getElementById("mine-raw").textContent = "RPC offline";
-        document.getElementById("stake-raw").textContent = "RPC offline";
-        return;
-      }
-      height.textContent = "getinfo height=" + (r.fields.height || "?") +
-        " network=" + (r.fields.network || "?") +
-        " next_reward=" + (r.fields.next_reward || "?");
-    }
-    document.getElementById("create-btn").addEventListener("click", async function () {
-      const r = await L.cmd("createwallet " + name());
-      L.showResult(document.getElementById("wallet-raw"), document.getElementById("wallet-fields"), r);
-    });
-    document.getElementById("list-btn").addEventListener("click", async function () {
-      const r = await L.cmd("wallet_list");
-      L.showResult(document.getElementById("wallet-raw"), document.getElementById("wallet-fields"), r);
-    });
-    document.getElementById("info-btn").addEventListener("click", async function () {
-      const r = await L.cmd("wallet_info " + name());
-      L.showResult(document.getElementById("wallet-raw"), document.getElementById("wallet-fields"), r);
-    });
-    document.getElementById("bal-btn").addEventListener("click", async function () {
-      const r = await L.cmd("wallet_balance " + name());
-      L.showResult(document.getElementById("wallet-raw"), document.getElementById("wallet-fields"), r);
-    });
-    document.getElementById("send-btn").addEventListener("click", async function () {
-      let line = "wallet_send " + name() + " " + L.val("to") + " " + L.val("amount");
-      if (L.val("fee")) {
-        line += " " + L.val("fee");
-      }
-      const r = await L.cmd(line);
-      document.getElementById("send-raw").textContent = r.raw;
-    });
-    document.getElementById("mine-btn").addEventListener("click", async function () {
-      const info = await walletAddress();
-      if (info.offline || !info.ok) {
-        document.getElementById("mine-raw").textContent = info.raw;
-        return;
-      }
-      const addr = info.fields.address || L.field(info.raw, "address");
-      document.getElementById("mine-raw").textContent = "mining to " + addr + " …";
-      const r = await L.cmd("mine " + addr, 300000);
-      document.getElementById("mine-raw").textContent = r.raw;
-      const bal = await L.cmd("wallet_balance " + name());
-      L.showResult(document.getElementById("wallet-raw"), document.getElementById("wallet-fields"), bal);
-      ping();
-    });
-    async function stakeCmd(line) {
-      const info = await walletAddress();
-      if (info.offline || !info.ok) {
-        document.getElementById("stake-raw").textContent = info.raw;
-        return;
-      }
-      const addr = info.fields.address || L.field(info.raw, "address");
-      const r = await L.cmd(line.replace("%ADDR%", addr));
-      document.getElementById("stake-raw").textContent = r.raw;
-    }
-    document.getElementById("stake-btn").addEventListener("click", function () {
-      stakeCmd("stake %ADDR% " + L.val("stake-amt"));
-    });
-    document.getElementById("unstake-btn").addEventListener("click", function () {
-      stakeCmd("unstake %ADDR% " + L.val("stake-amt"));
-    });
-    document.getElementById("staked-btn").addEventListener("click", function () {
-      stakeCmd("staked %ADDR%");
-    });
-    document.getElementById("claim-btn").addEventListener("click", function () {
-      stakeCmd("stake_claim %ADDR%");
-    });
-    ping();
-  </script>
+  <script src="/wallet.js"></script>
 </body>
 </html>

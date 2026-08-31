@@ -2,10 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ADDITION explorer</title>
-  <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ADDITION — Quantum-ready Layer 1</title>
+  <meta name="description" content="ADDITION is a C++20 Layer 1 with ML-DSA-87 signatures and SHA3-512 hashing. Explore the research testnet, run a home node, and use a local wallet.">
+  <meta name="theme-color" content="#0a0e14">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:image" content="https://additionblockchain.com/og.png">
+  <meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/common.css">
 </head>
@@ -18,41 +23,77 @@
     </div>
   </div>
   <main>
-    <form id="search-form" class="search-form" action="/" method="get">
-      <input id="q" name="q" type="search" autocomplete="off"
-        placeholder="block height, block hash, tx hash, address">
-      <button type="submit">Search</button>
-    </form>
-    <p id="search-status" hidden></p>
-    <p class="note">Public read: <a href="/rpc/">RPC commands</a> · <a href="/status/">getinfo</a> · <a href="/block/">block</a> · <a href="/tx/">tx</a> · <a href="/address/">address</a></p>
-    <section>
-      <h2>Latest Blocks</h2>
-      <p id="rpc-state"></p>
-      <table class="blocks-table">
-        <thead>
-          <tr>
-            <th>height</th>
-            <th>hash</th>
-            <th>tx_count</th>
-            <th>time</th>
-          </tr>
-        </thead>
-        <tbody id="latest-blocks"></tbody>
-      </table>
+    <section class="product-hero">
+      <p class="eyebrow"><span class="net-badge">TESTNET</span> Public product</p>
+      <h1>ADDITION</h1>
+      <p class="lede">
+        A C++20 Layer 1 with ML-DSA-87 signatures and SHA3-512 hashing.
+        The public explorer on this site is the research testnet
+        (<code>ADDITION_TESTNET_V1</code>). Keys stay on your device or home node —
+        hosted pages cannot spend.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="/wallet/">Open wallet</a>
+        <a class="btn btn-secondary" href="/join/">Get started</a>
+        <a class="btn btn-ghost" href="/status/">Network status</a>
+      </div>
     </section>
-    <section>
-      <h2>Latest Transactions</h2>
-      <p id="tx-state" class="note">From recent <code>getblock</code> <code>tx_hashes</code> when present.</p>
-      <table class="blocks-table">
-        <thead>
-          <tr>
-            <th>tx_hash</th>
-            <th>height</th>
-            <th>index</th>
-          </tr>
-        </thead>
-        <tbody id="latest-txs"></tbody>
-      </table>
+
+    <section class="explorer-panel">
+      <div class="section-head">
+        <h2>Explore the chain</h2>
+        <p>Search blocks, transactions, and addresses on testnet.</p>
+      </div>
+      <form id="search-form" class="search-form" action="/" method="get">
+        <input id="q" name="q" type="search" autocomplete="off"
+          placeholder="Block height, block hash, tx hash, or address"
+          aria-label="Search the chain">
+        <button type="submit">Search</button>
+      </form>
+      <p id="search-status" hidden></p>
+      <p class="note">Public read only via <code>/api/rpc</code> (testnet). Write RPC is never public.</p>
+
+      <div class="section-head">
+        <h2>Latest blocks</h2>
+      </div>
+      <p id="rpc-state"></p>
+      <div class="table-wrap">
+        <table class="blocks-table">
+          <thead>
+            <tr>
+              <th>Height</th>
+              <th>Hash</th>
+              <th>Tx</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody id="latest-blocks"></tbody>
+        </table>
+      </div>
+
+      <div class="section-head">
+        <h2>Latest transactions</h2>
+        <p id="tx-state" class="note">From recent <code>getblock</code> when present.</p>
+      </div>
+      <div class="table-wrap">
+        <table class="blocks-table">
+          <thead>
+            <tr>
+              <th>Tx hash</th>
+              <th>Height</th>
+              <th>Index</th>
+            </tr>
+          </thead>
+          <tbody id="latest-txs"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="cards" aria-label="Primary destinations">
+      <a href="/wallet/"><strong>Wallet</strong><span>Balance, receive, send — needs a local node to spend</span></a>
+      <a href="/join/"><strong>Get started</strong><span>Run a home node on testnet or mainnet</span></a>
+      <a href="/status/"><strong>Status</strong><span>Live getinfo from the public testnet read RPC</span></a>
+      <a href="/download/"><strong>Download</strong><span>Desktop helper for loopback write RPC</span></a>
     </section>
   </main>
   <footer id="site-footer"></footer>
