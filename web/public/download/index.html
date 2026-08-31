@@ -2,19 +2,33 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ADDITION wallet download (testnet / local)</title>
-  <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Download — ADDITION</title>
+  <meta name="description" content="ADDITION desktop wallet helper. Loopback write RPC only.">
+  <meta name="theme-color" content="#f3f6fa">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:image" content="https://additionblockchain.com/og.png">
+  <meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/common.css">
 </head>
 <body data-title="Download" data-sub="testnet / local">
   <header id="site-header"></header>
   <main class="prose">
+    <section class="product-hero" style="padding-top:1rem;padding-bottom:0.25rem">
+      <p class="eyebrow">Desktop helper</p>
+      <h1>Download</h1>
+      <p class="lede">
+        Testnet / local wallet helper. Write RPC stays on this machine.
+        Prefer the in-browser <a href="/wallet/">Wallet</a> PWA when
+        <code>python3 web/serve.py</code> sits next to your node.
+      </p>
+    </section>
+
     <div class="banner">
-      Testnet / local wallet helper only. Not a hosted web wallet.
-      Write RPC stays on this machine.
+      Not a hosted custodial wallet. Keys stay on disk. The helper refuses any RPC host other than loopback.
     </div>
 
     <section class="panel">
@@ -22,11 +36,11 @@
       <ul>
         <li>A desktop helper packaged from <code>web/addition_wallet_gui.py</code> and <code>web/addition_wallet.py</code></li>
         <li>Talks only to <code>127.0.0.1:8545</code> (or <code>::1</code> / <code>localhost</code>)</li>
-        <li>Refuses any other RPC host</li>
-        <li>Keys stay on disk. The helper never prints a private key</li>
+        <li>Refuses any other RPC host — including public <code>38545</code> / <code>38546</code> / <code>:80</code></li>
+        <li>Never prints a private key</li>
         <li>Needs a local <code>additiond --network testnet</code></li>
       </ul>
-      <p class="note">additionblockchain.com has no write RPC. The public <code>/wallet/</code> page stays <strong>RPC offline</strong> on this host.</p>
+      <p class="note">additionblockchain.com has no write RPC. The public <a href="/wallet/">/wallet/</a> page stays fail-closed there and explains how to connect a home node.</p>
     </section>
 
     <section class="panel">
@@ -34,7 +48,7 @@
       <p>Download the live wallet files on this page. Do not compile. There is no Windows compile path here. This host does not publish a <code>.exe</code>.</p>
       <p><a href="/download/addition-wallet-testnet">addition-wallet-testnet</a> — GUI + <code>--cli</code></p>
       <p><a href="/download/addition-wallet-cli-testnet">addition-wallet-cli-testnet</a> — caller-disk CLI</p>
-      <p>Run against a local <code>additiond --network testnet</code> on <code>127.0.0.1:8545</code>. Write RPC stays on this machine.</p>
+      <p>Run against a local <code>additiond --network testnet</code> on <code>127.0.0.1:8545</code>.</p>
     </section>
 
     <section class="panel">
@@ -52,9 +66,8 @@ additiond --network testnet --data-dir $HOME/addition-testnet
     </section>
 
     <section class="panel">
-      <h2>Source</h2>
-      <p>Linux compile of <code>additiond</code> is in the repository README (Ubuntu EliteDesk). Cashiers and Windows users stay on this page.</p>
-      <p>Packaging notes: <a href="https://github.com/ADDAddition/ADDITION/blob/main/packaging/README.md">packaging/README.md</a></p>
+      <h2>Install the website as an app</h2>
+      <p>On iPhone: Safari → Share → Add to Home Screen. On Android: Chrome → Install app / Add to Home screen. That installs this PWA; spending still needs your local node.</p>
       <p>Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
     </section>
   </main>

@@ -501,9 +501,16 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
     }
 
     if (cmd == "gossip_flush") {
-        auto msgs = node_.pull_outbound_messages();
+        std::size_t sent = 0;
+        std::string err;
+        if (!node_.flush_outbound_gossip(sent, err)) {
+            return "error: " + (err.empty() ? std::string("gossip flush failed") : err);
+        }
         std::ostringstream out;
-        out << "messages=" << msgs.size();
+        out << "ok:messages=" << sent;
+        if (!err.empty()) {
+            out << " note=" << err;
+        }
         return out.str();
     }
 
@@ -787,6 +794,11 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         if (!node_.submit_transaction(tx, error)) {
             return "error: " + error;
         }
+        {
+            std::size_t sent = 0;
+            std::string gossip_err;
+            node_.flush_outbound_gossip(sent, gossip_err);
+        }
         std::ostringstream out;
         out << "ok:gossiped"
             << " hash=" << hash_transaction(tx)
@@ -820,6 +832,13 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         }
         if (!ok) {
             return "error: " + error;
+        }
+        {
+            std::string announce_err;
+            node_.announce_tip(announce_err);
+            std::size_t sent = 0;
+            std::string gossip_err;
+            node_.flush_outbound_gossip(sent, gossip_err);
         }
 
         std::ostringstream out;

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION address</title>
+  <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body>
+  <header id="site-header"></header>
+  <main>
+    <form id="search-form" class="search-form" action="/address/" method="get">
+      <input id="q" name="q" type="search" autocomplete="off" placeholder="128-hex hash-committed address">
+      <button type="submit">Load</button>
+    </form>
+    <p id="rpc-state"></p>
+    <section>
+      <h2>Address</h2>
+      <div id="address-fields"></div>
+      <pre id="address-raw" class="raw"></pre>
+      <p class="note">
+        Public-read RPC does not expose <code>getbalance</code>, address history, or receipts.
+        Those stay on loopback write RPC (<code>127.0.0.1:8545</code>).
+        See <a href="/rpc/">public allowlist</a> and <a href="/docs/wallet.md">wallet docs</a>.
+      </p>
+    </section>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/common.js"></script>
+  <script src="/chrome.js"></script>
+  <script>
+    (function () {
+      const S = window.AdditionSite;
+      function el(id) { return document.getElementById(id); }
+      async function load(id) {
+        const state = el("rpc-state");
+        const fields = el("address-fields");
+        const raw = el("address-raw");
+        if (!id) {
+          state.textContent = "";
+          S.renderFields(fields, {}, "Enter a 128-hex address.");
+          raw.textContent = "";
+          return;
+        }
+        const ping = await S.explorerCommand("getinfo");
+        if (ping.offline) {
+          state.className = "offline";
+          state.textContent = "RPC offline";
+          S.renderFields(fields, {}, "RPC offline");
+          raw.textContent = "RPC offline";
+          return;
+        }
+        state.textContent = "";
+        const shown = {
+          address: id,
+          address_chars: String(id.length),
+          public_balance: "not on public-read allowlist",
+          public_tx_history: "not on public-read allowlist"
+        };
+        S.renderFields(fields, shown, "Not found");
+        raw.textContent = "address=" + id + " note=getbalance_and_history_not_public";
+      }
+      const params = new URLSearchParams(window.location.search);
+      const q = (params.get("q") || "").trim();
+      const input = el("q");
+      if (input && q) { input.value = q; }
+      el("search-form").addEventListener("submit", function (event) {
+        event.preventDefault();
+        const value = input.value.trim();
+        const next = new URL(window.location.href);
+        if (value) { next.searchParams.set("q", value); }
+        else { next.searchParams.delete("q"); }
+        window.history.replaceState({}, "", next.pathname + next.search);
+        load(value);
+      });
+      load(q);
+    }());
+  </script>
+</body>
+</html>

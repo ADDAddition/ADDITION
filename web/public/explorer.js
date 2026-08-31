@@ -44,28 +44,18 @@
     return td;
   }
 
-  function queryHref(value) {
-    const params = new URLSearchParams();
-    const rpc = new URLSearchParams(window.location.search).get("rpc");
-    if (rpc) {
-      params.set("rpc", rpc);
-    }
-    params.set("q", value);
-    return "/?" + params.toString();
-  }
-
-  function renderRows(tbody, rows) {
+  function renderBlockRows(tbody, rows) {
     clearRows(tbody);
     for (let i = 0; i < rows.length; i += 1) {
       const row = rows[i];
       const tr = document.createElement("tr");
       if (row.height) {
-        tr.appendChild(linkCell(queryHref(row.height), row.height));
+        tr.appendChild(linkCell(S.blockHref(row.height), row.height));
       } else {
         tr.appendChild(cell(""));
       }
       if (row.hash) {
-        tr.appendChild(linkCell(queryHref(row.hash), row.hash, "hash-cell"));
+        tr.appendChild(linkCell(S.blockHref(row.hash), row.hash, "hash-cell"));
       } else {
         tr.appendChild(cell("", "hash-cell"));
       }
@@ -75,62 +65,123 @@
     }
   }
 
-  function showSearch(result) {
-    const status = el("search-status");
-    const box = el("block-result");
-    const fields = el("block-fields");
-    if (result.kind === "empty") {
-      setText(status, "", "");
-      box.hidden = true;
-      fields.innerHTML = "";
-      return;
+  function renderTxRows(tbody, rows) {
+    clearRows(tbody);
+    for (let i = 0; i < rows.length; i += 1) {
+      const row = rows[i];
+      const tr = document.createElement("tr");
+      if (row.tx_hash) {
+        tr.appendChild(linkCell(S.txHref(row.tx_hash), row.tx_hash, "hash-cell"));
+      } else {
+        tr.appendChild(cell("", "hash-cell"));
+      }
+      if (row.height) {
+        tr.appendChild(linkCell(S.blockHref(row.height), row.height));
+      } else {
+        tr.appendChild(cell(""));
+      }
+      tr.appendChild(cell(row.index || ""));
+      tbody.appendChild(tr);
     }
-    if (result.kind === "offline") {
-      setText(status, "RPC offline", "offline");
-      box.hidden = true;
-      fields.innerHTML = "";
-      return;
-    }
-    if (result.kind === "notfound") {
-      setText(status, "Not found", "empty");
-      box.hidden = true;
-      fields.innerHTML = "";
-      return;
-    }
-    setText(status, "", "");
-    box.hidden = false;
-    S.renderFields(fields, result.fields, "Not found");
   }
 
-  async function searchQuery(q) {
-    const cmd = S.blockSearchCommand(q);
-    if (!cmd) {
-      return { kind: "empty" };
+  function renderStrip(status) {
+    const strip = el("live-strip");
+    const flag = el("strip-flag");
+    const cells = el("strip-cells");
+    if (!strip || !flag || !cells) {
+      return;
     }
-    const result = await S.explorerCommand(cmd);
-    if (result.offline) {
-      return { kind: "offline" };
+    clearRows(cells);
+    if (!status || status.offline || !status.ok) {
+      strip.className = "status-strip offline";
+      flag.textContent = "RPC offline";
+      return;
     }
-    if (!result.ok || !result.raw || result.raw.indexOf("error:") === 0) {
-      return { kind: "notfound" };
+    const fields = status.strip || S.stripFields(status.fields || {});
+    const keys = Object.keys(fields);
+    if (keys.length === 0) {
+      strip.className = "status-strip offline";
+      flag.textContent = "RPC offline";
+      return;
     }
-    if (!result.fields || Object.keys(result.fields).length === 0) {
-      return { kind: "notfound" };
+    strip.className = "status-strip ok";
+    flag.textContent = "live";
+    for (let i = 0; i < keys.length; i += 1) {
+      const wrap = document.createElement("div");
+      const dt = document.createElement("dt");
+      dt.textContent = keys[i];
+      const dd = document.createElement("dd");
+      dd.textContent = fields[keys[i]];
+      wrap.appendChild(dt);
+      wrap.appendChild(dd);
+      cells.appendChild(wrap);
     }
-    return { kind: "block", fields: result.fields };
+  }
+
+  async function routeSearch(value) {
+    const status = el("search-status");
+    if (!value) {
+      setText(status, "", "");
+      return;
+    }
+    setText(status, "Searching…", "empty");
+    const result = await S.resolveSearch(value);
+    if (result.kind === "offline") {
+      setText(status, "RPC offline", "offline");
+      return;
+    }
+    if (result.kind === "notfound" || result.kind === "empty") {
+      setText(status, "Not found", "empty");
+      return;
+    }
+    const dest = S.routeForSearch(result);
+    if (dest) {
+      window.location.assign(dest);
+      return;
+    }
+    setText(status, "Not found", "empty");
   }
 
   async function loadLatest() {
-    const state = el("rpc-state");
-    const tbody = el("latest-blocks");
-    const recent = await S.loadLatestBlockRows(10);
-    if (recent.offline) {
-      setText(state, "RPC offline", "offline");
-      clearRows(tbody);
+    const blockState = el("rpc-state");
+    const txState = el("tx-state");
+    const blocksBody = el("latest-blocks");
+    const txsBody = el("latest-txs");
+    const status = await S.loadChainStatus();
+    renderStrip(status);
+    if (status.offline) {
+      setText(blockState, "RPC offline", "offline");
+      setText(txState, "RPC offline", "offline");
+      clearRows(blocksBody);
+      clearRows(txsBody);
       return;
     }
-    setText(state, "", "");
-    renderRows(tbody, recent.blocks || []);
+    const recent = await S.loadLatestBlockRows(10);
+    if (recent.offline) {
+      setText(blockState, "RPC offline", "offline");
+      setText(txState, "RPC offline", "offline");
+      clearRows(blocksBody);
+      clearRows(txsBody);
+      return;
+    }
+    setText(blockState, "", "");
+    renderBlockRows(blocksBody, recent.blocks || []);
+    const txs = [];
+    for (let i = 0; i < (recent.blocks || []).length; i += 1) {
+      const fromBlock = S.txRowsFromBlock(recent.blocks[i]);
+      for (let j = 0; j < fromBlock.length; j += 1) {
+        txs.push(fromBlock[j]);
+        if (txs.length >= 20) {
+          break;
+        }
+      }
+      if (txs.length >= 20) {
+        break;
+      }
+    }
+    setText(txState, txs.length ? "" : "No tx_hashes in recent getblock rows.", txs.length ? "" : "empty");
+    renderTxRows(txsBody, txs);
   }
 
   async function boot() {
@@ -140,7 +191,7 @@
     const q = (params.get("q") || "").trim();
     if (input && q) {
       input.value = q;
-      showSearch(await searchQuery(q));
+      await routeSearch(q);
     }
     if (form) {
       form.addEventListener("submit", async function (event) {
@@ -153,7 +204,7 @@
           next.searchParams.delete("q");
         }
         window.history.replaceState({}, "", next.pathname + next.search);
-        showSearch(await searchQuery(value));
+        await routeSearch(value);
       });
     }
     await loadLatest();

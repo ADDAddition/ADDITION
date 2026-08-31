@@ -18,6 +18,27 @@
     </div>
     <p id="rpc-state" class="offline">Checking RPC…</p>
     <section class="panel">
+      <h2>Command explorer</h2>
+      <p class="note">Runs only public-read allowlist commands against <code>/api/rpc</code>. Not Ethereum JSON-RPC.</p>
+      <div class="form-grid">
+        <div>
+          <label for="cmd-name">command</label>
+          <select id="cmd-name"></select>
+        </div>
+        <div>
+          <label for="cmd-args">args</label>
+          <input id="cmd-args" placeholder="optional args">
+        </div>
+      </div>
+      <div class="btn-row">
+        <button id="run-cmd" type="button">Run</button>
+      </div>
+      <p id="cmd-usage" class="note"></p>
+      <div id="cmd-fields"></div>
+      <pre id="cmd-raw" class="raw"></pre>
+      <ul id="cmd-list"></ul>
+    </section>
+    <section class="panel">
       <h2>Example: getinfo</h2>
       <pre id="sample-raw" class="raw"></pre>
     </section>
@@ -94,6 +115,37 @@ curl -s -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method"
   <script>
     (async function () {
       const S = window.AdditionSite;
+      const commands = S.publicReadCommands();
+      const select = document.getElementById("cmd-name");
+      const args = document.getElementById("cmd-args");
+      const usage = document.getElementById("cmd-usage");
+      const list = document.getElementById("cmd-list");
+      const names = Object.keys(commands);
+      for (let i = 0; i < names.length; i += 1) {
+        const opt = document.createElement("option");
+        opt.value = names[i];
+        opt.textContent = names[i];
+        select.appendChild(opt);
+        const li = document.createElement("li");
+        li.innerHTML = "<code>" + commands[names[i]].usage + "</code>";
+        list.appendChild(li);
+      }
+      function refreshUsage() {
+        const meta = commands[select.value];
+        usage.textContent = meta ? ("usage: " + meta.usage) : "";
+        args.placeholder = meta && meta.args ? meta.args : "no args";
+      }
+      select.addEventListener("change", refreshUsage);
+      refreshUsage();
+      document.getElementById("run-cmd").addEventListener("click", async function () {
+        const line = (select.value + " " + args.value).trim();
+        const result = await S.explorerCommand(line);
+        if (result.offline) {
+          S.setStatus(document.getElementById("rpc-state"), result);
+        }
+        S.renderFields(document.getElementById("cmd-fields"), result.fields || {}, result.offline ? "RPC offline" : "No fields returned.");
+        document.getElementById("cmd-raw").textContent = result.raw || "";
+      });
       const result = await S.rpcCommand("getinfo");
       S.setStatus(document.getElementById("rpc-state"), result);
       document.getElementById("sample-raw").textContent = result.raw;

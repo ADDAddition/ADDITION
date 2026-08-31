@@ -27,6 +27,8 @@
   }
 
   async function cmd(command, timeoutMs) {
+    // Fail-closed: write commands only ever hit loopback via /local-rpc.
+    // Never POST createwallet / wallet_send / mine to public :80, 38545, 38546, or public 8545.
     const ctrl = timeoutMs ? new AbortController() : null;
     const timer = timeoutMs ? setTimeout(function () { ctrl.abort(); }, timeoutMs) : null;
     try {

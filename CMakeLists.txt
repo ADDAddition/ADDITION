@@ -144,6 +144,14 @@ if(ADDITION_BUILD_TESTS)
             ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
             TIMEOUT 180)
         add_test(
+            NAME test_mainnet_two_node
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_mainnet_two_node.py
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        )
+        set_tests_properties(test_mainnet_two_node PROPERTIES
+            ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
+            TIMEOUT 900)
+        add_test(
             NAME test_live_mine_and_privacy
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_live_mine_and_privacy.py
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
