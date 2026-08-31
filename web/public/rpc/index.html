@@ -13,8 +13,8 @@
   <header id="site-header"></header>
   <main class="prose">
     <div class="banner">
-      Public read is <code>/rpc?cmd=getinfo</code> (not <code>/getinfo</code>) on :80 and :38545.
-      Write RPC on <code>127.0.0.1:8545</code>.
+      Public product read is <code>/rpc?cmd=getinfo</code> on seed <code>34.27.30.115:38546</code>
+      (site <code>/api/rpc</code>). Write/send for the site wallet stays on <code>127.0.0.1:8546</code> via <code>/local-rpc</code>.
     </div>
     <p id="rpc-state" class="offline">Checking RPC…</p>
     <section class="panel">
@@ -44,23 +44,21 @@
     </section>
     <section class="panel">
       <h2>Enable the port</h2>
-      <pre>./build/additiond --network testnet --public-rpc
+      <pre>./build/additiond --mainnet --public-rpc --public-rpc-port 38546
 # or
-ADDITION_ENABLE_PUBLIC_RPC=1 ./build/additiond --network testnet</pre>
-      <p>Default bind: <code>0.0.0.0:38545</code>. Override with <code>--public-rpc-port</code>, <code>--public-rpc-bind</code>, <code>ADDITION_PUBLIC_RPC_PORT</code>, <code>ADDITION_PUBLIC_RPC_BIND</code>.</p>
+ADDITION_ENABLE_PUBLIC_RPC=1 ./build/additiond --mainnet --public-rpc-port 38546</pre>
+      <p>Mainnet seed bind: <code>0.0.0.0:38546</code>. Research testnet default remains <code>38545</code>.</p>
     </section>
     <section class="panel">
       <h2>Talk to it</h2>
       <p>One command line in, one response line out (same as local RPC):</p>
-      <pre>curl 'https://rpc.additionblockchain.com/rpc?cmd=getinfo'
-curl 'http://34.27.30.115/rpc?cmd=getinfo'
-curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'
-curl 'http://34.27.30.115:38545/jsonrpc?method=getinfo'
-curl 'http://34.27.30.115:38545/jsonrpc?method=getblockraw&params=0'
-printf 'getinfo\n' | nc 34.27.30.115 38545</pre>
+      <pre>curl -s 'https://additionblockchain.com/api/rpc?cmd=getinfo'
+curl -s 'http://34.27.30.115:38546/rpc?cmd=getinfo'
+curl -s 'http://34.27.30.115:38546/jsonrpc?method=getinfo'
+curl -s 'http://34.27.30.115:38546/jsonrpc?method=getblockraw&params=0'
+printf 'getinfo\n' | nc 34.27.30.115 38546</pre>
       <p>Those curls succeed only when the operator seed answers. If they timeout, run a local <code>--public-rpc</code> node.</p>
-      <p><code>:80</code> (nginx) works when <code>38545</code> is filtered. Path is <code>/rpc?cmd=getinfo</code> or <code>/jsonrpc?method=getinfo</code>, not <code>/getinfo</code>.</p>
-      <p>Allowlist:</p>
+      <p>Allowlist on the site proxy (<code>/api/rpc</code>):</p>
       <ul>
         <li><code>getinfo</code></li>
         <li><code>monetary_info</code></li>
@@ -71,42 +69,42 @@ printf 'getinfo\n' | nc 34.27.30.115 38545</pre>
         <li><code>getblockhash &lt;height&gt;</code></li>
         <li><code>getblockraw &lt;height&gt;</code> (<code>ok:BLKDATA</code>)</li>
       </ul>
-      <p>Everything else, including <code>mine</code>, <code>sendtx*</code>, <code>createwallet</code>, <code>wallet_*</code>, <code>stake</code>/<code>unstake</code>, <code>swap_*</code>, and identity rotation, returns <code>error: command disabled on public RPC</code>.</p>
+      <p>On seed <code>38546</code>, <code>createwallet</code> / <code>mine</code> may return 200. <code>wallet_send</code> / keys stay disabled on that public port. The site wallet never opens public send — it spends only through <code>/local-rpc</code> → loopback.</p>
       <p>Wallet create/send lives on localhost: <a href="/wallet/">/wallet/</a> or <code>python3 web/addition_wallet_gui.py</code>.</p>
     </section>
     <section class="panel">
-      <h2>Join the public testnet</h2>
-      <p>Bootstrap P2P: <code>34.27.30.115:28545</code>. Write RPC stays <code>127.0.0.1:8545</code>.</p>
-      <pre>./build/additiond --network testnet --bootstrap 34.27.30.115:28545
-printf 'sync\n' | nc 127.0.0.1 8545</pre>
-      <p><code>sync</code> reads the public chain over HTTP: <code>:80</code> first (<code>getblockraw</code>), then <code>:38545</code>. Public RPC still rejects <code>mine</code> / <code>createwallet</code> / <code>wallet_*</code> / <code>stake</code> / <code>swap_*</code>.</p>
+      <h2>Join the public mainnet</h2>
+      <p>Bootstrap P2P: <code>34.27.30.115:28546</code>. Site wallet write stays <code>127.0.0.1:8546</code>.</p>
+      <pre>./build/additiond --mainnet --bootstrap 34.27.30.115:28546
+printf 'sync\n' | nc 127.0.0.1 8546</pre>
+      <p>See <a href="/join/#mainnet">Get started</a> for the full home-node recipe.</p>
     </section>
     <section class="panel">
       <h2>Public-read JSON API</h2>
-      <p>Same allowlist. No write commands. Not Ethereum JSON-RPC. Not a third-party dRPC vendor.</p>
+      <p>Same allowlist on the site proxy. Not Ethereum JSON-RPC. Not a third-party dRPC vendor.</p>
       <p>On the public-rpc port:</p>
-      <pre>GET  http://HOST:38545/jsonrpc?method=getinfo
-GET  http://HOST:38545/jsonrpc?method=getblock&amp;params=0
-GET  http://HOST:38545/jsonrpc?method=getblockraw&amp;params=0
-POST http://HOST:38545/jsonrpc
+      <pre>GET  http://HOST:38546/jsonrpc?method=getinfo
+GET  http://HOST:38546/jsonrpc?method=getblock&amp;params=0
+GET  http://HOST:38546/jsonrpc?method=getblockraw&amp;params=0
+POST http://HOST:38546/jsonrpc
 {"jsonrpc":"2.0","id":1,"method":"getinfo","params":[]}</pre>
-      <p>Local site proxy (<code>python3 web/serve.py</code>): <code>GET /jsonrpc?method=getinfo</code> and <code>POST /jsonrpc</code>.</p>
+      <p>Local site proxy (<code>python3 web/serve.py</code>): <code>GET /jsonrpc?method=getinfo</code> and <code>POST /jsonrpc</code> (default public upstream port <code>38546</code>).</p>
       <p>Standalone adapter (public-read, no writes):</p>
-      <pre>python3 tools/addition_jsonrpc_adapter.py --public-read --rpc-port 38545 --port 8645
+      <pre>python3 tools/addition_jsonrpc_adapter.py --public-read --rpc-port 38546 --port 8645
 curl -s 'http://127.0.0.1:8645/jsonrpc?method=getinfo'
 curl -s -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"peers","params":[]}' http://127.0.0.1:8645/jsonrpc</pre>
     </section>
     <section class="panel">
       <h2>What stays private</h2>
       <ul>
-        <li>Trusted RPC: <code>127.0.0.1:8545</code> (optional <code>ADDITION_RPC_TOKEN</code>)</li>
+        <li>Trusted write RPC: <code>127.0.0.1:8546</code> mainnet / <code>8545</code> testnet (optional <code>ADDITION_RPC_TOKEN</code>)</li>
         <li>LAN RPC: off unless <code>ADDITION_ENABLE_LAN_RPC=1</code> and <code>ADDITION_LAN_RPC_TOKEN</code></li>
-        <li>P2P: off unless <code>ADDITION_ENABLE_P2P_RPC=1</code>. Operator public P2P (IPv4): <code>34.27.30.115:28545</code></li>
-        <li>Auto-mine: off unless <code>--auto-mine</code> / <code>ADDITION_AUTO_MINE=1</code> (testnet timer; never a public RPC command)</li>
+        <li>P2P: off unless <code>ADDITION_ENABLE_P2P_RPC=1</code>. Operator public P2P (IPv4): <code>34.27.30.115:28546</code></li>
+        <li>Auto-mine: refused on mainnet; testnet timer only with <code>--auto-mine</code> / <code>ADDITION_AUTO_MINE=1</code></li>
       </ul>
-      <p>Two local processes: <a href="/docs/two-node/">two-node runbook</a>. Website <code>PUBLIC_RPC_HTTP</code> is a Worker secret until an operator sets the real HTTP URL. Do not commit trycloudflare URLs.</p>
-      <p>Do not open unauthenticated write RPC to the world. Full command list: <a href="/docs/commands/">Commands</a>.</p>
-      <p class="note">Fees: spec <code>min_fee=0</code>. <code>last_tps</code> and <code>dynamic_min_fee</code> come from getinfo when the node answers. Not a Solana/XRP speed claim.</p>
+      <p>Two local processes: <a href="/docs/two-node/">two-node runbook</a>. Website <code>PUBLIC_RPC_HTTP</code> is a Worker secret until an operator sets the real HTTP URL (<code>http://34.27.30.115:38546/rpc</code>). Do not commit trycloudflare URLs.</p>
+      <p>Do not open unauthenticated write RPC to the world (<code>0.0.0.0:8545</code> / <code>8546</code>). Full command list: <a href="/docs/commands/">Commands</a>.</p>
+      <p class="note">Fees: spec <code>min_fee=0</code>. <code>last_tps</code> and <code>dynamic_min_fee</code> come from getinfo when the node answers. Not a Solana/XRP speed claim. Coinbase is 50 ADD, 100% miner.</p>
     </section>
   </main>
   <footer id="site-footer"></footer>

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Network status — ADDITION</title>
-  <meta name="description" content="Live getinfo from the ADDITION research testnet public read RPC.">
+  <meta name="description" content="Live getinfo from the ADDITION mainnet public read RPC (ADDITION_MAINNET_V1).">
   <meta name="theme-color" content="#f3f6fa">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/favicon.ico">
@@ -18,13 +18,13 @@
   <header id="site-header"></header>
   <main>
     <section class="product-hero" style="padding-top:1rem;padding-bottom:0.25rem">
-      <p class="eyebrow"><span class="net-badge">TESTNET</span> Public read</p>
+      <p class="eyebrow"><span class="net-badge">MAINNET</span> Public read</p>
       <h1>Network status</h1>
       <p class="lede">
-        Values come from the public testnet read path (<code>/api/rpc</code> →
-        <code>rpc.additionblockchain.com</code> / <code>ADDITION_TESTNET_V1</code>).
+        Values come from the public mainnet read path (<code>/api/rpc</code> →
+        <code>34.27.30.115:38546</code> / <code>ADDITION_MAINNET_V1</code>).
         If the node does not answer: <strong>RPC offline</strong>.
-        This page never talks to mainnet <code>38546</code>.
+        Copy only fields the node prints — height may be <code>0</code>.
       </p>
     </section>
     <p class="note"><code>last_tps</code> is measured when present. <code>privacy_claim</code> is whatever the node prints (SHA3 opening is <code>opening_not_zk</code>).</p>

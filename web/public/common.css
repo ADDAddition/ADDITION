@@ -805,6 +805,25 @@ code { font-family: var(--mono); font-size: 0.9em; }
 }
 .wallet-panel { display: none; }
 .wallet-panel.active { display: block; }
+.wallet-page .wallet-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+.wallet-page .wallet-tabs .bottom-tab {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+  width: 100%;
+}
+.wallet-page .wallet-tabs .bottom-tab:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+@media (min-width: 901px) {
+  .wallet-page .wallet-tabs { display: none !important; }
+}
 .connect-steps {
   list-style: none;
   margin: 0.85rem 0 0;

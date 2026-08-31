@@ -13,12 +13,13 @@
   <header id="site-header"></header>
   <main class="prose">
     <div class="banner">
-      From <code>docs/WHITE_PAPER.md</code>, <code>config.hpp</code>, <code>genesis.json</code>.
-      Default: <code>additiond --network testnet</code>.
+      From <code>docs/WHITE_PAPER.md</code>, <code>config.hpp</code>, genesis files.
+      Public product: <code>additiond --mainnet</code> / <code>ADDITION_MAINNET_V1</code>.
+      Binary default without flags remains <code>--network testnet</code>.
     </div>
 
     <h2>1. What this is</h2>
-    <p>C++ node. Post-quantum signatures (ML-DSA-87) and SHA3-512. Network name <code>addition-testnet</code> / <code>ADDITION_TESTNET_V1</code>.</p>
+    <p>C++ node. Post-quantum signatures (ML-DSA-87) and SHA3-512. Public product network <code>addition-mainnet</code> / <code>ADDITION_MAINNET_V1</code>; research <code>addition-testnet</code> / <code>ADDITION_TESTNET_V1</code>.</p>
     <p>Source: <a href="https://github.com/ADDAddition/ADDITION">https://github.com/ADDAddition/ADDITION</a></p>
 
     <h2>2. Why lattice signatures</h2>
@@ -28,7 +29,7 @@
     <ol>
       <li><strong>Quantum</strong> — ML-DSA-87 (FIPS 204). <code>getinfo</code> prints <code>pq_mode</code> when the process answers.</li>
       <li><strong>Privacy</strong> — SHA3-512 commitment + nullifier opening (<code>privacy_mint_open</code> / <code>privacy_spend_open</code>). Hash relation. Not Groth16. <code>ADDITION_PRIVACY_MASTER_KEY</code> must be ≥32 characters. Notes are a side ledger, not a native ADD lock.</li>
-      <li><strong>RPC</strong> — public read on :38545 (<code>getinfo</code>, <code>getblock</code>, …). Write RPC on <code>127.0.0.1:8545</code>.</li>
+      <li><strong>RPC</strong> — public read on seed :38546 (<code>getinfo</code>, <code>getblock</code>, …; site <code>/api/rpc</code>). Write/send for the site wallet on <code>127.0.0.1:8546</code>.</li>
       <li><strong>Fees</strong> — spec <code>min_fee=0</code>. Congestion can raise <code>recommended_min_fee</code>.</li>
       <li><strong>Bridges</strong> — in-process <code>bridge_*</code> and <code>web/evm/evm_rpc_bridge.py</code> on localhost. <code>eth_sendRawTransaction</code> disabled.</li>
     </ol>
@@ -53,7 +54,7 @@
       <tr><td>halving_interval</td><td>210,000</td></tr>
       <tr><td>target_block_time_sec</td><td>60</td></tr>
       <tr><td>min_fee</td><td>0</td></tr>
-      <tr><td>network_name</td><td>addition-testnet</td></tr>
+      <tr><td>network_name</td><td>addition-mainnet (public) / addition-testnet (research)</td></tr>
     </table>
 
     <p>Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>

@@ -14,7 +14,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="Wallet" data-sub="local node">
+<body data-title="Wallet" data-sub="local node" class="wallet-page">
   <header id="site-header"></header>
   <main>
     <div class="wallet-shell">
@@ -24,8 +24,9 @@
       </div>
       <p class="note" style="margin-top:0">
         Keys stay in your local node file. This page only talks to
-        <code>127.0.0.1:8545</code> through <code>/local-rpc</code>.
-        Public read ports cannot create wallets or send.
+        loopback write RPC through <code>/local-rpc</code>
+        (<code>127.0.0.1:8546</code> mainnet / <code>8545</code> testnet).
+        Public <code>wallet_send</code> stays off <code>38546</code>.
       </p>
 
       <!-- Offline / connect home node -->
@@ -35,19 +36,19 @@
         <ol class="connect-steps">
           <li>
             <strong>Run additiond locally</strong>
-            <span>Start a testnet node with write RPC on <code>127.0.0.1:8545</code> only — never bind write on <code>0.0.0.0</code>.</span>
+            <span>Start <code>additiond --mainnet</code> with write RPC on <code>127.0.0.1:8546</code> only — never bind write on <code>0.0.0.0</code>.</span>
           </li>
           <li>
             <strong>Serve this site next to the node</strong>
-            <span>From the repo: <code>python3 web/serve.py</code> so <code>/local-rpc</code> can reach loopback.</span>
+            <span>From the repo: <code>ADDITION_NETWORK=mainnet python3 web/serve.py</code> so <code>/local-rpc</code> can reach loopback.</span>
           </li>
           <li>
             <strong>Refresh this page</strong>
-            <span>When the node answers, Create wallet or Open existing appears here. Public <code>:80</code> / <code>38545</code> stay read-only.</span>
+            <span>When the node answers, Create wallet or Open existing appears here. Public read is <code>38546</code> / <code>/api/rpc</code>; send stays loopback-only.</span>
           </li>
         </ol>
         <div class="cta-row" style="margin-top:1rem">
-          <a class="btn btn-primary" href="/join/">How to run a node</a>
+          <a class="btn btn-primary" href="/join/#mainnet">How to run a node</a>
           <a class="btn btn-secondary" href="/download/">Desktop helper</a>
           <button type="button" class="btn btn-ghost" id="retry-btn">Check again</button>
         </div>
@@ -94,7 +95,7 @@
           </button>
         </div>
         <button type="button" class="btn btn-ghost" id="refresh-btn" style="width:100%">Refresh balance</button>
-        <a class="wallet-more-link" href="#more" id="go-more">More — mine, stake, tokens, swap</a>
+        <a class="wallet-more-link" href="#more" id="go-more">More — mine, tokens, swap</a>
       </section>
 
       <!-- Receive -->
@@ -112,7 +113,7 @@
       <!-- Send -->
       <section id="panel-send" class="panel wallet-panel" hidden>
         <h2>Send</h2>
-        <p class="note">Signs and broadcasts from your local node only. Never goes to public <code>:80</code>, <code>38545</code>, or <code>38546</code>.</p>
+        <p class="note">Signs and broadcasts from your local node only via <code>/local-rpc</code>. Never goes to public <code>:80</code>, <code>38545</code>, or <code>38546</code>.</p>
         <label for="to">Recipient address</label>
         <input id="to" autocomplete="off" spellcheck="false" placeholder="128-hex address">
         <label for="amount">Amount (whole ADD)</label>
@@ -144,30 +145,23 @@
         <p class="note">Secondary tools for operators. Not required for everyday receive/send.</p>
 
         <h3>Mine to this wallet</h3>
-        <p class="note">Testnet-local only: SHA3-512 via <code>127.0.0.1:8545</code>. Not mainnet (<code>memory_hard</code> / <code>8546</code> — see <a href="/join/#mainnet">Get started</a>). Public mine stays disabled (403).</p>
+        <p class="note">
+          Calls <code>mine</code> on your local write RPC via <code>/local-rpc</code>
+          (<code>127.0.0.1:8546</code> mainnet (<code>memory_hard</code>) or <code>8545</code> testnet (SHA3-512).
+          Coinbase is 50 ADD, 100% to the finding miner. This page never opens public send.
+        </p>
         <div class="btn-row">
           <button type="button" class="btn btn-secondary" id="mine-btn">Mine one block</button>
         </div>
         <pre id="mine-raw" class="raw"></pre>
 
-        <h3>Stake</h3>
-        <p class="note">Locks ADD on your address. Needs unlocked balance (mine first on a fresh node).</p>
-        <label for="stake-amt">Amount</label>
-        <input id="stake-amt" value="1" inputmode="numeric">
-        <div class="btn-row">
-          <button type="button" class="btn btn-ghost" id="stake-btn">Stake</button>
-          <button type="button" class="btn btn-ghost" id="unstake-btn">Unstake</button>
-          <button type="button" class="btn btn-ghost" id="staked-btn">Staked balance</button>
-          <button type="button" class="btn btn-ghost" id="claim-btn">Claim rewards</button>
-        </div>
-        <pre id="stake-raw" class="raw"></pre>
-
         <h3>Other local tools</h3>
         <div class="tool-grid">
           <a href="/tokens/"><strong>Tokens</strong><span>Create and transfer on your node</span></a>
-          <a href="/swap/"><strong>Swap</strong><span>Local in-process pool, not Uniswap</span></a>
+          <a href="/swap/"><strong>Swap</strong><span>Local in-process ADD tokens only</span></a>
           <a href="/privacy/"><strong>Privacy</strong><span>SHA3 opening — not ZK</span></a>
           <a href="/local/"><strong>Local hub</strong><span>Operator toolbox</span></a>
+          <a href="/"><strong>Explore</strong><span>Back to mainnet explorer</span></a>
         </div>
         <div class="btn-row">
           <button type="button" class="btn btn-ghost" data-back>Back to wallet</button>
@@ -176,6 +170,24 @@
     </div>
   </main>
   <footer id="site-footer"></footer>
+  <nav id="wallet-tabs" class="bottom-tabs wallet-tabs" aria-label="Wallet">
+    <button type="button" class="bottom-tab active" data-go="home" id="tab-home">
+      <span class="bottom-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>
+      <span class="bottom-tab-label">Home</span>
+    </button>
+    <button type="button" class="bottom-tab" data-go="receive" id="tab-receive">
+      <span class="bottom-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 4v12M8 12l4 4 4-4M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span class="bottom-tab-label">Receive</span>
+    </button>
+    <button type="button" class="bottom-tab" data-go="send" id="tab-send">
+      <span class="bottom-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 20V8M8 12l4-4 4 4M5 4h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span class="bottom-tab-label">Send</span>
+    </button>
+    <button type="button" class="bottom-tab" data-go="activity" id="tab-activity">
+      <span class="bottom-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12h4l2-6 4 12 2-6h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span class="bottom-tab-label">Activity</span>
+    </button>
+  </nav>
   <script src="/common.js"></script>
   <script src="/local-rpc.js"></script>
   <script src="/chrome.js"></script>

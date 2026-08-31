@@ -121,7 +121,7 @@ Website `PUBLIC_RPC_HTTP` is a Worker secret, not a committed `wrangler.toml` va
 - Strict handshake required before peer message processing:
 	- request: `HELLO|2|<network_id>|<unix_ts>|<nonce>|<peer_pubkey>|<peer_signature>`
 	- response: `HELLO_ACK|2|<network_id>|<unix_ts>|<echo_nonce>|<responder_pubkey>|<responder_signature>`
-	- testnet `network_id` is `ADDITION_TESTNET_V1` (default). There is no live public mainnet.
+	- testnet `network_id` is `ADDITION_TESTNET_V1` (default binary). Public product mainnet is `ADDITION_MAINNET_V1` (`additiond --mainnet`, seed `34.27.30.115:28546` / `38546`).
 	- inbound timestamp skew window: ±90s
 	- nonce replay is rejected per peer (rolling anti-replay set)
 	- signatures are validated with PQ verification (`ml-dsa-87`) over the signed handshake body
@@ -316,7 +316,7 @@ Custom network values (Add-to-MetaMask helper on `/evm/` uses only these):
 Supported local methods (bridge `0.2-local`):
 - `web3_clientVersion`, `eth_protocolVersion`
 - `eth_chainId` (`0x67932`), `net_version` (`424242`), `net_listening`, `net_peerCount`
-- `rpc_modules`, `addition_disclaimer`, `addition_networkInfo` (factual native getinfo + honest flags)
+- `rpc_modules`, `addition_disclaimer`, `addition_networkInfo` (factual native getinfo + status flags)
 - `eth_blockNumber`, `eth_getBlockByNumber`, `eth_getBlockByHash`
 - `eth_gasPrice`, `eth_maxPriorityFeePerGas`, `eth_coinbase`
 - `eth_getBalance` (native TEXT `getbalance`, whole units as hex, `0x` prefix stripped)

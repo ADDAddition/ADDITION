@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""ADDITION testnet site + RPC HTTP proxy (stdlib only)."""
+"""ADDITION site + RPC HTTP proxy (stdlib only)."""
 
 from __future__ import annotations
 
 import json
 import os
 import socket
+import urllib.error
 import urllib.parse
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -67,6 +69,26 @@ def tcp_rpc(host: str, port: int, command: str, timeout: float = 4.0) -> str:
             if b"\n" in data:
                 break
     return b"".join(chunks).decode("utf-8", errors="replace").strip()
+
+
+def public_http_rpc(host: str, port: int, command: str, timeout: float = 4.0) -> str:
+    """Proxy public-read allowlist over HTTP /rpc?cmd= (matches Cloudflare Worker upstream)."""
+    base = os.environ.get("ADDITION_PUBLIC_RPC_HTTP", "").strip().rstrip("/")
+    if base:
+        url = base + "?cmd=" + urllib.parse.quote(command, safe=" ")
+    else:
+        url = "http://%s:%s/rpc?cmd=%s" % (host, port, urllib.parse.quote(command, safe=" "))
+    req = urllib.request.Request(url, method="GET")
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.read().decode("utf-8", errors="replace").strip()
+
+
+def public_rpc(host: str, port: int, command: str, timeout: float = 4.0) -> str:
+    # Prefer HTTP (seed 38546 / Worker). Fall back to TEXT TCP for local --public-rpc.
+    try:
+        return public_http_rpc(host, port, command, timeout)
+    except (OSError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError):
+        return tcp_rpc(host, port, command, timeout)
 
 
 def client_is_loopback(handler: BaseHTTPRequestHandler) -> bool:
@@ -212,7 +234,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(403, "error: command disabled on public RPC")
                 return
             host = os.environ.get("ADDITION_PUBLIC_RPC_HOST", "127.0.0.1")
-            port = env_int("ADDITION_PUBLIC_RPC_PORT", 38545)
+            port = env_int("ADDITION_PUBLIC_RPC_PORT", 38546)
+            try:
+                reply = public_rpc(host, port, command, 4.0)
+            except OSError:
+                self._send(503, "RPC offline")
+                return
+            self._send(200, reply)
+            return
         try:
             reply = tcp_rpc(host, port, command, timeout if path == "/local-rpc" else 4.0)
         except OSError:
@@ -273,9 +302,9 @@ class Handler(BaseHTTPRequestHandler):
                 parts.append(str(item))
         command = " ".join(parts)
         host = os.environ.get("ADDITION_PUBLIC_RPC_HOST", "127.0.0.1")
-        port = env_int("ADDITION_PUBLIC_RPC_PORT", 38545)
+        port = env_int("ADDITION_PUBLIC_RPC_PORT", 38546)
         try:
-            reply = tcp_rpc(host, port, command, 4.0)
+            reply = public_rpc(host, port, command, 4.0)
         except OSError:
             self._send(503, "RPC offline")
             return

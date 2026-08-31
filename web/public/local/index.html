@@ -29,8 +29,8 @@
     </section>
     <div class="banner">
       Do not point additionblockchain.com write paths at a public port.
-      Never bind write RPC on <code>0.0.0.0:8545</code>.
-      Public <code>mine</code> / <code>createwallet</code> stay disabled on <code>38545</code> / <code>38546</code>.
+      Never bind write RPC on <code>0.0.0.0:8545</code> or <code>0.0.0.0:8546</code>.
+      Public <code>wallet_send</code> stays disabled on <code>38546</code>; site spend uses <code>/local-rpc</code> only.
     </div>
     <p id="rpc-state" class="offline">Checking local RPC…</p>
     <p id="height-line" class="note"></p>
