@@ -83,10 +83,30 @@ Binary (typical path):
 build\windows\x64\runner\Release\addition_wallet.exe
 ```
 
+## First-run helper scripts
+
+From the repo root (keeps write RPC on loopback; does not change the #55 wallet UI):
+
+```bash
+./scripts/setup_desktop.sh --mode testnet --run-wallet
+./scripts/setup_desktop.sh --start-only --mode testnet
+./scripts/setup_desktop.sh --stop --mode testnet
+```
+
+Windows: start the node in WSL via `setup_desktop.sh`, then
+`powershell -ExecutionPolicy Bypass -File scripts\setup_desktop.ps1 -Mode testnet -RunWallet`.
+
+Optional loopback tools:
+- EVM bridge: `python3 web/evm/evm_rpc_bridge.py` (`127.0.0.1:9545`, send disabled)
+- Local mining pool: `python3 tools/mining_pool.py coordinator` (not NiceHash; refuses public/LAN mine ports)
+
+`lib/rpc/evm_jsonrpc_client.dart` is a loopback client for that EVM bridge (additive; not wired into a separate Status wizard).
+
 ## Tests
 
 ```bash
 flutter test
+python3 scripts/rpc_smoke.py   # needs a live local additiond
 ```
 
 Unit tests cover write-RPC loopback policy, command builders, getinfo network
@@ -96,4 +116,5 @@ balances or claim a live mainnet.
 ## Out of scope
 
 DEX/swap UI, token sale, public write RPC, BIP wallets, and exporting private
-keys.
+keys. No #56 Status/first-run wizard overlay — the #55 wallet screen remains
+the product UI.

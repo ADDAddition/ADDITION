@@ -299,13 +299,13 @@ Notes:
 - `/local-rpc` proxies trusted `127.0.0.1:8545` and only accepts loopback clients
 - If RPC is down the pages show `RPC offline` and stay empty. They do not invent blocks, hashrate, node counts, or supply.
 
-## MetaMask (local EVM bootstrap only)
+## MetaMask (local EVM JSON-RPC only)
 Run:
 - `python3 web/evm/evm_rpc_bridge.py`
 
-This is **local testnet only**. Bind is `127.0.0.1:9545` (refuses `0.0.0.0`).
-`eth_sendRawTransaction` is disabled. MetaMask/Trust/Binance cannot list this
-as a public network.
+This is **local testnet bootstrap**. Bind is `127.0.0.1:9545` (refuses `0.0.0.0`).
+`eth_sendRawTransaction` is disabled. Not Ethereum mainnet. Not a live Uniswap / ETH / XMR bridge.
+MetaMask/Trust/Binance cannot list this as a public network.
 
 Custom network values (Add-to-MetaMask helper on `/evm/` uses only these):
 - Network Name: `ADDITION local testnet (send disabled)`
@@ -313,23 +313,28 @@ Custom network values (Add-to-MetaMask helper on `/evm/` uses only these):
 - Chain ID: `424242`
 - Currency Symbol: `ADD`
 
-Supported bootstrap methods:
-- `web3_clientVersion`
-- `eth_chainId` (`0x67932`)
-- `net_version` (`424242`)
-- `eth_blockNumber`
-- `eth_getBlockByNumber`
-- `eth_gasPrice`
-- `eth_maxPriorityFeePerGas`
-- `eth_getBalance` (native TEXT `getbalance`, `0x` prefix stripped)
+Supported local methods (bridge `0.2-local`):
+- `web3_clientVersion`, `eth_protocolVersion`
+- `eth_chainId` (`0x67932`), `net_version` (`424242`), `net_listening`, `net_peerCount`
+- `rpc_modules`, `addition_disclaimer`, `addition_networkInfo` (factual native getinfo + honest flags)
+- `eth_blockNumber`, `eth_getBlockByNumber`, `eth_getBlockByHash`
+- `eth_gasPrice`, `eth_maxPriorityFeePerGas`, `eth_coinbase`
+- `eth_getBalance` (native TEXT `getbalance`, whole units as hex, `0x` prefix stripped)
 - `eth_accounts` / `eth_requestAccounts` (empty)
-- `eth_getCode` (`0x`)
-- `eth_syncing` (`false`)
-- `wallet_addEthereumChain` (returns the loopback params above)
-- `eth_sendRawTransaction` — always disabled
-- `eth_estimateGas` / `eth_call` / `eth_getTransactionCount` / `eth_feeHistory` — unsupported
+- `eth_getCode` (`0x`), `eth_syncing` (`false`)
+- `eth_getTransactionByHash` / `eth_getTransactionReceipt` (from `tx_status`)
+- `wallet_addEthereumChain` / `wallet_switchEthereumChain`
+- JSON-RPC **batches** supported on POST
+- `eth_sendRawTransaction` / `eth_sendTransaction` — always disabled
+- `eth_estimateGas` / `eth_call` / `eth_getTransactionCount` / `eth_feeHistory` / `web3_sha3` — unsupported
 
 Limitations:
 - Not a full EVM execution node and not a public wallet RPC.
-- `eth_getTransactionReceipt` / `eth_getTransactionByHash` map to native `tx_status`.
-- No smart-contract bytecode execution in EVM context.
+- `addition_networkInfo.mainnetHasBlocks` is true only when live getinfo reports `network=mainnet` and `height>=1`. Never hardcodes “mainnet is live”.
+
+## Local mining pool (coordinator)
+- `python3 tools/mining_pool.py coordinator` — loopback JSON HTTP (`127.0.0.1:18555`) serializes `mine` to TEXT write (default testnet `127.0.0.1:8545`)
+- `python3 tools/mining_pool.py worker --once` — requests one mine slot
+- Docs: `tools/mining_pool_README.md`
+- Not NiceHash. No public mine. Prefer testnet. Share = completed mine attempt.
+- Refuses public/LAN ports `38545` / `38546` / `18545` and non-loopback hosts (including `0.0.0.0`).

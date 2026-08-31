@@ -75,6 +75,25 @@ Cashiers and Windows users download the live testnet / local wallet from [https:
 
 The helper talks to write RPC on `127.0.0.1:8545` on the machine that already runs `additiond --network testnet`. additionblockchain.com has no public write RPC.
 
+### Flutter desktop + local operator tools (loopback)
+
+Linux operators can also use the Flutter desktop wallet from this repo (`client/addition_app`, shipped in #55) and optional loopback helpers:
+
+```bash
+# Linux: deps + build + start testnet write on 127.0.0.1:8545
+./scripts/setup_desktop.sh --mode testnet --run-wallet
+```
+
+| Mode | Write RPC | Notes |
+| :--- | :--- | :--- |
+| testnet (default) | `127.0.0.1:8545` | Prefer for demos / pool |
+| mainnet | `127.0.0.1:8546` | Local/operator; height from live `getinfo` |
+| regtest | `127.0.0.1:8547` | Local min-diff |
+
+Optional loopback-only tools (never public write):
+- EVM: `python3 web/evm/evm_rpc_bridge.py` (JSON-RPC `127.0.0.1:9545`, send disabled)
+- Mining pool: `python3 tools/mining_pool.py coordinator` then `… worker --once` — serializes one loopback `mine` at a time (prefer testnet `:8545`; refuses `38545`/`38546`/`18545` and non-loopback; **not NiceHash**). See [`tools/mining_pool_README.md`](tools/mining_pool_README.md).
+
 ---
 
 ## Join the testnet
