@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "Addition" "\0"
-            VALUE "FileDescription", "Addition Wallet" "\0"
+            VALUE "FileDescription", "Addition Core" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "addition_wallet" "\0"
+            VALUE "InternalName", "addition_core" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 Addition. All rights reserved." "\0"
-            VALUE "OriginalFilename", "addition_wallet.exe" "\0"
-            VALUE "ProductName", "Addition Wallet" "\0"
+            VALUE "OriginalFilename", "addition_core.exe" "\0"
+            VALUE "ProductName", "Addition Core" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

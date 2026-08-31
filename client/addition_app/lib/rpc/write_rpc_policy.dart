@@ -1,14 +1,18 @@
 import 'kv_parser.dart';
 
-/// Write RPC policy for the desktop wallet.
+/// Write RPC policy for Addition Core (full-node desktop GUI).
 ///
 /// Write calls stay on loopback only (127.0.0.1 / ::1 / localhost).
-/// Public read is allowlisted to known getinfo endpoints.
+/// Never bind or target 0.0.0.0:8545 for send/keys.
+/// Public read is allowlisted to known getinfo endpoints (no wallet_send).
 class WriteRpcPolicy {
   static const defaultHost = '127.0.0.1';
-  static const defaultPort = 8545;
+  /// Mainnet local write default (coexists with testnet on :8545).
+  static const defaultPort = 8546;
   static const maxRpcLine = 32768;
   static const contact = 'contact@additionblockchain.com';
+  static const productNetworkId = 'ADDITION_MAINNET_V1';
+  static const coinbaseReward = 50;
 
   static const publicReadCommands = {'getinfo', 'getblock', 'getblockraw'};
 
@@ -21,6 +25,10 @@ class WriteRpcPolicy {
     'getbalance',
     'fee_info',
     'getinfo',
+    'mine',
+    'peers',
+    'monetary_info',
+    'protocol_status',
   };
 
   static const insecureCommands = {'sendtx', 'sendtx_hash', 'sign_message'};
@@ -34,6 +42,7 @@ class WriteRpcPolicy {
     'sol',
     'metamask',
     'walletconnect',
+    'smartchain',
   };
 
   static const loopbackHosts = {
@@ -52,12 +61,14 @@ class WriteRpcPolicy {
 
   static const knownPublicReadUrls = {
     'https://rpc.additionblockchain.com/rpc',
+    'https://additionblockchain.com/api/rpc',
     'http://34.27.30.115/rpc',
     'http://34.27.30.115:38545/rpc',
+    'http://34.27.30.115:38546/rpc',
   };
 
   static const defaultPublicReadUrl =
-      'https://rpc.additionblockchain.com/rpc';
+      'https://additionblockchain.com/api/rpc';
 
   static String hostFromEndpoint(String endpoint) {
     final text = endpoint.trim();
@@ -203,17 +214,33 @@ class WriteRpcPolicy {
     return values;
   }
 
-  /// Honest network label from getinfo. Never claims mainnet is live.
+  /// Honest network label from live getinfo only. Never invent stats.
   static String networkLabel(Map<String, String> info) {
     final network = (info['network'] ?? '').toLowerCase();
+    final networkId = info['network_id'] ?? '';
+    final networkName = info['network_name'] ?? '';
+    if (networkId == productNetworkId ||
+        networkName.toUpperCase().contains('ADDITION_MAINNET') ||
+        network.contains('mainnet') ||
+        network == 'main') {
+      return productNetworkId;
+    }
     if (network.contains('testnet') || network == 'test') {
       return 'testnet';
     }
-    if (network.contains('mainnet') || network == 'main') {
-      return 'mainnet (local/operator — not a live public network)';
+    if (network.contains('regtest')) {
+      return 'regtest';
     }
-    if (network.isEmpty) return 'unknown network';
+    if (network.isEmpty && networkId.isEmpty) return 'unknown network';
+    if (networkId.isNotEmpty) return networkId;
     return '$network (from getinfo)';
+  }
+
+  /// Height / peers / last_tps only when present in live getinfo — never invent.
+  static String liveStat(Map<String, String> info, String key) {
+    final value = info[key];
+    if (value == null || value.isEmpty) return '—';
+    return value;
   }
 
   static bool _isDigits(String value) {
