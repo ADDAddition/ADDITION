@@ -14,8 +14,8 @@ Primary nav (desktop + mobile bottom tabs): **Explore · Wallet · Get started �
 - PWA: `manifest.webmanifest`, `sw.js`, theme `#f3f6fa` (light), icons 192/512 for Add to Home Screen.
 - Brand: `logo-transparent.png`, `favicon.ico`, `apple-touch-icon.png`, `og.png`. Light teal-slate theme — no private-zone / gold / dark-privacy graphics.
 - `/download/` desktop helper for mainnet / local (`addition-wallet-mainnet`, loopback `8546` only). `/local/` operator toolbox.
-- Homepage hero: one muted autoplay loop `<video>` (no controls) at `https://additionblockchain.com/banners/addition-stinger.mp4` — not dual banner-1/banner-2 tiles. On ≤840px, `.hero-stinger` / `video.hero-stinger` use live `max-height: 56vw` + `object-fit: contain` (no `max-height: none`).
-- Site footer (`chrome.js`): one muted autoplay loop `playsinline` `<video>` (no controls) at `https://additionblockchain.com/banners/addition-banner-2.mp4` — full-width `object-fit: contain`. Banner-1 stays reserved for Addition Core About.
+- Homepage hero: one muted autoplay loop `playsinline` `webkit-playsinline` `<video>` with `preload="auto"` (no controls) at `https://additionblockchain.com/banners/addition-stinger.mp4` — not dual banner-1/banner-2 tiles. `chrome.js` kicks `.hero-stinger` with `muted=true` + `play().catch(()=>{})` so Safari/Chrome actually start. On ≤840px, `.hero-stinger` / `video.hero-stinger` use live `max-height: 56vw` + `object-fit: contain` (no `max-height: none`).
+- Site footer (`chrome.js`): one muted loop `playsinline` `<video>` (no controls, **no autoplay**) at `https://additionblockchain.com/banners/addition-banner-2.mp4` — full-width `object-fit: contain`. Only the hero stinger autoplays. Banner-1 stays reserved for Addition Core About.
 - Explorer calls `/api/rpc?cmd=…` for public-read. No consensus / economy code changes in this surface.
 - Contact: contact@additionblockchain.com
 - Source: https://github.com/ADDAddition/ADDITION
