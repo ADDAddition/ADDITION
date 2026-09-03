@@ -226,7 +226,6 @@
       '<video' +
       ' class="footer-banner"' +
       ' muted' +
-      ' autoplay' +
       ' loop' +
       ' playsinline' +
       ' preload="metadata"' +
@@ -236,6 +235,18 @@
       '<p><a href="/download/">Download</a> · <a href="/docs/">Docs</a> · ' +
       '<a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>' +
       "</div>";
+  }
+
+  function kickHeroStinger() {
+    const video = document.querySelector(".hero-stinger");
+    if (!video) {
+      return;
+    }
+    video.muted = true;
+    const playPromise = video.play();
+    if (playPromise && typeof playPromise.catch === "function") {
+      playPromise.catch(function () {});
+    }
   }
 
   injectHead();
@@ -250,4 +261,5 @@
     fillFooter(footer);
   }
   fillBottomTabs();
+  kickHeroStinger();
 }());
