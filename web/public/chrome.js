@@ -9,6 +9,8 @@
   const MORE = [
     ["/download/", "Download"],
     ["/local/", "Local tools"],
+    ["/launch/", "Launch"],
+    ["/embed/", "Embed"],
     ["/rpc/", "Public RPC"],
     ["/docs/", "Docs"]
   ];
