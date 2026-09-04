@@ -14,7 +14,7 @@
 - `rpc_server.*`: text-command RPC handling
 - `wallet.*` / `wallet_store.*`: transaction creation, local `.wal` files, `wallet_send`
 - `token_engine.*`: in-process token / AMM ledger (loopback RPC; not a public DEX)
-- `privacy.*`: SHA3-512 commitment + nullifier opening (`claim=opening_not_zk`)
+- `privacy.*`: SHA3-512 commitment + nullifier opening (`claim=opening_not_zk`); ZK path scaffold in `privacy_zk.*` (`zk_pending`, fail-closed) — see `docs/PRIVACY_REAL_V1.md`
 - `p2p.*` / `decentralized_node.*`: peer handshake, gossip, sync
 - `btc_hygiene.*`: offline Bitcoin script classifier and signed ADDITION hygiene receipt (attestation rehearsal; does not move Bitcoin; not BIP-360)
 

@@ -40,6 +40,7 @@ add_library(addition_core
     src/p2p.cpp
     src/consensus_engine.cpp
     src/privacy.cpp
+    src/privacy_zk.cpp
     src/pouw_storage.cpp
     src/pouw_compute.cpp
     src/private_messaging.cpp

@@ -56,6 +56,8 @@ int main() {
         "privacy_spend_open",
         "privacy_mint_zk",
         "privacy_spend_zk",
+        "privacy_mint_zk_v1",
+        "privacy_spend_zk_v1",
     };
     for (const char* cmd : blocked) {
         if (addition::is_public_read_command(cmd)) {
