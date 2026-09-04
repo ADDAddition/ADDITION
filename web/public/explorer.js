@@ -44,22 +44,27 @@
     return td;
   }
 
+  function hasValue(value) {
+    return value !== undefined && value !== null && value !== "";
+  }
+
   function renderBlockRows(tbody, rows) {
     clearRows(tbody);
     for (let i = 0; i < rows.length; i += 1) {
       const row = rows[i];
       const tr = document.createElement("tr");
-      if (row.height) {
-        tr.appendChild(linkCell(S.blockHref(row.height), row.height));
+      // height may be 0 / "0" — never treat zero as missing
+      if (hasValue(row.height)) {
+        tr.appendChild(linkCell(S.blockHref(row.height), String(row.height)));
       } else {
         tr.appendChild(cell(""));
       }
-      if (row.hash) {
+      if (hasValue(row.hash)) {
         tr.appendChild(linkCell(S.blockHref(row.hash), row.hash, "hash-cell"));
       } else {
         tr.appendChild(cell("", "hash-cell"));
       }
-      tr.appendChild(cell(row.tx_count || ""));
+      tr.appendChild(cell(hasValue(row.tx_count) ? String(row.tx_count) : ""));
       tr.appendChild(cell(row.time || ""));
       tbody.appendChild(tr);
     }
@@ -70,17 +75,17 @@
     for (let i = 0; i < rows.length; i += 1) {
       const row = rows[i];
       const tr = document.createElement("tr");
-      if (row.tx_hash) {
+      if (hasValue(row.tx_hash)) {
         tr.appendChild(linkCell(S.txHref(row.tx_hash), row.tx_hash, "hash-cell"));
       } else {
         tr.appendChild(cell("", "hash-cell"));
       }
-      if (row.height) {
-        tr.appendChild(linkCell(S.blockHref(row.height), row.height));
+      if (hasValue(row.height)) {
+        tr.appendChild(linkCell(S.blockHref(row.height), String(row.height)));
       } else {
         tr.appendChild(cell(""));
       }
-      tr.appendChild(cell(row.index || ""));
+      tr.appendChild(cell(hasValue(row.index) ? String(row.index) : ""));
       tbody.appendChild(tr);
     }
   }
@@ -165,11 +170,23 @@
       clearRows(txsBody);
       return;
     }
-    setText(blockState, "", "");
-    renderBlockRows(blocksBody, recent.blocks || []);
+    const blocks = recent.blocks || [];
+    if (blocks.length === 0) {
+      const tip = S.parseHeight((recent.info && recent.info.fields) || {});
+      setText(
+        blockState,
+        tip === 0
+          ? "Tip height is 0 — no getblock rows returned (empty/unavailable)."
+          : "No getblock rows for tip height.",
+        "empty"
+      );
+    } else {
+      setText(blockState, "", "");
+    }
+    renderBlockRows(blocksBody, blocks);
     const txs = [];
-    for (let i = 0; i < (recent.blocks || []).length; i += 1) {
-      const fromBlock = S.txRowsFromBlock(recent.blocks[i]);
+    for (let i = 0; i < blocks.length; i += 1) {
+      const fromBlock = S.txRowsFromBlock(blocks[i]);
       for (let j = 0; j < fromBlock.length; j += 1) {
         txs.push(fromBlock[j]);
         if (txs.length >= 20) {
@@ -180,7 +197,11 @@
         break;
       }
     }
-    setText(txState, txs.length ? "" : "No tx_hashes in recent getblock rows.", txs.length ? "" : "empty");
+    setText(
+      txState,
+      txs.length ? "" : "No tx_hashes in recent getblock rows.",
+      txs.length ? "" : "empty"
+    );
     renderTxRows(txsBody, txs);
   }
 

@@ -326,6 +326,10 @@ class PublicSiteStaticTests(unittest.TestCase):
         common = read("common.js")
         self.assertIn('raw: "RPC offline"', common)
         self.assertIn("STRIP_KEYS", common)
+        self.assertIn('"network_id"', common)
+        self.assertIn('"privacy_claim"', common)
+        self.assertIn("fieldPresent", common)
+        self.assertIn("fieldOrNull", common)
         self.assertIn("tx_status", common)
         self.assertIn("getblockraw", common)
         self.assertIn("explorerCommand", common)
@@ -334,10 +338,17 @@ class PublicSiteStaticTests(unittest.TestCase):
         index = read("index.html")
         chrome = read("chrome.js")
         status = read("status/index.html")
-        blob = index + chrome + status
+        whitepaper = read("whitepaper/index.html")
+        blob = index + chrome + status + whitepaper
         self.assertNotIn("KH/s", blob)
         self.assertNotIn("1,248,500", blob)
         self.assertNotIn("124.8", blob)
+        self.assertNotIn("peers=14", whitepaper)
+        self.assertNotIn("observed while drafting this document", whitepaper)
+        self.assertIn('id="live-getinfo-snapshot"', whitepaper)
+        self.assertIn('id="live-monetary-snapshot"', whitepaper)
+        self.assertIn("Fail closed — no sample getinfo substituted.", whitepaper)
+        self.assertIn('id="live-strip"', status)
 
     def test_strip_fields_and_rpc_fail_closed(self) -> None:
         node = shutil.which("node")
@@ -355,13 +366,22 @@ function run(fetchImpl) {
   return window.AdditionSite;
 }
 const S = run(async () => { throw new Error("offline"); });
-const fields = S.parseFields("network=mainnet height=0 peers=1 pq_mode=strict pow_algorithm=memory_hard max_supply=50000000 next_reward=50 last_tps=9.99");
+const fields = S.parseFields("network=mainnet network_id=ADDITION_MAINNET_V1 height=0 peers=0 pq_mode=strict pow_algorithm=memory_hard privacy_claim=opening_not_zk max_supply=50000000 next_reward=50 last_tps=9.99");
 const strip = S.stripFields(fields);
-if (strip.height !== "0" || strip.network !== "mainnet" || strip.pq_mode !== "strict") {
-  throw new Error("missing live strip fields");
+if (strip.height !== "0" || strip.peers !== "0" || strip.network !== "mainnet" || strip.network_id !== "ADDITION_MAINNET_V1" || strip.privacy_claim !== "opening_not_zk" || strip.pq_mode !== "strict") {
+  throw new Error("missing live strip fields or zero not preserved: " + JSON.stringify(strip));
 }
 if (Object.prototype.hasOwnProperty.call(strip, "last_tps")) {
   throw new Error("strip leaked non-strip getinfo fields");
+}
+if (S.parseHeight(fields) !== 0) {
+  throw new Error("parseHeight must keep height=0");
+}
+if (S.fieldOrNull(fields, "peers") !== "0") {
+  throw new Error("fieldOrNull must keep peers=0");
+}
+if (S.fieldOrNull({}, "height") !== null) {
+  throw new Error("missing height must stay null (do not invent 0)");
 }
 if (S.explorerAllowed("mine") || S.explorerAllowed("wallet_send")) {
   throw new Error("explorer must reject spend/mine");
@@ -370,7 +390,18 @@ S.rpcCommand("getinfo").then((offline) => {
   if (!offline.offline || offline.raw !== "RPC offline") {
     throw new Error("network error must fail closed");
   }
-  console.log("helpers-ok");
+  const htmlFetch = async () => ({
+    ok: false,
+    status: 502,
+    text: async () => "<!DOCTYPE html><html><body>bad gateway</body></html>"
+  });
+  const S2 = run(htmlFetch);
+  return S2.rpcCommand("getinfo").then((htmlOffline) => {
+    if (!htmlOffline.offline || htmlOffline.raw !== "RPC offline") {
+      throw new Error("HTML error body must fail closed without sample JSON");
+    }
+    console.log("helpers-ok");
+  });
 }).catch((err) => {
   console.error(err);
   process.exit(1);
@@ -390,6 +421,20 @@ S.rpcCommand("getinfo").then((offline) => {
         finally:
             Path(script_path).unlink(missing_ok=True)
         self.assertIn("helpers-ok", proc.stdout)
+
+    def test_wallet_and_api_do_not_invent_height(self) -> None:
+        wallet_js = read("wallet.js")
+        worker = read("worker.js")
+        serve_src = (ROOT / "web" / "serve.py").read_text(encoding="utf-8")
+        embed = read("embed/index.html")
+        self.assertNotIn('r.fields.height || "0"', wallet_js)
+        self.assertNotIn('r.fields.network || "mainnet"', wallet_js)
+        self.assertIn("privacy_claim", worker)
+        self.assertIn("fieldOrNull", worker)
+        self.assertIn('privacy_claim', serve_src)
+        self.assertNotIn('network_id: "ADDITION_MAINNET_V1"', worker)
+        self.assertNotIn('"network_id": "ADDITION_MAINNET_V1"', serve_src)
+        self.assertNotIn('data.network_id || "ADDITION_MAINNET_V1"', embed)
 
     def test_static_pages_serve_and_rpc_offline(self) -> None:
         class Handler(BaseHTTPRequestHandler):
@@ -479,7 +524,9 @@ S.rpcCommand("getinfo").then((offline) => {
         self.assertIn("def public_json_capabilities", serve_src)
         self.assertIn('"price_available": False', serve_src)
         self.assertIn('"price_usd": None', serve_src)
-        self.assertIn("ADDITION_MAINNET_V1", serve_src)
+        self.assertIn('"privacy_claim"', serve_src)
+        self.assertIn('parse_kv_fields(info_raw).get("network_id")', serve_src)
+        self.assertNotIn('"network_id": "ADDITION_MAINNET_V1"', serve_src)
         self.assertNotIn("0.0.0.0:8545", serve_src)
 
 

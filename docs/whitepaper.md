@@ -253,11 +253,13 @@ From `genesis-mainnet.json`, `config-mainnet.toml`, and `mainnet_chain_config()`
 
 **Fees:** Spec / genesis / `mainnet_chain_config()` floor is `min_fee=0`. Congestion heuristics raise `recommended_min_fee` / `dynamic_min_fee` from mempool size and last-block fees (`rpc_server.cpp` `recommended_min_fee`, plus `AIRoutingOptimizer` fee floor). Live seed `fee_info` observed while drafting reported `base_min_fee=1` / `recommended_min_fee=1` and `getinfo` reported `dynamic_min_fee=1` — that is an operational snapshot, not a rewrite of the in-repo genesis constant. Copy live fields; do not invent a fee market narrative.
 
-**Live monetary snapshot** (public seed `monetary_info`, observed while drafting):
+**Live `monetary_info`** — fetch; do not paste stale emitted/remaining into this doc:
 
-```text
-max_supply=50000000 emitted=0 remaining=50000000 next_reward=50 next_halving_height=210000
+```bash
+curl -s 'https://additionblockchain.com/api/rpc?cmd=monetary_info'
 ```
+
+The rendered site whitepaper loads that response live (fail closed → `RPC offline`).
 
 ---
 
@@ -394,25 +396,21 @@ Re-state the early table with live getinfo context. Design docs:
 - ZK circuit schema (not live): [`docs/ZK_CIRCUIT_V1.md`](ZK_CIRCUIT_V1.md)
 - Fast path scaffold: [`docs/FAST_PATH_V1.md`](FAST_PATH_V1.md) (vision #78, tip SHA `6d3f483` or later)
 
-**Live public `getinfo` snapshot** (seed `34.27.30.115:38546`, observed while drafting this document — copy fields only):
+**Live public `getinfo`** — do not paste stale height/peers into this doc. Fetch from the seed or the site:
 
-```text
-network=mainnet network_name=addition-mainnet network_id=ADDITION_MAINNET_V1
-height=0 mempool=0 peers=14 bootstrap_peers=34.27.30.115:28546
-difficulty_target=1099511627775 next_reward=50 dynamic_min_fee=1 max_supply=50000000
-last_mine_ms=0 last_mined_txs=0 last_tps=0.00
-pq_mode=strict allowed_sig_algs=ml-dsa-87
-pow_algorithm=memory_hard pow_profile=mainnet
-privacy_claim=opening_not_zk privacy_ok=true
-auto_mine=off mine_deadline_sec=0
+```bash
+curl -s 'https://additionblockchain.com/api/rpc?cmd=getinfo'
+curl -s 'http://34.27.30.115:38546/rpc?cmd=getinfo'
 ```
+
+The rendered site whitepaper (`/whitepaper/`) loads that response live (fail closed → `RPC offline`). Prefer [`/status/`](https://additionblockchain.com/status/) for the full panel. Height may be `0`; peers change; canned marketing numbers are out of scope.
 
 | Field / topic | Live truth |
 | --- | --- |
-| `network_id` | `ADDITION_MAINNET_V1` |
+| `network_id` | From live `getinfo` only |
 | Height | From live `getinfo` only — **may be `0`** |
-| `pq_mode` / algs | `strict` / `ml-dsa-87` + SHA3-512 |
-| `privacy_claim` | `opening_not_zk` |
+| `pq_mode` / algs | `strict` / `ml-dsa-87` + SHA3-512 (product claim; confirm via live fields) |
+| `privacy_claim` | From live `getinfo` (opening is `opening_not_zk`) |
 | `privacy_zk_roadmap` | `zk_pending` (scaffold) |
 | `consensus_path` | `memory_hard_pow` |
 | `fast_path_status` | `not_this_network` on mainnet |
@@ -420,7 +418,7 @@ auto_mine=off mine_deadline_sec=0
 | `research_goal_is_not_a_measurement` | `true` |
 | `economic_security` | `none` until real |
 | `last_tps` | Local mine telemetry when present — **not** marketed Solana TPS |
-| `peers=…` | Snapshot at query time — not a permanent marketing number |
+| `peers=…` | Live query only — not a permanent marketing number |
 
 No USD ticker (`price_usd` stays null on the site API). PoUW phase-1 text (`docs/POUW_PHASE1_SPEC.md`) is a design target, not a claim that public mainnet already sells compute/storage.
 

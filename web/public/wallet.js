@@ -225,8 +225,12 @@
       showPanel("panel-offline");
       return;
     }
-    const net = r.fields.network || "mainnet";
-    const height = r.fields.height || "0";
+    const net = Object.prototype.hasOwnProperty.call(r.fields, "network")
+      ? r.fields.network
+      : "unavailable";
+    const height = Object.prototype.hasOwnProperty.call(r.fields, "height")
+      ? r.fields.height
+      : "unavailable";
     const tag = state.via === "public" ? "Public" : "Local";
     setPill("ok", tag + " · " + net + " · h=" + height);
     L.setButtons(true);

@@ -191,13 +191,28 @@
             return;
           }
           status.className = "";
-          status.textContent = (data.network_id || "ADDITION_MAINNET_V1") + " · live public read";
+          status.textContent = data.network_id
+            ? (data.network_id + " · live public read")
+            : "live public read — network_id unavailable";
           metrics.hidden = false;
           metrics.innerHTML = "";
           metrics.appendChild(metric("Height", data.height));
-          metrics.appendChild(metric("Supply", data.emitted != null ? data.emitted + " / " + (data.max_supply || "—") : (data.max_supply || "—")));
-          metrics.appendChild(metric("Next reward", data.next_reward != null ? data.next_reward + " ADD" : "—"));
+          metrics.appendChild(metric(
+            "Supply",
+            data.emitted != null && data.emitted !== ""
+              ? (data.emitted + " / " + (data.max_supply != null ? data.max_supply : "—"))
+              : (data.max_supply != null ? data.max_supply : "—")
+          ));
+          metrics.appendChild(metric(
+            "Next reward",
+            data.next_reward != null && data.next_reward !== ""
+              ? (data.next_reward + " ADD")
+              : "—"
+          ));
           metrics.appendChild(metric("Peers", data.peers));
+          if (data.privacy_claim != null && data.privacy_claim !== "") {
+            metrics.appendChild(metric("Privacy claim", data.privacy_claim));
+          }
           setText(
             "embed-price",
             data.price_available && data.price_usd != null

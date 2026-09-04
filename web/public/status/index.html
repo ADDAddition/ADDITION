@@ -16,6 +16,12 @@
 </head>
 <body>
   <header id="site-header"></header>
+  <div id="live-strip" class="status-strip pending" aria-live="polite">
+    <div class="status-strip-inner">
+      <span id="strip-flag" class="status-flag">…</span>
+      <dl id="strip-cells" class="status-cells"></dl>
+    </div>
+  </div>
   <main>
     <section class="product-hero" style="padding-top:1rem;padding-bottom:0.25rem">
       <p class="eyebrow"><span class="net-badge">MAINNET</span> Public RPC</p>
@@ -65,6 +71,41 @@
   <script src="/chrome.js"></script>
   <script>
     const S = window.AdditionSite;
+    function renderStrip(status) {
+      const strip = document.getElementById("live-strip");
+      const flag = document.getElementById("strip-flag");
+      const cells = document.getElementById("strip-cells");
+      if (!strip || !flag || !cells) {
+        return;
+      }
+      while (cells.firstChild) {
+        cells.removeChild(cells.firstChild);
+      }
+      if (!status || status.offline || !status.ok) {
+        strip.className = "status-strip offline";
+        flag.textContent = "RPC offline";
+        return;
+      }
+      const fields = status.strip || S.stripFields(status.fields || {});
+      const keys = Object.keys(fields);
+      if (keys.length === 0) {
+        strip.className = "status-strip offline";
+        flag.textContent = "RPC offline";
+        return;
+      }
+      strip.className = "status-strip ok";
+      flag.textContent = "live";
+      for (let i = 0; i < keys.length; i += 1) {
+        const wrap = document.createElement("div");
+        const dt = document.createElement("dt");
+        dt.textContent = keys[i];
+        const dd = document.createElement("dd");
+        dd.textContent = fields[keys[i]];
+        wrap.appendChild(dt);
+        wrap.appendChild(dd);
+        cells.appendChild(wrap);
+      }
+    }
     async function loadOne(cmd, fieldsId, rawId) {
       const result = await S.explorerCommand(cmd);
       const raw = document.getElementById(rawId);
@@ -81,6 +122,8 @@
     }
     async function load() {
       const state = document.getElementById("rpc-state");
+      const status = await S.loadChainStatus();
+      renderStrip(status);
       const info = await loadOne("getinfo", "info-fields", "info-raw");
       if (info.offline || !info.ok) {
         state.className = "offline";

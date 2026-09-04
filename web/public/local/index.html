@@ -86,12 +86,21 @@
         line.textContent = "No node on 127.0.0.1:8545 (testnet) or 127.0.0.1:8546 (--mainnet). Start additiond, then python3 web/serve.py.";
         return;
       }
-      const net = info.fields.network || "?";
-      const netId = info.fields.network_id || "?";
-      line.textContent = "getinfo height=" + (info.fields.height || "?") +
+      const net = Object.prototype.hasOwnProperty.call(info.fields, "network")
+        ? info.fields.network
+        : "?";
+      const netId = Object.prototype.hasOwnProperty.call(info.fields, "network_id")
+        ? info.fields.network_id
+        : "?";
+      const height = Object.prototype.hasOwnProperty.call(info.fields, "height")
+        ? info.fields.height
+        : "?";
+      line.textContent = "getinfo height=" + height +
         " network=" + net +
         " network_id=" + netId +
-        " pq_mode=" + (info.fields.pq_mode || "?");
+        " pq_mode=" + (Object.prototype.hasOwnProperty.call(info.fields, "pq_mode")
+          ? info.fields.pq_mode
+          : "?");
       if (net === "mainnet") {
         line.textContent += " — local --mainnet profile";
       }

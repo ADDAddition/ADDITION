@@ -262,6 +262,7 @@ def public_json_info(host: str, port: int, symbol: str | None = None) -> tuple[i
         "peers": fields.get("peers"),
         "pq_mode": fields.get("pq_mode"),
         "pow_algorithm": fields.get("pow_algorithm"),
+        "privacy_claim": fields.get("privacy_claim"),
         "max_supply": fields.get("max_supply"),
         "emitted": fields.get("emitted"),
         "remaining": fields.get("remaining"),
@@ -313,10 +314,34 @@ def public_json_capabilities(host: str, port: int) -> tuple[int, dict[str, Any]]
         }
         if available:
             any_available = True
+    network_id = None
+    info_offline = False
+    try:
+        info_raw = public_rpc(host, port, "getinfo", 4.0)
+        if info_raw == "RPC offline" or info_raw.startswith("error: public read RPC"):
+            info_offline = True
+        elif not info_raw.startswith("error:"):
+            network_id = parse_kv_fields(info_raw).get("network_id")
+        else:
+            info_offline = True
+    except OSError:
+        info_offline = True
+    if info_offline:
+        return 503, {
+            "ok": False,
+            "offline": True,
+            "brand": "ADDITION",
+            "network_id": None,
+            "public_write": False,
+            "launch_tabs_enabled": False,
+            "note": "RPC offline",
+            "probes": probes,
+        }
     return 200, {
         "ok": True,
+        "offline": False,
         "brand": "ADDITION",
-        "network_id": "ADDITION_MAINNET_V1",
+        "network_id": network_id,
         "public_write": False,
         "launch_tabs_enabled": any_available,
         "note": (

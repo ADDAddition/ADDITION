@@ -12,15 +12,29 @@
 
   const STRIP_KEYS = [
     "network",
+    "network_id",
     "height",
     "peers",
     "pq_mode",
     "pow_algorithm",
+    "privacy_claim",
     "max_supply",
     "emitted",
     "remaining",
     "next_reward"
   ];
+
+  function fieldPresent(fields, key) {
+    return !!(fields && Object.prototype.hasOwnProperty.call(fields, key)
+      && fields[key] !== undefined && fields[key] !== null && fields[key] !== "");
+  }
+
+  function fieldOrNull(fields, key) {
+    if (!fieldPresent(fields, key)) {
+      return null;
+    }
+    return fields[key];
+  }
 
   function rpcUrlFromPage() {
     const params = new URLSearchParams(window.location.search);
@@ -163,7 +177,7 @@
   }
 
   function parseHeight(fields) {
-    if (!fields || fields.height === undefined) {
+    if (!fieldPresent(fields, "height")) {
       return null;
     }
     const n = Number(fields.height);
@@ -517,6 +531,8 @@
     rpcUrlFromPage: rpcUrlFromPage,
     parseFields: parseFields,
     parseHeight: parseHeight,
+    fieldPresent: fieldPresent,
+    fieldOrNull: fieldOrNull,
     rpcCommand: rpcCommand,
     loadRecentBlocks: loadRecentBlocks,
     loadLatestBlockRows: loadLatestBlockRows,
