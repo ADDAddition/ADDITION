@@ -303,6 +303,13 @@ def main() -> None:
         "From <code>docs/PRIVACY_REAL_V1.md</code>. Live claim stays <code>opening_not_zk</code>; ZK path fail-closed / <code>zk_pending</code>.",
     )
     write_doc(
+        "docs/ZK_CIRCUIT_V1.md",
+        OUT / "docs" / "zk-circuit" / "index.html",
+        "ADDITION ZK circuit v1 (not live)",
+        "ZK circuit v1",
+        "From <code>docs/ZK_CIRCUIT_V1.md</code>. Circuit work in progress / not live — <code>zk_circuit_status=not_proven</code>; live privacy remains <code>opening_not_zk</code>.",
+    )
+    write_doc(
         "docs/FAST_PATH_V1.md",
         OUT / "docs" / "fast-path" / "index.html",
         "ADDITION fast path v1 (scaffold)",

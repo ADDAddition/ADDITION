@@ -41,6 +41,7 @@ add_library(addition_core
     src/consensus_engine.cpp
     src/privacy.cpp
     src/privacy_zk.cpp
+    src/zk_circuit_v1.cpp
     src/fast_path.cpp
     src/pouw_storage.cpp
     src/pouw_compute.cpp
@@ -108,6 +109,10 @@ if(ADDITION_BUILD_TESTS)
     add_executable(test_privacy tests/test_privacy.cpp)
     target_link_libraries(test_privacy PRIVATE addition_core)
     add_test(NAME test_privacy COMMAND test_privacy)
+
+    add_executable(test_zk_circuit_v1 tests/test_zk_circuit_v1.cpp)
+    target_link_libraries(test_zk_circuit_v1 PRIVATE addition_core)
+    add_test(NAME test_zk_circuit_v1 COMMAND test_zk_circuit_v1)
 
     add_executable(test_fast_path tests/test_fast_path.cpp)
     target_link_libraries(test_fast_path PRIVATE addition_core)
