@@ -11,7 +11,7 @@ enum class NetworkMode {
     Testnet,
     Mainnet,
     Regtest,
-    Fast, // ADDITION_FAST_V1 scaffold; fail-closed until pipeline ships
+    Fast, // ADDITION_FAST_V1 research; typed stages exist; boot fail-closed until pipeline ships
 };
 
 enum class PowAlgorithm {

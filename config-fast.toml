@@ -1,6 +1,6 @@
-# ADDITION_FAST_V1 scaffold only — NOT a live public network.
-# Leader / pipeline / execution are not shipped. additiond --fast fail-closed.
-# Live public product: --mainnet ADDITION_MAINNET_V1 memory_hard @ 0x000000FFFFFFFFFF.
+# ADDITION_FAST_V1 research profile — NOT a live public network.
+# Typed pipeline stages (pipeline_stages_typed_v1) exist; leader/execution not shipped.
+# additiond --fast remains fail-closed. Live product: --mainnet memory_hard.
 # Do not invent measured Solana TPS. research_goal_is_not_a_measurement=true.
 # Brand: ADDITION.
 
