@@ -102,45 +102,40 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertNotIn("0.0.0.0:8545", chrome)
         self.assertIn('path === "/wallet"', chrome)
 
-    def test_chrome_footer_has_banner_2_video(self) -> None:
+    def test_chrome_footer_text_only_hero_uses_banner_2(self) -> None:
         chrome = read("chrome.js")
         videos = re.findall(r"<video\b[^>]*>", chrome, flags=re.IGNORECASE)
-        self.assertEqual(len(videos), 1, "site footer must have exactly one <video>")
-        footer_video = videos[0]
-        self.assertIn("addition-banner-2.mp4", footer_video)
-        self.assertIn("footer-banner", footer_video)
-        self.assertIn("data-src=", footer_video)
-        self.assertRegex(footer_video, re.compile(r'\bpreload=["\']none["\']', re.IGNORECASE))
-        self.assertRegex(footer_video, re.compile(r"\bmuted\b", re.IGNORECASE))
-        self.assertNotRegex(footer_video, re.compile(r"\bautoplay\b", re.IGNORECASE))
-        self.assertRegex(footer_video, re.compile(r"\bloop\b", re.IGNORECASE))
-        self.assertRegex(footer_video, re.compile(r"\bplaysinline\b", re.IGNORECASE))
-        self.assertNotRegex(footer_video, re.compile(r"\bcontrols\b", re.IGNORECASE))
+        self.assertEqual(len(videos), 0, "footer chrome must not embed a <video>")
+        self.assertNotIn("footer-banner", chrome)
+        self.assertNotIn("lazyFooterBanner", chrome)
         self.assertNotIn("addition-stinger.mp4", chrome)
         self.assertNotIn("addition-banner-1.mp4", chrome)
-        self.assertIn("kickHeroStinger", chrome)
-        self.assertIn('querySelector(".hero-stinger")', chrome)
+        self.assertNotIn("addition-banner-2.mp4", chrome)
+        self.assertIn("kickHeroBanner", chrome)
+        self.assertIn('querySelector(".hero-banner")', chrome)
         self.assertIn("video.muted = true", chrome)
         self.assertIn("video.play()", chrome)
-        self.assertIn("lazyFooterBanner", chrome)
-        self.assertIn("IntersectionObserver", chrome)
         self.assertIn('width="172"', chrome)
         self.assertIn('height="34"', chrome)
+        self.assertIn('ensureMeta("theme-color", "#0b1220")', chrome)
         css = read("common.css")
-        self.assertIn(".footer-banner", css)
+        self.assertIn(".hero-banner", css)
+        self.assertNotIn(".hero-stinger", css)
+        self.assertNotIn(".footer-banner", css)
         self.assertIn("object-fit: contain", css)
         self.assertIn("@media (max-width: 840px)", css)
         self.assertIn(":focus-visible", css)
-        # Full-bleed hero stinger: break out of centered main to 100vw.
+        self.assertIn("--ink: #f4f7fb", css)
+        self.assertIn("--bg: #0b1220", css)
+        self.assertIn("color-scheme: dark", css)
+        # Full-bleed hero banner: break out of centered main to 100vw.
         self.assertIn("width: 100vw", css)
         self.assertIn("margin-left: calc(50% - 50vw)", css)
         self.assertNotIn("max-width: 52rem", css)
-        # Live phone hotfix (CoS curl): exact ≤840px stinger block; 56vw×2; no max-height:none.
         self.assertIn(
             """@media (max-width: 840px) {
-  .hero-stinger,
-  video.hero-stinger,
-  .hero-stinger video {
+  .hero-banner,
+  video.hero-banner {
     display: block;
     width: 100vw;
     max-width: 100vw;
@@ -149,7 +144,7 @@ class PublicSiteStaticTests(unittest.TestCase):
     object-fit: contain;
     object-position: center;
   }
-  .hero-stinger {
+  .hero-banner {
     overflow: hidden;
     margin: 0.5rem 0 1rem;
     margin-left: calc(50% - 50vw);
@@ -158,8 +153,29 @@ class PublicSiteStaticTests(unittest.TestCase):
 }""",
             css,
         )
-        self.assertEqual(css.count("max-height: 56vw"), 2)
+        self.assertEqual(css.count("max-height: 56vw"), 1)
         self.assertNotIn("max-height: none", css)
+
+    def test_brand_is_addition_not_additionchain(self) -> None:
+        forbidden = (
+            "additionchain",
+            "addition-chain",
+            "addition_chain",
+            "addition chain",
+        )
+        for rel, text in iter_site_text():
+            lower = text.lower()
+            # Domain / mailbox additionblockchain.com is fine.
+            scrubbed = (
+                lower.replace("additionblockchain.com", "")
+                .replace("additionblockchain", "")
+                .replace("contact@", "")
+            )
+            for phrase in forbidden:
+                self.assertNotIn(phrase, scrubbed, f"{rel} still contains {phrase!r} brand")
+        chrome = read("chrome.js")
+        self.assertIn('class="brand-name">ADDITION</span>', chrome)
+        self.assertNotIn("SmartChain", chrome)
 
     def test_homepage_is_mainnet_product(self) -> None:
         index = read("index.html")
@@ -187,24 +203,26 @@ class PublicSiteStaticTests(unittest.TestCase):
         videos = re.findall(r"<video\b[^>]*>", index, flags=re.IGNORECASE)
         self.assertEqual(len(videos), 1, "homepage must have exactly one hero <video>")
         hero = videos[0]
-        self.assertIn("addition-stinger.mp4", hero)
+        self.assertIn("addition-banner-2.mp4", hero)
+        self.assertIn("hero-banner", hero)
+        self.assertNotIn("addition-stinger.mp4", index)
         self.assertIn('poster="/og.png"', hero)
         self.assertRegex(hero, re.compile(r"\bmuted\b", re.IGNORECASE))
         self.assertRegex(hero, re.compile(r"\bautoplay\b", re.IGNORECASE))
         self.assertRegex(hero, re.compile(r"\bloop\b", re.IGNORECASE))
         self.assertRegex(hero, re.compile(r"\bplaysinline\b", re.IGNORECASE))
         self.assertRegex(hero, re.compile(r"\bwebkit-playsinline\b", re.IGNORECASE))
-        self.assertRegex(hero, re.compile(r'\bpreload=["\']auto["\']', re.IGNORECASE))
+        self.assertRegex(hero, re.compile(r'\bpreload=["\']metadata["\']', re.IGNORECASE))
         self.assertNotRegex(hero, re.compile(r"\bcontrols\b", re.IGNORECASE))
         self.assertNotIn("hero-banners", index)
         self.assertNotIn("addition-banner-1.mp4", index)
-        self.assertNotIn("addition-banner-2.mp4", index)
         self.assertNotIn('net-badge">TESTNET</span>', index)
         self.assertNotIn("ADDITION_TESTNET_V1", index)
         self.assertNotIn("0.0.0.0:8545", index)
         self.assertNotIn("SmartChain", index)
         self.assertNotIn("DEX", index)
         self.assertNotIn("token sale", index.lower())
+        self.assertIn('theme-color" content="#0b1220"', index)
 
     def test_compare_page_is_live_only(self) -> None:
         compare = read("compare/index.html")

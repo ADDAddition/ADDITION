@@ -82,9 +82,9 @@
 
     ensureLink("manifest", "/manifest.webmanifest");
     ensureLink("apple-touch-icon", "/apple-touch-icon.png");
-    ensureMeta("theme-color", "#f3f6fa");
+    ensureMeta("theme-color", "#0b1220");
     ensureMeta("apple-mobile-web-app-capable", "yes");
-    ensureMeta("apple-mobile-web-app-status-bar-style", "default");
+    ensureMeta("apple-mobile-web-app-status-bar-style", "black-translucent");
     ensureMeta("apple-mobile-web-app-title", "ADDITION");
     ensureMeta("mobile-web-app-capable", "yes");
 
@@ -224,56 +224,17 @@
 
   function fillFooter(el) {
     el.className = "site-footer-wrap";
-    // Footer banner is ~22MB on CDN — do not set src until near viewport (lazy).
+    // Banner video lives in the homepage hero only — footer is copy + links.
     el.innerHTML =
-      '<video' +
-      ' class="footer-banner"' +
-      ' muted' +
-      ' loop' +
-      ' playsinline' +
-      ' preload="none"' +
-      ' data-src="https://additionblockchain.com/banners/addition-banner-2.mp4"></video>' +
       '<div class="site-footer-copy">' +
       '<p>ADDITION · public product is <strong>MAINNET</strong> · keys stay on your device or local node</p>' +
       '<p><a href="/compare/">Compare</a> · <a href="/download/">Download</a> · <a href="/docs/">Docs</a> · ' +
       '<a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>' +
       "</div>";
-    lazyFooterBanner(el.querySelector(".footer-banner"));
   }
 
-  function lazyFooterBanner(video) {
-    if (!video) {
-      return;
-    }
-    const url = video.getAttribute("data-src");
-    if (!url) {
-      return;
-    }
-    function load() {
-      if (video.getAttribute("src")) {
-        return;
-      }
-      video.setAttribute("src", url);
-      video.load();
-    }
-    if (typeof IntersectionObserver === "function") {
-      const io = new IntersectionObserver(function (entries) {
-        for (let i = 0; i < entries.length; i += 1) {
-          if (entries[i].isIntersecting) {
-            load();
-            io.disconnect();
-            return;
-          }
-        }
-      }, { rootMargin: "240px 0px" });
-      io.observe(video);
-      return;
-    }
-    window.addEventListener("load", load, { once: true });
-  }
-
-  function kickHeroStinger() {
-    const video = document.querySelector(".hero-stinger");
+  function kickHeroBanner() {
+    const video = document.querySelector(".hero-banner");
     if (!video) {
       return;
     }
@@ -296,7 +257,7 @@
     fillFooter(footer);
   }
   fillBottomTabs();
-  kickHeroStinger();
+  kickHeroBanner();
 
   // Close mobile drawer on Escape (a11y).
   document.addEventListener("keydown", function (event) {

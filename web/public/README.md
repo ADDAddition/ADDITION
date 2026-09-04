@@ -16,13 +16,13 @@ Primary nav (desktop + mobile bottom tabs): **Explore · Wallet · Get started �
 - `/embed/` is an iframe widget (themes `modern|compact|bare`) fed by `/api/info`. Says price unavailable when the node has no price RPC. Shows `network_id` only when `/api/info` returns it.
 - `/whitepaper/` loads live `getinfo` + `monetary_info` into economics panels (fail closed → `RPC offline`). No canned peers/height/supply snapshot.
 - Homepage live strip + latest blocks/txs come only from public read RPCs. Height `0` is displayed as `0`. Empty block lists stay empty (no demo rows).
-- PWA: `manifest.webmanifest`, `sw.js`, theme `#f3f6fa` (light), icons 192/512 for Add to Home Screen.
-- Brand: `logo-transparent.png`, `favicon.ico`, `apple-touch-icon.png`, `og.png`. Light teal-slate theme — no private-zone / gold / dark-privacy graphics.
+- PWA: `manifest.webmanifest`, `sw.js`, theme `#0b1220` (dark desk), icons 192/512 for Add to Home Screen.
+- Brand: `logo-transparent.png`, `favicon.ico`, `apple-touch-icon.png`, `og.png`. Dark teal-slate desk — near-white body text on dark panels. Product brand is **ADDITION** only.
 - `/download/` desktop helper for mainnet / local (`addition-wallet-mainnet`, loopback `8546` only). `/local/` operator toolbox (loopback).
-- Homepage hero: one muted autoplay loop `playsinline` `webkit-playsinline` `<video>` with `preload="auto"` (no controls) at `https://additionblockchain.com/banners/addition-stinger.mp4` — not dual banner-1/banner-2 tiles. `chrome.js` kicks `.hero-stinger` with `muted=true` + `play().catch(()=>{})` so Safari/Chrome actually start. On ≤840px, `.hero-stinger` / `video.hero-stinger` use live `max-height: 56vw` + `object-fit: contain` (no `max-height: none`).
-- Site footer (`chrome.js`): one muted loop `playsinline` `<video>` (no controls, **no autoplay**, `preload="none"`) with `data-src` → `https://additionblockchain.com/banners/addition-banner-2.mp4` — **lazy-loaded** via IntersectionObserver so the ~22MB banner is not fetched until near the footer. Full-width `object-fit: contain`. Only the hero stinger autoplays. Banner-1 stays reserved for Addition Core About.
-- Live strip: shared `AdditionSite.renderLiveStrip` (home / compare / status / join / privacy). Height `0` / peers `0` are shown as real zeros. Class `ok` (not a dead `online` alias alone).
-- Perf polish: compressed brand PNGs; early font preconnect on primary desks; hero `poster="/og.png"`; `:focus-visible` outlines; compare sticky axis column on narrow viewports; `_headers` cache for css/js/png.
+- Homepage hero: one muted autoplay loop `playsinline` `webkit-playsinline` `<video class="hero-banner">` with `preload="metadata"` + `poster="/og.png"` (no controls) at `https://additionblockchain.com/banners/addition-banner-2.mp4`. `chrome.js` kicks `.hero-banner` with `muted=true` + `play().catch(()=>{})`. On ≤840px, `.hero-banner` uses `max-height: 56vw` + `object-fit: contain`. **Not** the old stinger clip.
+- Site footer (`chrome.js`): text + links only — **no footer video** (banner-2 is hero-only; no duplicate placement).
+- Live strip: shared `AdditionSite.renderLiveStrip` (home / compare / status / join / privacy). Height `0` / peers `0` are shown as real zeros.
+- Perf polish: compressed brand PNGs; early font preconnect on primary desks; `:focus-visible` outlines; compare sticky axis column; `_headers` cache for css/js/png.
 - Explorer calls `/api/rpc?cmd=…` for public reads. No consensus / economy code changes in this surface. Height, TPS, and price come from live RPC fields only.
 - Contact: contact@additionblockchain.com
 - Source: https://github.com/ADDAddition/ADDITION
