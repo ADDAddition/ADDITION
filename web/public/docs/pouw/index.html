@@ -8,6 +8,7 @@
   <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/common.css">
+  
 </head>
 <body data-title="PoUW spec" data-sub="from the repo">
   <header id="site-header"></header>
@@ -20,11 +21,7 @@
 <hr>
 <h2>1. Objectives</h2>
 <p>Define a research testnet architecture for:</p>
-<p>1. <strong>PoUW Storage Layer</strong> (decentralized cloud)</p>
-<p>2. <strong>PoUW Compute Layer</strong> (AI/compute jobs)</p>
-<p>3. <strong>Private TTL Messaging</strong> (E2E encrypted, expiring)</p>
-<p>4. <strong>Economic/security model</strong> (rewards, staking, slashing)</p>
-<p>5. <strong>Web product architecture</strong> (portal + explorer + cloud + AI jobs + messaging)</p>
+<ol><li><strong>PoUW Storage Layer</strong> (decentralized cloud)</li><li><strong>PoUW Compute Layer</strong> (AI/compute jobs)</li><li><strong>Private TTL Messaging</strong> (E2E encrypted, expiring)</li><li><strong>Economic/security model</strong> (rewards, staking, slashing)</li><li><strong>Web product architecture</strong> (portal + explorer + cloud + AI jobs + messaging)</li></ol>
 <p>This spec is compatible with current ADDITION runtime posture:</p>
 <ul><li>PQ signatures (<code>ml-dsa-87</code>)</li><li>strict RPC hardening</li><li>native token/swap/bridge/privacy modules</li><li>optional EVM compatibility layer</li></ul>
 <hr>
@@ -41,13 +38,7 @@
 <ul><li><code>StorageChallenge</code></li><li><code>challenge_id</code></li><li><code>deal_id</code></li><li><code>worker_addr</code></li><li><code>random_seed</code></li><li><code>chunk_index</code></li><li><code>due_height</code></li></ul>
 <ul><li><code>StorageProof</code></li><li><code>challenge_id</code></li><li><code>proof_blob_hash</code></li><li><code>verdict</code> (pending/pass/fail)</li></ul>
 <h3>3.3 Protocol flow</h3>
-<p>1. Client encrypts file client-side and chunks it.</p>
-<p>2. Client computes chunk Merkle root and opens <code>StorageDeal</code>.</p>
-<p>3. Workers register commitments + lock collateral.</p>
-<p>4. Chain emits deterministic random challenges per epoch.</p>
-<p>5. Workers submit proofs before <code>due_height</code>.</p>
-<p>6. Verifiers/consensus validate proofs.</p>
-<p>7. Rewards distributed on pass; slashing on fail/miss.</p>
+<ol><li>Client encrypts file client-side and chunks it.</li><li>Client computes chunk Merkle root and opens <code>StorageDeal</code>.</li><li>Workers register commitments + lock collateral.</li><li>Chain emits deterministic random challenges per epoch.</li><li>Workers submit proofs before <code>due_height</code>.</li><li>Verifiers/consensus validate proofs.</li><li>Rewards distributed on pass; slashing on fail/miss.</li></ol>
 <h3>3.4 Security properties</h3>
 <ul><li>Files remain encrypted off-chain.</li><li>Chain stores commitments/proof hashes, not plaintext.</li><li>Challenge randomness must be unbiased and verifiable.</li><li>Repeated non-response or invalid proofs =&gt; escalating slash.</li></ul>
 <hr>
@@ -75,11 +66,7 @@
 <ul><li><code>PrivateMessageEnvelope</code></li><li><code>msg_id</code></li><li><code>sender_addr</code></li><li><code>recipient_addr</code></li><li><code>ciphertext_ref</code></li><li><code>created_at</code></li><li><code>ttl_sec</code></li><li><code>expire_at</code></li><li><code>policy</code> (single-read, auto-burn, forward-forbidden)</li><li><code>status</code> (active/expired/destroyed)</li></ul>
 <ul><li><code>MessageKeyMaterial</code></li><li>ephemeral key agreement output (off-chain)</li><li>never stored plaintext on-chain</li></ul>
 <h2>5.4 Protocol</h2>
-<p>1. Sender obtains recipient pre-key bundle.</p>
-<p>2. Sender encrypts payload (E2E) and uploads ciphertext.</p>
-<p>3. Sender submits envelope anchor to chain with TTL.</p>
-<p>4. Recipient decrypts while message active.</p>
-<p>5. On expiration: envelope state becomes expired and key material is discarded.</p>
+<ol><li>Sender obtains recipient pre-key bundle.</li><li>Sender encrypts payload (E2E) and uploads ciphertext.</li><li>Sender submits envelope anchor to chain with TTL.</li><li>Recipient decrypts while message active.</li><li>On expiration: envelope state becomes expired and key material is discarded.</li></ol>
 <h2>5.5 Optional advanced policies</h2>
 <ul><li>read-once receipts (signed)</li><li>delayed delivery windows</li><li>burn-on-open</li><li>group messaging with rotating group keys</li></ul>
 <hr>
@@ -112,17 +99,17 @@
 <hr>
 <h2>9. Web architecture (professional portal)</h2>
 <h2>9.1 Product areas</h2>
-<p>1. <strong>Explorer</strong></p>
+<ol><li><strong>Explorer</strong></li></ol>
 <ul><li>blocks, tx, validator stats, slashing events</li></ul>
-<p>2. <strong>Cloud Storage Console</strong></p>
+<ol><li><strong>Cloud Storage Console</strong></li></ol>
 <ul><li>upload, deals, replicas, proof status, billing</li></ul>
-<p>3. <strong>AI Jobs Console</strong></p>
+<ol><li><strong>AI Jobs Console</strong></li></ol>
 <ul><li>submit jobs, track execution, validator results, costs</li></ul>
-<p>4. <strong>Private Messaging</strong></p>
+<ol><li><strong>Private Messaging</strong></li></ol>
 <ul><li>secure inbox, TTL controls, read receipts, burn policies</li></ul>
-<p>5. <strong>DeFi/Wallet</strong></p>
+<ol><li><strong>DeFi/Wallet</strong></li></ol>
 <ul><li>send, staking, swap, token creator, bridge, governance</li></ul>
-<p>6. <strong>Node/Worker Ops</strong></p>
+<ol><li><strong>Node/Worker Ops</strong></li></ol>
 <ul><li>worker registration, reputation, earnings, penalties</li></ul>
 <h2>9.2 Technical stack target</h2>
 <ul><li>Frontend: Next.js + TypeScript + Tailwind + component system</li><li>API gateway: authenticated backend (no direct privileged RPC from browser)</li><li>Realtime: websockets for job/proof/message status</li><li>Observability: metrics + logs + tracing</li></ul>

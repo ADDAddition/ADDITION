@@ -20,6 +20,7 @@ SHELL = """<!DOCTYPE html>
   <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/common.css">
+  {extra_head}
 </head>
 <body data-title="{heading}" data-sub="{sub}">
   <header id="site-header"></header>
@@ -34,6 +35,22 @@ SHELL = """<!DOCTYPE html>
 </html>
 """
 
+TOC_STYLE = """<style>
+.wp-toc { margin: 1rem 0 1.5rem; padding: 0.85rem 1rem; border: 1px solid var(--line); border-radius: 12px; background: rgba(47, 95, 138, 0.06); }
+.wp-toc strong { display: block; margin-bottom: 0.5rem; }
+.wp-toc ol { margin: 0; padding-left: 1.2rem; }
+.wp-toc li { margin: 0.25rem 0; }
+.prose h2[id], .prose h3[id] { scroll-margin-top: 5rem; }
+.prose h2[id]:target, .prose h3[id]:target { outline: 2px solid rgba(47, 95, 138, 0.35); outline-offset: 4px; border-radius: 4px; }
+</style>
+"""
+
+
+def slugify(text: str) -> str:
+    plain = re.sub(r"[*`]", "", text).strip().lower()
+    plain = re.sub(r"[^a-z0-9]+", "-", plain)
+    return plain.strip("-") or "section"
+
 
 def inline(text: str) -> str:
     text = html.escape(text)
@@ -43,19 +60,31 @@ def inline(text: str) -> str:
     return text
 
 
-def md_to_html(md: str) -> str:
+def md_to_html(md: str, *, with_anchors: bool = False, skip_md_toc: bool = False) -> str:
     lines = md.replace("\r\n", "\n").split("\n")
     out: list[str] = []
     i = 0
     in_code = False
     code: list[str] = []
     list_items: list[str] = []
+    ordered_items: list[str] = []
     table_rows: list[str] = []
+    used_ids: dict[str, int] = {}
+    skipping_toc = False
+
+    def unique_id(raw: str) -> str:
+        base = slugify(raw)
+        n = used_ids.get(base, 0)
+        used_ids[base] = n + 1
+        return base if n == 0 else f"{base}-{n}"
 
     def flush_list() -> None:
         if list_items:
             out.append("<ul>" + "".join("<li>" + inline(x) + "</li>" for x in list_items) + "</ul>")
             list_items.clear()
+        if ordered_items:
+            out.append("<ol>" + "".join("<li>" + inline(x) + "</li>" for x in ordered_items) + "</ol>")
+            ordered_items.clear()
 
     def flush_table() -> None:
         if not table_rows:
@@ -75,6 +104,7 @@ def md_to_html(md: str) -> str:
         if line.startswith("```"):
             flush_list()
             flush_table()
+            skipping_toc = False
             if in_code:
                 out.append("<pre>" + html.escape("\n".join(code)) + "</pre>")
                 code.clear()
@@ -87,24 +117,61 @@ def md_to_html(md: str) -> str:
             code.append(line)
             i += 1
             continue
+
+        # Drop the markdown TOC block; HTML gets a generated TOC instead.
+        if skip_md_toc and re.match(r"^##\s+Table of contents\s*$", line, re.I):
+            skipping_toc = True
+            i += 1
+            continue
+        if skipping_toc:
+            if line.startswith("## ") or line.startswith("# "):
+                skipping_toc = False
+            else:
+                i += 1
+                continue
+
         if line.startswith("|"):
             flush_list()
             table_rows.append(line)
             i += 1
             continue
         flush_table()
+        if re.match(r"^\s*\d+\.\s+", line):
+            if list_items:
+                out.append("<ul>" + "".join("<li>" + inline(x) + "</li>" for x in list_items) + "</ul>")
+                list_items.clear()
+            ordered_items.append(re.sub(r"^\s*\d+\.\s+", "", line))
+            i += 1
+            continue
         if re.match(r"^\s*[-*]\s+", line):
+            if ordered_items:
+                out.append("<ol>" + "".join("<li>" + inline(x) + "</li>" for x in ordered_items) + "</ol>")
+                ordered_items.clear()
             list_items.append(re.sub(r"^\s*[-*]\s+", "", line))
             i += 1
             continue
         flush_list()
         if line.startswith("# "):
-            # page already has an H1 from chrome
-            out.append("<h2>" + inline(line[2:]) + "</h2>")
+            title = line[2:]
+            if with_anchors:
+                hid = unique_id(title)
+                out.append(f'<h2 id="{html.escape(hid)}">' + inline(title) + "</h2>")
+            else:
+                out.append("<h2>" + inline(title) + "</h2>")
         elif line.startswith("## "):
-            out.append("<h2>" + inline(line[3:]) + "</h2>")
+            title = line[3:]
+            if with_anchors:
+                hid = unique_id(title)
+                out.append(f'<h2 id="{html.escape(hid)}">' + inline(title) + "</h2>")
+            else:
+                out.append("<h2>" + inline(title) + "</h2>")
         elif line.startswith("### "):
-            out.append("<h3>" + inline(line[4:]) + "</h3>")
+            title = line[4:]
+            if with_anchors:
+                hid = unique_id(title)
+                out.append(f'<h3 id="{html.escape(hid)}">' + inline(title) + "</h3>")
+            else:
+                out.append("<h3>" + inline(title) + "</h3>")
         elif line.startswith("> "):
             out.append("<p class='note'>" + inline(line[2:]) + "</p>")
         elif line.strip() == "---":
@@ -119,23 +186,60 @@ def md_to_html(md: str) -> str:
     return "\n".join(out)
 
 
+def build_toc(md: str) -> str:
+    items: list[tuple[str, str]] = []
+    used: dict[str, int] = {}
+    for line in md.replace("\r\n", "\n").split("\n"):
+        if line.startswith("```"):
+            continue
+        m = re.match(r"^##\s+(.+)$", line)
+        if not m:
+            continue
+        title = m.group(1).strip()
+        if title.lower() == "table of contents":
+            continue
+        base = slugify(title)
+        n = used.get(base, 0)
+        used[base] = n + 1
+        hid = base if n == 0 else f"{base}-{n}"
+        items.append((hid, title))
+    if not items:
+        return ""
+    lis = "".join(
+        f'<li><a href="#{html.escape(hid)}">{inline(title)}</a></li>' for hid, title in items
+    )
+    return f'<nav class="wp-toc" aria-label="Table of contents"><strong>Contents</strong><ol>{lis}</ol></nav>'
+
+
 def publish_raw(rel_md: str, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text((ROOT / rel_md).read_text(encoding="utf-8"), encoding="utf-8")
 
 
-def write_doc(rel_md: str, dest: Path, title: str, heading: str, banner: str) -> None:
+def write_doc(
+    rel_md: str,
+    dest: Path,
+    title: str,
+    heading: str,
+    banner: str,
+    *,
+    with_toc: bool = False,
+) -> None:
     md = (ROOT / rel_md).read_text(encoding="utf-8")
     dest.parent.mkdir(parents=True, exist_ok=True)
+    body = md_to_html(md, with_anchors=with_toc, skip_md_toc=with_toc)
+    if with_toc:
+        body = build_toc(md) + "\n" + body
     dest.write_text(
         SHELL.format(
             title=html.escape(title),
             heading=html.escape(heading),
             sub="from the repo",
             banner=banner,
-            body=md_to_html(md),
+            body=body,
             github="https://github.com/ADDAddition/ADDITION/blob/main/" + rel_md,
             source=rel_md,
+            extra_head=TOC_STYLE if with_toc else "",
         ),
         encoding="utf-8",
     )
@@ -191,10 +295,19 @@ def main() -> None:
         "SHA3 opening notes",
         "From <code>tools/zk_backend_contract.md</code>. Privacy is SHA3-512 opening, not a ZK circuit.",
     )
+    write_doc(
+        "docs/whitepaper.md",
+        OUT / "whitepaper" / "index.html",
+        "ADDITION technical whitepaper",
+        "White paper",
+        "Complete technical whitepaper from <code>docs/whitepaper.md</code>. Honest values only — live <code>getinfo</code>, code, and docs. Brand: <strong>ADDITION</strong>.",
+        with_toc=True,
+    )
     publish_raw("docs/TESTNET_PUBLIC_RPC_RUNBOOK.md", OUT / "docs" / "testnet-rpc-runbook.md")
     publish_raw("docs/WALLET.md", OUT / "docs" / "wallet.md")
     publish_raw("web/public/join.md", OUT / "docs" / "join.md")
     print("rendered docs into", OUT / "docs")
+    print("rendered whitepaper into", OUT / "whitepaper")
 
 
 if __name__ == "__main__":
