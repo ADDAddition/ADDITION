@@ -166,9 +166,9 @@ def main() -> None:
     write_doc(
         "docs/MAINNET_RUNBOOK.md",
         OUT / "docs" / "runbook" / "index.html",
-        "ADDITION mainnet node runbook (not live)",
+        "ADDITION mainnet node runbook",
         "Mainnet node runbook",
-        "From <code>docs/MAINNET_RUNBOOK.md</code>. Separate chain. Default remains <code>additiond --network testnet</code>. Not a live public network.",
+        "From <code>docs/MAINNET_RUNBOOK.md</code>. Public product <code>ADDITION_MAINNET_V1</code> — P2P <code>34.27.30.115:28546</code>, RPC <code>34.27.30.115:38546</code> (write allowlist open per CoS). Height from live getinfo may be 0.",
     )
     write_doc(
         "docs/TWO_NODE_TESTNET.md",

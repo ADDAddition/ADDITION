@@ -13,7 +13,7 @@
   <header id="site-header"></header>
   <main class="prose">
     <p>ADDITION is MIT-licensed software. Public product network: <code>addition-mainnet</code> / <code>ADDITION_MAINNET_V1</code> (<code>additiond --mainnet</code>). Research default binary still boots testnet unless <code>--mainnet</code> is passed.</p>
-    <p>Public read is <code>/rpc?cmd=getinfo</code> on seed <code>34.27.30.115:38546</code> (site <code>/api/rpc</code>). Site wallet write stays on <code>127.0.0.1:8546</code> via <code>/local-rpc</code>. If the node does not answer: <strong>RPC offline</strong>.</p>
+    <p>Public RPC is <code>/rpc?cmd=getinfo</code> on seed <code>34.27.30.115:38546</code> (site <code>/api/rpc</code>). Write allowlist on that port includes createwallet / mine / wallet_send / sign / tx_build (CoS). Home-node write stays on <code>127.0.0.1:8546</code>. If the node does not answer: <strong>RPC offline</strong>. Height from live getinfo may be <code>0</code>.</p>
     <p>License: MIT (root <code>LICENSE</code>), as-is, no warranty. Do not commit wallets, <code>node_identity.dat</code>, <code>.env</code>, or keys.</p>
     <p>Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
     <p>Source: <a href="https://github.com/ADDAddition/ADDITION">https://github.com/ADDAddition/ADDITION</a></p>

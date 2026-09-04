@@ -9,36 +9,51 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="Docs" data-sub="from the repo">
+<body data-title="Docs" data-sub="ADDITION_MAINNET_V1">
   <header id="site-header"></header>
   <main>
-    <div class="banner">Mirrored from the repository. Default: <code>additiond --network testnet</code>. Live join: <a href="/join/">/join/</a>.</div>
+    <div class="banner">
+      <span class="net-badge">MAINNET</span>
+      Public product: <code>ADDITION_MAINNET_V1</code> —
+      P2P <code>34.27.30.115:28546</code>,
+      public RPC <code>34.27.30.115:38546</code> / site <code>/api/rpc</code>
+      (read + write allowlist: createwallet, mine, wallet_send, sign, tx_build).
+      Home-node write: <code>127.0.0.1:8546</code>.
+      Live join: <a href="/join/">/join/</a>.
+    </div>
     <div class="cards">
-      <a href="/join/"><strong>Join the testnet</strong>additiond from main, bootstrap 34.27.30.115:28545, then sync. If the seed times out, run your own node.</a>
+      <a href="/join/"><strong>Join mainnet</strong>additiond --mainnet, bootstrap 34.27.30.115:28546, sync + mine. Public RPC 38546.</a>
       <a href="/docs/getting-started/"><strong>Build and run</strong>liboqs, OpenSSL, additiond, public RPC.</a>
       <a href="/docs/architecture/"><strong>Architecture</strong>docs/ARCHITECTURE.md</a>
       <a href="/docs/commands/"><strong>Commands</strong>docs/FINAL_COMMANDS.md</a>
       <a href="/docs/pouw/"><strong>PoUW spec</strong>docs/POUW_PHASE1_SPEC.md</a>
-      <a href="/docs/runbook/"><strong>Runbook</strong>docs/MAINNET_RUNBOOK.md — separate chain, not a live public network.</a>
-      <a href="/docs/two-node/"><strong>Two-node testnet</strong>docs/TWO_NODE_TESTNET.md</a>
-      <a href="/docs/zk/"><strong>SHA3 opening notes</strong>tools/zk_backend_contract.md</a>
+      <a href="/docs/runbook/"><strong>Mainnet runbook</strong>docs/MAINNET_RUNBOOK.md — public seed, home node, ports.</a>
       <a href="/whitepaper/"><strong>White paper</strong>docs/WHITE_PAPER.md</a>
       <a href="/legal/"><strong>Legal</strong>MIT</a>
-      <a href="/local/"><strong>Local node tools</strong>wallet, tokens, swap pool, stake, mine, privacy opening, EVM probe</a>
-      <a href="/wallet/"><strong>Wallet</strong>createwallet / mine / stake on 127.0.0.1:8545</a>
-      <a href="/tokens/"><strong>Tokens</strong>token_create / mint / transfer</a>
-      <a href="/swap/"><strong>Swap pool</strong>create pool, liquidity, exact-in, tvl</a>
-      <a href="/privacy/"><strong>Privacy opening</strong>SHA3-512 mint_open / spend_open</a>
-      <a href="/rpc/"><strong>Public RPC</strong>/rpc?cmd=getinfo on :80 and :38545</a>
+      <a href="/wallet/"><strong>Wallet</strong>Prefer public 38546 write; home-node fallback 127.0.0.1:8546</a>
+      <a href="/rpc/"><strong>Public RPC</strong>/rpc?cmd=getinfo on seed :38546 / site /api/rpc</a>
+      <a href="/local/"><strong>Local node tools</strong>operator forms via /local-rpc → 8546</a>
+      <a href="/status/"><strong>Status</strong>Live getinfo — height may be 0</a>
     </div>
+    <section class="panel">
+      <h2>Research testnet (secondary)</h2>
+      <p>Separate chain from the public product. Not the default on this site.</p>
+      <ul>
+        <li><a href="/join/#testnet">Join research testnet</a> — bootstrap <code>34.27.30.115:28545</code>, write <code>127.0.0.1:8545</code></li>
+        <li><a href="/docs/two-node/">Two-node testnet</a> — <code>docs/TWO_NODE_TESTNET.md</code></li>
+        <li><a href="/docs/testnet-rpc-runbook.md">Testnet public-read RPC runbook</a></li>
+        <li><a href="/docs/zk/">SHA3 opening notes</a> — not a ZK circuit</li>
+        <li><a href="/tokens/">Tokens</a> / <a href="/swap/">Swap pool</a> / <a href="/privacy/">Privacy opening</a> — local operator tools</li>
+      </ul>
+    </section>
     <section class="panel">
       <h2>Raw markdown</h2>
       <p>Same copy as <code>text/markdown</code> (no HTML scrape):</p>
       <ul>
-        <li><a href="/join.md"><code>/join.md</code></a> — join the research testnet</li>
+        <li><a href="/join.md"><code>/join.md</code></a> — join ADDITION mainnet</li>
         <li><a href="/docs/join.md"><code>/docs/join.md</code></a> — same join copy</li>
-        <li><a href="/docs/testnet-rpc-runbook.md"><code>/docs/testnet-rpc-runbook.md</code></a> — public-read RPC systemd runbook</li>
-        <li><a href="/docs/wallet.md"><code>/docs/wallet.md</code></a> — local loopback wallet</li>
+        <li><a href="/docs/wallet.md"><code>/docs/wallet.md</code></a> — mainnet wallet + public 38546 write</li>
+        <li><a href="/docs/testnet-rpc-runbook.md"><code>/docs/testnet-rpc-runbook.md</code></a> — research testnet public-read RPC</li>
       </ul>
     </section>
     <section class="panel">

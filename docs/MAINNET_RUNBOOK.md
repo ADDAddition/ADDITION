@@ -9,13 +9,13 @@ Run `additiond --mainnet` (same as `--network mainnet`) like `bitcoind`: anyone 
 | Public seed | Role |
 |-------------|------|
 | `34.27.30.115:28546` | P2P bootstrap |
-| `34.27.30.115:38546` | HTTP public read (`/rpc?cmd=getinfo`) |
+| `34.27.30.115:38546` | HTTP public RPC (`/rpc?cmd=getinfo`; write allowlist open per CoS) |
 
-That is a separate chain from the research testnet (`28545` / `38545` / HTTP `:80`). Not a label flip.
+That is a separate chain from the research testnet (`28545` / `38545`). Not a label flip.
 
-The public website and explorer stay on testnet until the operator switches them. This runbook does not flip the explorer.
+The public site and explorer follow `ADDITION_MAINNET_V1`. Height comes from live `getinfo` only (may still be `0`). This runbook does not invent TPS or peer counts.
 
-Do not open write RPC `8545`/`8546` to the internet. Never bind write RPC to `0.0.0.0`. Do not bootstrap `34.27.30.115:28545` for mainnet.
+Do not open home-node write RPC `8545`/`8546` to the internet. Never bind write RPC to `0.0.0.0`. Do not bootstrap `34.27.30.115:28545` for mainnet.
 
 Unit file: [`deploy/systemd/additiond-mainnet.service`](../deploy/systemd/additiond-mainnet.service)
 
@@ -78,14 +78,16 @@ thread, `hardware_concurrency` workers by default) against the existing
 target `0x000000FFFFFFFFFF`. That is about 2^24 hashes. Do not loosen it.
 Do not invent TPS.
 
-Write RPC stays `127.0.0.1:8546`. Public read cannot mine. Public RPC still refuses `mine` / `createwallet` / `send`.
+Home-node write RPC stays `127.0.0.1:8546` (never publish). Public seed `38546` now allows the write allowlist CoS enabled: `createwallet`, `mine`, `wallet_send`, `wallet_sign` / `sign_message`, `tx_build` / `sendtx_signed*`. Height from live `getinfo` may still be `0`.
 
 ```bash
 printf 'mine miner1\n' | nc 127.0.0.1 8546
 # waits until a nonce meets the target; clients must not use a 30s timeout
+# or against the public seed when the write allowlist is open:
+curl -s 'http://34.27.30.115:38546/rpc?cmd=getinfo'
 ```
 
-After a local `mine`, the node announces `BLK|` and `gossip_flush` pushes to peers.
+After a `mine`, the node announces `BLK|` and `gossip_flush` pushes to peers.
 
 ## Difficulty (what we picked and why)
 
@@ -137,8 +139,8 @@ sudo systemctl enable --now additiond-mainnet.service
 
 | Listener | Bind | Port | Role |
 |----------|------|------|------|
-| Public read RPC | `0.0.0.0` | **38546** | Allowlisted reads only (seed: `34.27.30.115:38546`) |
-| Write / admin RPC | `127.0.0.1` | **8546** | Trusted local only; never public |
+| Public RPC | `0.0.0.0` | **38546** | Seed: `34.27.30.115:38546` — read + write allowlist (createwallet/mine/wallet_send/sign/tx_build per CoS) |
+| Home-node write RPC | `127.0.0.1` | **8546** | Trusted local only; never publish |
 | P2P | `0.0.0.0` | **28546** | Public seed; home nodes use another port (e.g. 28547). Needs `ADDITION_ENABLE_P2P_RPC=1` |
 
 Never publish **8545** or **8546**. Never enable LAN RPC (`18546`) on a public interface.
@@ -148,8 +150,8 @@ If you also run the research testnet unit, keep its ports (38545 / 8545 / 28545)
 ```bash
 printf 'getinfo\n' | nc 127.0.0.1 38546
 curl -s 'http://127.0.0.1:38546/rpc?cmd=getinfo'
-printf 'mine\n' | nc 127.0.0.1 38546
-# error: command disabled on public RPC
+curl -s 'http://34.27.30.115:38546/rpc?cmd=getinfo'
+# height may be 0 — copy only live fields
 ```
 
 `getinfo` must include `network=mainnet` and `network_id=ADDITION_MAINNET_V1`.

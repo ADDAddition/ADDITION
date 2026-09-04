@@ -29,9 +29,9 @@
       <p class="lede">
         A C++20 Layer 1 with ML-DSA-87 signatures and SHA3-512 hashing.
         This site’s public explorer is <code>ADDITION_MAINNET_V1</code>
-        (seed read <code>34.27.30.115:38546</code> / <code>/api/rpc</code>).
+        (seed <code>34.27.30.115:38546</code> / <code>/api/rpc</code>).
         Height comes from live <code>getinfo</code> only — no invented TPS figures.
-        Keys stay on your device or home node; hosted pages cannot spend.
+        Sync, mine, and wallet write are open on that public RPC (CoS allowlist).
       </p>
       <div class="cta-row">
         <a class="btn btn-primary" href="/wallet/">Open wallet</a>
@@ -61,7 +61,7 @@
         <button type="submit">Search</button>
       </form>
       <p id="search-status" hidden></p>
-      <p class="note">Public read via <code>/api/rpc</code> → <code>34.27.30.115:38546</code>. Write/send stays off the public path.</p>
+      <p class="note">Public RPC via <code>/api/rpc</code> → <code>34.27.30.115:38546</code> (read + write allowlist). Height from live getinfo only.</p>
 
       <div class="section-head">
         <h2>Latest blocks</h2>
@@ -100,9 +100,9 @@
     </section>
 
     <section class="cards" aria-label="Primary destinations">
-      <a href="/wallet/"><strong>Wallet</strong><span>Balance, receive, send — needs a local node to spend</span></a>
+      <a href="/wallet/"><strong>Wallet</strong><span>Balance, receive, send — public 38546 write or home node</span></a>
       <a href="/join/"><strong>Get started</strong><span>Run a home node on mainnet (P2P 28546)</span></a>
-      <a href="/status/"><strong>Status</strong><span>Live getinfo from the public mainnet read RPC</span></a>
+      <a href="/status/"><strong>Status</strong><span>Live getinfo from the public mainnet RPC</span></a>
       <a href="/download/"><strong>Download</strong><span>Desktop helper for loopback write RPC</span></a>
     </section>
   </main>

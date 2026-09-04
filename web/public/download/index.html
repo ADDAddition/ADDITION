@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Download — ADDITION</title>
-  <meta name="description" content="ADDITION desktop wallet helper for mainnet. Loopback write RPC only.">
+  <meta name="description" content="ADDITION desktop wallet helper for mainnet. Loopback write RPC only. Browser wallet can use public 38546.">
   <meta name="theme-color" content="#f3f6fa">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/favicon.ico">
@@ -22,16 +22,16 @@
       <h1>Download</h1>
       <p class="lede">
         Mainnet / local wallet helper for <code>ADDITION_MAINNET_V1</code>.
-        Write RPC stays on this machine (<code>127.0.0.1:8546</code>).
-        Prefer the in-browser <a href="/wallet/">Wallet</a> PWA when
-        <code>ADDITION_NETWORK=mainnet python3 web/serve.py</code> sits next to your node
-        (spend path: <code>/local-rpc</code>).
+        This desktop binary talks only to loopback write (<code>127.0.0.1:8546</code>).
+        Prefer the in-browser <a href="/wallet/">Wallet</a> when you want public seed write on
+        <code>38546</code> via <code>/api/rpc</code> (createwallet / mine / send open per CoS).
       </p>
     </section>
 
     <div class="banner">
-      Not a hosted custodial wallet. Keys stay on disk. The helper refuses any RPC host other than loopback.
-      Public read <code>34.27.30.115:38546</code> has no <code>wallet_send</code>.
+      Not a hosted custodial product. Desktop helper keys stay on disk and refuse any RPC host other than loopback.
+      Public seed <code>34.27.30.115:38546</code> write allowlist is open for the site wallet / curl;
+      this binary still stays loopback-only for self-custody on your machine.
     </div>
 
     <section class="panel">
@@ -43,7 +43,7 @@
         <li>Never prints a private key</li>
         <li>Needs a local <code>additiond --mainnet</code> with write RPC on loopback</li>
       </ul>
-      <p class="note">additionblockchain.com has no write RPC. The public <a href="/wallet/">/wallet/</a> page stays fail-closed there and explains how to connect a home node. PWA spend is <code>/local-rpc</code> → loopback only.</p>
+      <p class="note">The public <a href="/wallet/">/wallet/</a> page prefers <code>/api/rpc</code> → <code>38546</code> write when available, with loopback fallback. PWA install uses the same path.</p>
     </section>
 
     <section class="panel">
@@ -70,7 +70,7 @@ additiond --mainnet --data-dir $HOME/addition-mainnet --local-rpc-port 8546
 
     <section class="panel">
       <h2>Install the website as an app</h2>
-      <p>On iPhone: Safari → Share → Add to Home Screen. On Android: Chrome → Install app / Add to Home screen. That installs this PWA; spending still needs your local node via <code>/local-rpc</code>.</p>
+      <p>On iPhone: Safari → Share → Add to Home Screen. On Android: Chrome → Install app / Add to Home screen. That installs this PWA; spend prefers public <code>38546</code> via <code>/api/rpc</code>, with home-node fallback.</p>
       <p>Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
     </section>
   </main>

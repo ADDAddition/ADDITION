@@ -1,4 +1,6 @@
 (function (global) {
+  const PUBLIC_SEED_RPC = "http://34.27.30.115:38546/rpc";
+
   function parseFields(line) {
     if (global.AdditionSite && typeof global.AdditionSite.parseFields === "function") {
       return global.AdditionSite.parseFields(line);
@@ -26,37 +28,106 @@
     return "";
   }
 
-  async function cmd(command, timeoutMs) {
-    // Fail-closed: write commands only ever hit loopback via /local-rpc.
-    // Never POST createwallet / wallet_send / mine to public :80, 38545, 38546, or public 8545.
+  function looksOffline(raw, status) {
+    if (!raw) {
+      return true;
+    }
+    if (raw.charAt(0) === "<" || raw.indexOf("<!DOCTYPE") === 0) {
+      return true;
+    }
+    if (raw === "RPC offline" || raw.indexOf("error: local RPC") === 0) {
+      return true;
+    }
+    if (raw.indexOf("error: public read RPC") === 0) {
+      return true;
+    }
+    if (status === 503) {
+      return true;
+    }
+    return false;
+  }
+
+  function isPublicDisabled(raw) {
+    return !!(raw && raw.indexOf("error: command disabled on public RPC") === 0);
+  }
+
+  function isLocalProxyMissing(raw, status) {
+    if (status === 403 && raw && raw.indexOf("local RPC proxy is not available") !== -1) {
+      return true;
+    }
+    if (raw && raw.indexOf("error: local RPC proxy is loopback-only") === 0) {
+      return true;
+    }
+    return false;
+  }
+
+  async function fetchRpc(base, command, timeoutMs) {
     const ctrl = timeoutMs ? new AbortController() : null;
     const timer = timeoutMs ? setTimeout(function () { ctrl.abort(); }, timeoutMs) : null;
     try {
-      const res = await fetch("/local-rpc?cmd=" + encodeURIComponent(command), {
+      const url = base.indexOf("?") === -1
+        ? base + "?cmd=" + encodeURIComponent(command)
+        : base + "&cmd=" + encodeURIComponent(command);
+      const res = await fetch(url, {
         cache: "no-store",
         signal: ctrl ? ctrl.signal : undefined
       });
       const raw = (await res.text()).trim();
-      if (!res.ok || !raw || raw.charAt(0) === "<" || raw.indexOf("<!DOCTYPE") === 0) {
-        return { ok: false, offline: true, raw: "RPC offline", fields: {} };
+      if (looksOffline(raw, res.status) || isLocalProxyMissing(raw, res.status)) {
+        return { ok: false, offline: true, disabled: false, raw: "RPC offline", fields: {} };
       }
-      if (raw === "RPC offline" || raw.indexOf("error: local RPC") === 0) {
-        return { ok: false, offline: true, raw: raw, fields: {} };
+      if (isPublicDisabled(raw)) {
+        return { ok: false, offline: false, disabled: true, raw: raw, fields: {} };
       }
-      const offline = raw === "RPC offline";
       return {
-        ok: !offline && raw.indexOf("error:") !== 0,
-        offline: offline,
+        ok: res.ok && raw.indexOf("error:") !== 0,
+        offline: false,
+        disabled: false,
         raw: raw,
         fields: parseFields(raw)
       };
     } catch (e) {
-      return { ok: false, offline: true, raw: "RPC offline", fields: {} };
+      return { ok: false, offline: true, disabled: false, raw: "RPC offline", fields: {} };
     } finally {
       if (timer) {
         clearTimeout(timer);
       }
     }
+  }
+
+  function canUseDirectSeed() {
+    // HTTPS pages cannot call the plain HTTP seed (mixed content).
+    return global.location && global.location.protocol === "http:";
+  }
+
+  async function cmd(command, timeoutMs) {
+    // Prefer public seed write (CoS open on 38546) via same-origin /api/rpc.
+    // Fall back to loopback /local-rpc when public write is offline or filtered.
+    const publicResult = await fetchRpc("/api/rpc", command, timeoutMs);
+    if (!publicResult.offline && !publicResult.disabled) {
+      return Object.assign(publicResult, { via: "public" });
+    }
+
+    if (canUseDirectSeed() && (publicResult.offline || publicResult.disabled)) {
+      const seedResult = await fetchRpc(PUBLIC_SEED_RPC, command, timeoutMs);
+      if (!seedResult.offline && !seedResult.disabled) {
+        return Object.assign(seedResult, { via: "public" });
+      }
+    }
+
+    const localResult = await fetchRpc("/local-rpc", command, timeoutMs);
+    if (!localResult.offline) {
+      return Object.assign(localResult, { via: "local" });
+    }
+
+    return {
+      ok: false,
+      offline: true,
+      disabled: false,
+      via: "none",
+      raw: "RPC offline",
+      fields: {}
+    };
   }
 
   function setButtons(enabled) {
@@ -76,7 +147,11 @@
       return;
     }
     el.className = "ok";
-    el.textContent = "Local trusted RPC answered";
+    if (result.via === "public") {
+      el.textContent = "Public mainnet RPC answered (38546 write)";
+    } else {
+      el.textContent = "Local write RPC answered";
+    }
   }
 
   function showResult(rawEl, fieldsEl, result) {

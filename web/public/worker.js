@@ -276,11 +276,11 @@ async function buildCapabilitiesPayload(upstream) {
       ok: true,
       brand: "ADDITION",
       network_id: "ADDITION_MAINNET_V1",
-      public_write: false,
+      public_write: true,
       launch_tabs_enabled: anyAvailable,
       note: anyAvailable
         ? "At least one launch command answered on the public path"
-        : "Create Token / Presale / Airdrop / Farm are not available on public mainnet RPC",
+        : "Public write on 38546 includes createwallet/mine/wallet_send/sign/tx_build; Create Token / Presale / Airdrop / Farm stay off unless probed available",
       probes: probes,
     },
   };
@@ -372,6 +372,19 @@ export default {
         return rpcOffline();
       }
     }
+
+    // /rpc docs page (no ?cmd=) is under run_worker_first=["/rpc*"].
+    // Rewriting to /rpc/index.html makes Assets 307 → /rpc/ forever.
+    // Serve the directory URL so Assets returns index.html with 200.
+    if (rpcPath(url) === "/rpc" && !url.searchParams.has("cmd")) {
+      if (!url.pathname.endsWith("/")) {
+        const slash = new URL(request.url);
+        slash.pathname = "/rpc/";
+        return Response.redirect(slash.toString(), 308);
+      }
+      return env.ASSETS.fetch(request);
+    }
+
     const mapped = PAGE_ROUTES[url.pathname.replace(/\/$/, "") || "/"];
     if (mapped) {
       url.pathname = mapped;

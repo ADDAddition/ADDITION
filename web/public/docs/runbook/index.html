@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ADDITION mainnet node runbook (not live)</title>
+  <title>ADDITION mainnet node runbook</title>
   <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
@@ -12,15 +12,15 @@
 <body data-title="Mainnet node runbook" data-sub="from the repo">
   <header id="site-header"></header>
   <main class="prose">
-    <div class="banner">From <code>docs/MAINNET_RUNBOOK.md</code>. Separate chain. Default remains <code>additiond --network testnet</code>. Not a live public network.</div>
+    <div class="banner">From <code>docs/MAINNET_RUNBOOK.md</code>. Public product <code>ADDITION_MAINNET_V1</code> — P2P <code>34.27.30.115:28546</code>, RPC <code>34.27.30.115:38546</code> (write allowlist open per CoS). Height from live getinfo may be 0.</div>
     <h2>ADDITION mainnet runbook (public chain)</h2>
 <p>Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
 <p>This is the <strong>public ADDITION mainnet</strong>: <code>network_id=ADDITION_MAINNET_V1</code>, genesis <code>genesis-mainnet.json</code>, default data dir <code>data-mainnet</code>.</p>
 <p>Run <code>additiond --mainnet</code> (same as <code>--network mainnet</code>) like <code>bitcoind</code>: anyone can join the P2P network, sync from the public seed, and mine locally on loopback write RPC.</p>
-<table><tr><th>Public seed</th><th>Role</th></tr><tr><td><code>34.27.30.115:28546</code></td><td>P2P bootstrap</td></tr><tr><td><code>34.27.30.115:38546</code></td><td>HTTP public read (<code>/rpc?cmd=getinfo</code>)</td></tr></table>
-<p>That is a separate chain from the research testnet (<code>28545</code> / <code>38545</code> / HTTP <code>:80</code>). Not a label flip.</p>
-<p>The public website and explorer stay on testnet until the operator switches them. This runbook does not flip the explorer.</p>
-<p>Do not open write RPC <code>8545</code>/<code>8546</code> to the internet. Never bind write RPC to <code>0.0.0.0</code>. Do not bootstrap <code>34.27.30.115:28545</code> for mainnet.</p>
+<table><tr><th>Public seed</th><th>Role</th></tr><tr><td><code>34.27.30.115:28546</code></td><td>P2P bootstrap</td></tr><tr><td><code>34.27.30.115:38546</code></td><td>HTTP public RPC (<code>/rpc?cmd=getinfo</code>; write allowlist open per CoS)</td></tr></table>
+<p>That is a separate chain from the research testnet (<code>28545</code> / <code>38545</code>). Not a label flip.</p>
+<p>The public site and explorer follow <code>ADDITION_MAINNET_V1</code>. Height comes from live <code>getinfo</code> only (may still be <code>0</code>). This runbook does not invent TPS or peer counts.</p>
+<p>Do not open home-node write RPC <code>8545</code>/<code>8546</code> to the internet. Never bind write RPC to <code>0.0.0.0</code>. Do not bootstrap <code>34.27.30.115:28545</code> for mainnet.</p>
 <p>Unit file: <a href="../deploy/systemd/additiond-mainnet.service"><code>deploy/systemd/additiond-mainnet.service</code></a></p>
 <h2>Join mainnet (home node)</h2>
 <p>Build <code>additiond</code> from this repository on <code>main</code>. Set <code>ADDITION_PRIVACY_MASTER_KEY</code> to at least 32 characters. Then:</p>
@@ -50,10 +50,12 @@ export ADDITION_ENABLE_P2P_RPC=1
 <p>thread, <code>hardware_concurrency</code> workers by default) against the existing</p>
 <p>target <code>0x000000FFFFFFFFFF</code>. That is about 2^24 hashes. Do not loosen it.</p>
 <p>Do not invent TPS.</p>
-<p>Write RPC stays <code>127.0.0.1:8546</code>. Public read cannot mine. Public RPC still refuses <code>mine</code> / <code>createwallet</code> / <code>send</code>.</p>
+<p>Home-node write RPC stays <code>127.0.0.1:8546</code> (never publish). Public seed <code>38546</code> now allows the write allowlist CoS enabled: <code>createwallet</code>, <code>mine</code>, <code>wallet_send</code>, <code>wallet_sign</code> / <code>sign_message</code>, <code>tx_build</code> / <code>sendtx_signed*</code>. Height from live <code>getinfo</code> may still be <code>0</code>.</p>
 <pre>printf &#x27;mine miner1\n&#x27; | nc 127.0.0.1 8546
-# waits until a nonce meets the target; clients must not use a 30s timeout</pre>
-<p>After a local <code>mine</code>, the node announces <code>BLK|</code> and <code>gossip_flush</code> pushes to peers.</p>
+# waits until a nonce meets the target; clients must not use a 30s timeout
+# or against the public seed when the write allowlist is open:
+curl -s &#x27;http://34.27.30.115:38546/rpc?cmd=getinfo&#x27;</pre>
+<p>After a <code>mine</code>, the node announces <code>BLK|</code> and <code>gossip_flush</code> pushes to peers.</p>
 <h2>Difficulty (what we picked and why)</h2>
 <p>The existing retarget in <code>src/chain.cpp</code> compares the last <code>retarget_window</code> (30) block timestamps to <code>window * target_block_time_sec</code> (30 × 60s).</p>
 <p>If blocks arrive early, the target is multiplied by <code>9/10</code> (harder). If they arrive late, the target is scaled up, then clamped to <code>[min_difficulty_target, max_difficulty_target]</code>.</p>
@@ -84,13 +86,13 @@ sudo chown -R addition:addition /var/lib/addition/mainnet
 sudo install -m 0644 deploy/systemd/additiond-mainnet.service /etc/systemd/system/additiond-mainnet.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now additiond-mainnet.service</pre>
-<table><tr><th>Listener</th><th>Bind</th><th>Port</th><th>Role</th></tr><tr><td>Public read RPC</td><td><code>0.0.0.0</code></td><td><strong>38546</strong></td><td>Allowlisted reads only (seed: <code>34.27.30.115:38546</code>)</td></tr><tr><td>Write / admin RPC</td><td><code>127.0.0.1</code></td><td><strong>8546</strong></td><td>Trusted local only; never public</td></tr><tr><td>P2P</td><td><code>0.0.0.0</code></td><td><strong>28546</strong></td><td>Public seed; home nodes use another port (e.g. 28547). Needs <code>ADDITION_ENABLE_P2P_RPC=1</code></td></tr></table>
+<table><tr><th>Listener</th><th>Bind</th><th>Port</th><th>Role</th></tr><tr><td>Public RPC</td><td><code>0.0.0.0</code></td><td><strong>38546</strong></td><td>Seed: <code>34.27.30.115:38546</code> — read + write allowlist (createwallet/mine/wallet_send/sign/tx_build per CoS)</td></tr><tr><td>Home-node write RPC</td><td><code>127.0.0.1</code></td><td><strong>8546</strong></td><td>Trusted local only; never publish</td></tr><tr><td>P2P</td><td><code>0.0.0.0</code></td><td><strong>28546</strong></td><td>Public seed; home nodes use another port (e.g. 28547). Needs <code>ADDITION_ENABLE_P2P_RPC=1</code></td></tr></table>
 <p>Never publish <strong>8545</strong> or <strong>8546</strong>. Never enable LAN RPC (<code>18546</code>) on a public interface.</p>
 <p>If you also run the research testnet unit, keep its ports (38545 / 8545 / 28545) and its <code>/var/lib/addition/testnet</code> data dir.</p>
 <pre>printf &#x27;getinfo\n&#x27; | nc 127.0.0.1 38546
 curl -s &#x27;http://127.0.0.1:38546/rpc?cmd=getinfo&#x27;
-printf &#x27;mine\n&#x27; | nc 127.0.0.1 38546
-# error: command disabled on public RPC</pre>
+curl -s &#x27;http://34.27.30.115:38546/rpc?cmd=getinfo&#x27;
+# height may be 0 — copy only live fields</pre>
 <p><code>getinfo</code> must include <code>network=mainnet</code> and <code>network_id=ADDITION_MAINNET_V1</code>.</p>
 <h2>P2P (public mainnet seed)</h2>
 <p>P2P listen is off unless <code>ADDITION_ENABLE_P2P_RPC=1</code>. HELLO carries <code>ADDITION_MAINNET_V1</code>, so a testnet peer is rejected.</p>
