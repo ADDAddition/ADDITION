@@ -82,6 +82,35 @@ bool zk_circuit_v1_self_test_opening(std::uint64_t amount,
                                      const std::string& nullifier_hex,
                                      std::string& error);
 
+// Named-constraint evaluation (REAL checks where implemented).
+// Honesty: this is constraint_check_not_zk — the evaluator sees the witness.
+// It does NOT produce a ZK proof and must not flip zk_circuit_v1_proven / zk_v1.
+struct ZkConstraintEvalResult {
+    ZkConstraintId id;
+    bool satisfied{false};
+    bool implemented{false};
+    const char* method;   // e.g. sha3_opening_check_not_zk | r1cs_field_eval | unimplemented
+    const char* honesty;  // always constraint_check_not_zk when implemented
+};
+
+// Evaluate C_cm / C_nf via SHA3-512 opening (witness required). Other IDs:
+// C_value_conserved can be checked via R1CS when in/out/change provided through
+// the dedicated helper; C_nf_fresh / C_note_member remain unimplemented here.
+bool zk_circuit_v1_eval_opening_constraints(std::uint64_t amount,
+                                            const std::string& trapdoor_hex,
+                                            const std::string& commitment_hex,
+                                            const std::string& nullifier_hex,
+                                            std::vector<ZkConstraintEvalResult>& results_out,
+                                            std::string& error);
+
+// REAL R1CS evaluation of C_value_conserved toy form (in == out + change).
+// Label remains constraint_check_not_zk.
+bool zk_circuit_v1_eval_value_conservation_r1cs(std::uint64_t in_value,
+                                                std::uint64_t out_value,
+                                                std::uint64_t change,
+                                                ZkConstraintEvalResult& result_out,
+                                                std::string& error);
+
 // Convert RPC-facing public inputs into circuit statements.
 ZkCircuitMintStatement zk_circuit_mint_from_rpc(const ZkMintPublicInputs& in);
 ZkCircuitSpendStatement zk_circuit_spend_from_rpc(const ZkSpendPublicInputs& in,

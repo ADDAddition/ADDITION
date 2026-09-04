@@ -29,9 +29,12 @@
 <p>future proof backend (<code>FailClosedPrivacyZkVerifier</code>). They always reject today and</p>
 <p>label <code>claim=zk_pending</code>. Circuit schema + fail-closed prover live in</p>
 <p><code>docs/ZK_CIRCUIT_V1.md</code> / <code>zk_circuit_v1.*</code> (<code>zk_circuit_status=not_proven</code>).</p>
+<p>Additional REAL building blocks (still not live product ZK):</p>
+<ul><li>R1CS field evaluator (<code>zk_r1cs.*</code>) — constraint satisfaction; <strong><code>constraint_check_not_zk</code></strong></li><li>Toy Fiat–Shamir Schnorr DL prove/verify (<code>zk_toy_proof.*</code>) — real NIZK for a toy</li></ul>
+<p>  statement only; must not flip <code>privacy_claim</code></p>
 <p>A separate <strong>lab</strong> Groth16/Poseidon path is documented in <code>docs/ZK_SNARK_V1.md</code></p>
 <p>(opt-in <code>ADDITION_ZK_SNARK_V1</code>; not live privacy; not PR #82 toy Schnorr).</p>
-<p>See <code>docs/PRIVACY_REAL_V1.md</code>.</p>
+<p>See <code>docs/PRIVACY_REAL_V1.md</code> and <code>docs/ZK_CIRCUIT_V1.md</code>.</p>
 <p><code>tools/zk_verify_wrapper.py</code> exits with an error if invoked. Do not set</p>
 <p><code>ADDITION_ZK_VERIFY_CMD</code> and do not advertise a ZK backend as live.</p>
     <p class="note">Source file in the repository: <a href="https://github.com/ADDAddition/ADDITION/blob/main/tools/zk_backend_contract.md">tools/zk_backend_contract.md</a></p>
