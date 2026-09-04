@@ -17,15 +17,19 @@
     <h2>SHA3 opening notes (not a ZK circuit)</h2>
 <p>This file used to describe an external <code>ADDITION_ZK_VERIFY_CMD</code> wrapper. That path is</p>
 <p><strong>not</strong> a Groth16 / SNARK / Bulletproofs / STARK verifier. This repository does not</p>
-<p>ship a ZK circuit.</p>
+<p>ship a production ZK circuit.</p>
 <p>The privacy path that exists is <strong>SHA3-512 commitment + nullifier opening</strong>:</p>
 <ul><li><code>privacy_note_prepare</code></li><li><code>privacy_mint_open</code></li><li><code>privacy_spend_open</code></li></ul>
-<p><code>getinfo</code> reports <code>privacy_mode=sha3_opening</code>, <code>privacy_ok=true</code>, and</p>
-<p><code>privacy_verifier=sha3_opening</code>.</p>
+<p><code>getinfo</code> reports <code>privacy_mode=sha3_opening</code>, <code>privacy_ok=true</code>,</p>
+<p><code>privacy_verifier=sha3_opening</code>, and <code>privacy_claim=opening_not_zk</code>.</p>
+<p>It also reports <code>privacy_zk_roadmap=zk_pending</code> for the unfinished real-ZK path.</p>
 <p><code>privacy_mint_zk</code> / <code>privacy_spend_zk</code> remain an ML-DSA-87 signature wrap of a</p>
 <p>mint/spend string. A garbage proof returns <code>error:</code>. They are not a circuit.</p>
+<p><code>privacy_mint_zk_v1</code> / <code>privacy_spend_zk_v1</code> are the fail-closed scaffold for a</p>
+<p>future proof backend (<code>FailClosedPrivacyZkVerifier</code>). They always reject today and</p>
+<p>label <code>claim=zk_pending</code>. See <code>docs/PRIVACY_REAL_V1.md</code>.</p>
 <p><code>tools/zk_verify_wrapper.py</code> exits with an error if invoked. Do not set</p>
-<p><code>ADDITION_ZK_VERIFY_CMD</code> and do not advertise a ZK backend.</p>
+<p><code>ADDITION_ZK_VERIFY_CMD</code> and do not advertise a ZK backend as live.</p>
     <p class="note">Source file in the repository: <a href="https://github.com/ADDAddition/ADDITION/blob/main/tools/zk_backend_contract.md">tools/zk_backend_contract.md</a></p>
   </main>
   <footer id="site-footer"></footer>

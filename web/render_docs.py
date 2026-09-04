@@ -296,6 +296,13 @@ def main() -> None:
         "From <code>tools/zk_backend_contract.md</code>. Privacy is SHA3-512 opening, not a ZK circuit.",
     )
     write_doc(
+        "docs/FAST_PATH_V1.md",
+        OUT / "docs" / "fast-path" / "index.html",
+        "ADDITION fast path v1 (scaffold)",
+        "Fast path v1",
+        "From <code>docs/FAST_PATH_V1.md</code>. Separate <code>ADDITION_FAST_V1</code> profile — fail-closed until leader/pipeline ships. Live product remains memory_hard mainnet.",
+    )
+    write_doc(
         "docs/whitepaper.md",
         OUT / "whitepaper" / "index.html",
         "ADDITION technical whitepaper",

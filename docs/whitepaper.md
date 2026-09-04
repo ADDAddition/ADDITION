@@ -369,6 +369,8 @@ Future hardening called out in-repo (architecture notes): stronger on-disk forma
 
 **Privacy roadmap vs live:** live remains `opening_not_zk`. A C++ fail-closed ZK scaffold (`privacy_zk.*`, `docs/PRIVACY_REAL_V1.md`) reports `privacy_zk_roadmap=zk_pending` and does not mint/spend without a real verifier. No false ZK claims.
 
+**Speed / fast path vs live:** a separate network profile `ADDITION_FAST_V1` is scaffolded (`docs/FAST_PATH_V1.md`, `--fast` / `--network fast`) for a future leader/pipeline path. It is **fail-closed** until that pipeline ships. The live public product remains **memory_hard mainnet** (`ADDITION_MAINNET_V1` at `0x000000FFFFFFFFFF`). Speed path is in progress; do not treat mainnet PoW as a Solana TPS claim. `research_goal_tps` stays `research_goal_is_not_a_measurement=true`. getinfo reports `consensus_path=memory_hard_pow`, `fast_path_status=not_this_network`, `throughput_claim=none`.
+
 ---
 
 ## 13. How to join

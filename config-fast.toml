@@ -1,0 +1,46 @@
+# ADDITION_FAST_V1 scaffold only — NOT a live public network.
+# Leader / pipeline / execution are not shipped. additiond --fast fail-closed.
+# Live public product: --mainnet ADDITION_MAINNET_V1 memory_hard @ 0x000000FFFFFFFFFF.
+# Do not invent measured Solana TPS. research_goal_is_not_a_measurement=true.
+# Brand: ADDITION.
+
+network = "fast"
+network_name = "addition-fast"
+network_id = "ADDITION_FAST_V1"
+data_dir = "data-fast"
+genesis_file = "genesis-fast.json"
+
+# No public fast-path seed. Do not list mainnet/testnet seeds here.
+bootstrap_peers = [
+  "127.0.0.1:28547"
+]
+
+enable_public_rpc = false
+enable_auto_mine = false
+
+[ports]
+# Distinct from mainnet 8546/28546/38546 and testnet 8545/28545/38545.
+local_rpc = 8547
+lan_rpc = 18547
+p2p = 28547
+public_rpc = 38547
+public_rpc_bind = "127.0.0.1"
+
+[chain]
+block_reward = 50
+max_supply = 50000000
+target_block_time_sec = 1
+halving_interval = 210000
+tail_emission_reward = 1
+min_fee = 0
+genesis_timestamp = 1780000000
+# Placeholder PoW fields for genesis compatibility only.
+# Fast path consensus is leader/pipeline (not shipped) — not a throughput claim.
+pow_algorithm = "sha3_512"
+pow_profile = "fast-scaffold"
+initial_difficulty_target = 0x0000FFFFFFFFFFFF
+min_difficulty_target = 0x000000FFFFFFFFFF
+max_difficulty_target = 0x0000FFFFFFFFFFFF
+retarget_window = 30
+confirmations_policy = 2
+economic_security = "none"

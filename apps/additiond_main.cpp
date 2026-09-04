@@ -616,11 +616,15 @@ int main(int argc, char** argv) {
     case addition::NetworkMode::Mainnet:
         std::cout << "mainnet chain " << node_cfg.chain.network_id
                   << " data-dir=" << node_cfg.data_dir
-                  << "; this is not a live public network\n";
+                  << "; memory_hard PoW product path\n";
         break;
     case addition::NetworkMode::Regtest:
         std::cout << "regtest mode enabled (local min-diff; not a public network; "
                   << "write RPC 127.0.0.1)\n";
+        break;
+    case addition::NetworkMode::Fast:
+        std::cout << "fast path scaffold " << node_cfg.chain.network_id
+                  << " (fail-closed until leader/pipeline ships; not a Solana TPS claim)\n";
         break;
     case addition::NetworkMode::Testnet:
         std::cout << "testnet mode enabled (default)\n";

@@ -1,0 +1,18 @@
+{
+  "network_name": "addition-fast",
+  "network_id": "ADDITION_FAST_V1",
+  "network_mode": "fast",
+  "comment": "SCAFFOLD ONLY for ADDITION_FAST_V1. Leader/pipeline/execution not shipped — daemon fail-closed on --fast. Live public product is ADDITION_MAINNET_V1 memory_hard (0x000000FFFFFFFFFF). Do not invent measured Solana TPS. Brand: ADDITION.",
+  "genesis_timestamp": 1780000000,
+  "max_supply": 50000000,
+  "block_reward": 50,
+  "tail_emission_reward": 1,
+  "target_block_time_sec": 1,
+  "halving_interval": 210000,
+  "min_fee": 0,
+  "pow_algorithm": "sha3_512",
+  "initial_difficulty_target": "0x0000FFFFFFFFFFFF",
+  "min_difficulty_target": "0x000000FFFFFFFFFF",
+  "max_difficulty_target": "0x0000FFFFFFFFFFFF",
+  "retarget_window": 30
+}
