@@ -8,6 +8,7 @@
   <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/common.css">
+  
 </head>
 <body data-title="Two-node testnet" data-sub="from the repo">
   <header id="site-header"></header>
@@ -117,9 +118,9 @@ python3 tests/test_two_node_http_ingest.py
 <p>The script starts two <code>additiond</code> processes. Node A mines on trusted write</p>
 <p>RPC, advertises <code>ADDITION_ADVERTISED_P2P=34.27.30.115:28545</code> so public</p>
 <p><code>getinfo</code> / <code>peers</code> omit <code>self</code>, then node B:</p>
-<p>1. pulls A&#x27;s chain over <strong>HTTP ingest</strong> (<code>getinfo</code> + <code>getblockraw</code> on A&#x27;s</p>
+<ol><li>pulls A&#x27;s chain over <strong>HTTP ingest</strong> (<code>getinfo</code> + <code>getblockraw</code> on A&#x27;s</li></ol>
 <p>   public-read port via <code>ADDITION_PUBLIC_HTTP_PORT</code>)</p>
-<p>2. on a fresh data-dir, pulls again via local <strong>HELLO</strong> when HTTP ports</p>
+<ol><li>on a fresh data-dir, pulls again via local <strong>HELLO</strong> when HTTP ports</li></ol>
 <p>   are closed (localhost P2P only; not a public-28545 claim)</p>
 <p>Auto-mine is testnet only, off unless <code>--auto-mine</code> / <code>ADDITION_AUTO_MINE=1</code>.</p>
 <p>It is not a public RPC command. Each mined block is written to <code>blocks.dat</code>.</p>

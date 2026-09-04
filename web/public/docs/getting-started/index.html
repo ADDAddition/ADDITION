@@ -8,6 +8,7 @@
   <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/common.css">
+  
 </head>
 <body data-title="Build and run" data-sub="from the repo">
   <header id="site-header"></header>
@@ -38,17 +39,17 @@
 <table><tr><th>Feature</th><th>ADDITION</th><th>Solana</th><th>Ethereum</th><th>Bitcoin</th></tr><tr><td><strong>Signatures</strong></td><td><strong>ML-DSA-87</strong></td><td>Ed25519</td><td>ECDSA</td><td>ECDSA</td></tr><tr><td><strong>Hash</strong></td><td><strong>SHA3-512</strong></td><td>SHA-256</td><td>Keccak-256</td><td>SHA-256</td></tr><tr><td><strong>Addresses</strong></td><td><strong>SHA3-512 commitment (128 hex)</strong></td><td>Ed25519 pubkey</td><td>keccak</td><td>HASH160</td></tr><tr><td><strong>Privacy path</strong></td><td><strong>SHA3-512 opening (not ZK)</strong></td><td>public ledger</td><td>public ledger</td><td>public ledger</td></tr><tr><td><strong>Public network today</strong></td><td><strong>mainnet</strong></td><td>mainnet</td><td>mainnet</td><td>mainnet</td></tr><tr><td><strong>Max supply</strong></td><td><strong>50,000,000</strong> (whole units)</td><td>no fixed cap</td><td>no fixed cap</td><td>21,000,000</td></tr><tr><td><strong>Min fee</strong></td><td><strong>0</strong> (whole unit)</td><td>lamports</td><td>wei</td><td>satoshis</td></tr></table>
 <hr>
 <h2>Networks</h2>
-<table><tr><th></th><th>Research testnet</th><th>Public mainnet</th></tr><tr><td>Flag</td><td><code>additiond --network testnet</code></td><td><code>additiond --mainnet</code></td></tr><tr><td><code>network_id</code></td><td><code>ADDITION_TESTNET_V1</code></td><td><code>ADDITION_MAINNET_V1</code></td></tr><tr><td>Genesis</td><td><a href="genesis.json"><code>genesis.json</code></a></td><td><a href="genesis-mainnet.json"><code>genesis-mainnet.json</code></a></td></tr><tr><td>Bootstrap</td><td><code>34.27.30.115:28545</code></td><td><code>34.27.30.115:28546</code></td></tr><tr><td>Public read</td><td><code>34.27.30.115:38545</code></td><td><code>34.27.30.115:38546</code> / site <code>/api/rpc</code></td></tr><tr><td>Role</td><td>Research chain (separate)</td><td>Public product — explorer, join, wallet PWA</td></tr></table>
+<table><tr><th></th><th>Research testnet</th><th>Public mainnet</th></tr><tr><td>Flag</td><td><code>additiond --network testnet</code></td><td><code>additiond --mainnet</code></td></tr><tr><td><code>network_id</code></td><td><code>ADDITION_TESTNET_V1</code></td><td><code>ADDITION_MAINNET_V1</code></td></tr><tr><td>Genesis</td><td><a href="genesis.json"><code>genesis.json</code></a></td><td><a href="genesis-mainnet.json"><code>genesis-mainnet.json</code></a></td></tr><tr><td>Bootstrap</td><td><code>34.27.30.115:28545</code></td><td><code>34.27.30.115:28546</code></td></tr><tr><td>Public RPC</td><td><code>34.27.30.115:38545</code></td><td><code>34.27.30.115:38546</code> / site <code>/api/rpc</code></td></tr><tr><td>Role</td><td>Research chain (separate)</td><td>Public product — explorer, join, wallet PWA</td></tr></table>
 <p><code>--mainnet</code> is the public ADDITION mainnet (<code>ADDITION_MAINNET_V1</code>), a separate chain from the research testnet. See <a href="docs/MAINNET_RUNBOOK.md">docs/MAINNET_RUNBOOK.md</a> and the mainnet section in <a href="web/public/join.md"><code>join.md</code></a>.</p>
 <hr>
 <h2>Architecture</h2>
 <p>What <code>main</code> ships:</p>
-<ul><li><strong>Hash / PoW</strong> — SHA3-512 of the header on testnet; <code>memory_hard</code> on <code>--mainnet</code></li><li><strong>Signatures</strong> — ML-DSA-87 (FIPS 204) in <code>pq_mode=strict</code></li><li><strong>Addresses</strong> — hash-committed: <code>SHA3-512(scheme_id || 0x00 || pubkey)</code> (128 hex)</li><li><strong>Privacy</strong> — SHA3-512 commitment + nullifier <strong>opening</strong> (<code>privacy_mint_open</code> / <code>privacy_spend_open</code>). A hash relation, not ZK</li><li><strong>SLH-DSA</strong> — opt-in vault (<code>slh-dsa-shake-256s</code>) when this liboqs can sign with a non-empty context; otherwise disabled</li><li><strong>RPC</strong> — write on <code>127.0.0.1</code>; public read allowlist (<code>getinfo</code>, <code>getblockraw</code>, …). Site wallet spend stays on <code>/local-rpc</code> → loopback. Public <code>wallet_send</code> / keys stay off <code>38546</code>. Seed <code>createwallet</code> / <code>mine</code> may answer on <code>38546</code>.</li></ul>
+<ul><li><strong>Hash / PoW</strong> — SHA3-512 of the header on testnet; <code>memory_hard</code> on <code>--mainnet</code></li><li><strong>Signatures</strong> — ML-DSA-87 (FIPS 204) in <code>pq_mode=strict</code></li><li><strong>Addresses</strong> — hash-committed: <code>SHA3-512(scheme_id || 0x00 || pubkey)</code> (128 hex)</li><li><strong>Privacy</strong> — SHA3-512 commitment + nullifier <strong>opening</strong> (<code>privacy_mint_open</code> / <code>privacy_spend_open</code>). A hash relation, not ZK</li><li><strong>SLH-DSA</strong> — opt-in vault (<code>slh-dsa-shake-256s</code>) when this liboqs can sign with a non-empty context; otherwise disabled</li><li><strong>RPC</strong> — home-node write on <code>127.0.0.1:8546</code> (mainnet). Public seed <code>34.27.30.115:38546</code> write allowlist is open per CoS (<code>createwallet</code>, <code>mine</code>, <code>wallet_send</code>, sign, <code>tx_build</code>). Site wallet prefers <code>/api/rpc</code> → that path, with <code>/local-rpc</code> loopback fallback. Height from live <code>getinfo</code> may be <code>0</code>.</li></ul>
 <p>Whole integers. No 8-decimal subunit. Block reward <code>50</code> (100% to finding miner), <code>max_supply</code> <code>50000000</code>, min fee <code>0</code>.</p>
 <hr>
 <h2>Cashiers / Windows</h2>
 <p>Cashiers and Windows users download the live mainnet / local wallet from <a href="https://additionblockchain.com/download/">https://additionblockchain.com/download/</a> only (<code>addition-wallet-mainnet</code> and <code>addition-wallet-cli-mainnet</code>). Do not compile liboqs. There is no Windows compile path in this README. This host does not publish a <code>.exe</code>.</p>
-<p>The helper talks to write RPC on <code>127.0.0.1:8546</code> on the machine that already runs <code>additiond --mainnet</code>. additionblockchain.com has no public write RPC (<code>38546</code> has no <code>wallet_send</code>; PWA spend is <code>/local-rpc</code> → loopback).</p>
+<p>The helper talks to write RPC on <code>127.0.0.1:8546</code> on the machine that already runs <code>additiond --mainnet</code>. The desktop binary refuses non-loopback hosts. The in-browser <code>/wallet/</code> page prefers public <code>38546</code> write via <code>/api/rpc</code> when available.</p>
 <h3>Flutter desktop + local operator tools (loopback)</h3>
 <p>Linux operators can also use the Flutter desktop wallet from this repo (<code>client/addition_app</code>, shipped in #55) and optional loopback helpers:</p>
 <pre># Linux: deps + build + start testnet write on 127.0.0.1:8545
@@ -92,10 +93,7 @@ ctest --test-dir build --output-on-failure</pre>
 <p>Local static site: <code>python3 web/serve.py</code> (Pages root is <code>web/public/</code>).</p>
 <hr>
 <h2>Contributing</h2>
-<p>1. Fork the repository</p>
-<p>2. Create a feature branch</p>
-<p>3. Keep secrets out of git (<code>build/</code>, <code>data/</code>, <code>.wrangler/</code>, <code>*.dat</code>, keys)</p>
-<p>4. Open a pull request</p>
+<ol><li>Fork the repository</li><li>Create a feature branch</li><li>Keep secrets out of git (<code>build/</code>, <code>data/</code>, <code>.wrangler/</code>, <code>*.dat</code>, keys)</li><li>Open a pull request</li></ol>
 <p>&lt;p align=&quot;center&quot;&gt;</p>
 <p>  &lt;b&gt;License:&lt;/b&gt; &lt;a href=&quot;LICENSE&quot;&gt;MIT&lt;/a&gt; ·</p>
 <p>  &lt;b&gt;Contact:&lt;/b&gt; &lt;a href=&quot;mailto:contact@additionblockchain.com&quot;&gt;contact@additionblockchain.com&lt;/a&gt;</p>
