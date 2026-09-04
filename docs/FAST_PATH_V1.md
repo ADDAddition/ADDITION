@@ -68,7 +68,7 @@ clients --> RPC/ingest --> leader scheduler --> execution workers
 | Stage | Intent | Status |
 | :--- | :--- | :--- |
 | Typed stage enum + message kinds | Ordered ingest → schedule → execute → verify → commit | **REAL** (`pipeline_stages_typed_v1`) |
-| SHA3-512 sealed message digests | Domain-separated `addition.fast_path_v1\|…` | **REAL** |
+| SHA3-512 sealed message digests | Domain-separated `addition.fast_path_v1|…` | **REAL** |
 | Local batch stage machine | Deterministic apply; rejects OOO / bad digest / fake TPS magic | **REAL** (not consensus) |
 | Leader election / rotation | Who proposes the next batch | No |
 | Parallel execution | Non-conflicting txs across workers | No |
@@ -136,4 +136,4 @@ kind, empty body, and bodies containing `CLAIM_FAST_LIVE` /
 - [x] No invented TPS; `research_goal_is_not_a_measurement=true`
 - [x] `pq_mode=strict` / ML-DSA-87 / SHA3-512 kept
 - [x] Privacy labels stay `opening_not_zk` / `zk_pending`
-- [x] Site/docs: honest REAL vs scaffold status
+- [x] Site/docs: accurate REAL vs scaffold status

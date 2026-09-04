@@ -13,7 +13,7 @@
 <body data-title="ZK circuit v1" data-sub="from the repo">
   <header id="site-header"></header>
   <main class="prose">
-    <div class="banner">From <code>docs/ZK_CIRCUIT_V1.md</code>. Circuit work in progress / not live — <code>zk_circuit_status=not_proven</code>; live privacy remains <code>opening_not_zk</code>.</div>
+    <div class="banner">From <code>docs/ZK_CIRCUIT_V1.md</code>. Circuit work in progress / not live — <code>zk_circuit_status=not_proven</code>; live privacy remains <code>opening_not_zk</code>. Lab Groth16 Poseidon path: <code>docs/ZK_SNARK_V1.md</code>.</div>
     <h2>ZK Circuit v1 — interface + schema (fail-closed progress)</h2>
 <p>Status: <strong>circuit work in progress / not live</strong>. No production zero-knowledge</p>
 <p>proof system ships in this PR. Live privacy remains SHA3-512 opening with</p>
@@ -21,7 +21,7 @@
 <p>(<code>claim=zk_pending</code>). See <code>docs/PRIVACY_REAL_V1.md</code>.</p>
 <p>Brand: <strong>ADDITION</strong> only.</p>
 <h2>What this PR is (REAL vs scaffold)</h2>
-<table><tr><th>Piece</th><th>Status</th></tr><tr><td>Circuit statement + witness / public-input schema</td><td><strong>REAL</strong> (documented + typed in C++)</td></tr><tr><td>Canonical public-input encoding (domain-separated)</td><td><strong>REAL</strong> (byte string for a future Fiat–Shamir transcript)</td></tr><tr><td>Constraint scaffolding (named opening-relation constraints)</td><td><strong>REAL</strong> (interface + enumeration; not a SNARK/STARK)</td></tr><tr><td>Self-test hook: witness → recompute SHA3-512 opening</td><td><strong>REAL</strong> hash check; <strong>NOT</strong> zero-knowledge</td></tr><tr><td>Prover that emits acceptances / proving keys</td><td><strong>Scaffold</strong> — fail-closed; refuses to emit</td></tr><tr><td>On-node verifier that accepts proofs</td><td><strong>Scaffold</strong> — fail-closed; <code>backend_wired()==false</code></td></tr><tr><td>Live product claim <code>zk_v1</code></td><td><strong>Forbidden</strong> until a proven backend verifies</td></tr></table>
+<table><tr><th>Piece</th><th>Status</th></tr><tr><td>Circuit statement + witness / public-input schema</td><td><strong>REAL</strong> (documented + typed in C++)</td></tr><tr><td>Canonical public-input encoding (domain-separated)</td><td><strong>REAL</strong> (byte string for a future Fiat–Shamir transcript)</td></tr><tr><td>Constraint scaffolding (named opening-relation constraints)</td><td><strong>REAL</strong> (interface + enumeration; not a SNARK/STARK)</td></tr><tr><td>Self-test hook: witness → recompute SHA3-512 opening</td><td><strong>REAL</strong> hash check; <strong>NOT</strong> zero-knowledge</td></tr><tr><td>Lab Groth16 SNARK (Poseidon opening)</td><td><strong>REAL</strong> prove+verify behind <code>ADDITION_ZK_SNARK_V1</code> — see <code>docs/ZK_SNARK_V1.md</code></td></tr><tr><td>Prover that emits acceptances / proving keys for <strong>SHA3</strong> zk_v1</td><td><strong>Scaffold</strong> — fail-closed; refuses to emit</td></tr><tr><td>On-node verifier that accepts <strong>production SHA3</strong> proofs</td><td><strong>Scaffold</strong> — fail-closed; <code>backend_wired()==false</code></td></tr><tr><td>Live product claim <code>zk_v1</code></td><td><strong>Forbidden</strong> until a proven backend verifies the production privacy statement</td></tr></table>
 <p>Do <strong>not</strong> market this as live ZK. Do <strong>not</strong> treat the opening self-test as a</p>
 <p>proof. Do <strong>not</strong> weaken mainnet <code>memory_hard</code> / <code>0x000000FFFFFFFFFF</code>.</p>
 <h2>Goal statement</h2>
@@ -47,7 +47,7 @@ nf = SHA3-512(&quot;nf|v1|&quot; || cm || &quot;|&quot; || trapdoor_hex)</pre>
 <h2>Constraint scaffolding (named, not proven)</h2>
 <p>These are the algebraic / hash constraints a future backend must implement.</p>
 <p>Listing them here does <strong>not</strong> mean they are proven in-process.</p>
-<table><tr><th>ID</th><th>Kind</th><th>Informal constraint</th></tr><tr><td><code>C_cm</code></td><td>Mint + Spend</td><td>`cm == SHA3-512(&quot;cm</td><td>v1</td><td>&quot; \</td><td>\</td><td>amount \</td><td>\</td><td>&quot;</td><td>&quot; \</td><td>\</td><td>r)`</td></tr><tr><td><code>C_nf</code></td><td>Mint + Spend</td><td>`nf == SHA3-512(&quot;nf</td><td>v1</td><td>&quot; \</td><td>\</td><td>cm \</td><td>\</td><td>&quot;</td><td>&quot; \</td><td>\</td><td>r)`</td></tr><tr><td><code>C_nf_fresh</code></td><td>Spend (ledger)</td><td>nullifier not previously used (public set check)</td></tr><tr><td><code>C_value_conserved</code></td><td>Spend (future)</td><td>in_value == out_value + change</td></tr><tr><td><code>C_note_member</code></td><td>Spend (future)</td><td>note in committed set / Merkle root</td></tr></table>
+<table><tr><th>ID</th><th>Kind</th><th>Informal constraint</th></tr><tr><td><code>C_cm</code></td><td>Mint + Spend</td><td><code>cm == SHA3-512(&quot;cm|v1|&quot; \|\| amount \|\| &quot;|&quot; \|\| r)</code></td></tr><tr><td><code>C_nf</code></td><td>Mint + Spend</td><td><code>nf == SHA3-512(&quot;nf|v1|&quot; \|\| cm \|\| &quot;|&quot; \|\| r)</code></td></tr><tr><td><code>C_nf_fresh</code></td><td>Spend (ledger)</td><td>nullifier not previously used (public set check)</td></tr><tr><td><code>C_value_conserved</code></td><td>Spend (future)</td><td>in_value == out_value + change</td></tr><tr><td><code>C_note_member</code></td><td>Spend (future)</td><td>note in committed set / Merkle root</td></tr></table>
 <p>Self-test API (<code>zk_circuit_v1_self_test_opening</code>) recomputes <code>C_cm</code> / <code>C_nf</code></p>
 <p>with the witness via the same SHA3-512 path as <code>PrivacyPool::verify_opening</code>.</p>
 <p>That proves the <strong>relation hash</strong> is wired correctly. It is <strong>not</strong> a ZK proof</p>
@@ -62,10 +62,13 @@ live getinfo privacy_claim        →  opening_not_zk</pre>
 <p>Fake proof blobs (empty, garbage hex, magic “CLAIM_ZK_V1” prefixes, ML-DSA wrap</p>
 <p>bytes) must be rejected. Claiming “zk” without a valid verified proof fails</p>
 <p>closed.</p>
-<h2>Backend candidates (none claimed live)</h2>
-<p>Same as <code>PRIVACY_REAL_V1.md</code>: PQ-friendly hash argument (FRI/STARK-style),</p>
-<p>lattice/hash ZK library, or hybrid with ML-DSA-87 envelopes. Pick and wire in a</p>
-<p>later PR only when compile + tests prove verify can succeed.</p>
+<h2>Backend candidates (none claimed live for SHA3)</h2>
+<p>Same as <code>PRIVACY_REAL_V1.md</code>. A <strong>lab</strong> Groth16 / Poseidon path ships in</p>
+<p><code>docs/ZK_SNARK_V1.md</code> (opt-in flag; trusted setup; <strong>not</strong> the live SHA3 statement).</p>
+<p>PR #82 toy Fiat–Shamir Schnorr is a different HOLD path and is not this SNARK.</p>
+<p>Pick and wire a production-SHA3 (or explicit hash-migration) backend in a later PR</p>
+<p>only when compile + tests prove verify can succeed <strong>and</strong> product claims are</p>
+<p>updated deliberately.</p>
 <h2>Checklist (PR gate)</h2>
 <ul><li>[x] Mainnet <code>memory_hard</code> target <code>0x000000FFFFFFFFFF</code> untouched</li><li>[x] No fake ZK claims; self-test labeled not-ZK</li><li>[x] <code>opening_not_zk</code> remains live product claim</li><li>[x] Prover/verifier fail-closed while <code>zk_circuit_v1_proven()==false</code></li><li>[x] ML-DSA-87 + SHA3-512 <code>pq_mode=strict</code> kept</li><li>[x] Ship only what tests prove</li></ul>
     <p class="note">Source file in the repository: <a href="https://github.com/ADDAddition/ADDITION/blob/main/docs/ZK_CIRCUIT_V1.md">docs/ZK_CIRCUIT_V1.md</a></p>

@@ -58,6 +58,12 @@ Prefer a **PQ-friendly hybrid** that reuses the existing commitment/nullifier st
    Typed witness / public-input schema, constraint scaffolding, SHA3 opening
    self-test (not ZK), and fail-closed prover. Still **not live ZK**.
 
+7. **Lab SNARK slice (`docs/ZK_SNARK_V1.md`)**  
+   Real Groth16 prove+verify (arkworks / BN254) for a **Poseidon** opening
+   analogous to `C_cm` / `C_nf`. Opt-in via `ADDITION_ZK_SNARK_V1=1`. Trusted
+   setup. Does **not** flip `privacy_claim` or mark the SHA3 circuit `proven`.
+   Not PR #82 toy Schnorr.
+
 ## Migration
 
 | Stage | Live `privacy_claim` (getinfo) | ZK path RPC claim | Behavior |

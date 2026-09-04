@@ -48,6 +48,11 @@
 <ol><li><strong>Circuit slice (#80 / <code>docs/ZK_CIRCUIT_V1.md</code>)</strong>  </li></ol>
 <p>   Typed witness / public-input schema, constraint scaffolding, SHA3 opening</p>
 <p>   self-test (not ZK), and fail-closed prover. Still <strong>not live ZK</strong>.</p>
+<ol><li><strong>Lab SNARK slice (<code>docs/ZK_SNARK_V1.md</code>)</strong>  </li></ol>
+<p>   Real Groth16 prove+verify (arkworks / BN254) for a <strong>Poseidon</strong> opening</p>
+<p>   analogous to <code>C_cm</code> / <code>C_nf</code>. Opt-in via <code>ADDITION_ZK_SNARK_V1=1</code>. Trusted</p>
+<p>   setup. Does <strong>not</strong> flip <code>privacy_claim</code> or mark the SHA3 circuit <code>proven</code>.</p>
+<p>   Not PR #82 toy Schnorr.</p>
 <h2>Migration</h2>
 <table><tr><th>Stage</th><th>Live <code>privacy_claim</code> (getinfo)</th><th>ZK path RPC claim</th><th>Behavior</th></tr><tr><td>Now</td><td><code>opening_not_zk</code></td><td><code>zk_pending</code></td><td>Opening works; zk_v1 fail-closed</td></tr><tr><td>Proofs wired + tests green</td><td>still <code>opening_not_zk</code> until cutover</td><td><code>zk_v1</code> on success</td><td>Parallel paths</td></tr><tr><td>Cutover (later PR)</td><td>may become <code>zk_v1</code> only if opening retired</td><td><code>zk_v1</code></td><td>Product decision</td></tr></table>
 <p>Opening path stays. No silent rename. Roadmap field: <code>privacy_zk_roadmap=zk_pending</code>.</p>
