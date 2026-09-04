@@ -27,13 +27,25 @@
       <p class="eyebrow"><span class="net-badge">MAINNET</span> Public product</p>
       <h1>ADDITION</h1>
       <p class="lede">
-        A C++20 Layer 1 with ML-DSA-87 signatures and SHA3-512 hashing.
+        A C++20 Layer 1 with ML-DSA-87 signatures and SHA3-512 hashing
+        (<code>pq_mode=strict</code>) — kept and shipped; not a forever-unbreakable claim.
         This site’s public explorer is <code>ADDITION_MAINNET_V1</code>
-        (seed <code>34.27.30.115:38546</code> / <code>/api/rpc</code>).
-        Height comes from live <code>getinfo</code> only — no invented TPS figures.
+        (seed <code>34.27.30.115:38546</code> / <code>/api/rpc</code>),
+        <code>memory_hard</code> PoW. Height comes from live <code>getinfo</code> only
+        (may be <code>0</code>) — no invented TPS figures.
         Sync, mine, and wallet write are open on that public RPC (CoS allowlist).
-        Speed path (<code>ADDITION_FAST_V1</code>) is in progress and separate from
-        memory_hard mainnet — the live public product is memory_hard PoW, not a Solana TPS claim.
+      </p>
+      <p class="note">
+        <strong>Vision vs Live:</strong>
+        Live product is <code>ADDITION_MAINNET_V1</code> + <code>opening_not_zk</code> privacy.
+        ZK path is fail-closed / <code>zk_pending</code>
+        (<a href="/docs/privacy-real/">privacy-real</a> · repo <code>docs/PRIVACY_REAL_V1.md</code>).
+        Fast path <code>ADDITION_FAST_V1</code> is a separate scaffold
+        (<a href="/docs/fast-path/">fast-path</a> · repo <code>docs/FAST_PATH_V1.md</code>) —
+        fail-closed, not the public product, not a Solana TPS claim.
+        <code>research_goal_is_not_a_measurement=true</code>;
+        <code>economic_security=none</code> until real.
+        Full table: <a href="/whitepaper/">whitepaper</a>.
       </p>
       <div class="cta-row">
         <a class="btn btn-primary" href="/wallet/">Open wallet</a>

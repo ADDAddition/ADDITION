@@ -24,12 +24,12 @@
         Mainnet / local wallet helper for <code>ADDITION_MAINNET_V1</code>.
         This desktop binary talks only to loopback write (<code>127.0.0.1:8546</code>).
         Prefer the in-browser <a href="/wallet/">Wallet</a> when you want public seed write on
-        <code>38546</code> via <code>/api/rpc</code> (createwallet / mine / send open per CoS).
+        <code>38546</code> via <code>/api/rpc</code> (createwallet / mine / wallet_send open per CoS).
       </p>
     </section>
 
     <div class="banner">
-      Not a hosted custodial product. Desktop helper keys stay on disk and refuse any RPC host other than loopback.
+      Not a hosted custodial wallet. Desktop helper keys stay on disk and refuse any RPC host other than loopback.
       Public seed <code>34.27.30.115:38546</code> write allowlist is open for the site wallet / curl;
       this binary still stays loopback-only for self-custody on your machine.
     </div>
@@ -43,7 +43,7 @@
         <li>Never prints a private key</li>
         <li>Needs a local <code>additiond --mainnet</code> with write RPC on loopback</li>
       </ul>
-      <p class="note">The public <a href="/wallet/">/wallet/</a> page prefers <code>/api/rpc</code> → <code>38546</code> write when available, with loopback fallback. PWA install uses the same path.</p>
+      <p class="note">The public <a href="/wallet/">/wallet/</a> page prefers <code>/api/rpc</code> → <code>38546</code> write when available, with <code>/local-rpc</code> loopback fallback. PWA install uses the same path.</p>
     </section>
 
     <section class="panel">

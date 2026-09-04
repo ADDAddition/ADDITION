@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION privacy real v1 (scaffold)</title>
+  <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="/common.css">
+  
+</head>
+<body data-title="Privacy real v1" data-sub="from the repo">
+  <header id="site-header"></header>
+  <main class="prose">
+    <div class="banner">From <code>docs/PRIVACY_REAL_V1.md</code>. Live claim stays <code>opening_not_zk</code>; ZK path fail-closed / <code>zk_pending</code>.</div>
+    <h2>Privacy Real v1 — design (scaffold)</h2>
+<p>Status: <strong>scaffold only</strong>. Live privacy remains SHA3-512 opening.</p>
+<p><code>getinfo</code> / <code>privacy_status</code> must keep <code>privacy_claim=opening_not_zk</code> until a real</p>
+<p>zero-knowledge verifier accepts proofs on-node.</p>
+<h2>Gap</h2>
+<table><tr><th>Path</th><th>What the node learns</th><th>Claim label</th></tr><tr><td>Live today: <code>privacy_mint_open</code> / <code>privacy_spend_open</code></td><td>Trapdoor (opening), amount in the clear on the wire</td><td><code>opening_not_zk</code></td></tr><tr><td>Legacy: <code>privacy_mint_zk</code> / <code>privacy_spend_zk</code></td><td>Public mint/spend string; ML-DSA-87 signature wrap</td><td><code>mldsa_wrap_not_zk</code></td></tr><tr><td>Target: real ZK mint/spend</td><td>Commitment, nullifier, proof — <strong>not</strong> the trapdoor</td><td><code>zk_v1</code> only after verify works</td></tr></table>
+<p><code>opening_not_zk</code> is a correct hash relation and double-spend defense. It is <strong>not</strong></p>
+<p>zero-knowledge: the verifier recomputes</p>
+<ul><li><code>SHA3-512(&quot;cm|v1|&quot; || amount || &quot;|&quot; || trapdoor)</code></li><li><code>SHA3-512(&quot;nf|v1|&quot; || commitment || &quot;|&quot; || trapdoor)</code></li></ul>
+<p>and therefore learns the trapdoor. Vision item 1 (node must not learn the trapdoor)</p>
+<p>requires a proof system that checks the same relation without the witness.</p>
+<p>Do <strong>not</strong> relabel <code>opening_not_zk</code> as ZK. Do <strong>not</strong> treat the ML-DSA wrap as a circuit.</p>
+<h2>Chosen approach (ADDITION, C++20)</h2>
+<p>Prefer a <strong>PQ-friendly hybrid</strong> that reuses the existing commitment/nullifier strings:</p>
+<ol><li><strong>Public objects (unchanged shape)</strong>  </li></ol>
+<p>   Commitment and nullifier stay SHA3-512 digests so opening notes and future ZK notes</p>
+<p>   share one note ledger format.</p>
+<ol><li><strong>Witness (private)</strong>  </li></ol>
+<p>   Trapdoor (+ amount for mint; spend binds note membership / value conservation).</p>
+<ol><li><strong>Proof (future PRs)</strong>  </li></ol>
+<p>   A statement roughly: “I know trapdoor <code>r</code> such that <code>cm</code> and <code>nf</code> match the v1</p>
+<p>   opening relation for amount <code>v</code>, and (for spend) this nullifier has not been used</p>
+<p>   and value is conserved.” The node verifies the proof and never receives <code>r</code>.</p>
+<ol><li><strong>Backend plan (multi-PR)</strong>  </li></ol>
+<p>   Full circuit + proving keys are <strong>out of scope for this PR</strong>. Interfaces land first</p>
+<p>   and are <strong>fail-closed</strong>. Candidate backends (pick one in a later PR; none claimed live):</p>
+<ul><li>Hash-based argument over SHA3-512 (FRI / STARK-style) — PQ-friendly, large proofs.</li><li>Lattice / hash ZK library bound from C++20 — research dependency risk.</li><li>Hybrid: PQ signatures (ML-DSA-87, <code>pq_mode=strict</code>) for authorization envelopes;</li></ul>
+<p>     separate ZK only for the opening relation (still not “unbreakable forever”).</p>
+<ol><li><strong>This PR</strong>  </li></ol>
+<ul><li><code>PrivacyZkVerifier</code> + <code>FailClosedPrivacyZkVerifier</code>  </li><li>RPC <code>privacy_mint_zk_v1</code> / <code>privacy_spend_zk_v1</code> reject every proof  </li><li>Labels: live <code>opening_not_zk</code>; zk path responses may say <code>claim=zk_pending</code>;</li></ul>
+<p>     <code>claim=zk_v1</code> is forbidden until <code>backend_wired()==true</code> and verify can succeed</p>
+<h2>Migration</h2>
+<table><tr><th>Stage</th><th>Live <code>privacy_claim</code> (getinfo)</th><th>ZK path RPC claim</th><th>Behavior</th></tr><tr><td>Now</td><td><code>opening_not_zk</code></td><td><code>zk_pending</code></td><td>Opening works; zk_v1 fail-closed</td></tr><tr><td>Proofs wired + tests green</td><td>still <code>opening_not_zk</code> until cutover</td><td><code>zk_v1</code> on success</td><td>Parallel paths</td></tr><tr><td>Cutover (later PR)</td><td>may become <code>zk_v1</code> only if opening retired</td><td><code>zk_v1</code></td><td>Product decision</td></tr></table>
+<p>Opening path stays. No silent rename. Roadmap field: <code>privacy_zk_roadmap=zk_pending</code>.</p>
+<h2>Threat model</h2>
+<h3>Today (opening)</h3>
+<ul><li><strong>Node / operator</strong> sees trapdoor, amount, owner tags (sealed at rest with</li></ul>
+<p>  <code>ADDITION_PRIVACY_MASTER_KEY</code>, but the opening RPC still presents the witness).</p>
+<ul><li><strong>Network observer</strong> of loopback RPC sees the same if they can read the socket.</li><li><strong>Double-spend</strong> blocked via nullifier + spent-commitment sets.</li><li><strong>Not hidden</strong>: amounts and links between mint and spend when trapdoors are logged.</li></ul>
+<h3>After real <code>zk_v1</code> (target)</h3>
+<ul><li><strong>Verifier</strong> learns: public commitment, nullifier, amount policy / public inputs the</li></ul>
+<p>  circuit exposes by design, proof validity. Does <strong>not</strong> learn trapdoor.</p>
+<ul><li><strong>Still not claimed</strong>: perfect forever privacy, decoy anonymity sets, or network-layer</li></ul>
+<p>  metadata hiding. PQ signatures remain ML-DSA-87; crypto assumptions can age.</p>
+<ul><li><strong>Fail-closed until then</strong>: garbage or empty proofs must error; no note mint on the</li></ul>
+<p>  zk_v1 path; no <code>zk_v1</code> claim string on success paths that do not verify.</p>
+<h2>PR gate checklist</h2>
+<ul><li>[x] Mainnet <code>memory_hard</code> target <code>0x000000FFFFFFFFFF</code> untouched</li><li>[x] No GCP seed hasher / mining changes</li><li>[x] <code>opening_not_zk</code> not relabeled as ZK</li><li>[x] No invented TPS; <code>research_goal_tps</code> stays non-measurement</li><li>[x] <code>economic_security</code> / height not faked here</li><li>[x] zk_v1 path rejects without a real backend</li></ul>
+    <p class="note">Source file in the repository: <a href="https://github.com/ADDAddition/ADDITION/blob/main/docs/PRIVACY_REAL_V1.md">docs/PRIVACY_REAL_V1.md</a></p>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/chrome.js"></script>
+</body>
+</html>

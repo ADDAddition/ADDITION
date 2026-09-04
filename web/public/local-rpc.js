@@ -103,6 +103,7 @@
   async function cmd(command, timeoutMs) {
     // Prefer public seed write (CoS open on 38546) via same-origin /api/rpc.
     // Fall back to loopback /local-rpc when public write is offline or filtered.
+    // Proxy path form: /local-rpc?cmd=<command>
     const publicResult = await fetchRpc("/api/rpc", command, timeoutMs);
     if (!publicResult.offline && !publicResult.disabled) {
       return Object.assign(publicResult, { via: "public" });

@@ -28,7 +28,17 @@
         Copy only fields the node prints — height may be <code>0</code>.
       </p>
     </section>
-    <p class="note"><code>last_tps</code> is measured when present. <code>privacy_claim</code> is whatever the node prints (SHA3 opening is <code>opening_not_zk</code>).</p>
+    <p class="note">
+      <strong>Vision vs Live:</strong> live product is <code>ADDITION_MAINNET_V1</code>
+      + <code>memory_hard</code> + <code>pq_mode=strict</code> (ML-DSA-87 / SHA3-512).
+      <code>privacy_claim</code> is whatever the node prints (opening is <code>opening_not_zk</code>;
+      ZK roadmap <code>zk_pending</code> — <a href="/docs/privacy-real/">privacy-real</a> · <code>docs/PRIVACY_REAL_V1.md</code>).
+      <code>last_tps</code> is mine telemetry when present — not a Solana TPS claim;
+      <code>research_goal_is_not_a_measurement=true</code>.
+      Fast path <code>ADDITION_FAST_V1</code> is scaffold only
+      (<a href="/docs/fast-path/">fast-path</a> · <code>docs/FAST_PATH_V1.md</code>).
+      <code>economic_security=none</code> until real. See <a href="/whitepaper/">whitepaper</a>.
+    </p>
     <p id="rpc-state"></p>
     <section class="panel">
       <h2>getinfo</h2>

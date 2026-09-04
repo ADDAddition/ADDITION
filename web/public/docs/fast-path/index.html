@@ -22,7 +22,7 @@
 <p>PoW is Solana-speed.</p>
 <p>Brand: <strong>ADDITION</strong> only.</p>
 <h2>Gap</h2>
-<table><tr><th>Profile</th><th>Consensus today</th><th>Throughput honesty</th></tr><tr><td>Live mainnet <code>ADDITION_MAINNET_V1</code></td><td><code>memory_hard</code> PoW (1 MiB × 16 rounds / attempt)</td><td><code>last_tps</code> is local mine telemetry only; not a marketed Solana TPS</td></tr><tr><td>Research testnet <code>ADDITION_TESTNET_V1</code></td><td><code>sha3_512</code> header PoW</td><td>Same: no invented measured TPS</td></tr><tr><td>Target fast path <code>ADDITION_FAST_V1</code></td><td>Leader / pipeline / parallel execution (not PoW-as-throughput)</td><td><code>throughput_claim=none</code> until a real pipeline ships and is measured</td></tr></table>
+<table><tr><th>Profile</th><th>Consensus today</th><th>Throughput label</th></tr><tr><td>Live mainnet <code>ADDITION_MAINNET_V1</code></td><td><code>memory_hard</code> PoW (1 MiB × 16 rounds / attempt)</td><td><code>last_tps</code> is local mine telemetry only; not a marketed Solana TPS</td></tr><tr><td>Research testnet <code>ADDITION_TESTNET_V1</code></td><td><code>sha3_512</code> header PoW</td><td>Same: no invented measured TPS</td></tr><tr><td>Target fast path <code>ADDITION_FAST_V1</code></td><td>Leader / pipeline / parallel execution (not PoW-as-throughput)</td><td><code>throughput_claim=none</code> until a real pipeline ships and is measured</td></tr></table>
 <p>Do <strong>not</strong> loosen mainnet <code>memory_hard</code> / <code>0x000000FFFFFFFFFF</code> to “go faster.”</p>
 <p>Do <strong>not</strong> stop mining or touch the public seed hasher. Do <strong>not</strong> invent</p>
 <p>measured TPS. <code>research_goal_tps</code> stays labeled</p>
@@ -35,7 +35,7 @@
 <p>   propagation, and parallel transaction execution. PoW is not the latency</p>
 <p>   path; mainnet keeps memory-hard PoW for the public product.</p>
 <ol><li><strong>Crypto unchanged</strong> — ML-DSA-87 / SHA3-512, <code>pq_mode=strict</code>. Privacy</li></ol>
-<p>   labels stay honest (<code>opening_not_zk</code> live; <code>zk_pending</code> stub).</p>
+<p>   labels stay accurate (<code>opening_not_zk</code> live; <code>zk_pending</code> stub).</p>
 <ol><li><strong>This PR</strong> — design doc, genesis/config stubs, CLI <code>--fast</code> /</li></ol>
 <p>   <code>--network fast</code>, getinfo fields that distinguish profiles, fail-closed</p>
 <p>   boot if the pipeline is incomplete, tests that mainnet PoW knobs are</p>
@@ -48,7 +48,7 @@
                                 |
                                 v
                          replica verify / commit</pre>
-<table><tr><th>Stage</th><th>Intent</th><th>Shipped in this PR?</th></tr><tr><td>Leader election / rotation</td><td>Who proposes the next batch</td><td>No</td></tr><tr><td>Pipeline stages</td><td>Overlap verify / propagate / commit</td><td>No</td></tr><tr><td>Parallel execution</td><td>Non-conflicting txs across workers</td><td>No</td></tr><tr><td>Measured throughput RPC</td><td>Honest bench of the fast profile</td><td>No</td></tr></table>
+<table><tr><th>Stage</th><th>Intent</th><th>Shipped in this PR?</th></tr><tr><td>Leader election / rotation</td><td>Who proposes the next batch</td><td>No</td></tr><tr><td>Pipeline stages</td><td>Overlap verify / propagate / commit</td><td>No</td></tr><tr><td>Parallel execution</td><td>Non-conflicting txs across workers</td><td>No</td></tr><tr><td>Measured throughput RPC</td><td>Measured bench of the fast profile (when shipped)</td><td>No</td></tr></table>
 <h2>Fail-closed rules</h2>
 <ul><li><code>--network fast</code> / <code>--fast</code> <strong>refuses to boot</strong> while</li></ul>
 <p>  <code>fast_path_pipeline_shipped()==false</code> (scaffold incomplete).</p>
@@ -58,11 +58,11 @@
 <p>  <code>memory_hard</code>, target <code>0x000000FFFFFFFFFF</code>.</p>
 <ul><li>getinfo / protocol_status must never print a measured Solana TPS figure.</li></ul>
 <p>  <code>throughput_claim=none</code>. Research goals stay non-measurements.</p>
-<h2>getinfo honesty</h2>
+<h2>getinfo labels (Vision vs Live)</h2>
 <table><tr><th>Field</th><th>Mainnet</th><th>Fast scaffold (when ready to boot)</th></tr><tr><td><code>network_id</code></td><td><code>ADDITION_MAINNET_V1</code></td><td><code>ADDITION_FAST_V1</code></td></tr><tr><td><code>consensus_path</code></td><td><code>memory_hard_pow</code></td><td><code>leader_pipeline_scaffold</code></td></tr><tr><td><code>fast_path_status</code></td><td><code>not_this_network</code></td><td><code>scaffold_incomplete</code> (until shipped)</td></tr><tr><td><code>fast_path_shipped</code></td><td><code>false</code></td><td><code>false</code> until pipeline lands</td></tr><tr><td><code>throughput_claim</code></td><td><code>none</code></td><td><code>none</code></td></tr><tr><td><code>research_goal_is_not_a_measurement</code></td><td><code>true</code> (protocol_status / getinfo)</td><td><code>true</code></td></tr></table>
 <h2>What is not shipped yet</h2>
 <ul><li>No public <code>ADDITION_FAST_V1</code> seed, peers, or explorer product surface</li><li>No leader, pipeline, or parallel executor</li><li>No claim that ADDITION matches Solana (or any chain) measured TPS</li><li>No change to mainnet mining, difficulty, or seed hasher</li></ul>
-<h2>Honesty checklist (PR gate)</h2>
+<h2>PR gate checklist</h2>
 <ul><li>[x] Mainnet <code>memory_hard</code> target <code>0x000000FFFFFFFFFF</code> untouched</li><li>[x] No GCP seed hasher / mining stop</li><li>[x] Fast path is a <strong>separate</strong> profile (<code>ADDITION_FAST_V1</code>)</li><li>[x] Fail-closed while pipeline incomplete</li><li>[x] No invented TPS; <code>research_goal_is_not_a_measurement=true</code></li><li>[x] <code>pq_mode=strict</code> / ML-DSA-87 / SHA3-512 kept</li><li>[x] Privacy labels stay <code>opening_not_zk</code> / <code>zk_pending</code></li><li>[x] Site/whitepaper: speed path in progress; live product is memory_hard mainnet</li></ul>
     <p class="note">Source file in the repository: <a href="https://github.com/ADDAddition/ADDITION/blob/main/docs/FAST_PATH_V1.md">docs/FAST_PATH_V1.md</a></p>
   </main>
