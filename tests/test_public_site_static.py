@@ -399,6 +399,18 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn('id="live-monetary-snapshot"', whitepaper)
         self.assertIn("Fail closed — no sample getinfo substituted.", whitepaper)
         self.assertIn('id="live-strip"', status)
+        self.assertNotIn("Vision vs Live", whitepaper)
+        self.assertNotIn("research_goal", whitepaper)
+        self.assertNotIn("zk_pending", whitepaper)
+        self.assertNotIn("ADDITION_FAST_V1", whitepaper)
+        self.assertNotIn("scaffold", whitepaper.lower())
+        self.assertNotIn("Vision roadmap", whitepaper)
+        wp_md = (ROOT / "docs" / "whitepaper.md").read_text(encoding="utf-8")
+        self.assertNotIn("Vision vs Live", wp_md)
+        self.assertNotIn("research_goal", wp_md)
+        self.assertNotIn("zk_pending", wp_md)
+        self.assertNotIn("scaffold", wp_md.lower())
+        self.assertNotIn("ADDITION_FAST_V1", wp_md)
 
     def test_strip_fields_and_rpc_fail_closed(self) -> None:
         node = shutil.which("node")
