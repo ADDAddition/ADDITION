@@ -296,6 +296,13 @@ def main() -> None:
         "From <code>tools/zk_backend_contract.md</code>. Privacy is SHA3-512 opening, not a ZK circuit.",
     )
     write_doc(
+        "docs/PRIVACY_REAL_V1.md",
+        OUT / "docs" / "privacy-real" / "index.html",
+        "ADDITION privacy real v1 (scaffold)",
+        "Privacy real v1",
+        "From <code>docs/PRIVACY_REAL_V1.md</code>. Live claim stays <code>opening_not_zk</code>; ZK path fail-closed / <code>zk_pending</code>.",
+    )
+    write_doc(
         "docs/FAST_PATH_V1.md",
         OUT / "docs" / "fast-path" / "index.html",
         "ADDITION fast path v1 (scaffold)",
@@ -307,7 +314,7 @@ def main() -> None:
         OUT / "whitepaper" / "index.html",
         "ADDITION technical whitepaper",
         "White paper",
-        "Complete technical whitepaper from <code>docs/whitepaper.md</code>. Honest values only — live <code>getinfo</code>, code, and docs. Brand: <strong>ADDITION</strong>.",
+        "Complete technical whitepaper from <code>docs/whitepaper.md</code>. Live <code>getinfo</code>, code, and docs only — Vision vs Live made explicit. Brand: <strong>ADDITION</strong>.",
         with_toc=True,
     )
     publish_raw("docs/TESTNET_PUBLIC_RPC_RUNBOOK.md", OUT / "docs" / "testnet-rpc-runbook.md")

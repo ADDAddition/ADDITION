@@ -76,7 +76,7 @@ additiond --mainnet --data-dir $HOME/addition-mainnet --local-rpc-port 8546 --p2
       <pre>curl -s 'http://34.27.30.115:38546/rpc?cmd=getinfo'
 curl -s 'https://additionblockchain.com/api/rpc?cmd=getinfo'</pre>
       <p>Expect <code>network=mainnet</code> and <code>network_id=ADDITION_MAINNET_V1</code>. Height may still be <code>0</code>; copy only fields the node prints. Do not invent peer counts or TPS.</p>
-      <p>On the seed, <code>createwallet</code> / <code>mine</code> / <code>wallet_send</code> / sign / <code>tx_build</code> answer on <code>38546</code> (CoS write allowlist). The site wallet prefers that public path via <code>/api/rpc</code>, with honest fallback to loopback <code>/local-rpc</code> if offline.</p>
+      <p>On the seed, <code>createwallet</code> / <code>mine</code> / <code>wallet_send</code> / sign / <code>tx_build</code> answer on <code>38546</code> (CoS write allowlist). The site wallet prefers that public path via <code>/api/rpc</code>, with a loopback fallback to <code>/local-rpc</code> if offline.</p>
       <p>Seed operator: <code>ADDITION_ADVERTISED_P2P=34.27.30.115:28546</code> so public <code>getinfo</code> / <code>peers</code> list that IPv4 endpoint and do not list <code>self</code>.</p>
     </section>
 

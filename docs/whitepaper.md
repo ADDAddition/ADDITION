@@ -3,11 +3,45 @@
 **Brand:** ADDITION (never “SmartChain”)  
 **Network (public product):** `ADDITION_MAINNET_V1` / `addition-mainnet`  
 **Research chain:** `ADDITION_TESTNET_V1` / `addition-testnet`  
+**Fast-path scaffold (not live product):** `ADDITION_FAST_V1` — fail-closed; see [`docs/FAST_PATH_V1.md`](FAST_PATH_V1.md)  
 **Canonical source:** [github.com/ADDAddition/ADDITION](https://github.com/ADDAddition/ADDITION)  
 **Contact:** [contact@additionblockchain.com](mailto:contact@additionblockchain.com)  
-**Status:** Honest description of the C++20 node, configs, and live public RPC as of this document. Values that can change (height, peers, fees, TPS telemetry) are taken only from live `getinfo` / related RPCs — never invented.
+**Status:** Engineering description of the C++20 node, configs, and live public RPC as of this document. Values that can change (height, peers, fees, TPS telemetry) come only from live `getinfo` / related RPCs — do not invent figures.
 
 This document supersedes the short sketch in `docs/WHITE_PAPER.md` and the thin site page previously at `/whitepaper/`.
+
+---
+
+## Vision roadmap vs Live product
+
+| Topic | Live public product | Vision / scaffold / research |
+| --- | --- | --- |
+| Network | `ADDITION_MAINNET_V1`, `memory_hard` PoW | `ADDITION_FAST_V1` scaffold ([`FAST_PATH_V1.md`](FAST_PATH_V1.md)) — not the public product |
+| Height / peers / fees | Copy live `getinfo` only (height may be `0`) | No invented height, peer counts, or USD ticker |
+| Privacy | `privacy_claim=opening_not_zk` (SHA3-512 opening; node sees trapdoor) | ZK path fail-closed / `zk_pending` ([`PRIVACY_REAL_V1.md`](PRIVACY_REAL_V1.md)); never fake ZK |
+| Throughput | `last_tps` = local mine telemetry when present; `throughput_claim=none` | `research_goal_tps` with `research_goal_is_not_a_measurement=true` — not a Solana TPS claim |
+| PQ crypto | **ML-DSA-87** + **SHA3-512**, `pq_mode=strict` (kept) | Same stack on scaffolds; not “unbreakable forever” |
+| Economic security | `economic_security=none` until real | Staking side map remains non-consensus |
+
+### What ships today
+
+- Public product **`ADDITION_MAINNET_V1`**: UTXO L1, P2P seed, public RPC, wallet spend path with **ML-DSA-87** / **SHA3-512** / `pq_mode=strict`
+- Mainnet PoW **`memory_hard`** at target floor **`0x000000FFFFFFFFFF`**
+- Privacy opening path: `privacy_mint_open` / `privacy_spend_open` labeled **`opening_not_zk`**
+- Height and monetary fields from **live `getinfo` / `monetary_info` only**
+
+### What is scaffold
+
+- Real ZK privacy path: `privacy_*_zk_v1` + `FailClosedPrivacyZkVerifier` — always rejects; labels `zk_pending` until a verifier can succeed ([`PRIVACY_REAL_V1.md`](PRIVACY_REAL_V1.md), vision #77)
+- Fast path network profile **`ADDITION_FAST_V1`**: config/genesis/CLI stubs; **`--fast` / `--network fast` refuse to boot** until the pipeline ships ([`FAST_PATH_V1.md`](FAST_PATH_V1.md), vision #78 / SHA `6d3f483`+)
+- Legacy `privacy_mint_zk` / `privacy_spend_zk`: ML-DSA wrap of a string — still not a circuit
+
+### What is research goal
+
+- Measured high throughput on a separate fast profile (leader / pipeline / parallel execution) — **not** marketed as live mainnet TPS
+- `research_goal_tps` remains labeled **`research_goal_is_not_a_measurement=true`**
+- Future `zk_v1` only after a real proof backend verifies on-node
+- `economic_security` stays **`none`** until a real security model ships
 
 ---
 
@@ -16,7 +50,7 @@ This document supersedes the short sketch in `docs/WHITE_PAPER.md` and the thin 
 1. [Abstract and motivation](#1-abstract-and-motivation)
 2. [Architecture](#2-architecture)
 3. [Cryptography](#3-cryptography)
-4. [Privacy model (honest)](#4-privacy-model-honest)
+4. [Privacy model (as shipped)](#4-privacy-model-as-shipped)
 5. [Consensus and proof of work](#5-consensus-and-proof-of-work)
 6. [Economics](#6-economics)
 7. [Networks and ports](#7-networks-and-ports)
@@ -24,7 +58,7 @@ This document supersedes the short sketch in `docs/WHITE_PAPER.md` and the thin 
 9. [Wallet, transactions, contracts, tokens](#9-wallet-transactions-contracts-tokens)
 10. [Bridges](#10-bridges)
 11. [Security assumptions and threat model](#11-security-assumptions-and-threat-model)
-12. [Roadmap honesty](#12-roadmap-honesty)
+12. [Vision vs Live (roadmap)](#12-vision-vs-live-roadmap)
 13. [How to join](#13-how-to-join)
 14. [Contact](#14-contact)
 
@@ -88,15 +122,23 @@ Build requires **liboqs** and **OpenSSL**. Missing liboqs fails the build.
 
 ## 3. Cryptography
 
-### 3.1 Signatures — ML-DSA-87 / FIPS 204 via liboqs
+### 3.1 Post-quantum signatures — ML-DSA-87 (FIPS 204) — kept
 
-- Default scheme: **ML-DSA-87** (`pq=` signature format)
-- Live and code: `pq_mode=strict`, `allowed_sig_algs=ml-dsa-87`
+ADDITION’s signature path is a **real, shipped** post-quantum choice — celebrate that carefully:
+
+| Claim | Status |
+| --- | --- |
+| Default scheme **ML-DSA-87** (`pq=`), FIPS 204 parameter set via liboqs | **Live** on mainnet spends |
+| `pq_mode=strict`, `allowed_sig_algs=ml-dsa-87` | **Live** |
+| Hashing / PoW digests / addresses / privacy openings use **SHA3-512** | **Live** |
+| “Unbreakable forever” / immune to all future cryptanalysis | **Not claimed** |
+| FIPS 140-3 validated cryptographic module | **Not claimed** |
+
 - Thread-local `OQS_SIG` and parallel batch verify in `crypto.cpp`
 - Opt-in **SLH-DSA** (`slh-dsa-shake-256s`) only if this liboqs build can `OQS_SIG_sign_with_ctx_str` with a non-empty context; otherwise rejected in strict mode
 - Unknown schemes (including Falcon/FN-DSA) are rejected
 
-Strict mode is not a FIPS 140-3 module claim. It means the node only accepts the allowlisted PQ schemes it can verify.
+Strict mode means the node only accepts the allowlisted PQ schemes it can verify. Lattice assumptions can age; operators should track NIST / cryptanalysis guidance over time. PQ here is a **grade and posture**, not a forever warranty.
 
 ### 3.2 Hashing — SHA3-512
 
@@ -121,7 +163,7 @@ Default `scheme_id` is `ml-dsa-87`. The raw 2592-byte ML-DSA-87 public key is **
 
 ---
 
-## 4. Privacy model (honest)
+## 4. Privacy model (as shipped)
 
 ADDITION privacy is a **SHA3-512 commitment + nullifier opening**. The node sees the trapdoor when minting/spending open notes.
 
@@ -135,7 +177,7 @@ ADDITION privacy is a **SHA3-512 commitment + nullifier opening**. The node sees
 
 Relevant RPCs: `privacy_note_prepare`, `privacy_mint_open`, `privacy_spend_open`. Notes live in a **side ledger** (`privacy.dat`), not a native ADD lock into a consensus privacy pool.
 
-**Roadmap vs live:** live privacy is `opening_not_zk` (node sees the trapdoor). Real zero-knowledge is in progress: fail-closed RPCs `privacy_mint_zk_v1` / `privacy_spend_zk_v1` reject until a proof backend is wired (`claim=zk_pending` only; never `zk_v1` while stubbed). See `docs/PRIVACY_REAL_V1.md`.
+**Vision vs Live:** live privacy is `opening_not_zk` (node sees the trapdoor). Real zero-knowledge is scaffold only: fail-closed RPCs `privacy_mint_zk_v1` / `privacy_spend_zk_v1` reject until a proof backend is wired (`claim=zk_pending` only; never `zk_v1` while stubbed). Design + labels: [`docs/PRIVACY_REAL_V1.md`](PRIVACY_REAL_V1.md).
 
 **Master key:** `ADDITION_PRIVACY_MASTER_KEY` must be at least **32 characters** or note writes fail with `error: ADDITION_PRIVACY_MASTER_KEY not set or too short (min 32)`. Mainnet start requires this key (`docs/MAINNET_RUNBOOK.md`).
 
@@ -147,7 +189,7 @@ Relevant RPCs: `privacy_note_prepare`, `privacy_mint_open`, `privacy_spend_open`
 - `privacy_mint_zk` / `privacy_spend_zk` are an **ML-DSA wrap** of a mint/spend string — still not a circuit (`tools/zk_backend_contract.md`)
 - `tools/zk_verify_wrapper.py` errors if invoked; do not set `ADDITION_ZK_VERIFY_CMD` or advertise a ZK backend as live
 
-Honest claim language: live `claim=opening_not_zk`; roadmap `privacy_zk_roadmap=zk_pending`.
+Claim language: live `claim=opening_not_zk`; roadmap `privacy_zk_roadmap=zk_pending`.
 
 ---
 
@@ -219,18 +261,18 @@ max_supply=50000000 emitted=0 remaining=50000000 next_reward=50 next_halving_hei
 
 ## 7. Networks and ports
 
-Two separate chains — not a label flip:
+Three profiles — not a label flip. Only mainnet is the live public product:
 
-| | Public mainnet | Research testnet |
-| --- | --- | --- |
-| Flag | `additiond --mainnet` | `additiond --network testnet` (binary default) |
-| `network_id` | `ADDITION_MAINNET_V1` | `ADDITION_TESTNET_V1` |
-| Genesis | `genesis-mainnet.json` (`timestamp` 1770000000) | `genesis.json` (`timestamp` 1763000000) |
-| Default data dir | `data-mainnet` | `data` |
-| Home-node write RPC | **`127.0.0.1:8546`** | `127.0.0.1:8545` |
-| Public HTTP | **`38546`** (seed `34.27.30.115:38546`) | `38545` |
-| P2P | **`28546`** (seed `34.27.30.115:28546`) | `28545` |
-| PoW | `memory_hard` | `sha3_512` |
+| | Public mainnet (Live) | Research testnet | Fast path (scaffold) |
+| --- | --- | --- | --- |
+| Flag | `additiond --mainnet` | `additiond --network testnet` (binary default) | `additiond --fast` / `--network fast` (**refuses to boot** until pipeline ships) |
+| `network_id` | `ADDITION_MAINNET_V1` | `ADDITION_TESTNET_V1` | `ADDITION_FAST_V1` |
+| Genesis | `genesis-mainnet.json` (`timestamp` 1770000000) | `genesis.json` (`timestamp` 1763000000) | `genesis-fast.json` (stub) |
+| Default data dir | `data-mainnet` | `data` | `data-fast` (stub) |
+| Home-node write RPC | **`127.0.0.1:8546`** | `127.0.0.1:8545` | stub ports in `config-fast.toml` |
+| Public HTTP | **`38546`** (seed `34.27.30.115:38546`) | `38545` | none (not a public product) |
+| P2P | **`28546`** (seed `34.27.30.115:28546`) | `28545` | none public |
+| Consensus | `memory_hard` | `sha3_512` | leader/pipeline sketch — see [`FAST_PATH_V1.md`](FAST_PATH_V1.md) |
 
 **Hard rules:**
 
@@ -259,7 +301,7 @@ Read path (stock allowlist in `rpc_access.cpp` `is_public_read_command`): `getin
 
 Live probe while drafting: `createwallet` on `38546` returned a wallet-store error (`error: wallet already exists`) rather than `command disabled on public RPC` — i.e. the write surface is open on the seed as documented. Token create / presale / airdrop / farm stay off unless separately probed available.
 
-Home operators still keep trusted write on **`127.0.0.1:8546`**. The site wallet prefers `/api/rpc` → public `38546`, with honest fallback to `/local-rpc` → loopback when public RPC is offline.
+Home operators still keep trusted write on **`127.0.0.1:8546`**. The site wallet prefers `/api/rpc` → public `38546`, with a loopback fallback to `/local-rpc` when public RPC is offline.
 
 Example:
 
@@ -323,9 +365,9 @@ What does not exist: watched BTC/ETH/SOL custody, mint of ADD from a foreign dep
 
 ### Assumptions
 
-1. **ML-DSA-87 remains hard** against classical and near-term quantum adversaries at the parameter set shipped by liboqs for FIPS 204 level used here.
-2. **SHA3-512** remains a secure hash for commitments and PoW digests.
-3. **Honest majority of hashrate** under memory-hard PoW (same economic assumption family as Bitcoin PoW — not proven by this paper).
+1. **ML-DSA-87 remains hard** against classical and near-term quantum adversaries at the parameter set shipped by liboqs for FIPS 204 level used here — **not** a forever-unbreakable claim.
+2. **SHA3-512** remains a secure hash for commitments and PoW digests under current public cryptanalysis.
+3. **Majority of hashrate** under memory-hard PoW (same economic assumption family as Bitcoin PoW — not proven by this paper).
 4. Operators protect `ADDITION_PRIVACY_MASTER_KEY`, wallet `.wal` files, and never expose home write RPC beyond loopback.
 5. Public seed write allowlist is an operational trust surface: anyone who can reach those RPCs can create wallets / mine / send as allowed — treat keys and node storage accordingly.
 
@@ -342,9 +384,14 @@ An observer with node access or the master key can open commitments. This is **n
 
 ---
 
-## 12. Roadmap honesty
+## 12. Vision vs Live (roadmap)
 
-**Live public `getinfo` snapshot** (seed `34.27.30.115:38546`, observed while drafting this document — copy fields, do not invent):
+Re-state the early table with live getinfo context. Design docs:
+
+- Privacy scaffold: [`docs/PRIVACY_REAL_V1.md`](PRIVACY_REAL_V1.md) (vision #77)
+- Fast path scaffold: [`docs/FAST_PATH_V1.md`](FAST_PATH_V1.md) (vision #78, tip SHA `6d3f483` or later)
+
+**Live public `getinfo` snapshot** (seed `34.27.30.115:38546`, observed while drafting this document — copy fields only):
 
 ```text
 network=mainnet network_name=addition-mainnet network_id=ADDITION_MAINNET_V1
@@ -357,19 +404,28 @@ privacy_claim=opening_not_zk privacy_ok=true
 auto_mine=off mine_deadline_sec=0
 ```
 
-Notes:
+| Field / topic | Live truth |
+| --- | --- |
+| `network_id` | `ADDITION_MAINNET_V1` |
+| Height | From live `getinfo` only — **may be `0`** |
+| `pq_mode` / algs | `strict` / `ml-dsa-87` + SHA3-512 |
+| `privacy_claim` | `opening_not_zk` |
+| `privacy_zk_roadmap` | `zk_pending` (scaffold) |
+| `consensus_path` | `memory_hard_pow` |
+| `fast_path_status` | `not_this_network` on mainnet |
+| `throughput_claim` | `none` |
+| `research_goal_is_not_a_measurement` | `true` |
+| `economic_security` | `none` until real |
+| `last_tps` | Local mine telemetry when present — **not** marketed Solana TPS |
+| `peers=…` | Snapshot at query time — not a permanent marketing number |
 
-- **Height may be 0** — explorer usefulness for confirmed history starts after `height > 0`
-- **`last_tps`** is local mine telemetry when present, not a consensus incentive or marketed throughput
-- **`peers=14`** is whatever that process reported at query time — not a permanent marketing number
-- No USD ticker (`price_usd` stays null on the site API)
-- PoUW phase-1 text (`docs/POUW_PHASE1_SPEC.md`) is a design target, not a claim that public mainnet already sells compute/storage
+No USD ticker (`price_usd` stays null on the site API). PoUW phase-1 text (`docs/POUW_PHASE1_SPEC.md`) is a design target, not a claim that public mainnet already sells compute/storage.
 
 Future hardening called out in-repo (architecture notes): stronger on-disk formats, native ADD lock into privacy (notes are still a side ledger), reproducible releases. Those are backlog items, not shipped guarantees.
 
-**Privacy roadmap vs live:** live remains `opening_not_zk`. A C++ fail-closed ZK scaffold (`privacy_zk.*`, `docs/PRIVACY_REAL_V1.md`) reports `privacy_zk_roadmap=zk_pending` and does not mint/spend without a real verifier. No false ZK claims.
+**Privacy — Vision vs Live:** live remains `opening_not_zk`. A C++ fail-closed ZK scaffold (`privacy_zk.*`, [`PRIVACY_REAL_V1.md`](PRIVACY_REAL_V1.md)) reports `privacy_zk_roadmap=zk_pending` and does not mint/spend without a real verifier. No false ZK claims.
 
-**Speed / fast path vs live:** a separate network profile `ADDITION_FAST_V1` is scaffolded (`docs/FAST_PATH_V1.md`, `--fast` / `--network fast`) for a future leader/pipeline path. It is **fail-closed** until that pipeline ships. The live public product remains **memory_hard mainnet** (`ADDITION_MAINNET_V1` at `0x000000FFFFFFFFFF`). Speed path is in progress; do not treat mainnet PoW as a Solana TPS claim. `research_goal_tps` stays `research_goal_is_not_a_measurement=true`. getinfo reports `consensus_path=memory_hard_pow`, `fast_path_status=not_this_network`, `throughput_claim=none`.
+**Fast path — Vision vs Live:** separate profile `ADDITION_FAST_V1` ([`FAST_PATH_V1.md`](FAST_PATH_V1.md), `--fast` / `--network fast`) is **fail-closed** until the leader/pipeline ships. Live public product remains **memory_hard mainnet** (`ADDITION_MAINNET_V1` at `0x000000FFFFFFFFFF`). Do not treat mainnet PoW as a Solana TPS claim.
 
 ---
 
@@ -402,4 +458,4 @@ MIT-licensed software. This whitepaper is research/engineering documentation, no
 
 ---
 
-*Sources: `include/addition/config.hpp`, `src/crypto.cpp`, `src/chain.cpp`, `src/privacy.cpp`, `src/auto_mine.cpp`, `src/rpc_access.cpp`, `src/rpc_server.cpp`, `genesis-mainnet.json`, `config-mainnet.toml`, `docs/MAINNET_RUNBOOK.md`, `docs/ARCHITECTURE.md`, `docs/BRIDGE.md`, `docs/TOKENS.md`, `docs/WALLET.md`, `tools/zk_backend_contract.md`, and live RPCs on `34.27.30.115:38546`.*
+*Sources: `include/addition/config.hpp`, `src/crypto.cpp`, `src/chain.cpp`, `src/privacy.cpp`, `src/privacy_zk.cpp`, `src/fast_path.cpp`, `src/auto_mine.cpp`, `src/rpc_access.cpp`, `src/rpc_server.cpp`, `genesis-mainnet.json`, `config-mainnet.toml`, `docs/MAINNET_RUNBOOK.md`, `docs/ARCHITECTURE.md`, `docs/BRIDGE.md`, `docs/TOKENS.md`, `docs/WALLET.md`, `docs/PRIVACY_REAL_V1.md`, `docs/FAST_PATH_V1.md`, `tools/zk_backend_contract.md`, and live RPCs on `34.27.30.115:38546`.*

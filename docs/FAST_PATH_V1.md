@@ -10,7 +10,7 @@ Brand: **ADDITION** only.
 
 ## Gap
 
-| Profile | Consensus today | Throughput honesty |
+| Profile | Consensus today | Throughput label |
 | :--- | :--- | :--- |
 | Live mainnet `ADDITION_MAINNET_V1` | `memory_hard` PoW (1 MiB × 16 rounds / attempt) | `last_tps` is local mine telemetry only; not a marketed Solana TPS |
 | Research testnet `ADDITION_TESTNET_V1` | `sha3_512` header PoW | Same: no invented measured TPS |
@@ -31,7 +31,7 @@ A **separate network id** so the fast path cannot be confused with mainnet PoW:
    propagation, and parallel transaction execution. PoW is not the latency
    path; mainnet keeps memory-hard PoW for the public product.
 3. **Crypto unchanged** — ML-DSA-87 / SHA3-512, `pq_mode=strict`. Privacy
-   labels stay honest (`opening_not_zk` live; `zk_pending` stub).
+   labels stay accurate (`opening_not_zk` live; `zk_pending` stub).
 4. **This PR** — design doc, genesis/config stubs, CLI `--fast` /
    `--network fast`, getinfo fields that distinguish profiles, fail-closed
    boot if the pipeline is incomplete, tests that mainnet PoW knobs are
@@ -54,7 +54,7 @@ clients --> RPC/ingest --> leader scheduler --> execution workers
 | Leader election / rotation | Who proposes the next batch | No |
 | Pipeline stages | Overlap verify / propagate / commit | No |
 | Parallel execution | Non-conflicting txs across workers | No |
-| Measured throughput RPC | Honest bench of the fast profile | No |
+| Measured throughput RPC | Measured bench of the fast profile (when shipped) | No |
 
 ## Fail-closed rules
 
@@ -67,7 +67,7 @@ clients --> RPC/ingest --> leader scheduler --> execution workers
 - getinfo / protocol_status must never print a measured Solana TPS figure.
   `throughput_claim=none`. Research goals stay non-measurements.
 
-## getinfo honesty
+## getinfo labels (Vision vs Live)
 
 | Field | Mainnet | Fast scaffold (when ready to boot) |
 | :--- | :--- | :--- |
@@ -85,7 +85,7 @@ clients --> RPC/ingest --> leader scheduler --> execution workers
 - No claim that ADDITION matches Solana (or any chain) measured TPS
 - No change to mainnet mining, difficulty, or seed hasher
 
-## Honesty checklist (PR gate)
+## PR gate checklist
 
 - [x] Mainnet `memory_hard` target `0x000000FFFFFFFFFF` untouched
 - [x] No GCP seed hasher / mining stop

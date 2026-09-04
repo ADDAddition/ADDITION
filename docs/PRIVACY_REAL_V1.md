@@ -1,4 +1,4 @@
-# Privacy Real v1 — design (honest scaffold)
+# Privacy Real v1 — design (scaffold)
 
 Status: **scaffold only**. Live privacy remains SHA3-512 opening.
 `getinfo` / `privacy_status` must keep `privacy_claim=opening_not_zk` until a real
@@ -68,7 +68,7 @@ Opening path stays. No silent rename. Roadmap field: `privacy_zk_roadmap=zk_pend
 
 ### Today (opening)
 
-- **Honest node / operator** sees trapdoor, amount, owner tags (sealed at rest with
+- **Node / operator** sees trapdoor, amount, owner tags (sealed at rest with
   `ADDITION_PRIVACY_MASTER_KEY`, but the opening RPC still presents the witness).
 - **Network observer** of loopback RPC sees the same if they can read the socket.
 - **Double-spend** blocked via nullifier + spent-commitment sets.
@@ -83,7 +83,7 @@ Opening path stays. No silent rename. Roadmap field: `privacy_zk_roadmap=zk_pend
 - **Fail-closed until then**: garbage or empty proofs must error; no note mint on the
   zk_v1 path; no `zk_v1` claim string on success paths that do not verify.
 
-## Honesty checklist (PR gate)
+## PR gate checklist
 
 - [x] Mainnet `memory_hard` target `0x000000FFFFFFFFFF` untouched
 - [x] No GCP seed hasher / mining changes

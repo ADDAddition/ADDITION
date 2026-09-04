@@ -19,7 +19,7 @@ Public seed **38546** write allowlist is open (CoS): `createwallet`, `mine`,
 `wallet_send`, `wallet_sign` / `sign_message`, `tx_build` / `sendtx_signed*`.
 Site `/wallet/` prefers `/api/rpc` → that public path; falls back to
 `/local-rpc` → loopback when public RPC is offline. Height from live `getinfo`
-may still be `0` — never invent TPS or a USD ticker.
+may still be `0` — do not invent TPS or a USD ticker.
 
 Never bind home-node write RPC to `0.0.0.0`. Never publish `8545` / `8546`.
 

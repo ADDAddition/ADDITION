@@ -13,13 +13,38 @@
   <header id="site-header"></header>
   <main>
     <div class="banner">
-      SHA3-512 commitment + nullifier opening.
-      The node sees the trapdoor. <code>claim=opening_not_zk</code>.
+      <strong>Vision vs Live.</strong>
+      Live privacy is SHA3-512 commitment + nullifier opening:
+      the node sees the trapdoor. <code>claim=opening_not_zk</code>.
       Not Groth16, Bulletproofs, or ZK-Shield.
       <code>privacy_mint_zk</code> is an ML-DSA wrap, not a circuit — this page does not call it.
-      <strong>Roadmap vs live:</strong> live is <code>opening_not_zk</code>. Real ZK (<code>zk_pending</code> → future <code>zk_v1</code>) is in progress and fail-closed on-node; see <code>docs/PRIVACY_REAL_V1.md</code>.
+      ZK path is scaffold / fail-closed (<code>zk_pending</code> → future <code>zk_v1</code> only after verify works).
+      Design: <a href="/docs/privacy-real/">privacy-real</a>
+      (repo <code>docs/PRIVACY_REAL_V1.md</code>).
+      Fast path is separate (<a href="/docs/fast-path/">ADDITION_FAST_V1</a> · <code>docs/FAST_PATH_V1.md</code>) —
+      not this page’s product surface.
       Mint/spend need <code>ADDITION_PRIVACY_MASTER_KEY</code> (≥32 chars) on the daemon. Without it the node returns <code>error: ADDITION_PRIVACY_MASTER_KEY not set or too short (min 32)</code>.
     </div>
+    <section class="panel">
+      <h2>What ships today</h2>
+      <p class="note">
+        Opening RPCs on loopback: <code>privacy_note_prepare</code>,
+        <code>privacy_mint_open</code>, <code>privacy_spend_open</code>.
+        Live <code>getinfo</code> / <code>privacy_status</code> keep
+        <code>privacy_claim=opening_not_zk</code>.
+      </p>
+      <h2>What is scaffold</h2>
+      <p class="note">
+        <code>privacy_mint_zk_v1</code> / <code>privacy_spend_zk_v1</code> reject every proof
+        (<code>claim=zk_pending</code>). See <a href="/docs/privacy-real/">privacy-real</a>
+        / <code>docs/PRIVACY_REAL_V1.md</code>.
+      </p>
+      <h2>What is research goal</h2>
+      <p class="note">
+        Real <code>zk_v1</code> only when a verifier accepts proofs on-node.
+        No fake ZK marketing. PQ stays ML-DSA-87 / SHA3-512 <code>pq_mode=strict</code>.
+      </p>
+    </section>
     <p id="rpc-state" class="offline">Checking local RPC…</p>
     <p id="status-line" class="note"></p>
 
