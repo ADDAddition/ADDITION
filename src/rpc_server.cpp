@@ -6,6 +6,7 @@
 #include "addition/crypto.hpp"
 #include "addition/fast_path.hpp"
 #include "addition/privacy_zk.hpp"
+#include "addition/zk_circuit_v1.hpp"
 #include "addition/rpc_access.hpp"
 #include "addition/wallet.hpp"
 #include "addition/wallet_keys.hpp"
@@ -295,6 +296,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " auto_mine=" << (auto_mine_enabled_ ? "on" : "off")
             << " auto_mine_interval_sec=" << auto_mine_interval_sec_
             << fast_path_info_fields(net)
+            << zk_circuit_v1_info_fields()
             << " research_goal_is_not_a_measurement=true";
         if (trusted) {
             out << " privacy_master_key=" << (PrivacyPool::master_key_configured() ? "set" : "missing");
@@ -322,7 +324,8 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " pouw_storage_check=first_nibble_parity"
             << " research_goal_tps=" << std::fixed << std::setprecision(0) << kObjectiveTps
             << " research_goal_is_not_a_measurement=true"
-            << fast_path_info_fields(chain_.config());
+            << fast_path_info_fields(chain_.config())
+            << zk_circuit_v1_info_fields();
         return out.str();
     }
 
@@ -2415,6 +2418,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " privacy_zk_roadmap=" << privacy_zk_roadmap_label()
             << " privacy_zk_backend=" << default_privacy_zk_verifier().backend_id()
             << " zk_v1_wired=" << (default_privacy_zk_verifier().backend_wired() ? "true" : "false")
+            << zk_circuit_v1_info_fields()
             << " legacy_mldsa_wrap=" << privacy_.native_verifier_mode()
             << " verifier_configured=" << (privacy_.verifier_configured() ? "true" : "false")
             << " native_verifier_mode=" << privacy_.native_verifier_mode()

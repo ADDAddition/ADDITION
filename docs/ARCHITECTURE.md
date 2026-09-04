@@ -15,6 +15,7 @@
 - `wallet.*` / `wallet_store.*`: transaction creation, local `.wal` files, `wallet_send`
 - `token_engine.*`: in-process token / AMM ledger (loopback RPC; not a public DEX)
 - `privacy.*`: SHA3-512 commitment + nullifier opening (`claim=opening_not_zk`); ZK path scaffold in `privacy_zk.*` (`zk_pending`, fail-closed) — see `docs/PRIVACY_REAL_V1.md`
+- `zk_circuit_v1.*`: circuit interface + witness/public-input schema + fail-closed prover (`zk_circuit_status=not_proven`) — see `docs/ZK_CIRCUIT_V1.md`. Not live ZK
 - `fast_path.*`: separate `ADDITION_FAST_V1` high-throughput profile scaffold (leader/pipeline not shipped; fail-closed) — see `docs/FAST_PATH_V1.md`. Does **not** loosen mainnet `memory_hard`
 - `p2p.*` / `decentralized_node.*`: peer handshake, gossip, sync
 - `btc_hygiene.*`: offline Bitcoin script classifier and signed ADDITION hygiene receipt (attestation rehearsal; does not move Bitcoin; not BIP-360)

@@ -42,9 +42,12 @@
 <p>   and are <strong>fail-closed</strong>. Candidate backends (pick one in a later PR; none claimed live):</p>
 <ul><li>Hash-based argument over SHA3-512 (FRI / STARK-style) — PQ-friendly, large proofs.</li><li>Lattice / hash ZK library bound from C++20 — research dependency risk.</li><li>Hybrid: PQ signatures (ML-DSA-87, <code>pq_mode=strict</code>) for authorization envelopes;</li></ul>
 <p>     separate ZK only for the opening relation (still not “unbreakable forever”).</p>
-<ol><li><strong>This PR</strong>  </li></ol>
+<ol><li><strong>This PR (privacy scaffold #77)</strong>  </li></ol>
 <ul><li><code>PrivacyZkVerifier</code> + <code>FailClosedPrivacyZkVerifier</code>  </li><li>RPC <code>privacy_mint_zk_v1</code> / <code>privacy_spend_zk_v1</code> reject every proof  </li><li>Labels: live <code>opening_not_zk</code>; zk path responses may say <code>claim=zk_pending</code>;</li></ul>
 <p>     <code>claim=zk_v1</code> is forbidden until <code>backend_wired()==true</code> and verify can succeed</p>
+<ol><li><strong>Circuit slice (#80 / <code>docs/ZK_CIRCUIT_V1.md</code>)</strong>  </li></ol>
+<p>   Typed witness / public-input schema, constraint scaffolding, SHA3 opening</p>
+<p>   self-test (not ZK), and fail-closed prover. Still <strong>not live ZK</strong>.</p>
 <h2>Migration</h2>
 <table><tr><th>Stage</th><th>Live <code>privacy_claim</code> (getinfo)</th><th>ZK path RPC claim</th><th>Behavior</th></tr><tr><td>Now</td><td><code>opening_not_zk</code></td><td><code>zk_pending</code></td><td>Opening works; zk_v1 fail-closed</td></tr><tr><td>Proofs wired + tests green</td><td>still <code>opening_not_zk</code> until cutover</td><td><code>zk_v1</code> on success</td><td>Parallel paths</td></tr><tr><td>Cutover (later PR)</td><td>may become <code>zk_v1</code> only if opening retired</td><td><code>zk_v1</code></td><td>Product decision</td></tr></table>
 <p>Opening path stays. No silent rename. Roadmap field: <code>privacy_zk_roadmap=zk_pending</code>.</p>

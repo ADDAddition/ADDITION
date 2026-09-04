@@ -78,12 +78,21 @@ public:
 const PrivacyZkVerifier& default_privacy_zk_verifier();
 
 // High-level fail-closed path used by RPC. Never mutates notes while unwired.
+// Claiming zk without a valid verified proof always fails closed (zk_pending).
 bool privacy_zk_v1_mint_allowed(const ZkMintPublicInputs& inputs,
                                 const ZkProofMaterial& proof,
                                 std::string& error,
                                 PrivacyClaimLabel& claim_out);
 bool privacy_zk_v1_spend_allowed(const ZkSpendPublicInputs& inputs,
                                  const ZkProofMaterial& proof,
+                                 std::string& error,
+                                 PrivacyClaimLabel& claim_out);
+
+// Optional note commitment for spend circuit statement validation (ledger cm).
+// When empty, spend path still fail-closes on unwired backend / proof material.
+bool privacy_zk_v1_spend_allowed(const ZkSpendPublicInputs& inputs,
+                                 const ZkProofMaterial& proof,
+                                 const std::string& note_commitment_hex,
                                  std::string& error,
                                  PrivacyClaimLabel& claim_out);
 

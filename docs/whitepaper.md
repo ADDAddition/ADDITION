@@ -18,7 +18,7 @@ This document supersedes the short sketch in `docs/WHITE_PAPER.md` and the thin 
 | --- | --- | --- |
 | Network | `ADDITION_MAINNET_V1`, `memory_hard` PoW | `ADDITION_FAST_V1` scaffold ([`FAST_PATH_V1.md`](FAST_PATH_V1.md)) — not the public product |
 | Height / peers / fees | Copy live `getinfo` only (height may be `0`) | No invented height, peer counts, or USD ticker |
-| Privacy | `privacy_claim=opening_not_zk` (SHA3-512 opening; node sees trapdoor) | ZK path fail-closed / `zk_pending` ([`PRIVACY_REAL_V1.md`](PRIVACY_REAL_V1.md)); never fake ZK |
+| Privacy | `privacy_claim=opening_not_zk` (SHA3-512 opening; node sees trapdoor) | ZK path fail-closed / `zk_pending` ([`PRIVACY_REAL_V1.md`](PRIVACY_REAL_V1.md)); circuit schema in progress ([`ZK_CIRCUIT_V1.md`](ZK_CIRCUIT_V1.md)) — never fake ZK |
 | Throughput | `last_tps` = local mine telemetry when present; `throughput_claim=none` | `research_goal_tps` with `research_goal_is_not_a_measurement=true` — not a Solana TPS claim |
 | PQ crypto | **ML-DSA-87** + **SHA3-512**, `pq_mode=strict` (kept) | Same stack on scaffolds; not “unbreakable forever” |
 | Economic security | `economic_security=none` until real | Staking side map remains non-consensus |
@@ -33,6 +33,7 @@ This document supersedes the short sketch in `docs/WHITE_PAPER.md` and the thin 
 ### What is scaffold
 
 - Real ZK privacy path: `privacy_*_zk_v1` + `FailClosedPrivacyZkVerifier` — always rejects; labels `zk_pending` until a verifier can succeed ([`PRIVACY_REAL_V1.md`](PRIVACY_REAL_V1.md), vision #77)
+- Circuit slice: typed witness/public-input schema + fail-closed prover (`zk_circuit_status=not_proven`) — **not live ZK** ([`ZK_CIRCUIT_V1.md`](ZK_CIRCUIT_V1.md))
 - Fast path network profile **`ADDITION_FAST_V1`**: config/genesis/CLI stubs; **`--fast` / `--network fast` refuse to boot** until the pipeline ships ([`FAST_PATH_V1.md`](FAST_PATH_V1.md), vision #78 / SHA `6d3f483`+)
 - Legacy `privacy_mint_zk` / `privacy_spend_zk`: ML-DSA wrap of a string — still not a circuit
 
@@ -97,6 +98,7 @@ The tree is a single canonical C++20 codebase. Major modules (from `docs/ARCHITE
 | `wallet.*` / `wallet_store.*` / `wallet_keys.*` | Local `.wal` files, `wallet_send`, key material |
 | `p2p.*` / `decentralized_node.*` / `net_io.*` | Handshake, gossip, sync (`HELLO` / `REQBLK` / `BLKDATA`) |
 | `privacy.*` | SHA3-512 commitment + nullifier opening (`opening_not_zk`); ZK scaffold `privacy_zk.*` (`zk_pending`, fail-closed) |
+| `zk_circuit_v1.*` | Circuit schema + fail-closed prover (`zk_circuit_status=not_proven`); not live ZK — [`ZK_CIRCUIT_V1.md`](ZK_CIRCUIT_V1.md) |
 | `contract_engine.*` | Deterministic in-process KV (`set` / `add` / `get`) — not the EVM |
 | `token_engine.*` | In-process token / NFT / AMM ledger |
 | `bridge.*` | In-process counters (`bridge.dat`) — not a live cross-chain bridge |
@@ -177,7 +179,7 @@ ADDITION privacy is a **SHA3-512 commitment + nullifier opening**. The node sees
 
 Relevant RPCs: `privacy_note_prepare`, `privacy_mint_open`, `privacy_spend_open`. Notes live in a **side ledger** (`privacy.dat`), not a native ADD lock into a consensus privacy pool.
 
-**Vision vs Live:** live privacy is `opening_not_zk` (node sees the trapdoor). Real zero-knowledge is scaffold only: fail-closed RPCs `privacy_mint_zk_v1` / `privacy_spend_zk_v1` reject until a proof backend is wired (`claim=zk_pending` only; never `zk_v1` while stubbed). Design + labels: [`docs/PRIVACY_REAL_V1.md`](PRIVACY_REAL_V1.md).
+**Vision vs Live:** live privacy is `opening_not_zk` (node sees the trapdoor). Real zero-knowledge is scaffold only: fail-closed RPCs `privacy_mint_zk_v1` / `privacy_spend_zk_v1` reject until a proof backend is wired (`claim=zk_pending` only; never `zk_v1` while stubbed). Circuit interface + schema: [`docs/ZK_CIRCUIT_V1.md`](ZK_CIRCUIT_V1.md) (`zk_circuit_status=not_proven`). Design + labels: [`docs/PRIVACY_REAL_V1.md`](PRIVACY_REAL_V1.md).
 
 **Master key:** `ADDITION_PRIVACY_MASTER_KEY` must be at least **32 characters** or note writes fail with `error: ADDITION_PRIVACY_MASTER_KEY not set or too short (min 32)`. Mainnet start requires this key (`docs/MAINNET_RUNBOOK.md`).
 
@@ -389,6 +391,7 @@ An observer with node access or the master key can open commitments. This is **n
 Re-state the early table with live getinfo context. Design docs:
 
 - Privacy scaffold: [`docs/PRIVACY_REAL_V1.md`](PRIVACY_REAL_V1.md) (vision #77)
+- ZK circuit schema (not live): [`docs/ZK_CIRCUIT_V1.md`](ZK_CIRCUIT_V1.md)
 - Fast path scaffold: [`docs/FAST_PATH_V1.md`](FAST_PATH_V1.md) (vision #78, tip SHA `6d3f483` or later)
 
 **Live public `getinfo` snapshot** (seed `34.27.30.115:38546`, observed while drafting this document — copy fields only):
@@ -423,7 +426,7 @@ No USD ticker (`price_usd` stays null on the site API). PoUW phase-1 text (`docs
 
 Future hardening called out in-repo (architecture notes): stronger on-disk formats, native ADD lock into privacy (notes are still a side ledger), reproducible releases. Those are backlog items, not shipped guarantees.
 
-**Privacy — Vision vs Live:** live remains `opening_not_zk`. A C++ fail-closed ZK scaffold (`privacy_zk.*`, [`PRIVACY_REAL_V1.md`](PRIVACY_REAL_V1.md)) reports `privacy_zk_roadmap=zk_pending` and does not mint/spend without a real verifier. No false ZK claims.
+**Privacy — Vision vs Live:** live remains `opening_not_zk`. A C++ fail-closed ZK scaffold (`privacy_zk.*`, [`PRIVACY_REAL_V1.md`](PRIVACY_REAL_V1.md)) reports `privacy_zk_roadmap=zk_pending` and does not mint/spend without a real verifier. Circuit work in progress (`zk_circuit_v1.*`, [`ZK_CIRCUIT_V1.md`](ZK_CIRCUIT_V1.md), `zk_circuit_status=not_proven`) — not live ZK. No false ZK claims.
 
 **Fast path — Vision vs Live:** separate profile `ADDITION_FAST_V1` ([`FAST_PATH_V1.md`](FAST_PATH_V1.md), `--fast` / `--network fast`) is **fail-closed** until the leader/pipeline ships. Live public product remains **memory_hard mainnet** (`ADDITION_MAINNET_V1` at `0x000000FFFFFFFFFF`). Do not treat mainnet PoW as a Solana TPS claim.
 
@@ -458,4 +461,4 @@ MIT-licensed software. This whitepaper is research/engineering documentation, no
 
 ---
 
-*Sources: `include/addition/config.hpp`, `src/crypto.cpp`, `src/chain.cpp`, `src/privacy.cpp`, `src/privacy_zk.cpp`, `src/fast_path.cpp`, `src/auto_mine.cpp`, `src/rpc_access.cpp`, `src/rpc_server.cpp`, `genesis-mainnet.json`, `config-mainnet.toml`, `docs/MAINNET_RUNBOOK.md`, `docs/ARCHITECTURE.md`, `docs/BRIDGE.md`, `docs/TOKENS.md`, `docs/WALLET.md`, `docs/PRIVACY_REAL_V1.md`, `docs/FAST_PATH_V1.md`, `tools/zk_backend_contract.md`, and live RPCs on `34.27.30.115:38546`.*
+*Sources: `include/addition/config.hpp`, `src/crypto.cpp`, `src/chain.cpp`, `src/privacy.cpp`, `src/privacy_zk.cpp`, `src/zk_circuit_v1.cpp`, `src/fast_path.cpp`, `src/auto_mine.cpp`, `src/rpc_access.cpp`, `src/rpc_server.cpp`, `genesis-mainnet.json`, `config-mainnet.toml`, `docs/MAINNET_RUNBOOK.md`, `docs/ARCHITECTURE.md`, `docs/BRIDGE.md`, `docs/TOKENS.md`, `docs/WALLET.md`, `docs/PRIVACY_REAL_V1.md`, `docs/ZK_CIRCUIT_V1.md`, `docs/FAST_PATH_V1.md`, `tools/zk_backend_contract.md`, and live RPCs on `34.27.30.115:38546`.*

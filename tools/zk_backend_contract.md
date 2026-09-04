@@ -19,7 +19,9 @@ mint/spend string. A garbage proof returns `error:`. They are not a circuit.
 
 `privacy_mint_zk_v1` / `privacy_spend_zk_v1` are the fail-closed scaffold for a
 future proof backend (`FailClosedPrivacyZkVerifier`). They always reject today and
-label `claim=zk_pending`. See `docs/PRIVACY_REAL_V1.md`.
+label `claim=zk_pending`. Circuit schema + fail-closed prover live in
+`docs/ZK_CIRCUIT_V1.md` / `zk_circuit_v1.*` (`zk_circuit_status=not_proven`).
+See `docs/PRIVACY_REAL_V1.md`.
 
 `tools/zk_verify_wrapper.py` exits with an error if invoked. Do not set
 `ADDITION_ZK_VERIFY_CMD` and do not advertise a ZK backend as live.

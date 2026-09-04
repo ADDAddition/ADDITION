@@ -48,11 +48,15 @@ Prefer a **PQ-friendly hybrid** that reuses the existing commitment/nullifier st
    - Hybrid: PQ signatures (ML-DSA-87, `pq_mode=strict`) for authorization envelopes;
      separate ZK only for the opening relation (still not “unbreakable forever”).
 
-5. **This PR**  
+5. **This PR (privacy scaffold #77)**  
    - `PrivacyZkVerifier` + `FailClosedPrivacyZkVerifier`  
    - RPC `privacy_mint_zk_v1` / `privacy_spend_zk_v1` reject every proof  
    - Labels: live `opening_not_zk`; zk path responses may say `claim=zk_pending`;
      `claim=zk_v1` is forbidden until `backend_wired()==true` and verify can succeed
+
+6. **Circuit slice (#80 / `docs/ZK_CIRCUIT_V1.md`)**  
+   Typed witness / public-input schema, constraint scaffolding, SHA3 opening
+   self-test (not ZK), and fail-closed prover. Still **not live ZK**.
 
 ## Migration
 

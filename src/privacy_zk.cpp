@@ -1,5 +1,7 @@
 #include "addition/privacy_zk.hpp"
 
+#include "addition/zk_circuit_v1.hpp"
+
 #include <sstream>
 
 namespace addition {
@@ -21,6 +23,7 @@ bool is_hex_even(const std::string& s) {
 std::string reject_unwired(const char* op, std::string& error) {
     std::ostringstream oss;
     oss << "zk_v1 " << op << " rejected: backend not wired (fail-closed); "
+        << "circuit_status=" << zk_circuit_v1_status_label() << "; "
         << "live privacy_claim remains opening_not_zk; roadmap="
         << privacy_zk_roadmap_label();
     error = oss.str();
@@ -104,7 +107,7 @@ bool privacy_zk_v1_mint_allowed(const ZkMintPublicInputs& inputs,
                                 std::string& error,
                                 PrivacyClaimLabel& claim_out) {
     const auto& verifier = default_privacy_zk_verifier();
-    claim_out = verifier.claim_label();
+    claim_out = PrivacyClaimLabel::ZkPending;
 
     if (inputs.owner.empty() || inputs.amount == 0) {
         error = "invalid zk_v1 mint params";
@@ -114,12 +117,17 @@ bool privacy_zk_v1_mint_allowed(const ZkMintPublicInputs& inputs,
         error = "commitment/nullifier must be even-length hex";
         return false;
     }
-    if (!is_hex_even(proof.proof_hex) || !is_hex_even(proof.verification_key_hex)) {
-        error = "proof/vk must be even-length hex";
+
+    const auto st = zk_circuit_mint_from_rpc(inputs);
+    if (!zk_circuit_v1_validate_mint_public(st, error)) {
+        return false;
+    }
+    // Reject fake self-advertised zk claims and unproven circuit before any mint.
+    if (!zk_circuit_v1_validate_proof_material(proof, error)) {
         return false;
     }
 
-    if (!verifier.backend_wired()) {
+    if (!verifier.backend_wired() || !zk_circuit_v1_proven()) {
         // Fail-closed: never mint; never upgrade claim to zk_v1.
         claim_out = PrivacyClaimLabel::ZkPending;
         reject_unwired("mint", error);
@@ -127,10 +135,7 @@ bool privacy_zk_v1_mint_allowed(const ZkMintPublicInputs& inputs,
     }
 
     if (!verifier.verify_mint(inputs, proof, error)) {
-        if (claim_out == PrivacyClaimLabel::ZkV1) {
-            // A wired backend that rejects must not advertise a successful zk_v1 mint.
-            claim_out = PrivacyClaimLabel::ZkPending;
-        }
+        claim_out = PrivacyClaimLabel::ZkPending;
         return false;
     }
 
@@ -142,8 +147,16 @@ bool privacy_zk_v1_spend_allowed(const ZkSpendPublicInputs& inputs,
                                  const ZkProofMaterial& proof,
                                  std::string& error,
                                  PrivacyClaimLabel& claim_out) {
+    return privacy_zk_v1_spend_allowed(inputs, proof, /*note_commitment_hex=*/"", error, claim_out);
+}
+
+bool privacy_zk_v1_spend_allowed(const ZkSpendPublicInputs& inputs,
+                                 const ZkProofMaterial& proof,
+                                 const std::string& note_commitment_hex,
+                                 std::string& error,
+                                 PrivacyClaimLabel& claim_out) {
     const auto& verifier = default_privacy_zk_verifier();
-    claim_out = verifier.claim_label();
+    claim_out = PrivacyClaimLabel::ZkPending;
 
     if (inputs.owner.empty() || inputs.recipient.empty() || inputs.note_id.empty() ||
         inputs.amount == 0) {
@@ -154,21 +167,26 @@ bool privacy_zk_v1_spend_allowed(const ZkSpendPublicInputs& inputs,
         error = "nullifier must be even-length hex";
         return false;
     }
-    if (!is_hex_even(proof.proof_hex) || !is_hex_even(proof.verification_key_hex)) {
-        error = "proof/vk must be even-length hex";
+
+    if (!note_commitment_hex.empty()) {
+        const auto st = zk_circuit_spend_from_rpc(inputs, note_commitment_hex);
+        if (!zk_circuit_v1_validate_spend_public(st, error)) {
+            return false;
+        }
+    }
+
+    if (!zk_circuit_v1_validate_proof_material(proof, error)) {
         return false;
     }
 
-    if (!verifier.backend_wired()) {
+    if (!verifier.backend_wired() || !zk_circuit_v1_proven()) {
         claim_out = PrivacyClaimLabel::ZkPending;
         reject_unwired("spend", error);
         return false;
     }
 
     if (!verifier.verify_spend(inputs, proof, error)) {
-        if (claim_out == PrivacyClaimLabel::ZkV1) {
-            claim_out = PrivacyClaimLabel::ZkPending;
-        }
+        claim_out = PrivacyClaimLabel::ZkPending;
         return false;
     }
 
