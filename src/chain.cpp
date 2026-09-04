@@ -172,7 +172,8 @@ bool Chain::hash_meets_target(const std::string& hex_hash, std::uint64_t target)
     case PowAlgorithm::MemoryHard:
         break;
     }
-    return hash_head64(hex_hash) <= target;
+    // Fail closed: never accept PoW via plain SHA3 when algorithm is unknown.
+    return false;
 }
 
 std::uint64_t Chain::compute_block_reward(std::uint64_t h) const {

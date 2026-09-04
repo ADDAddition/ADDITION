@@ -20,7 +20,11 @@ Hash512 sha3_512_bytes(const std::vector<std::uint8_t>& data);
 Hash512 sha3_512_bytes(const std::string& data);
 std::string to_hex(const Hash512& hash);
 std::uint64_t hash_head64(const std::string& hex_hash);
-// 1 MiB x 16-round scratch hash. Consensus: do not change the mix.
+
+// Mainnet PoW mix (ADDITION_MAINNET_V1). Consensus: do not change size/rounds/mix.
+// Design is SHA3-512 + this scratch (not SHA3-256; testnet PoW stays plain sha3_512).
+inline constexpr std::size_t kMemoryHardScratchBytes = 1U << 20; // 1 MiB
+inline constexpr std::size_t kMemoryHardRounds = 16;
 std::uint64_t memory_hard_head64(const std::string& seed_hex);
 std::string bytes_to_hex(const std::vector<std::uint8_t>& bytes);
 bool hex_to_bytes(const std::string& hex,
