@@ -120,6 +120,10 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn(".footer-banner", css)
         self.assertIn("object-fit: contain", css)
         self.assertIn("@media (max-width: 840px)", css)
+        # Full-bleed hero stinger: break out of centered main to 100vw.
+        self.assertIn("width: 100vw", css)
+        self.assertIn("margin-left: calc(50% - 50vw)", css)
+        self.assertNotIn("max-width: 52rem", css)
         # Live phone hotfix (CoS curl): exact ≤840px stinger block; 56vw×2; no max-height:none.
         self.assertIn(
             """@media (max-width: 840px) {
@@ -127,8 +131,8 @@ class PublicSiteStaticTests(unittest.TestCase):
   video.hero-stinger,
   .hero-stinger video {
     display: block;
-    width: 100%;
-    max-width: 100%;
+    width: 100vw;
+    max-width: 100vw;
     height: auto;
     max-height: 56vw;
     object-fit: contain;
@@ -137,6 +141,8 @@ class PublicSiteStaticTests(unittest.TestCase):
   .hero-stinger {
     overflow: hidden;
     margin: 0.5rem 0 1rem;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
   }
 }""",
             css,
