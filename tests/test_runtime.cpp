@@ -123,6 +123,12 @@ int main() {
         std::cerr << "test failed: crypto_selftest: " << selftest << '\n';
         return 1;
     }
+    if (selftest.find("sha3_512=real") == std::string::npos ||
+        selftest.find("memory_hard=real") == std::string::npos) {
+        std::cerr << "test failed: crypto_selftest must prove real SHA3-512 + memory_hard: "
+                  << selftest << '\n';
+        return 1;
+    }
 
     const auto created = rpc.handle_command("createwallet miner");
     if (!expect_contains(created, "algo=ml-dsa-87", "createwallet algo")) {

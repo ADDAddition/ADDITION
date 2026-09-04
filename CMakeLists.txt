@@ -88,6 +88,11 @@ if(ADDITION_BUILD_TESTS)
     target_link_libraries(test_hash_address PRIVATE addition_core)
     add_test(NAME test_hash_address COMMAND test_hash_address)
 
+    add_executable(test_crypto tests/test_crypto.cpp)
+    target_link_libraries(test_crypto PRIVATE addition_core)
+    add_test(NAME test_crypto COMMAND test_crypto)
+    set_tests_properties(test_crypto PROPERTIES TIMEOUT 60)
+
     add_executable(test_slh_dsa tests/test_slh_dsa.cpp)
     target_link_libraries(test_slh_dsa PRIVATE addition_core)
     add_test(NAME test_slh_dsa COMMAND test_slh_dsa)

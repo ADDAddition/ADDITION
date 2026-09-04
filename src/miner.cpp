@@ -24,7 +24,8 @@ bool pow_meets_target(PowAlgorithm algorithm, const std::string& header_hash, st
     case PowAlgorithm::MemoryHard:
         break;
     }
-    return hash_head64(header_hash) <= target;
+    // Fail closed: never fall back to plain SHA3 head64 for unknown / mainnet paths.
+    return false;
 }
 
 std::size_t resolve_mine_threads(std::size_t requested) {

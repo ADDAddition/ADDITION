@@ -820,6 +820,38 @@ bool random_hex(std::size_t nbytes, std::string& out, std::string& error) {
 bool crypto_selftest(std::string& report) {
     report.clear();
 
+    // OpenSSL SHA3-512 must match FIPS 202 / NIST short vectors (not a no-op digest).
+    // Chain hashing and testnet PoW use SHA3-512; design does not use SHA3-256.
+    const auto empty_hex = to_hex(sha3_512_bytes(std::string{}));
+    const auto abc_hex = to_hex(sha3_512_bytes(std::string{"abc"}));
+    constexpr const char* kSha3_512Empty =
+        "a69f73cca23a9ac5c8b567dc185a756e97c982164fe25859e0d1dcc1475c80a6"
+        "15b2123af1f5f94c11e3e9402c3ac558f500199d95b6d3e301758586281dcd26";
+    constexpr const char* kSha3_512Abc =
+        "b751850b1a57168a5693cd924b6b096e08f621827444f70d884f5d0240d2712e"
+        "10e116e9192af3c91a7ec57647e3934057340b4cf408d5a56592f8274eec53f0";
+    if (empty_hex != kSha3_512Empty || abc_hex != kSha3_512Abc) {
+        report = "selftest: SHA3-512 NIST vector mismatch (OpenSSL digest not real)";
+        return false;
+    }
+
+    // Mainnet memory_hard: 1 MiB x 16 rounds over SHA3-512. Must be deterministic
+    // and must not collapse to plain hash_head64(SHA3-512(seed)).
+    static_assert(kMemoryHardScratchBytes == (1U << 20), "memory_hard scratch must stay 1 MiB");
+    static_assert(kMemoryHardRounds == 16, "memory_hard rounds must stay 16");
+    constexpr const char* kMhSeed = "addition-memory-hard-selftest";
+    constexpr std::uint64_t kMhExpected = 0x316e8360b8cde37bULL;
+    const auto mh = memory_hard_head64(kMhSeed);
+    const auto plain = hash_head64(to_hex(sha3_512_bytes(std::string{kMhSeed})));
+    if (mh != kMhExpected) {
+        report = "selftest: memory_hard vector mismatch (PoW mix not as designed)";
+        return false;
+    }
+    if (mh == plain) {
+        report = "selftest: memory_hard collapsed to plain SHA3 head64 (stub/no-op)";
+        return false;
+    }
+
     OQS_SIG* sig = OQS_SIG_new(OQS_SIG_alg_ml_dsa_87);
     if (sig == nullptr) {
         report = "selftest: OQS_SIG_new failed";
@@ -865,7 +897,8 @@ bool crypto_selftest(std::string& report) {
         return false;
     }
 
-    report = std::string("selftest: ok allowed_sig_algs=") + allowed_sig_algs_list();
+    report = std::string("selftest: ok sha3_512=real memory_hard=real allowed_sig_algs=") +
+             allowed_sig_algs_list();
     return true;
 }
 
@@ -878,29 +911,27 @@ std::uint64_t hash_head64(const std::string& hex_hash) {
 }
 
 std::uint64_t memory_hard_head64(const std::string& seed_hex) {
-    constexpr std::size_t kScratchSize = 1 << 20; // 1 MiB
-    constexpr std::size_t kRounds = 16;
-
-    std::vector<std::uint8_t> scratch(kScratchSize, 0);
+    std::vector<std::uint8_t> scratch(kMemoryHardScratchBytes, 0);
     auto digest = sha3_512_bytes(seed_hex);
 
     for (std::size_t i = 0; i < scratch.size(); ++i) {
         scratch[i] = static_cast<std::uint8_t>(digest[i % digest.size()] ^ static_cast<std::uint8_t>(i & 0xFF));
     }
 
-    for (std::size_t r = 0; r < kRounds; ++r) {
+    for (std::size_t r = 0; r < kMemoryHardRounds; ++r) {
         for (std::size_t i = 0; i < scratch.size(); ++i) {
             const std::size_t j = (static_cast<std::size_t>(scratch[i]) * 1315423911ULL + i + r) % scratch.size();
             scratch[i] = static_cast<std::uint8_t>(scratch[i] ^ scratch[j] ^ static_cast<std::uint8_t>((i + r) & 0xFF));
         }
-        digest = sha3_512_bytes(std::string(reinterpret_cast<const char*>(scratch.data()), scratch.size()));
+        // Hash the full binary scratch (length-aware); null bytes are significant.
+        digest = sha3_512_bytes(std::vector<std::uint8_t>(scratch.begin(), scratch.end()));
         for (std::size_t i = 0; i < digest.size(); ++i) {
             const std::size_t k = (i * 8191 + r) % scratch.size();
             scratch[k] ^= digest[i];
         }
     }
 
-    const auto final_hex = to_hex(sha3_512_bytes(std::string(reinterpret_cast<const char*>(scratch.data()), scratch.size())));
+    const auto final_hex = to_hex(sha3_512_bytes(std::vector<std::uint8_t>(scratch.begin(), scratch.end())));
     return hash_head64(final_hex);
 }
 
