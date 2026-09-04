@@ -527,6 +527,44 @@
     return PUBLIC_READ_COMMANDS;
   }
 
+  function renderLiveStrip(status) {
+    const strip = document.getElementById("live-strip");
+    const flag = document.getElementById("strip-flag");
+    const cells = document.getElementById("strip-cells");
+    if (!strip || !flag || !cells) {
+      return;
+    }
+    while (cells.firstChild) {
+      cells.removeChild(cells.firstChild);
+    }
+    const offline = !status || status.offline || status.ok === false;
+    if (offline) {
+      strip.className = "status-strip offline";
+      flag.textContent = "RPC offline";
+      return;
+    }
+    const fields = (status.strip) || stripFields(status.fields || {});
+    const keys = Object.keys(fields);
+    if (keys.length === 0) {
+      strip.className = "status-strip offline";
+      flag.textContent = "RPC offline";
+      return;
+    }
+    strip.className = "status-strip ok";
+    flag.textContent = "live";
+    for (let i = 0; i < keys.length; i += 1) {
+      const wrap = document.createElement("div");
+      const dt = document.createElement("dt");
+      dt.textContent = keys[i];
+      const dd = document.createElement("dd");
+      // Preserve real zeros (height=0 / peers=0) — never blank or invent.
+      dd.textContent = String(fields[keys[i]]);
+      wrap.appendChild(dt);
+      wrap.appendChild(dd);
+      cells.appendChild(wrap);
+    }
+  }
+
   global.AdditionSite = {
     rpcUrlFromPage: rpcUrlFromPage,
     parseFields: parseFields,
@@ -540,6 +578,7 @@
     loadChainStatus: loadChainStatus,
     renderRecentBlocks: renderRecentBlocks,
     renderFields: renderFields,
+    renderLiveStrip: renderLiveStrip,
     setStatus: setStatus,
     stripFields: stripFields,
     mergeFields: mergeFields,

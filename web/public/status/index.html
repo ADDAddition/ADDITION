@@ -5,13 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Network status — ADDITION</title>
   <meta name="description" content="Live getinfo from the ADDITION mainnet public read RPC (ADDITION_MAINNET_V1).">
-  <meta name="theme-color" content="#f3f6fa">
+  <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/favicon.ico">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta property="og:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="/common.css">
 </head>
 <body>
@@ -66,41 +69,6 @@
   <script src="/chrome.js"></script>
   <script>
     const S = window.AdditionSite;
-    function renderStrip(status) {
-      const strip = document.getElementById("live-strip");
-      const flag = document.getElementById("strip-flag");
-      const cells = document.getElementById("strip-cells");
-      if (!strip || !flag || !cells) {
-        return;
-      }
-      while (cells.firstChild) {
-        cells.removeChild(cells.firstChild);
-      }
-      if (!status || status.offline || !status.ok) {
-        strip.className = "status-strip offline";
-        flag.textContent = "RPC offline";
-        return;
-      }
-      const fields = status.strip || S.stripFields(status.fields || {});
-      const keys = Object.keys(fields);
-      if (keys.length === 0) {
-        strip.className = "status-strip offline";
-        flag.textContent = "RPC offline";
-        return;
-      }
-      strip.className = "status-strip ok";
-      flag.textContent = "live";
-      for (let i = 0; i < keys.length; i += 1) {
-        const wrap = document.createElement("div");
-        const dt = document.createElement("dt");
-        dt.textContent = keys[i];
-        const dd = document.createElement("dd");
-        dd.textContent = fields[keys[i]];
-        wrap.appendChild(dt);
-        wrap.appendChild(dd);
-        cells.appendChild(wrap);
-      }
-    }
     async function loadOne(cmd, fieldsId, rawId) {
       const result = await S.explorerCommand(cmd);
       const raw = document.getElementById(rawId);
@@ -118,7 +86,7 @@
     async function load() {
       const state = document.getElementById("rpc-state");
       const status = await S.loadChainStatus();
-      renderStrip(status);
+      S.renderLiveStrip(status);
       const info = await loadOne("getinfo", "info-fields", "info-raw");
       if (info.offline || !info.ok) {
         state.className = "offline";

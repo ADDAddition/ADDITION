@@ -82,9 +82,9 @@
 
     ensureLink("manifest", "/manifest.webmanifest");
     ensureLink("apple-touch-icon", "/apple-touch-icon.png");
-    ensureMeta("theme-color", "#f3f6fa");
+    ensureMeta("theme-color", "#0b1220");
     ensureMeta("apple-mobile-web-app-capable", "yes");
-    ensureMeta("apple-mobile-web-app-status-bar-style", "default");
+    ensureMeta("apple-mobile-web-app-status-bar-style", "black-translucent");
     ensureMeta("apple-mobile-web-app-title", "ADDITION");
     ensureMeta("mobile-web-app-capable", "yes");
 
@@ -139,7 +139,7 @@
     el.innerHTML =
       '<div class="site-chrome-inner">' +
       '<a class="brand" href="' + withQ("/") + '">' +
-      '<img class="brand-logo" src="/logo-transparent.png" alt="ADDITION">' +
+      '<img class="brand-logo" src="/logo-transparent.png" alt="ADDITION" width="172" height="34" decoding="async">' +
       '<span class="brand-text"><span class="brand-name">ADDITION</span>' +
       '<span class="brand-tag">Layer 1 · ML-DSA-87</span></span></a>' +
       '<div class="chrome-right">' +
@@ -224,14 +224,8 @@
 
   function fillFooter(el) {
     el.className = "site-footer-wrap";
+    // Banner video lives in the homepage hero only — footer is copy + links.
     el.innerHTML =
-      '<video' +
-      ' class="footer-banner"' +
-      ' muted' +
-      ' loop' +
-      ' playsinline' +
-      ' preload="metadata"' +
-      ' src="https://additionblockchain.com/banners/addition-banner-2.mp4"></video>' +
       '<div class="site-footer-copy">' +
       '<p>ADDITION · public product is <strong>MAINNET</strong> · keys stay on your device or local node</p>' +
       '<p><a href="/compare/">Compare</a> · <a href="/download/">Download</a> · <a href="/docs/">Docs</a> · ' +
@@ -239,8 +233,8 @@
       "</div>";
   }
 
-  function kickHeroStinger() {
-    const video = document.querySelector(".hero-stinger");
+  function kickHeroBanner() {
+    const video = document.querySelector(".hero-banner");
     if (!video) {
       return;
     }
@@ -263,5 +257,20 @@
     fillFooter(footer);
   }
   fillBottomTabs();
-  kickHeroStinger();
+  kickHeroBanner();
+
+  // Close mobile drawer on Escape (a11y).
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape") {
+      return;
+    }
+    const toggle = document.getElementById("menu-toggle");
+    const drawer = document.getElementById("mobile-drawer");
+    if (!toggle || !drawer || drawer.hasAttribute("hidden")) {
+      return;
+    }
+    drawer.setAttribute("hidden", "");
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.focus();
+  });
 }());

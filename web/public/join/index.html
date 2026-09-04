@@ -5,17 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Get started — ADDITION</title>
   <meta name="description" content="Join ADDITION_MAINNET_V1. Public seed P2P 34.27.30.115:28546, RPC 38546 (read + write). Bitcoin-like self-custody.">
-  <meta name="theme-color" content="#f3f6fa">
+  <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/favicon.ico">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta property="og:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="/common.css">
 </head>
 <body data-title="Get started" data-sub="home node">
   <header id="site-header"></header>
+  <div id="live-strip" class="status-strip pending" aria-live="polite">
+    <div class="status-strip-inner">
+      <span id="strip-flag" class="status-flag">…</span>
+      <dl id="strip-cells" class="status-cells"></dl>
+    </div>
+  </div>
   <main class="prose">
     <section class="product-hero" style="padding-top:1rem">
       <p class="eyebrow"><span class="net-badge">MAINNET</span> Home node</p>
@@ -120,6 +129,15 @@ curl -s 'https://additionblockchain.com/api/rpc?cmd=getinfo'</pre>
     </section>
   </main>
   <footer id="site-footer"></footer>
+  <script src="/common.js"></script>
   <script src="/chrome.js"></script>
+  <script>
+    (function () {
+      const S = window.AdditionSite;
+      S.rpcCommand("getinfo").then(function (info) {
+        S.renderLiveStrip(info);
+      });
+    }());
+  </script>
 </body>
 </html>
