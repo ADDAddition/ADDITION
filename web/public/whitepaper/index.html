@@ -102,8 +102,8 @@ kRounds      = 16</pre>
 <table><tr><th>Parameter</th><th>Value</th></tr><tr><td><code>max_supply</code></td><td><strong>50,000,000</strong> whole units</td></tr><tr><td><code>block_reward</code></td><td><strong>50</strong></td></tr><tr><td><code>halving_interval</code></td><td><strong>210,000</strong> blocks</td></tr><tr><td><code>tail_emission_reward</code></td><td>1 (after deep halvings / policy in chain)</td></tr><tr><td><code>min_fee</code> (spec / genesis)</td><td><strong>0</strong></td></tr><tr><td>Precision</td><td>Whole integers only — no 8-decimal satoshi subunit</td></tr></table>
 <p><strong>Coinbase:</strong> 100% of the block reward (plus collected fees, subject to validation) goes to the finding miner’s address. No token sale, no pre-mine claim in genesis beyond the empty height-0 chain, no ICO language.</p>
 <p><strong>Fees:</strong> Spec / genesis / <code>mainnet_chain_config()</code> floor is <code>min_fee=0</code>. Congestion heuristics raise <code>recommended_min_fee</code> / <code>dynamic_min_fee</code> from mempool size and last-block fees (<code>rpc_server.cpp</code> <code>recommended_min_fee</code>, plus <code>AIRoutingOptimizer</code> fee floor). Live seed <code>fee_info</code> observed while drafting reported <code>base_min_fee=1</code> / <code>recommended_min_fee=1</code> and <code>getinfo</code> reported <code>dynamic_min_fee=1</code> — that is an operational snapshot, not a rewrite of the in-repo genesis constant. Copy live fields; do not invent a fee market narrative.</p>
-<p><strong>Live monetary snapshot</strong> (public seed <code>monetary_info</code>, observed while drafting):</p>
-<pre>max_supply=50000000 emitted=0 remaining=50000000 next_reward=50 next_halving_height=210000</pre>
+<p><strong>Live <code>monetary_info</code></strong> (fetched via <code>/api/rpc</code> — emit/remaining change with height; fail closed if RPC is offline):</p>
+<pre id="live-monetary-snapshot" class="raw">Loading live monetary_info…</pre>
 <hr>
 <h2 id="7-networks-and-ports">7. Networks and ports</h2>
 <p>Three profiles — not a label flip. Only mainnet is the live public product:</p>
@@ -153,16 +153,10 @@ curl -s &#x27;http://34.27.30.115:38546/jsonrpc?method=getinfo&#x27;</pre>
 <h2 id="12-vision-vs-live-roadmap">12. Vision vs Live (roadmap)</h2>
 <p>Re-state the early table with live getinfo context. Design docs:</p>
 <ul><li>Privacy scaffold: <a href="PRIVACY_REAL_V1.md"><code>docs/PRIVACY_REAL_V1.md</code></a> (vision #77)</li><li>ZK circuit schema (not live): <a href="ZK_CIRCUIT_V1.md"><code>docs/ZK_CIRCUIT_V1.md</code></a></li><li>Fast path scaffold: <a href="FAST_PATH_V1.md"><code>docs/FAST_PATH_V1.md</code></a> (vision #78, tip SHA <code>6d3f483</code> or later)</li></ul>
-<p><strong>Live public <code>getinfo</code> snapshot</strong> (seed <code>34.27.30.115:38546</code>, observed while drafting this document — copy fields only):</p>
-<pre>network=mainnet network_name=addition-mainnet network_id=ADDITION_MAINNET_V1
-height=0 mempool=0 peers=14 bootstrap_peers=34.27.30.115:28546
-difficulty_target=1099511627775 next_reward=50 dynamic_min_fee=1 max_supply=50000000
-last_mine_ms=0 last_mined_txs=0 last_tps=0.00
-pq_mode=strict allowed_sig_algs=ml-dsa-87
-pow_algorithm=memory_hard pow_profile=mainnet
-privacy_claim=opening_not_zk privacy_ok=true
-auto_mine=off mine_deadline_sec=0</pre>
-<table><tr><th>Field / topic</th><th>Live truth</th></tr><tr><td><code>network_id</code></td><td><code>ADDITION_MAINNET_V1</code></td></tr><tr><td>Height</td><td>From live <code>getinfo</code> only — <strong>may be <code>0</code></strong></td></tr><tr><td><code>pq_mode</code> / algs</td><td><code>strict</code> / <code>ml-dsa-87</code> + SHA3-512</td></tr><tr><td><code>privacy_claim</code></td><td><code>opening_not_zk</code></td></tr><tr><td><code>privacy_zk_roadmap</code></td><td><code>zk_pending</code> (scaffold)</td></tr><tr><td><code>consensus_path</code></td><td><code>memory_hard_pow</code></td></tr><tr><td><code>fast_path_status</code></td><td><code>not_this_network</code> on mainnet</td></tr><tr><td><code>throughput_claim</code></td><td><code>none</code></td></tr><tr><td><code>research_goal_is_not_a_measurement</code></td><td><code>true</code></td></tr><tr><td><code>economic_security</code></td><td><code>none</code> until real</td></tr><tr><td><code>last_tps</code></td><td>Local mine telemetry when present — <strong>not</strong> marketed Solana TPS</td></tr><tr><td><code>peers=…</code></td><td>Snapshot at query time — not a permanent marketing number</td></tr></table>
+<p><strong>Live public <code>getinfo</code></strong> (fetched from seed <code>34.27.30.115:38546</code> via <code>/api/rpc</code> — height may be <code>0</code>; peers change; never a canned marketing number). Prefer <a href="/status/">/status/</a> for the full panel.</p>
+<pre id="live-getinfo-snapshot" class="raw">Loading live getinfo…</pre>
+<p id="live-getinfo-note" class="note"></p>
+<table><tr><th>Field / topic</th><th>Live truth</th></tr><tr><td><code>network_id</code></td><td>From live <code>getinfo</code> only</td></tr><tr><td>Height</td><td>From live <code>getinfo</code> only — <strong>may be <code>0</code></strong></td></tr><tr><td><code>pq_mode</code> / algs</td><td><code>strict</code> / <code>ml-dsa-87</code> + SHA3-512 (product claim; confirm via live fields)</td></tr><tr><td><code>privacy_claim</code></td><td>From live <code>getinfo</code> (opening is <code>opening_not_zk</code>)</td></tr><tr><td><code>privacy_zk_roadmap</code></td><td><code>zk_pending</code> (scaffold)</td></tr><tr><td><code>consensus_path</code></td><td><code>memory_hard_pow</code></td></tr><tr><td><code>fast_path_status</code></td><td><code>not_this_network</code> on mainnet</td></tr><tr><td><code>throughput_claim</code></td><td><code>none</code></td></tr><tr><td><code>research_goal_is_not_a_measurement</code></td><td><code>true</code></td></tr><tr><td><code>economic_security</code></td><td><code>none</code> until real</td></tr><tr><td><code>last_tps</code></td><td>Local mine telemetry when present — <strong>not</strong> marketed Solana TPS</td></tr><tr><td><code>peers=…</code></td><td>Live query only — not a permanent marketing number</td></tr></table>
 <p>No USD ticker (<code>price_usd</code> stays null on the site API). PoUW phase-1 text (<code>docs/POUW_PHASE1_SPEC.md</code>) is a design target, not a claim that public mainnet already sells compute/storage.</p>
 <p>Future hardening called out in-repo (architecture notes): stronger on-disk formats, native ADD lock into privacy (notes are still a side ledger), reproducible releases. Those are backlog items, not shipped guarantees.</p>
 <p><strong>Privacy — Vision vs Live:</strong> live remains <code>opening_not_zk</code>. A C++ fail-closed ZK scaffold (<code>privacy_zk.*</code>, <a href="PRIVACY_REAL_V1.md"><code>PRIVACY_REAL_V1.md</code></a>) reports <code>privacy_zk_roadmap=zk_pending</code> and does not mint/spend without a real verifier. Circuit work in progress (<code>zk_circuit_v1.*</code>, <a href="ZK_CIRCUIT_V1.md"><code>ZK_CIRCUIT_V1.md</code></a>, <code>zk_circuit_status=not_proven</code>) — not live ZK. No false ZK claims.</p>
@@ -188,6 +182,48 @@ export ADDITION_ENABLE_P2P_RPC=1
     <p class="note">Source file in the repository: <a href="https://github.com/ADDAddition/ADDITION/blob/main/docs/whitepaper.md">docs/whitepaper.md</a></p>
   </main>
   <footer id="site-footer"></footer>
+  <script src="/common.js"></script>
   <script src="/chrome.js"></script>
+  <script>
+    (function () {
+      const S = window.AdditionSite;
+      const pre = document.getElementById("live-getinfo-snapshot");
+      const note = document.getElementById("live-getinfo-note");
+      if (!S || !pre) {
+        return;
+      }
+      const monetary = document.getElementById("live-monetary-snapshot");
+      S.explorerCommand("getinfo").then(function (result) {
+        if (result.offline || !result.ok) {
+          pre.textContent = "RPC offline";
+          if (monetary) {
+            monetary.textContent = "RPC offline";
+          }
+          if (note) {
+            note.textContent = "Fail closed — no sample getinfo substituted.";
+          }
+          return;
+        }
+        pre.textContent = result.raw || "";
+        if (note) {
+          const h = S.fieldOrNull(result.fields || {}, "height");
+          const p = S.fieldOrNull(result.fields || {}, "peers");
+          note.textContent = "Copied from live getinfo"
+            + (h !== null ? (" · height=" + h) : "")
+            + (p !== null ? (" · peers=" + p) : "")
+            + ".";
+        }
+      });
+      if (monetary) {
+        S.explorerCommand("monetary_info").then(function (result) {
+          if (result.offline || !result.ok) {
+            monetary.textContent = "RPC offline";
+            return;
+          }
+          monetary.textContent = result.raw || "";
+        });
+      }
+    }());
+  </script>
 </body>
 </html>

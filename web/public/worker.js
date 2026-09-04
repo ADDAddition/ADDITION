@@ -111,8 +111,20 @@ function parseFields(line) {
   return fields;
 }
 
+function fieldPresent(fields, key) {
+  return !!(fields && Object.prototype.hasOwnProperty.call(fields, key)
+    && fields[key] !== undefined && fields[key] !== null && fields[key] !== "");
+}
+
+function fieldOrNull(fields, key) {
+  if (!fieldPresent(fields, key)) {
+    return null;
+  }
+  return fields[key];
+}
+
 function parseHeight(fields) {
-  if (!fields || fields.height === undefined) {
+  if (!fieldPresent(fields, "height")) {
     return null;
   }
   const n = Number(fields.height);
@@ -207,18 +219,19 @@ async function buildInfoPayload(upstream, symbol) {
     ok: true,
     offline: false,
     brand: "ADDITION",
-    network: fields.network || null,
-    network_name: fields.network_name || null,
-    network_id: fields.network_id || null,
+    network: fieldOrNull(fields, "network"),
+    network_name: fieldOrNull(fields, "network_name"),
+    network_id: fieldOrNull(fields, "network_id"),
     height: height,
-    peers: fields.peers || null,
-    pq_mode: fields.pq_mode || null,
-    pow_algorithm: fields.pow_algorithm || null,
-    max_supply: fields.max_supply || null,
-    emitted: fields.emitted || null,
-    remaining: fields.remaining || null,
-    next_reward: fields.next_reward || null,
-    next_halving_height: fields.next_halving_height || null,
+    peers: fieldOrNull(fields, "peers"),
+    pq_mode: fieldOrNull(fields, "pq_mode"),
+    pow_algorithm: fieldOrNull(fields, "pow_algorithm"),
+    privacy_claim: fieldOrNull(fields, "privacy_claim"),
+    max_supply: fieldOrNull(fields, "max_supply"),
+    emitted: fieldOrNull(fields, "emitted"),
+    remaining: fieldOrNull(fields, "remaining"),
+    next_reward: fieldOrNull(fields, "next_reward"),
+    next_halving_height: fieldOrNull(fields, "next_halving_height"),
     price_available: false,
     price_usd: null,
     price_note: "No market price RPC on this node",
@@ -270,17 +283,25 @@ async function buildCapabilitiesPayload(upstream) {
       anyAvailable = true;
     }
   }
+  const info = await upstreamCmd(upstream, "getinfo");
+  let networkId = null;
+  if (!info.offline && info.ok) {
+    networkId = fieldOrNull(info.fields || {}, "network_id");
+  }
   return {
-    status: 200,
+    status: info.offline ? 503 : 200,
     body: {
-      ok: true,
+      ok: !info.offline,
+      offline: !!info.offline,
       brand: "ADDITION",
-      network_id: "ADDITION_MAINNET_V1",
+      network_id: networkId,
       public_write: true,
       launch_tabs_enabled: anyAvailable,
-      note: anyAvailable
-        ? "At least one launch command answered on the public path"
-        : "Public write on 38546 includes createwallet/mine/wallet_send/sign/tx_build; Create Token / Presale / Airdrop / Farm stay off unless probed available",
+      note: info.offline
+        ? "RPC offline"
+        : (anyAvailable
+          ? "At least one launch command answered on the public path"
+          : "Public write on 38546 includes createwallet/mine/wallet_send/sign/tx_build; Create Token / Presale / Airdrop / Farm stay off unless probed available"),
       probes: probes,
     },
   };
