@@ -216,6 +216,7 @@ int main() {
             !expect_contains(info, "fast_path_status=not_this_network", "fast status") ||
             !expect_contains(info, "fast_path_network_id=ADDITION_FAST_V1", "fast id") ||
             !expect_contains(info, "fast_path_shipped=false", "fast shipped") ||
+            !expect_contains(info, "fast_path_slice=pipeline_stages_typed_v1", "fast slice") ||
             !expect_contains(info, "throughput_claim=none", "throughput claim") ||
             !expect_contains(info, "research_goal_is_not_a_measurement=true", "goal label") ||
             !expect_contains(info, "pq_mode=strict", "pq mode") ||
@@ -245,12 +246,160 @@ int main() {
         const auto fields = addition::fast_path_info_fields(fast);
         if (!expect_contains(fields, "consensus_path=leader_pipeline_scaffold", "fast consensus") ||
             !expect_contains(fields, "fast_path_status=scaffold_incomplete", "fast status") ||
+            !expect_contains(fields, "fast_path_slice=pipeline_stages_typed_v1", "fast slice") ||
             !expect_contains(fields, "throughput_claim=none", "fast throughput")) {
             return 1;
         }
         if (!expect_absent(fields, "solana", "solana in fast fields") ||
             !expect_absent(fields, "measured_tps=65000", "fake solana tps") ||
             !expect_absent(fields, "tps=100000", "fake 100k as measurement")) {
+            return 1;
+        }
+    }
+
+    // --- Pipeline stages + typed messages (REAL validation; not consensus) ---
+    {
+        const auto order = addition::fast_pipeline_stage_order();
+        if (order.size() != 6 || order.front() != addition::FastPipelineStage::Idle ||
+            order.back() != addition::FastPipelineStage::Committed) {
+            std::cerr << "test failed: stage order\n";
+            return 1;
+        }
+        if (std::string(addition::fast_path_slice_label()) != "pipeline_stages_typed_v1") {
+            std::cerr << "test failed: slice label\n";
+            return 1;
+        }
+
+        addition::FastPipelineBatch batch(42);
+        if (batch.stage() != addition::FastPipelineStage::Idle) {
+            std::cerr << "test failed: batch starts Idle\n";
+            return 1;
+        }
+
+        const addition::FastMessageKind kinds[] = {
+            addition::FastMessageKind::IngestBatch,
+            addition::FastMessageKind::ScheduleTicket,
+            addition::FastMessageKind::ExecutionReceipt,
+            addition::FastMessageKind::VerifyAck,
+            addition::FastMessageKind::CommitSeal,
+        };
+        const addition::FastPipelineStage after[] = {
+            addition::FastPipelineStage::Ingested,
+            addition::FastPipelineStage::Scheduled,
+            addition::FastPipelineStage::Executed,
+            addition::FastPipelineStage::Verified,
+            addition::FastPipelineStage::Committed,
+        };
+        for (std::size_t i = 0; i < 5; ++i) {
+            addition::FastPipelineMessage msg;
+            msg.kind = kinds[i];
+            msg.batch_id = 42;
+            msg.network_id = addition::kFastNetworkId;
+            msg.body = std::string("research-batch-step-") + addition::fast_message_kind_label(kinds[i]);
+            addition::fast_pipeline_seal_digest(msg);
+            std::string apply_err;
+            if (!batch.apply(msg, apply_err)) {
+                std::cerr << "test failed: apply step " << i << ": " << apply_err << '\n';
+                return 1;
+            }
+            if (batch.stage() != after[i]) {
+                std::cerr << "test failed: stage after step " << i << '\n';
+                return 1;
+            }
+        }
+        {
+            std::string done_err;
+            addition::FastMessageKind next{};
+            if (addition::fast_pipeline_next_kind(batch.stage(), next, done_err)) {
+                std::cerr << "test failed: committed batch must refuse next kind\n";
+                return 1;
+            }
+        }
+    }
+
+    // Fail-closed: wrong network, bad digest, out-of-order kind, fake TPS magic.
+    {
+        addition::FastPipelineBatch batch(7);
+        addition::FastPipelineMessage msg;
+        msg.kind = addition::FastMessageKind::IngestBatch;
+        msg.batch_id = 7;
+        msg.network_id = addition::kMainnetNetworkId;
+        msg.body = "x";
+        addition::fast_pipeline_seal_digest(msg);
+        std::string err;
+        if (batch.apply(msg, err) || err.find("ADDITION_FAST_V1") == std::string::npos) {
+            std::cerr << "test failed: mainnet network_id must be rejected: " << err << '\n';
+            return 1;
+        }
+
+        msg.network_id = addition::kFastNetworkId;
+        msg.body = "ok-body";
+        addition::fast_pipeline_seal_digest(msg);
+        msg.payload_digest_hex = std::string(128, '0');
+        if (batch.apply(msg, err) || err.find("digest") == std::string::npos) {
+            std::cerr << "test failed: bad digest must be rejected: " << err << '\n';
+            return 1;
+        }
+
+        addition::fast_pipeline_seal_digest(msg);
+        msg.kind = addition::FastMessageKind::CommitSeal; // skip ahead
+        addition::fast_pipeline_seal_digest(msg);
+        if (batch.apply(msg, err) || err.find("expected kind") == std::string::npos) {
+            std::cerr << "test failed: out-of-order kind must be rejected: " << err << '\n';
+            return 1;
+        }
+
+        msg.kind = addition::FastMessageKind::IngestBatch;
+        msg.body = std::string("prefix ") + addition::kFastFakeTpsMagic + " suffix";
+        addition::fast_pipeline_seal_digest(msg);
+        if (batch.apply(msg, err) || err.find("TPS claim") == std::string::npos) {
+            std::cerr << "test failed: CLAIM_MEASURED_TPS magic must be rejected: " << err << '\n';
+            return 1;
+        }
+
+        msg.body = std::string("live ") + addition::kFastFakeLiveMagic;
+        addition::fast_pipeline_seal_digest(msg);
+        if (batch.apply(msg, err) || err.find("fail-closed") == std::string::npos) {
+            std::cerr << "test failed: CLAIM_FAST_LIVE magic must be rejected: " << err << '\n';
+            return 1;
+        }
+
+        msg.body = "solana_tps=65000";
+        addition::fast_pipeline_seal_digest(msg);
+        if (batch.apply(msg, err)) {
+            std::cerr << "test failed: solana_tps body must be rejected\n";
+            return 1;
+        }
+    }
+
+    // SHA3-512 digest is deterministic for the domain-separated preimage.
+    {
+        addition::FastPipelineMessage a;
+        a.kind = addition::FastMessageKind::ScheduleTicket;
+        a.batch_id = 99;
+        a.network_id = addition::kFastNetworkId;
+        a.body = "deterministic-body";
+        addition::fast_pipeline_seal_digest(a);
+        addition::FastPipelineMessage b = a;
+        addition::fast_pipeline_seal_digest(b);
+        if (a.payload_digest_hex != b.payload_digest_hex || a.payload_digest_hex.size() != 128) {
+            std::cerr << "test failed: digest not deterministic SHA3-512\n";
+            return 1;
+        }
+        const auto pre = addition::fast_pipeline_digest_preimage(a);
+        if (pre.find("addition.fast_path_v1|schedule_ticket|99|ADDITION_FAST_V1|deterministic-body") ==
+            std::string::npos) {
+            std::cerr << "test failed: digest preimage domain: " << pre << '\n';
+            return 1;
+        }
+        // Full pipeline still not shipped after typed-stage progress.
+        if (addition::fast_path_pipeline_shipped()) {
+            std::cerr << "test failed: typed stages must not set pipeline shipped\n";
+            return 1;
+        }
+        std::string boot_err;
+        if (addition::fast_path_boot_allowed(boot_err)) {
+            std::cerr << "test failed: boot must stay fail-closed after typed stages\n";
             return 1;
         }
     }
@@ -272,6 +421,6 @@ int main() {
         }
     }
 
-    std::cout << "ok: fast path scaffold (mainnet PoW untouched; fail-closed; no fake Solana TPS)\n";
+    std::cout << "ok: fast path stages typed (mainnet PoW untouched; fail-closed; no fake Solana TPS)\n";
     return 0;
 }
