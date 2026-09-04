@@ -28,30 +28,22 @@
       <h1>ADDITION</h1>
       <p class="lede">
         A C++20 Layer 1 with ML-DSA-87 signatures and SHA3-512 hashing
-        (<code>pq_mode=strict</code>) — kept and shipped; not a forever-unbreakable claim.
-        This site’s public explorer is <code>ADDITION_MAINNET_V1</code>
+        (<code>pq_mode=strict</code>) — shipped on mainnet; not a forever-unbreakable claim.
+        Public product <code>ADDITION_MAINNET_V1</code>
         (seed <code>34.27.30.115:38546</code> / <code>/api/rpc</code>),
         <code>memory_hard</code> PoW. Height comes from live <code>getinfo</code> only
-        (may be <code>0</code>) — no invented TPS figures.
+        (may be <code>0</code>). Live privacy claim is <code>opening_not_zk</code>.
         Sync, mine, and wallet write are open on that public RPC (CoS allowlist).
-      </p>
-      <p class="note">
-        <strong>Vision vs Live:</strong>
-        Live product is <code>ADDITION_MAINNET_V1</code> + <code>opening_not_zk</code> privacy.
-        ZK path is fail-closed / <code>zk_pending</code>
-        (<a href="/docs/privacy-real/">privacy-real</a> · repo <code>docs/PRIVACY_REAL_V1.md</code>).
-        Fast path <code>ADDITION_FAST_V1</code> is a separate profile with typed stages
-        (<a href="/docs/fast-path/">fast-path</a> · repo <code>docs/FAST_PATH_V1.md</code>) —
-        boot fail-closed, not the public product, not a Solana TPS claim.
-        <code>research_goal_is_not_a_measurement=true</code>;
-        <code>economic_security=none</code> until real.
-        Full table: <a href="/whitepaper/">whitepaper</a>.
       </p>
       <div class="cta-row">
         <a class="btn btn-primary" href="/wallet/">Open wallet</a>
         <a class="btn btn-secondary" href="/join/">Get started</a>
-        <a class="btn btn-ghost" href="/status/">Network status</a>
+        <a class="btn btn-ghost" href="/compare/">Compare</a>
       </div>
+      <a class="compare-teaser" href="/compare/">
+        <strong>ADDITION vs Bitcoin · Ethereum · Solana · Monero</strong>
+        <span>Live mainnet axes only — PQ spends, open <code>memory_hard</code> mining, opening privacy, getinfo-backed height. No invented TPS.</span>
+      </a>
       <video
         class="hero-stinger"
         muted
@@ -114,10 +106,12 @@
     </section>
 
     <section class="cards" aria-label="Primary destinations">
+      <a href="/compare/"><strong>Compare</strong><span>Live ADDITION vs Bitcoin, Ethereum, Solana, Monero</span></a>
       <a href="/wallet/"><strong>Wallet</strong><span>Balance, receive, send — public 38546 write or home node</span></a>
       <a href="/join/"><strong>Get started</strong><span>Run a home node on mainnet (P2P 28546)</span></a>
       <a href="/status/"><strong>Status</strong><span>Live getinfo from the public mainnet RPC</span></a>
-      <a href="/download/"><strong>Download</strong><span>Desktop helper for loopback write RPC</span></a>
+      <a href="/privacy/"><strong>Privacy</strong><span>Live claim opening_not_zk — SHA3-512 opening</span></a>
+      <a href="/rpc/"><strong>Public RPC</strong><span>getinfo and command surface on seed 38546</span></a>
     </section>
   </main>
   <footer id="site-footer"></footer>

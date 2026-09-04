@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Compare — ADDITION vs Bitcoin, Ethereum, Solana, Monero</title>
+  <meta name="description" content="Live ADDITION_MAINNET_V1 facts next to well-known public characterizations of Bitcoin, Ethereum, Solana, and Monero. No invented TPS, height, or price.">
+  <meta name="theme-color" content="#f3f6fa">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:image" content="https://additionblockchain.com/og.png">
+  <meta name="twitter:image" content="https://additionblockchain.com/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="/common.css">
+</head>
+<body>
+  <header id="site-header"></header>
+  <div id="live-strip" class="status-strip pending" aria-live="polite">
+    <div class="status-strip-inner">
+      <span id="strip-flag" class="status-flag">…</span>
+      <dl id="strip-cells" class="status-cells"></dl>
+    </div>
+  </div>
+  <main>
+    <section class="product-hero" style="padding-top:1rem;padding-bottom:0.25rem">
+      <p class="eyebrow"><span class="net-badge">MAINNET</span> Live product</p>
+      <h1>ADDITION vs four chains</h1>
+      <p class="lede">
+        Only what <code>ADDITION_MAINNET_V1</code> ships today — next to short,
+        well-known public characterizations of Bitcoin, Ethereum, Solana, and Monero.
+        Height and peers come from live <code>getinfo</code> (may be <code>0</code>).
+        No ADDITION TPS, USD price, or ZK-privacy claim on this page.
+      </p>
+    </section>
+
+    <section class="panel compare-panel">
+      <h2>Live comparison</h2>
+      <p class="note">
+        ADDITION column = shipped mainnet. Other columns = typical public characterizations
+        (not ADDITION measurements).
+      </p>
+      <div class="table-wrap">
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th scope="col">Axis</th>
+              <th scope="col" class="col-addition">ADDITION</th>
+              <th scope="col">Bitcoin</th>
+              <th scope="col">Ethereum</th>
+              <th scope="col">Solana</th>
+              <th scope="col">Monero</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Consensus</th>
+              <td class="col-addition">UTXO L1 · <code>memory_hard</code> PoW · <code>ADDITION_MAINNET_V1</code></td>
+              <td>UTXO · Nakamoto PoW</td>
+              <td>Account · Proof of Stake</td>
+              <td>Account · PoH + Tower BFT (PoS)</td>
+              <td>UTXO-like · RandomX PoW</td>
+            </tr>
+            <tr>
+              <th scope="row">PoW / energy style</th>
+              <td class="col-addition">Memory-hard scratch over SHA3-512 (target floor in genesis / runbook)</td>
+              <td>SHA-256d · ASIC-oriented</td>
+              <td>N/A (PoS; no PoW mining)</td>
+              <td>N/A (PoS validators)</td>
+              <td>RandomX · CPU-oriented</td>
+            </tr>
+            <tr>
+              <th scope="row">Signatures</th>
+              <td class="col-addition"><code>ML-DSA-87</code> via liboqs · <code>pq_mode=strict</code> · SHA3-512 digests — NIST PQ suite as shipped; not a forever-unbreakable claim</td>
+              <td>ECDSA / Schnorr (secp256k1)</td>
+              <td>ECDSA (secp256k1)</td>
+              <td>Ed25519</td>
+              <td>Ed25519-family / CLSAG stack</td>
+            </tr>
+            <tr>
+              <th scope="row">Privacy (live)</th>
+              <td class="col-addition"><code>privacy_claim=opening_not_zk</code> — SHA3-512 commitment + nullifier opening; the node sees the trapdoor</td>
+              <td>Transparent ledger</td>
+              <td>Transparent ledger</td>
+              <td>Transparent ledger</td>
+              <td>Ring signatures + confidential amounts (RingCT) as public Monero design</td>
+            </tr>
+            <tr>
+              <th scope="row">Finality model</th>
+              <td class="col-addition">Probabilistic PoW (longest / heaviest valid chain)</td>
+              <td>Probabilistic PoW</td>
+              <td>Economic finality under PoS epochs</td>
+              <td>Slot confirmation under PoH / Tower</td>
+              <td>Probabilistic PoW</td>
+            </tr>
+            <tr>
+              <th scope="row">Fee model</th>
+              <td class="col-addition">Genesis / spec <code>min_fee=0</code>; live <code>dynamic_min_fee</code> / fee fields from <code>getinfo</code> when the node answers</td>
+              <td>Fee market / auction</td>
+              <td>EIP-1559 base + tip</td>
+              <td>Priority fees / prioritization</td>
+              <td>Dynamic fees (typical public Monero design)</td>
+            </tr>
+            <tr>
+              <th scope="row">Open mining / join</th>
+              <td class="col-addition">Open: bootstrap <code>34.27.30.115:28546</code>, sync, mine <code>memory_hard</code>; public RPC <code>38546</code> / site <code>/api/rpc</code></td>
+              <td>Open mining + public nodes</td>
+              <td>Validator staking (not open PoW mining)</td>
+              <td>Validator set / stake (not open PoW mining)</td>
+              <td>Open mining + public nodes</td>
+            </tr>
+            <tr>
+              <th scope="row">Height / peers</th>
+              <td class="col-addition">Only live <code>getinfo</code> (strip on this page) — height may be <code>0</code>; no canned stats</td>
+              <td>Public explorers / nodes</td>
+              <td>Public explorers / nodes</td>
+              <td>Public explorers / nodes</td>
+              <td>Public explorers / nodes</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>What ADDITION ships today</h2>
+      <ul class="compare-ships">
+        <li><strong>Post-quantum spends</strong> — ML-DSA-87 + SHA3-512 on mainnet (<code>pq_mode=strict</code>)</li>
+        <li><strong>Open PoW join</strong> — anyone can bootstrap, sync, and mine <code>memory_hard</code></li>
+        <li><strong>Live network reads</strong> — explorer / status / strip use public <code>getinfo</code> only</li>
+        <li><strong>Opening privacy</strong> — current live claim is <code>opening_not_zk</code> (not zero-knowledge)</li>
+      </ul>
+      <p class="note">
+        Rows that are not live on ADDITION mainnet (throughput races, ZK privacy, separate fast profiles)
+        are omitted here on purpose.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="/join/">Join mainnet</a>
+        <a class="btn btn-secondary" href="/status/">Live status</a>
+        <a class="btn btn-ghost" href="/wallet/">Wallet</a>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Sources / notes</h2>
+      <ul class="note" style="margin:0;padding-left:1.2rem">
+        <li>ADDITION cells: code, genesis, public seed ports, and live <code>getinfo</code> / <code>privacy_claim</code> only.</li>
+        <li>BTC / ETH / SOL / XMR cells: short typical public characterizations of those networks — not measurements taken by ADDITION.</li>
+        <li>No invented ADDITION height, peer count, TPS, or USD ticker on this page.</li>
+        <li>Deeper engineering write-up: <a href="/whitepaper/">whitepaper</a> · join steps: <a href="/join/">/join/</a> · RPC: <a href="/rpc/">/rpc/</a>.</li>
+      </ul>
+    </section>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/common.js"></script>
+  <script src="/chrome.js"></script>
+  <script>
+    (function () {
+      const S = window.AdditionSite;
+      function renderStrip(status) {
+        const strip = document.getElementById("live-strip");
+        const flag = document.getElementById("strip-flag");
+        const cells = document.getElementById("strip-cells");
+        if (!strip || !flag || !cells) {
+          return;
+        }
+        strip.className = "status-strip " + (status.offline ? "offline" : "online");
+        flag.textContent = status.offline ? "RPC offline" : "Live getinfo";
+        cells.innerHTML = "";
+        if (status.offline) {
+          return;
+        }
+        const stripFields = S.stripFields(status.fields || {});
+        const keys = Object.keys(stripFields);
+        for (let i = 0; i < keys.length; i += 1) {
+          const dt = document.createElement("dt");
+          dt.textContent = keys[i];
+          const dd = document.createElement("dd");
+          dd.textContent = stripFields[keys[i]];
+          cells.appendChild(dt);
+          cells.appendChild(dd);
+        }
+      }
+      S.rpcCommand("getinfo").then(function (info) {
+        renderStrip(info);
+      });
+    }());
+  </script>
+</body>
+</html>

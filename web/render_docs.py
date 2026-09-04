@@ -358,7 +358,7 @@ def main() -> None:
         OUT / "whitepaper" / "index.html",
         "ADDITION technical whitepaper",
         "White paper",
-        "Complete technical whitepaper from <code>docs/whitepaper.md</code>. Live <code>getinfo</code>, code, and docs only — Vision vs Live made explicit. Brand: <strong>ADDITION</strong>.",
+        "Complete technical whitepaper from <code>docs/whitepaper.md</code>. Live <code>getinfo</code>, code, and docs. Brand: <strong>ADDITION</strong>.",
         with_toc=True,
     )
     publish_raw("docs/TESTNET_PUBLIC_RPC_RUNBOOK.md", OUT / "docs" / "testnet-rpc-runbook.md")
