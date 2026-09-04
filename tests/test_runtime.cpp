@@ -343,6 +343,7 @@ int main() {
     const auto pstat = rpc.handle_command("protocol_status");
     if (!expect_contains(pstat, "measured_last_mine_ms=", "protocol measured mine") ||
         !expect_contains(pstat, "privacy_claim=opening_not_zk", "protocol claim") ||
+        !expect_contains(pstat, "privacy_zk_roadmap=zk_pending", "protocol zk roadmap") ||
         !expect_contains(pstat, "pouw_storage_check=first_nibble_parity", "protocol pouw") ||
         !expect_contains(pstat, "research_goal_is_not_a_measurement=true", "protocol goal")) {
         return 1;
@@ -361,6 +362,16 @@ int main() {
     const auto zk_bad = rpc.handle_command("privacy_mint_zk alice 1 aa bb cc dd");
     if (zk_bad.rfind("error:", 0) != 0) {
         std::cerr << "test failed: privacy_mint_zk stub/garbage must error, got " << zk_bad << '\n';
+        return 1;
+    }
+    const auto zk_v1_bad =
+        rpc.handle_command("privacy_mint_zk_v1 alice 1 " + std::string(128, 'a') + " " + std::string(128, 'b') +
+                           " " + std::string(64, 'c') + " " + std::string(64, 'd'));
+    if (zk_v1_bad.rfind("error:", 0) != 0 || zk_v1_bad.find("fail-closed") == std::string::npos ||
+        zk_v1_bad.find("claim=zk_pending") == std::string::npos ||
+        zk_v1_bad.find("claim=zk_v1") != std::string::npos) {
+        std::cerr << "test failed: privacy_mint_zk_v1 must fail-closed with zk_pending, got " << zk_v1_bad
+                  << '\n';
         return 1;
     }
 
@@ -386,10 +397,18 @@ int main() {
     if (!expect_contains(trusted_info, "privacy_mode=sha3_opening", "trusted getinfo mode") ||
         !expect_contains(trusted_info, "privacy_ok=true", "trusted getinfo privacy_ok") ||
         !expect_contains(trusted_info, "privacy_claim=opening_not_zk", "trusted getinfo claim") ||
+        !expect_contains(trusted_info, "privacy_zk_roadmap=zk_pending", "trusted getinfo zk roadmap") ||
+        !expect_contains(trusted_info, "privacy_zk_backend=fail_closed_stub", "trusted getinfo zk backend") ||
         !expect_contains(trusted_info, "privacy_verifier=sha3_opening", "trusted getinfo verifier") ||
         !expect_contains(public_info, "privacy_mode=sha3_opening", "public getinfo mode") ||
         !expect_contains(public_info, "privacy_ok=true", "public getinfo privacy_ok") ||
-        !expect_contains(public_info, "privacy_verifier=sha3_opening", "public getinfo verifier")) {
+        !expect_contains(public_info, "privacy_verifier=sha3_opening", "public getinfo verifier") ||
+        !expect_contains(public_info, "privacy_claim=opening_not_zk", "public getinfo claim")) {
+        return 1;
+    }
+    if (trusted_info.find("privacy_claim=zk_v1") != std::string::npos ||
+        public_info.find("privacy_claim=zk_v1") != std::string::npos) {
+        std::cerr << "test failed: getinfo must not claim zk_v1 while stubbed\n";
         return 1;
     }
     if (trusted_info.find("127.0.0.1:28545") == std::string::npos) {

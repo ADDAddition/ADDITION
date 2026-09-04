@@ -62,7 +62,7 @@ The tree is a single canonical C++20 codebase. Major modules (from `docs/ARCHITE
 | `rpc_access.*` / `rpc_network_server.*` | HTTP `/rpc` and `/jsonrpc`, public vs trusted surfaces |
 | `wallet.*` / `wallet_store.*` / `wallet_keys.*` | Local `.wal` files, `wallet_send`, key material |
 | `p2p.*` / `decentralized_node.*` / `net_io.*` | Handshake, gossip, sync (`HELLO` / `REQBLK` / `BLKDATA`) |
-| `privacy.*` | SHA3-512 commitment + nullifier opening (`opening_not_zk`) |
+| `privacy.*` | SHA3-512 commitment + nullifier opening (`opening_not_zk`); ZK scaffold `privacy_zk.*` (`zk_pending`, fail-closed) |
 | `contract_engine.*` | Deterministic in-process KV (`set` / `add` / `get`) — not the EVM |
 | `token_engine.*` | In-process token / NFT / AMM ledger |
 | `bridge.*` | In-process counters (`bridge.dat`) — not a live cross-chain bridge |
@@ -130,21 +130,24 @@ ADDITION privacy is a **SHA3-512 commitment + nullifier opening**. The node sees
 | `privacy_mode` | `sha3_opening` |
 | `privacy_verifier` | `sha3_opening` |
 | `privacy_claim` | `opening_not_zk` |
+| `privacy_zk_roadmap` | `zk_pending` (scaffold; not live ZK) |
 | `privacy_ok` | `true` (when the process answers) |
 
 Relevant RPCs: `privacy_note_prepare`, `privacy_mint_open`, `privacy_spend_open`. Notes live in a **side ledger** (`privacy.dat`), not a native ADD lock into a consensus privacy pool.
+
+**Roadmap vs live:** live privacy is `opening_not_zk` (node sees the trapdoor). Real zero-knowledge is in progress: fail-closed RPCs `privacy_mint_zk_v1` / `privacy_spend_zk_v1` reject until a proof backend is wired (`claim=zk_pending` only; never `zk_v1` while stubbed). See `docs/PRIVACY_REAL_V1.md`.
 
 **Master key:** `ADDITION_PRIVACY_MASTER_KEY` must be at least **32 characters** or note writes fail with `error: ADDITION_PRIVACY_MASTER_KEY not set or too short (min 32)`. Mainnet start requires this key (`docs/MAINNET_RUNBOOK.md`).
 
 ### What this is NOT
 
-- **Not** Groth16, Halo2, Bulletproofs, STARKs, or any ZK circuit
+- **Not** Groth16, Halo2, Bulletproofs, STARKs, or any live ZK circuit
 - **Not** Monero ring signatures or Zcash Sapling/Orchard
 - **Not** “ZK-Shield” or shielded balances on the UTXO set
 - `privacy_mint_zk` / `privacy_spend_zk` are an **ML-DSA wrap** of a mint/spend string — still not a circuit (`tools/zk_backend_contract.md`)
-- `tools/zk_verify_wrapper.py` errors if invoked; do not set `ADDITION_ZK_VERIFY_CMD` or advertise a ZK backend
+- `tools/zk_verify_wrapper.py` errors if invoked; do not set `ADDITION_ZK_VERIFY_CMD` or advertise a ZK backend as live
 
-Honest claim language: `claim=opening_not_zk`.
+Honest claim language: live `claim=opening_not_zk`; roadmap `privacy_zk_roadmap=zk_pending`.
 
 ---
 
@@ -363,6 +366,8 @@ Notes:
 - PoUW phase-1 text (`docs/POUW_PHASE1_SPEC.md`) is a design target, not a claim that public mainnet already sells compute/storage
 
 Future hardening called out in-repo (architecture notes): stronger on-disk formats, native ADD lock into privacy (notes are still a side ledger), reproducible releases. Those are backlog items, not shipped guarantees.
+
+**Privacy roadmap vs live:** live remains `opening_not_zk`. A C++ fail-closed ZK scaffold (`privacy_zk.*`, `docs/PRIVACY_REAL_V1.md`) reports `privacy_zk_roadmap=zk_pending` and does not mint/spend without a real verifier. No false ZK claims.
 
 ---
 

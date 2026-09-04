@@ -75,7 +75,8 @@ bool is_side_state_write(const std::string& cmd) {
     }
     if (cmd.rfind("privacy_", 0) == 0) {
         return cmd == "privacy_mint_open" || cmd == "privacy_spend_open" ||
-               cmd == "privacy_mint_zk" || cmd == "privacy_spend_zk";
+               cmd == "privacy_mint_zk" || cmd == "privacy_spend_zk" ||
+               cmd == "privacy_mint_zk_v1" || cmd == "privacy_spend_zk_v1";
     }
     if (cmd.rfind("contract_", 0) == 0) {
         return cmd != "contract_get";
@@ -551,7 +552,9 @@ int main(int argc, char** argv) {
                  "privacy_spend_open <owner> <note_id> <recipient> <amt> <trapdoor>,\n"
                  "privacy_native_verifier <pq_mldsa87>,\n"
                  "privacy_mint_zk <owner> <amt> <commitment> <nullifier> <proof> <vk> (ML-DSA wrap, not a circuit),\n"
-                 "privacy_spend_zk <owner> <note_id> <recipient> <amt> <nullifier> <proof> <vk> (ML-DSA wrap, not a circuit), privacy_status,\n"
+                 "privacy_spend_zk <owner> <note_id> <recipient> <amt> <nullifier> <proof> <vk> (ML-DSA wrap, not a circuit),\n"
+                 "privacy_mint_zk_v1 / privacy_spend_zk_v1 (real ZK scaffold; fail-closed until wired; claim=zk_pending),\n"
+                 "privacy_status,\n"
                  "pouw_storage_create_deal <client_addr> <content_root> <chunk_count> <replication_factor> <start_height> <end_height> <price_per_epoch>,\n"
                  "pouw_storage_commit <deal_id> <worker_addr> <sealed_commitment> <collateral>,\n"
                  "pouw_storage_challenge <deal_id> <worker_addr> <height>,\n"

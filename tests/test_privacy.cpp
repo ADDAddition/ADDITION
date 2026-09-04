@@ -1,5 +1,6 @@
 #include "addition/crypto.hpp"
 #include "addition/privacy.hpp"
+#include "addition/privacy_zk.hpp"
 
 #include <cstdlib>
 #include <iostream>
@@ -190,6 +191,72 @@ int main() {
         return 1;
     }
 
-    std::cout << "all privacy opening tests passed\n";
+    // --- Real ZK path scaffold: fail-closed, honest labels ---
+    {
+        const auto& zk = addition::default_privacy_zk_verifier();
+        if (!expect(!zk.backend_wired(), "zk backend unwired") ||
+            !expect(zk.backend_id() == "fail_closed_stub", "zk backend id") ||
+            !expect(zk.claim_label() == addition::PrivacyClaimLabel::ZkPending, "zk claim pending") ||
+            !expect(addition::live_privacy_claim() == "opening_not_zk", "live claim opening") ||
+            !expect(addition::privacy_zk_roadmap_label() == "zk_pending", "roadmap pending") ||
+            !expect(addition::privacy_claim_label_string(addition::PrivacyClaimLabel::ZkV1) == "zk_v1",
+                    "zk_v1 string exists for future")) {
+            return 1;
+        }
+
+        addition::ZkMintPublicInputs mint_in{"alice", 5, std::string(128, 'a'), std::string(128, 'b')};
+        addition::ZkProofMaterial material{std::string(64, 'c'), std::string(64, 'd')};
+        addition::PrivacyClaimLabel claim = addition::PrivacyClaimLabel::ZkV1;
+        std::string zk_err;
+        if (addition::privacy_zk_v1_mint_allowed(mint_in, material, zk_err, claim)) {
+            std::cerr << "test failed: zk_v1 mint must reject without proofs\n";
+            return 1;
+        }
+        if (!expect(claim == addition::PrivacyClaimLabel::ZkPending, "mint reject claim") ||
+            !expect(zk_err.find("fail-closed") != std::string::npos, "mint fail-closed text") ||
+            !expect(zk_err.find("opening_not_zk") != std::string::npos, "mint keeps live claim honest")) {
+            std::cerr << "got claim/err: " << addition::privacy_claim_label_string(claim) << " / " << zk_err
+                      << '\n';
+            return 1;
+        }
+        // Empty / odd hex must not slip through as zk_v1.
+        addition::ZkMintPublicInputs bad_hex{"alice", 1, "abc", "00"};
+        claim = addition::PrivacyClaimLabel::ZkV1;
+        if (addition::privacy_zk_v1_mint_allowed(bad_hex, material, zk_err, claim)) {
+            std::cerr << "test failed: odd commitment hex must reject\n";
+            return 1;
+        }
+        if (claim == addition::PrivacyClaimLabel::ZkV1) {
+            std::cerr << "test failed: reject must not leave claim=zk_v1\n";
+            return 1;
+        }
+
+        addition::ZkSpendPublicInputs spend_in{"alice", "note", "bob", 1, std::string(128, 'e')};
+        claim = addition::PrivacyClaimLabel::ZkV1;
+        if (addition::privacy_zk_v1_spend_allowed(spend_in, material, zk_err, claim)) {
+            std::cerr << "test failed: zk_v1 spend must reject without proofs\n";
+            return 1;
+        }
+        if (!expect(claim == addition::PrivacyClaimLabel::ZkPending, "spend reject claim") ||
+            !expect(zk_err.find("fail-closed") != std::string::npos, "spend fail-closed text")) {
+            std::cerr << "got: " << zk_err << '\n';
+            return 1;
+        }
+
+        // Opening path still works after zk rejects (no shared state mutation).
+        addition::OpeningNote still{};
+        if (!addition::PrivacyPool::prepare_opening(3, still, error)) {
+            std::cerr << "test failed: opening still works after zk reject: " << error << '\n';
+            return 1;
+        }
+        addition::PrivacyPool pool2;
+        const auto n2 = pool2.mint_open("carol", 3, still.commitment, still.nullifier, still.trapdoor, error);
+        if (n2.empty()) {
+            std::cerr << "test failed: mint_open after zk scaffold: " << error << '\n';
+            return 1;
+        }
+    }
+
+    std::cout << "all privacy opening + zk scaffold tests passed\n";
     return 0;
 }
