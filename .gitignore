@@ -80,6 +80,7 @@ ios/**/*.dSYM.zip
 !wrangler.toml
 !genesis.json
 !genesis-mainnet.json
+!genesis-fast.json
 !fixtures/btc_hygiene_samples.json
 !**/manifest.json
 !**/Contents.json
