@@ -60,6 +60,36 @@ def inline(text: str) -> str:
     return text
 
 
+def split_table_cells(row: str) -> list[str]:
+    """Split a markdown table row on '|' while keeping pipes inside `code` spans."""
+    body = row.strip()
+    if body.startswith("|"):
+        body = body[1:]
+    if body.endswith("|"):
+        body = body[:-1]
+    cells: list[str] = []
+    cur: list[str] = []
+    in_code = False
+    i = 0
+    while i < len(body):
+        ch = body[i]
+        if ch == "`":
+            in_code = not in_code
+            cur.append(ch)
+        elif ch == "|" and not in_code:
+            cells.append("".join(cur).strip())
+            cur = []
+        elif ch == "\\" and not in_code and i + 1 < len(body) and body[i + 1] == "|":
+            # Markdown escaped pipe outside code — keep as literal '|'.
+            cur.append("|")
+            i += 1
+        else:
+            cur.append(ch)
+        i += 1
+    cells.append("".join(cur).strip())
+    return cells
+
+
 def md_to_html(md: str, *, with_anchors: bool = False, skip_md_toc: bool = False) -> str:
     lines = md.replace("\r\n", "\n").split("\n")
     out: list[str] = []
@@ -91,7 +121,7 @@ def md_to_html(md: str, *, with_anchors: bool = False, skip_md_toc: bool = False
             return
         rows = []
         for idx, row in enumerate(table_rows):
-            cells = [c.strip() for c in row.strip("|").split("|")]
+            cells = split_table_cells(row)
             tag = "th" if idx == 0 else "td"
             if idx == 1 and all(re.fullmatch(r":?-{3,}:?", c.replace(" ", "")) for c in cells):
                 continue
@@ -319,9 +349,9 @@ def main() -> None:
     write_doc(
         "docs/FAST_PATH_V1.md",
         OUT / "docs" / "fast-path" / "index.html",
-        "ADDITION fast path v1 (scaffold)",
+        "ADDITION fast path v1 (typed stages)",
         "Fast path v1",
-        "From <code>docs/FAST_PATH_V1.md</code>. Separate <code>ADDITION_FAST_V1</code> profile — fail-closed until leader/pipeline ships. Live product remains memory_hard mainnet.",
+        "From <code>docs/FAST_PATH_V1.md</code>. Separate <code>ADDITION_FAST_V1</code> profile — typed stages REAL; leader/execution still scaffold; <code>--fast</code> fail-closed. Live product remains memory_hard mainnet.",
     )
     write_doc(
         "docs/whitepaper.md",

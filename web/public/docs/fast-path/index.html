@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ADDITION fast path v1 (scaffold)</title>
+  <title>ADDITION fast path v1 (typed stages)</title>
   <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
@@ -13,7 +13,7 @@
 <body data-title="Fast path v1" data-sub="from the repo">
   <header id="site-header"></header>
   <main class="prose">
-    <div class="banner">From <code>docs/FAST_PATH_V1.md</code>. Separate <code>ADDITION_FAST_V1</code> profile — fail-closed until leader/pipeline ships. Live product remains memory_hard mainnet.</div>
+    <div class="banner">From <code>docs/FAST_PATH_V1.md</code>. Separate <code>ADDITION_FAST_V1</code> profile — typed stages REAL; leader/execution still scaffold; <code>--fast</code> fail-closed. Live product remains memory_hard mainnet.</div>
     <h2>Fast Path v1 — design (separate network profile)</h2>
 <p>Status: <strong>partial fill beyond scaffold</strong>. The live public ADDITION product remains</p>
 <p><code>ADDITION_MAINNET_V1</code> with <code>pow_algorithm=memory_hard</code> at target</p>
@@ -50,7 +50,7 @@
                                 |
                                 v
                          replica verify / commit</pre>
-<table><tr><th>Stage</th><th>Intent</th><th>Status</th></tr><tr><td>Typed stage enum + message kinds</td><td>Ordered ingest → schedule → execute → verify → commit</td><td><strong>REAL</strong> (<code>pipeline_stages_typed_v1</code>)</td></tr><tr><td>SHA3-512 sealed message digests</td><td>Domain-separated `addition.fast_path_v1\</td><td>…`</td><td><strong>REAL</strong></td></tr><tr><td>Local batch stage machine</td><td>Deterministic apply; rejects OOO / bad digest / fake TPS magic</td><td><strong>REAL</strong> (not consensus)</td></tr><tr><td>Leader election / rotation</td><td>Who proposes the next batch</td><td>No</td></tr><tr><td>Parallel execution</td><td>Non-conflicting txs across workers</td><td>No</td></tr><tr><td>Measured throughput RPC</td><td>Measured bench of the fast profile (when shipped)</td><td>No</td></tr></table>
+<table><tr><th>Stage</th><th>Intent</th><th>Status</th></tr><tr><td>Typed stage enum + message kinds</td><td>Ordered ingest → schedule → execute → verify → commit</td><td><strong>REAL</strong> (<code>pipeline_stages_typed_v1</code>)</td></tr><tr><td>SHA3-512 sealed message digests</td><td>Domain-separated <code>addition.fast_path_v1|…</code></td><td><strong>REAL</strong></td></tr><tr><td>Local batch stage machine</td><td>Deterministic apply; rejects OOO / bad digest / fake TPS magic</td><td><strong>REAL</strong> (not consensus)</td></tr><tr><td>Leader election / rotation</td><td>Who proposes the next batch</td><td>No</td></tr><tr><td>Parallel execution</td><td>Non-conflicting txs across workers</td><td>No</td></tr><tr><td>Measured throughput RPC</td><td>Measured bench of the fast profile (when shipped)</td><td>No</td></tr></table>
 <h3>Typed messages (research surface)</h3>
 <p>Domain-separated digest preimage (SHA3-512 → 128 hex):</p>
 <pre>addition.fast_path_v1|&lt;kind&gt;|&lt;batch_id&gt;|&lt;network_id&gt;|&lt;body&gt;</pre>

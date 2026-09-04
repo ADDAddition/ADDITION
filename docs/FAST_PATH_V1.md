@@ -68,7 +68,7 @@ clients --> RPC/ingest --> leader scheduler --> execution workers
 | Stage | Intent | Status |
 | :--- | :--- | :--- |
 | Typed stage enum + message kinds | Ordered ingest → schedule → execute → verify → commit | **REAL** (`pipeline_stages_typed_v1`) |
-| SHA3-512 sealed message digests | Domain-separated `addition.fast_path_v1\|…` | **REAL** |
+| SHA3-512 sealed message digests | Domain-separated `addition.fast_path_v1|…` | **REAL** |
 | Local batch stage machine | Deterministic apply; rejects OOO / bad digest / fake TPS magic | **REAL** (not consensus) |
 | Leader election / rotation | Who proposes the next batch | No |
 | Parallel execution | Non-conflicting txs across workers | No |
