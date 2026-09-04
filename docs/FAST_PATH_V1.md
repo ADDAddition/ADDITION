@@ -136,4 +136,4 @@ kind, empty body, and bodies containing `CLAIM_FAST_LIVE` /
 - [x] No invented TPS; `research_goal_is_not_a_measurement=true`
 - [x] `pq_mode=strict` / ML-DSA-87 / SHA3-512 kept
 - [x] Privacy labels stay `opening_not_zk` / `zk_pending`
-- [x] Site/docs: honest REAL vs scaffold status
+- [x] Site/docs: accurate REAL vs scaffold status

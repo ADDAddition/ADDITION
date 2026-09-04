@@ -307,7 +307,14 @@ def main() -> None:
         OUT / "docs" / "zk-circuit" / "index.html",
         "ADDITION ZK circuit v1 (not live)",
         "ZK circuit v1",
-        "From <code>docs/ZK_CIRCUIT_V1.md</code>. Circuit work in progress / not live — <code>zk_circuit_status=not_proven</code>; live privacy remains <code>opening_not_zk</code>.",
+        "From <code>docs/ZK_CIRCUIT_V1.md</code>. Circuit work in progress / not live — <code>zk_circuit_status=not_proven</code>; live privacy remains <code>opening_not_zk</code>. Lab Groth16 Poseidon path: <code>docs/ZK_SNARK_V1.md</code>.",
+    )
+    write_doc(
+        "docs/ZK_SNARK_V1.md",
+        OUT / "docs" / "zk-snark" / "index.html",
+        "ADDITION ZK SNARK v1 (lab Groth16)",
+        "ZK SNARK v1",
+        "From <code>docs/ZK_SNARK_V1.md</code>. Real Groth16 prove+verify (Poseidon lab hash) behind <code>ADDITION_ZK_SNARK_V1</code>; live <code>privacy_claim</code> stays <code>opening_not_zk</code>.",
     )
     write_doc(
         "docs/FAST_PATH_V1.md",

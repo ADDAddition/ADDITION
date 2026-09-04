@@ -6,8 +6,25 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(ADDITION_BUILD_TESTS "Build tests" OFF)
+option(ADDITION_BUILD_ZK_SNARK "Build arkworks Groth16 lab SNARK (Rust)" ON)
 
 find_package(OpenSSL REQUIRED)
+
+# Lab zkSNARK: arkworks Groth16 over BN254 (Poseidon opening). Optional; fail-closed
+# unless ADDITION_ZK_SNARK_V1=1 at runtime. Does not flip live privacy_claim.
+set(ADDITION_SNARK_CRATE_DIR ${CMAKE_SOURCE_DIR}/zk/snark_v1)
+set(ADDITION_SNARK_LIB ${ADDITION_SNARK_CRATE_DIR}/target/release/libaddition_snark_v1.a)
+if(ADDITION_BUILD_ZK_SNARK)
+    find_program(CARGO_EXECUTABLE cargo REQUIRED)
+    add_custom_command(
+        OUTPUT ${ADDITION_SNARK_LIB}
+        COMMAND ${CARGO_EXECUTABLE} build --release --manifest-path ${ADDITION_SNARK_CRATE_DIR}/Cargo.toml
+        WORKING_DIRECTORY ${ADDITION_SNARK_CRATE_DIR}
+        COMMENT "Building addition_snark_v1 (arkworks Groth16)"
+        VERBATIM
+    )
+    add_custom_target(addition_snark_v1_rust DEPENDS ${ADDITION_SNARK_LIB})
+endif()
 
 find_path(OQS_INCLUDE_DIR oqs/oqs.h)
 find_library(OQS_LIBRARY oqs)
@@ -42,6 +59,7 @@ add_library(addition_core
     src/privacy.cpp
     src/privacy_zk.cpp
     src/zk_circuit_v1.cpp
+    src/zk_snark_v1.cpp
     src/fast_path.cpp
     src/pouw_storage.cpp
     src/pouw_compute.cpp
@@ -55,6 +73,14 @@ add_library(addition_core
 target_include_directories(addition_core PUBLIC include)
 target_include_directories(addition_core PUBLIC ${OQS_INCLUDE_DIR})
 target_link_libraries(addition_core PUBLIC ${OQS_LIBRARY} OpenSSL::SSL OpenSSL::Crypto)
+
+if(ADDITION_BUILD_ZK_SNARK)
+    target_include_directories(addition_core PUBLIC ${ADDITION_SNARK_CRATE_DIR}/include)
+    add_dependencies(addition_core addition_snark_v1_rust)
+    target_link_libraries(addition_core PUBLIC ${ADDITION_SNARK_LIB} pthread dl m)
+    # Ensure C++ objects re-link when the Rust archive changes.
+    set_source_files_properties(src/zk_snark_v1.cpp PROPERTIES OBJECT_DEPENDS ${ADDITION_SNARK_LIB})
+endif()
 
 if(WIN32)
     target_link_libraries(addition_core PUBLIC ws2_32)
@@ -113,6 +139,13 @@ if(ADDITION_BUILD_TESTS)
     add_executable(test_zk_circuit_v1 tests/test_zk_circuit_v1.cpp)
     target_link_libraries(test_zk_circuit_v1 PRIVATE addition_core)
     add_test(NAME test_zk_circuit_v1 COMMAND test_zk_circuit_v1)
+
+    if(ADDITION_BUILD_ZK_SNARK)
+        add_executable(test_zk_snark_v1 tests/test_zk_snark_v1.cpp)
+        target_link_libraries(test_zk_snark_v1 PRIVATE addition_core)
+        add_test(NAME test_zk_snark_v1 COMMAND test_zk_snark_v1)
+        set_tests_properties(test_zk_snark_v1 PROPERTIES TIMEOUT 180)
+    endif()
 
     add_executable(test_fast_path tests/test_fast_path.cpp)
     target_link_libraries(test_fast_path PRIVATE addition_core)

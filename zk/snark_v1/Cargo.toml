@@ -1,0 +1,28 @@
+[package]
+name = "addition_snark_v1"
+version = "0.1.0"
+edition = "2021"
+description = "Lab Groth16 SNARK for Poseidon commitment/nullifier opening (NOT production SHA3 privacy)"
+publish = false
+
+[lib]
+crate-type = ["staticlib", "cdylib", "rlib"]
+name = "addition_snark_v1"
+
+[dependencies]
+ark-ff = "0.4"
+ark-ec = "0.4"
+ark-std = { version = "0.4", features = ["std"] }
+ark-bn254 = "0.4"
+ark-groth16 = "0.4"
+ark-relations = "0.4"
+ark-r1cs-std = "0.4"
+ark-snark = "0.4"
+ark-serialize = { version = "0.4", features = ["derive"] }
+ark-crypto-primitives = { version = "0.4", default-features = false, features = ["r1cs", "sponge"] }
+rand = "0.8"
+hex = "0.4"
+
+# Pin transitive deps for rustc 1.83 (no edition2024).
+zeroize = "=1.8.1"
+zeroize_derive = "=1.4.2"

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADDITION ZK SNARK v1 (lab Groth16)</title>
+  <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="/common.css">
+  
+</head>
+<body data-title="ZK SNARK v1" data-sub="from the repo">
+  <header id="site-header"></header>
+  <main class="prose">
+    <div class="banner">From <code>docs/ZK_SNARK_V1.md</code>. Real Groth16 prove+verify (Poseidon lab hash) behind <code>ADDITION_ZK_SNARK_V1</code>; live <code>privacy_claim</code> stays <code>opening_not_zk</code>.</div>
+    <h2>ZK SNARK v1 — real Groth16 prove+verify (lab / optional)</h2>
+<p>Status: <strong>REAL zkSNARK prove+verify path</strong> for a schema-analogous opening</p>
+<p>statement, behind an opt-in flag. This is <strong>not</strong> live production privacy.</p>
+<p>Live product remains SHA3-512 opening with <code>privacy_claim=opening_not_zk</code>.</p>
+<p><code>zk_circuit_status</code> stays <code>not_proven</code> for the <strong>production SHA3-512</strong> privacy</p>
+<p>statement. Do not market this PR as shipping production ZK privacy.</p>
+<p>Brand: <strong>ADDITION</strong> only.</p>
+<h2>Proving system</h2>
+<table><tr><th>Item</th><th>Value</th></tr><tr><td>System</td><td><strong>Groth16</strong> (arkworks)</td></tr><tr><td>Curve</td><td>BN254</td></tr><tr><td>Setup</td><td><strong>Trusted setup</strong> — circuit-specific CRS (<code>trusted_setup_circuit_specific</code>)</td></tr><tr><td>Library</td><td><code>zk/snark_v1</code> Rust crate (<code>addition_snark_v1</code>), linked from C++20</td></tr><tr><td>Enable flag</td><td><code>ADDITION_ZK_SNARK_V1=1</code> (default off = fail-closed)</td></tr></table>
+<p>Groth16 requires a trusted setup. Tests run a fresh in-process circuit-specific</p>
+<p>setup. A production multi-party ceremony is <strong>out of scope</strong> and not claimed.</p>
+<h2>Statement proven (REAL)</h2>
+<p>Mint-shaped opening (schema-analogous to <code>C_cm</code> / <code>C_nf</code> in <code>ZK_CIRCUIT_V1.md</code>):</p>
+<pre>public:  amount, cm, nf
+witness: trapdoor r
+cm == Poseidon(TAG_CM, amount, r)
+nf == Poseidon(TAG_NF, cm, r)</pre>
+<p>Poseidon is over BN254 Fr (arkworks sponge parameters). The verifier accepts a</p>
+<p>real Groth16 proof of this relation without learning <code>r</code>.</p>
+<h2>Gap vs production privacy</h2>
+<table><tr><th>Piece</th><th>Production today</th><th>This SNARK path</th></tr><tr><td>Commitment / nullifier hash</td><td><strong>SHA3-512</strong> domain strings</td><td><strong>Poseidon</strong> (BN254 Fr) lab hash</td></tr><tr><td>Live <code>privacy_claim</code></td><td><code>opening_not_zk</code></td><td>unchanged (<code>opening_not_zk</code>)</td></tr><tr><td><code>zk_circuit_status</code> (SHA3 statement)</td><td><code>not_proven</code></td><td>stays <code>not_proven</code></td></tr><tr><td>Default <code>PrivacyZkVerifier</code></td><td>fail-closed stub</td><td>still fail-closed</td></tr><tr><td>Optional lab verifier</td><td>n/a</td><td>wired only if <code>ADDITION_ZK_SNARK_V1=1</code></td></tr></table>
+<p>SHA3-512-in-circuit was not shipped here (heavy R1CS). The Poseidon circuit is a</p>
+<p>real SNARK for a related opening shape; it is <strong>not</strong> a proof of the live SHA3</p>
+<p>opening relation. Production cutover to <code>zk_v1</code> requires a verifier for the</p>
+<p><strong>SHA3</strong> privacy statement (or an explicit product decision to change the note</p>
+<p>hash) plus ceremony / PQ story — none of that is claimed here.</p>
+<h2>What this is NOT</h2>
+<ul><li>Not PR <strong>#82</strong> / <code>vision/zk-real-v1</code> toy Fiat–Shamir Schnorr for discrete-log</li></ul>
+<p>  knowledge. That path is HOLD / not merging; this PR does not merge it.</p>
+<ul><li>Not a transparent STARK/FRI backend.</li><li>Not post-quantum (Groth16 / BN254 pairing assumptions).</li><li>Not a flip of mainnet <code>memory_hard</code> / <code>0x000000FFFFFFFFFF</code>.</li><li>Not permission to set <code>privacy_claim=zk_v1</code> or <code>zk_circuit_status=proven</code>.</li></ul>
+<h2>REAL vs pending</h2>
+<table><tr><th>Piece</th><th>Status</th></tr><tr><td>Groth16 setup → prove → verify (Poseidon opening)</td><td><strong>REAL</strong> (tests green)</td></tr><tr><td>Tampered proof / wrong public inputs reject</td><td><strong>REAL</strong></td></tr><tr><td>Opt-in flag fail-closed when unset</td><td><strong>REAL</strong></td></tr><tr><td>C++ wrapper + optional verifier</td><td><strong>REAL</strong> (lab only)</td></tr><tr><td>Docs label the Poseidon vs SHA3 gap</td><td><strong>REAL</strong></td></tr><tr><td>Production SHA3-512 circuit SNARK</td><td><strong>Pending</strong></td></tr><tr><td>Live <code>privacy_claim=zk_v1</code></td><td><strong>Forbidden</strong> here</td></tr><tr><td>Trusted setup ceremony / ceremony transcript</td><td><strong>Pending</strong></td></tr><tr><td>PQ-friendly proof system</td><td><strong>Pending</strong></td></tr></table>
+<h2>API surface</h2>
+<ul><li>Rust/C ABI: <code>zk/snark_v1/include/addition_snark_v1.h</code></li><li>C++: <code>include/addition/zk_snark_v1.hpp</code> / <code>src/zk_snark_v1.cpp</code></li><li>Tests: <code>tests/test_zk_snark_v1.cpp</code> (+ Rust unit test in the crate)</li></ul>
+<h2>Checklist (PR gate)</h2>
+<ul><li>[x] Mainnet <code>memory_hard</code> target <code>0x000000FFFFFFFFFF</code> untouched</li><li>[x] No fake live ZK claims; <code>opening_not_zk</code> kept</li><li>[x] <code>zk_circuit_status</code> not set to <code>proven</code> for SHA3 production statement</li><li>[x] Optional verifier behind <code>ADDITION_ZK_SNARK_V1</code> fail-closed flag</li><li>[x] ML-DSA-87 + SHA3-512 <code>pq_mode=strict</code> kept</li><li>[x] Ship only what tests prove (setup/prove/verify + reject paths)</li></ul>
+    <p class="note">Source file in the repository: <a href="https://github.com/ADDAddition/ADDITION/blob/main/docs/ZK_SNARK_V1.md">docs/ZK_SNARK_V1.md</a></p>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="/chrome.js"></script>
+</body>
+</html>

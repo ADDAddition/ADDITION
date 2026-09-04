@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ADDITION fast path v1 (typed stages)</title>
+  <title>ADDITION fast path v1 (scaffold)</title>
   <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
@@ -13,7 +13,7 @@
 <body data-title="Fast path v1" data-sub="from the repo">
   <header id="site-header"></header>
   <main class="prose">
-    <div class="banner">From <code>docs/FAST_PATH_V1.md</code>. Separate <code>ADDITION_FAST_V1</code> profile — typed stages REAL; leader/execution still scaffold; <code>--fast</code> fail-closed. Live product remains memory_hard mainnet.</div>
+    <div class="banner">From <code>docs/FAST_PATH_V1.md</code>. Separate <code>ADDITION_FAST_V1</code> profile — fail-closed until leader/pipeline ships. Live product remains memory_hard mainnet.</div>
     <h2>Fast Path v1 — design (separate network profile)</h2>
 <p>Status: <strong>partial fill beyond scaffold</strong>. The live public ADDITION product remains</p>
 <p><code>ADDITION_MAINNET_V1</code> with <code>pow_algorithm=memory_hard</code> at target</p>
@@ -33,7 +33,15 @@
 <p><code>research_goal_is_not_a_measurement=true</code>.</p>
 <h2>Chosen approach (ADDITION, C++20)</h2>
 <p>A <strong>separate network id</strong> so the fast path cannot be confused with mainnet PoW:</p>
-<ol><li><strong>Network profile</strong> — <code>network_id=ADDITION_FAST_V1</code>, <code>network_mode=fast</code>, distinct genesis / data dir / ports.</li><li><strong>Consensus sketch</strong> — leader schedules, pipelined block propagation, parallel execution. Mainnet keeps memory-hard PoW.</li><li><strong>Crypto unchanged</strong> — ML-DSA-87 / SHA3-512, <code>pq_mode=strict</code>.</li><li><strong>This fill PR</strong> — typed pipeline stages + fail-closed message validation (SHA3-512 digests). Boot remains refused. No invented TPS.</li></ol>
+<ol><li><strong>Network profile</strong> — <code>network_id=ADDITION_FAST_V1</code>, <code>network_mode=fast</code>,</li></ol>
+<p>   distinct genesis timestamp / data dir / ports from mainnet and testnet.</p>
+<ol><li><strong>Consensus sketch</strong> — leader schedules, pipelined block propagation, and</li></ol>
+<p>   parallel transaction execution. PoW is not the latency path; mainnet keeps</p>
+<p>   memory-hard PoW for the public product.</p>
+<ol><li><strong>Crypto unchanged</strong> — ML-DSA-87 / SHA3-512, <code>pq_mode=strict</code>. Privacy</li></ol>
+<p>   labels stay accurate (<code>opening_not_zk</code> live; <code>zk_pending</code> stub).</p>
+<ol><li><strong>This fill PR</strong> — typed pipeline stages + fail-closed message validation</li></ol>
+<p>   (SHA3-512 digests). Boot remains refused. No invented TPS.</p>
 <h3>Leader / pipeline / execution sketch</h3>
 <pre>clients --&gt; RPC/ingest --&gt; leader scheduler --&gt; execution workers
                                 |                    |
@@ -42,17 +50,30 @@
                                 |
                                 v
                          replica verify / commit</pre>
-<table><tr><th>Stage</th><th>Intent</th><th>Status</th></tr><tr><td>Typed stage enum + message kinds</td><td>Ordered ingest → schedule → execute → verify → commit</td><td><strong>REAL</strong> (<code>pipeline_stages_typed_v1</code>)</td></tr><tr><td>SHA3-512 sealed message digests</td><td>Domain-separated <code>addition.fast_path_v1|…</code></td><td><strong>REAL</strong></td></tr><tr><td>Local batch stage machine</td><td>Deterministic apply; rejects OOO / bad digest / fake TPS magic</td><td><strong>REAL</strong> (not consensus)</td></tr><tr><td>Leader election / rotation</td><td>Who proposes the next batch</td><td>No</td></tr><tr><td>Parallel execution</td><td>Non-conflicting txs across workers</td><td>No</td></tr><tr><td>Measured throughput RPC</td><td>Measured bench of the fast profile (when shipped)</td><td>No</td></tr></table>
+<table><tr><th>Stage</th><th>Intent</th><th>Status</th></tr><tr><td>Typed stage enum + message kinds</td><td>Ordered ingest → schedule → execute → verify → commit</td><td><strong>REAL</strong> (<code>pipeline_stages_typed_v1</code>)</td></tr><tr><td>SHA3-512 sealed message digests</td><td>Domain-separated `addition.fast_path_v1\</td><td>…`</td><td><strong>REAL</strong></td></tr><tr><td>Local batch stage machine</td><td>Deterministic apply; rejects OOO / bad digest / fake TPS magic</td><td><strong>REAL</strong> (not consensus)</td></tr><tr><td>Leader election / rotation</td><td>Who proposes the next batch</td><td>No</td></tr><tr><td>Parallel execution</td><td>Non-conflicting txs across workers</td><td>No</td></tr><tr><td>Measured throughput RPC</td><td>Measured bench of the fast profile (when shipped)</td><td>No</td></tr></table>
 <h3>Typed messages (research surface)</h3>
+<p>Domain-separated digest preimage (SHA3-512 → 128 hex):</p>
 <pre>addition.fast_path_v1|&lt;kind&gt;|&lt;batch_id&gt;|&lt;network_id&gt;|&lt;body&gt;</pre>
 <table><tr><th>Kind</th><th>Advances stage to</th></tr><tr><td><code>ingest_batch</code></td><td><code>ingested</code></td></tr><tr><td><code>schedule_ticket</code></td><td><code>scheduled</code></td></tr><tr><td><code>execution_receipt</code></td><td><code>executed</code></td></tr><tr><td><code>verify_ack</code></td><td><code>verified</code></td></tr><tr><td><code>commit_seal</code></td><td><code>committed</code></td></tr></table>
-<p>Fail-closed rejects wrong <code>network_id</code>, bad digest, out-of-order kind, empty body, and bodies containing <code>CLAIM_FAST_LIVE</code> / <code>CLAIM_MEASURED_TPS</code> / Solana-TPS slogans.</p>
+<p>Fail-closed rejects: <code>network_id != ADDITION_FAST_V1</code>, wrong digest, out-of-order</p>
+<p>kind, empty body, and bodies containing <code>CLAIM_FAST_LIVE</code> /</p>
+<p><code>CLAIM_MEASURED_TPS</code> / Solana-TPS slogans.</p>
 <h2>Fail-closed rules</h2>
-<ul><li><code>--network fast</code> / <code>--fast</code> <strong>refuses to boot</strong> while <code>fast_path_pipeline_shipped()==false</code>.</li><li>Loading fast genesis/config onto mainnet or testnet modes is rejected.</li><li>Mainnet <code>--mainnet</code> path is unchanged: <code>ADDITION_MAINNET_V1</code>, <code>memory_hard</code>, target <code>0x000000FFFFFFFFFF</code>.</li><li>getinfo / protocol_status never prints a measured Solana TPS figure. <code>throughput_claim=none</code>.</li><li>Typed stage progress must <strong>not</strong> flip <code>kFastPathPipelineShipped</code>.</li></ul>
+<ul><li><code>--network fast</code> / <code>--fast</code> <strong>refuses to boot</strong> while</li></ul>
+<p>  <code>fast_path_pipeline_shipped()==false</code> (full pipeline incomplete).</p>
+<ul><li>Loading <code>genesis-fast.json</code> / <code>config-fast.toml</code> onto mainnet or testnet</li></ul>
+<p>  modes is rejected (<code>network_id</code> / <code>network_mode</code> mismatch).</p>
+<ul><li>Mainnet <code>--mainnet</code> path is unchanged: <code>ADDITION_MAINNET_V1</code>,</li></ul>
+<p>  <code>memory_hard</code>, target <code>0x000000FFFFFFFFFF</code>.</p>
+<ul><li>getinfo / protocol_status must never print a measured Solana TPS figure.</li></ul>
+<p>  <code>throughput_claim=none</code>. Research goals stay non-measurements.</p>
+<ul><li>Typed stage progress must <strong>not</strong> flip <code>kFastPathPipelineShipped</code>.</li></ul>
 <h2>getinfo labels (Vision vs Live)</h2>
 <table><tr><th>Field</th><th>Mainnet</th><th>Fast profile</th></tr><tr><td><code>network_id</code></td><td><code>ADDITION_MAINNET_V1</code></td><td><code>ADDITION_FAST_V1</code></td></tr><tr><td><code>consensus_path</code></td><td><code>memory_hard_pow</code></td><td><code>leader_pipeline_scaffold</code></td></tr><tr><td><code>fast_path_status</code></td><td><code>not_this_network</code></td><td><code>scaffold_incomplete</code> (until shipped)</td></tr><tr><td><code>fast_path_shipped</code></td><td><code>false</code></td><td><code>false</code> until full pipeline lands</td></tr><tr><td><code>fast_path_slice</code></td><td><code>pipeline_stages_typed_v1</code></td><td>same (names the fill; not a ship claim)</td></tr><tr><td><code>throughput_claim</code></td><td><code>none</code></td><td><code>none</code></td></tr><tr><td><code>research_goal_is_not_a_measurement</code></td><td><code>true</code></td><td><code>true</code></td></tr></table>
 <h2>What is not shipped yet</h2>
 <ul><li>No public <code>ADDITION_FAST_V1</code> seed, peers, or explorer product surface</li><li>No leader election, parallel executor, or replica commit path</li><li>No claim that ADDITION matches Solana (or any chain) measured TPS</li><li>No change to mainnet mining, difficulty, or seed hasher</li><li><code>--fast</code> still <strong>refuses to boot</strong></li></ul>
+<h2>PR gate checklist</h2>
+<ul><li>[x] Mainnet <code>memory_hard</code> target <code>0x000000FFFFFFFFFF</code> untouched</li><li>[x] No GCP seed hasher / mining stop</li><li>[x] Fast path is a <strong>separate</strong> profile (<code>ADDITION_FAST_V1</code>)</li><li>[x] Fail-closed while pipeline incomplete</li><li>[x] Typed stages + message digests with deterministic tests</li><li>[x] No invented TPS; <code>research_goal_is_not_a_measurement=true</code></li><li>[x] <code>pq_mode=strict</code> / ML-DSA-87 / SHA3-512 kept</li><li>[x] Privacy labels stay <code>opening_not_zk</code> / <code>zk_pending</code></li><li>[x] Site/docs: accurate REAL vs scaffold status</li></ul>
     <p class="note">Source file in the repository: <a href="https://github.com/ADDAddition/ADDITION/blob/main/docs/FAST_PATH_V1.md">docs/FAST_PATH_V1.md</a></p>
   </main>
   <footer id="site-footer"></footer>

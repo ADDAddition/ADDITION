@@ -15,9 +15,10 @@ Brand: **ADDITION** only.
 | Canonical public-input encoding (domain-separated) | **REAL** (byte string for a future Fiat–Shamir transcript) |
 | Constraint scaffolding (named opening-relation constraints) | **REAL** (interface + enumeration; not a SNARK/STARK) |
 | Self-test hook: witness → recompute SHA3-512 opening | **REAL** hash check; **NOT** zero-knowledge |
-| Prover that emits acceptances / proving keys | **Scaffold** — fail-closed; refuses to emit |
-| On-node verifier that accepts proofs | **Scaffold** — fail-closed; `backend_wired()==false` |
-| Live product claim `zk_v1` | **Forbidden** until a proven backend verifies |
+| Lab Groth16 SNARK (Poseidon opening) | **REAL** prove+verify behind `ADDITION_ZK_SNARK_V1` — see `docs/ZK_SNARK_V1.md` |
+| Prover that emits acceptances / proving keys for **SHA3** zk_v1 | **Scaffold** — fail-closed; refuses to emit |
+| On-node verifier that accepts **production SHA3** proofs | **Scaffold** — fail-closed; `backend_wired()==false` |
+| Live product claim `zk_v1` | **Forbidden** until a proven backend verifies the production privacy statement |
 
 Do **not** market this as live ZK. Do **not** treat the opening self-test as a
 proof. Do **not** weaken mainnet `memory_hard` / `0x000000FFFFFFFFFF`.
@@ -107,11 +108,15 @@ Fake proof blobs (empty, garbage hex, magic “CLAIM_ZK_V1” prefixes, ML-DSA w
 bytes) must be rejected. Claiming “zk” without a valid verified proof fails
 closed.
 
-## Backend candidates (none claimed live)
+## Backend candidates (none claimed live for SHA3)
 
-Same as `PRIVACY_REAL_V1.md`: PQ-friendly hash argument (FRI/STARK-style),
-lattice/hash ZK library, or hybrid with ML-DSA-87 envelopes. Pick and wire in a
-later PR only when compile + tests prove verify can succeed.
+Same as `PRIVACY_REAL_V1.md`. A **lab** Groth16 / Poseidon path ships in
+`docs/ZK_SNARK_V1.md` (opt-in flag; trusted setup; **not** the live SHA3 statement).
+PR #82 toy Fiat–Shamir Schnorr is a different HOLD path and is not this SNARK.
+
+Pick and wire a production-SHA3 (or explicit hash-migration) backend in a later PR
+only when compile + tests prove verify can succeed **and** product claims are
+updated deliberately.
 
 ## Checklist (PR gate)
 

@@ -2,6 +2,7 @@
 build/
 build/**
 cmake-build-*/
+zk/snark_v1/target/
 *.obj
 *.o
 *.a
