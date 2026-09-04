@@ -41,6 +41,7 @@ add_library(addition_core
     src/consensus_engine.cpp
     src/privacy.cpp
     src/privacy_zk.cpp
+    src/fast_path.cpp
     src/pouw_storage.cpp
     src/pouw_compute.cpp
     src/private_messaging.cpp
@@ -107,6 +108,11 @@ if(ADDITION_BUILD_TESTS)
     add_executable(test_privacy tests/test_privacy.cpp)
     target_link_libraries(test_privacy PRIVATE addition_core)
     add_test(NAME test_privacy COMMAND test_privacy)
+
+    add_executable(test_fast_path tests/test_fast_path.cpp)
+    target_link_libraries(test_fast_path PRIVATE addition_core)
+    add_test(NAME test_fast_path COMMAND test_fast_path)
+    set_tests_properties(test_fast_path PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
     add_executable(test_auto_mine tests/test_auto_mine.cpp)
     target_link_libraries(test_auto_mine PRIVATE addition_core)

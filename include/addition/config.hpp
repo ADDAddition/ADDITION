@@ -11,6 +11,7 @@ enum class NetworkMode {
     Testnet,
     Mainnet,
     Regtest,
+    Fast, // ADDITION_FAST_V1 scaffold; fail-closed until pipeline ships
 };
 
 enum class PowAlgorithm {
@@ -26,12 +27,15 @@ inline constexpr std::uint64_t kTestnetHardDifficultyTarget = 0x000000FFFFFFFFFF
 inline constexpr const char* kTestnetNetworkId = "ADDITION_TESTNET_V1";
 inline constexpr const char* kMainnetNetworkId = "ADDITION_MAINNET_V1";
 inline constexpr const char* kRegtestNetworkId = "ADDITION_REGTEST_V1";
+inline constexpr const char* kFastNetworkId = "ADDITION_FAST_V1";
 inline constexpr const char* kTestnetNetworkName = "addition-testnet";
 inline constexpr const char* kMainnetNetworkName = "addition-mainnet";
 inline constexpr const char* kRegtestNetworkName = "addition-regtest";
+inline constexpr const char* kFastNetworkName = "addition-fast";
 inline constexpr std::uint64_t kTestnetGenesisTimestamp = 1'763'000'000ULL;
 inline constexpr std::uint64_t kMainnetGenesisTimestamp = 1'770'000'000ULL;
 inline constexpr std::uint64_t kRegtestGenesisTimestamp = 1'765'000'000ULL;
+inline constexpr std::uint64_t kFastGenesisTimestamp = 1'780'000'000ULL;
 // Local --regtest only. Higher target = easier. This is min-diff (any SHA3-512
 // header hash meets it). Do not use on ADDITION_MAINNET_V1.
 inline constexpr std::uint64_t kRegtestMinDifficultyTarget = 0xFFFFFFFFFFFFFFFFULL;
@@ -117,10 +121,13 @@ const ChainConfig& default_config();
 ChainConfig testnet_chain_config();
 ChainConfig mainnet_chain_config();
 ChainConfig regtest_chain_config();
+ChainConfig fast_chain_config();
 NodeConfig default_node_config();
 NodeConfig mainnet_node_config();
 NodeConfig regtest_node_config();
+NodeConfig fast_node_config();
 void apply_regtest_profile(ChainConfig& chain);
+void apply_fast_profile(ChainConfig& chain);
 bool validate_network_profile(const NodeConfig& cfg, std::string& error);
 
 void set_runtime_network_mode(NetworkMode mode);

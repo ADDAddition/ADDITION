@@ -4,6 +4,7 @@
 #include "addition/btc_hygiene.hpp"
 #include "addition/config.hpp"
 #include "addition/crypto.hpp"
+#include "addition/fast_path.hpp"
 #include "addition/privacy_zk.hpp"
 #include "addition/rpc_access.hpp"
 #include "addition/wallet.hpp"
@@ -292,7 +293,9 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " privacy_ok=true"
             << " require_privacy_pool=" << (net.require_privacy_pool ? "true" : "false")
             << " auto_mine=" << (auto_mine_enabled_ ? "on" : "off")
-            << " auto_mine_interval_sec=" << auto_mine_interval_sec_;
+            << " auto_mine_interval_sec=" << auto_mine_interval_sec_
+            << fast_path_info_fields(net)
+            << " research_goal_is_not_a_measurement=true";
         if (trusted) {
             out << " privacy_master_key=" << (PrivacyPool::master_key_configured() ? "set" : "missing");
         }
@@ -318,7 +321,8 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " verifier_configured=" << (privacy_.verifier_configured() ? "true" : "false")
             << " pouw_storage_check=first_nibble_parity"
             << " research_goal_tps=" << std::fixed << std::setprecision(0) << kObjectiveTps
-            << " research_goal_is_not_a_measurement=true";
+            << " research_goal_is_not_a_measurement=true"
+            << fast_path_info_fields(chain_.config());
         return out.str();
     }
 

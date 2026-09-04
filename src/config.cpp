@@ -1,4 +1,5 @@
 #include "addition/config.hpp"
+#include "addition/fast_path.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -138,6 +139,8 @@ ChainConfig profile_for_mode(NetworkMode mode) {
         return mainnet_chain_config();
     case NetworkMode::Regtest:
         return regtest_chain_config();
+    case NetworkMode::Fast:
+        return fast_chain_config();
     }
     return testnet_chain_config();
 }
@@ -521,6 +524,19 @@ void apply_regtest_profile(ChainConfig& chain) {
     chain.economic_security = "none";
 }
 
+void apply_fast_profile(ChainConfig& chain) {
+    // Placeholder PoW fields only — consensus is leader/pipeline (not shipped).
+    // Must never be used to loosen ADDITION_MAINNET_V1 memory_hard.
+    chain.pow_profile = "fast-scaffold";
+    chain.pow_algorithm = PowAlgorithm::Sha3_512;
+    chain.initial_difficulty_target = kTestnetEasyDifficultyTarget;
+    chain.min_difficulty_target = kTestnetHardDifficultyTarget;
+    chain.max_difficulty_target = kTestnetEasyDifficultyTarget;
+    chain.target_block_time_sec = 1U;
+    chain.confirmations_policy = 2;
+    chain.economic_security = "none";
+}
+
 ChainConfig testnet_chain_config() {
     ChainConfig cfg{};
     cfg.network_mode = "testnet";
@@ -573,6 +589,27 @@ ChainConfig mainnet_chain_config() {
     return cfg;
 }
 
+ChainConfig fast_chain_config() {
+    ChainConfig cfg{};
+    cfg.network_mode = "fast";
+    cfg.network_name = kFastNetworkName;
+    cfg.network_id = kFastNetworkId;
+    cfg.genesis_timestamp = kFastGenesisTimestamp;
+    cfg.max_supply = 50'000'000ULL;
+    cfg.block_reward = 50ULL;
+    cfg.tail_emission_reward = 1ULL;
+    cfg.difficulty_window = 120U;
+    cfg.retarget_window = 30U;
+    cfg.halving_interval = 210000U;
+    cfg.require_pq_signatures = true;
+    cfg.require_privacy_pool = true;
+    cfg.allow_zero_reward_blocks = true;
+    cfg.min_fee = 0ULL;
+    apply_fast_profile(cfg);
+    cfg.bootstrap_peers = {"127.0.0.1:28547"};
+    return cfg;
+}
+
 NodeConfig default_node_config() {
     NodeConfig cfg{};
     cfg.mode = NetworkMode::Testnet;
@@ -613,6 +650,22 @@ NodeConfig regtest_node_config() {
     return cfg;
 }
 
+NodeConfig fast_node_config() {
+    NodeConfig cfg{};
+    cfg.mode = NetworkMode::Fast;
+    cfg.chain = fast_chain_config();
+    cfg.local_rpc_port = 8547;
+    cfg.lan_rpc_port = 18547;
+    cfg.p2p_port = 28547;
+    cfg.public_rpc_port = 38547;
+    cfg.public_rpc_bind = "127.0.0.1";
+    cfg.enable_public_rpc = false;
+    cfg.enable_auto_mine = false;
+    cfg.bootstrap_peers = cfg.chain.bootstrap_peers;
+    cfg.data_dir = "data-fast";
+    return cfg;
+}
+
 bool validate_network_profile(const NodeConfig& cfg, std::string& error) {
     error.clear();
     switch (cfg.mode) {
@@ -635,6 +688,10 @@ bool validate_network_profile(const NodeConfig& cfg, std::string& error) {
         if (cfg.chain.min_difficulty_target != kMainnetDifficultyTarget ||
             cfg.chain.initial_difficulty_target != kMainnetDifficultyTarget) {
             error = "mainnet difficulty must stay at 0x000000FFFFFFFFFF";
+            return false;
+        }
+        if (cfg.chain.pow_algorithm != PowAlgorithm::MemoryHard) {
+            error = "mainnet must keep pow_algorithm=memory_hard";
             return false;
         }
         for (const auto& peer : cfg.bootstrap_peers) {
@@ -664,6 +721,17 @@ bool validate_network_profile(const NodeConfig& cfg, std::string& error) {
             }
         }
         return true;
+    case NetworkMode::Fast: {
+        if (cfg.chain.network_mode != "fast" || cfg.chain.network_id != kFastNetworkId) {
+            error = "fast profile requires network_id=ADDITION_FAST_V1";
+            return false;
+        }
+        // HARD: incomplete pipeline must not boot. No fake Solana-speed product.
+        if (!fast_path_boot_allowed(error)) {
+            return false;
+        }
+        return true;
+    }
     case NetworkMode::Testnet:
         if (cfg.chain.network_id == kMainnetNetworkId || cfg.chain.network_mode == "mainnet") {
             error = "testnet cannot load mainnet genesis (network_id=ADDITION_MAINNET_V1)";
@@ -671,6 +739,11 @@ bool validate_network_profile(const NodeConfig& cfg, std::string& error) {
         }
         if (cfg.chain.network_id == kRegtestNetworkId || cfg.chain.network_mode == "regtest") {
             error = "testnet cannot load regtest genesis (network_id=ADDITION_REGTEST_V1)";
+            return false;
+        }
+        if (cfg.chain.network_id == kFastNetworkId || cfg.chain.network_mode == "fast") {
+            error = "testnet cannot load fast genesis (network_id=ADDITION_FAST_V1); "
+                    "fast path is a separate fail-closed profile";
             return false;
         }
         return true;
@@ -702,6 +775,7 @@ bool is_mainnet_runtime() {
         return true;
     case NetworkMode::Testnet:
     case NetworkMode::Regtest:
+    case NetworkMode::Fast:
         return false;
     }
     return false;
@@ -715,6 +789,8 @@ const char* network_mode_label(NetworkMode mode) {
         return "mainnet";
     case NetworkMode::Regtest:
         return "regtest";
+    case NetworkMode::Fast:
+        return "fast";
     }
     return "testnet";
 }
@@ -738,6 +814,10 @@ const char* pow_algorithm_label(PowAlgorithm algorithm) {
 std::uint64_t mine_deadline_seconds(const ChainConfig& cfg) {
     if (cfg.network_mode == "mainnet" || cfg.network_id == kMainnetNetworkId) {
         return kMainnetMineDeadlineSec;
+    }
+    if (cfg.network_mode == "fast" || cfg.network_id == kFastNetworkId) {
+        // Scaffold only; boot is fail-closed. Keep a finite deadline if ever constructed in tests.
+        return kTestnetMineDeadlineSec;
     }
     return kTestnetMineDeadlineSec;
 }
@@ -774,6 +854,10 @@ NetworkMode parse_network_mode(const std::string& value, bool& ok) {
     if (v == "mainnet" || v == "addition-mainnet") {
         ok = true;
         return NetworkMode::Mainnet;
+    }
+    if (v == "fast" || v == "addition-fast") {
+        ok = true;
+        return NetworkMode::Fast;
     }
     ok = false;
     return NetworkMode::Testnet;
@@ -1044,6 +1128,11 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
             network_from_cli = true;
             continue;
         }
+        if (arg == "--fast") {
+            cli_network = "fast";
+            network_from_cli = true;
+            continue;
+        }
         if (arg == "--regtest") {
             regtest_from_cli = true;
             continue;
@@ -1167,7 +1256,7 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
         bool ok = false;
         mode = parse_network_mode(cli_network, ok);
         if (!ok) {
-            error = "invalid --network value (use testnet, regtest, mainnet, --regtest, or --mainnet)";
+            error = "invalid --network value (use testnet, regtest, mainnet, fast, --regtest, --mainnet, or --fast)";
             return false;
         }
     } else if (const char* v = std::getenv("ADDITION_MAINNET_MODE")) {
@@ -1180,6 +1269,10 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
             error = "--regtest cannot be combined with --mainnet";
             return false;
         }
+        if (mode == NetworkMode::Fast) {
+            error = "--regtest cannot be combined with --fast";
+            return false;
+        }
         mode = NetworkMode::Regtest;
     }
     switch (mode) {
@@ -1188,6 +1281,9 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
         break;
     case NetworkMode::Regtest:
         cfg = regtest_node_config();
+        break;
+    case NetworkMode::Fast:
+        cfg = fast_node_config();
         break;
     case NetworkMode::Testnet:
         cfg = default_node_config();
@@ -1200,6 +1296,8 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
             config_path = first_existing({"config-mainnet.toml", "../config-mainnet.toml"});
         } else if (mode == NetworkMode::Regtest) {
             config_path = first_existing({"config-regtest.toml", "../config-regtest.toml"});
+        } else if (mode == NetworkMode::Fast) {
+            config_path = first_existing({"config-fast.toml", "../config-fast.toml"});
         } else {
             config_path = first_existing({"config.toml", "../config.toml"});
         }
@@ -1221,6 +1319,8 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
             genesis_path = first_existing({"genesis-mainnet.json", "../genesis-mainnet.json"});
         } else if (mode == NetworkMode::Regtest) {
             genesis_path.clear();
+        } else if (mode == NetworkMode::Fast) {
+            genesis_path = first_existing({"genesis-fast.json", "../genesis-fast.json"});
         } else {
             genesis_path = first_existing({"genesis.json", "../genesis.json"});
         }
@@ -1314,6 +1414,9 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
         case NetworkMode::Mainnet:
             cfg.bootstrap_peers = {kOperatorPublicMainnetP2p};
             break;
+        case NetworkMode::Fast:
+            cfg.bootstrap_peers = {"127.0.0.1:28547"};
+            break;
         case NetworkMode::Regtest:
         case NetworkMode::Testnet:
             cfg.bootstrap_peers = {"127.0.0.1:28545"};
@@ -1340,19 +1443,19 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
 }
 
 std::string daemon_help_text() {
-    return "ADDITION research daemon (testnet by default; --mainnet is a separate local chain, not a live public network)\n"
+    return "ADDITION research daemon (testnet by default; --mainnet is the public memory_hard product)\n"
            "\n"
            "Usage:\n"
-           "  additiond [--network testnet|regtest|mainnet] [--regtest] [--mainnet] [--config PATH] [--genesis PATH] [--data-dir PATH]\n"
+           "  additiond [--network testnet|regtest|mainnet|fast] [--regtest] [--mainnet] [--fast] [--config PATH] [--genesis PATH] [--data-dir PATH]\n"
            "            [--public-rpc] [--public-rpc-port PORT] [--public-rpc-bind IP]\n"
            "            [--local-rpc-port PORT] [--p2p-port PORT] [--bootstrap IP:PORT]\n"
            "            [--auto-mine] [--auto-mine-interval SEC] [--auto-mine-reward ADDR]\n"
            "\n"
            "Defaults:\n"
            "  --network testnet\n"
-           "  --config  config.toml (testnet) or config-mainnet.toml (--mainnet); --regtest skips both\n"
-           "  --genesis genesis.json (testnet) or genesis-mainnet.json (--mainnet); --regtest is in-process\n"
-           "  --data-dir data (testnet), data-mainnet (--mainnet), or data-regtest (--regtest)\n"
+           "  --config  config.toml (testnet), config-mainnet.toml (--mainnet), config-fast.toml (--fast); --regtest skips\n"
+           "  --genesis genesis.json (testnet), genesis-mainnet.json (--mainnet), genesis-fast.json (--fast); --regtest in-process\n"
+           "  --data-dir data (testnet), data-mainnet (--mainnet), data-fast (--fast), or data-regtest (--regtest)\n"
            "\n"
            "--regtest (same as --network regtest) is a local min-diff chain (ADDITION_REGTEST_V1).\n"
            "  Target 0xFFFFFFFFFFFFFFFF so two local nodes can mine and confirm quickly.\n"
@@ -1362,7 +1465,11 @@ std::string daemon_help_text() {
            "--mainnet (same as --network mainnet) starts ADDITION_MAINNET_V1 from genesis-mainnet.json.\n"
            "  Default bootstrap is the public mainnet seed 34.27.30.115:28546 (not the testnet seed).\n"
            "  Override with --bootstrap IP:PORT. Write RPC stays 127.0.0.1:8546. Auto-mine refused.\n"
-           "  PoW memory_hard at 0x000000FFFFFFFFFF — do not loosen. Not the website product.\n"
+           "  PoW memory_hard at 0x000000FFFFFFFFFF — do not loosen.\n"
+           "\n"
+           "--fast (same as --network fast) is ADDITION_FAST_V1 scaffold only (docs/FAST_PATH_V1.md).\n"
+           "  Leader/pipeline/execution not shipped — daemon fail-closed. Not a Solana TPS claim.\n"
+           "  Does not change --mainnet memory_hard. Live public product remains mainnet PoW.\n"
            "\n"
            "Local trusted write RPC: 127.0.0.1 (never bound to 0.0.0.0; optional ADDITION_RPC_TOKEN)\n"
            "  Override port with --local-rpc-port or ADDITION_LOCAL_RPC_PORT (second node: 8546).\n"

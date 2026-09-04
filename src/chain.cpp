@@ -80,8 +80,9 @@ Block Chain::make_genesis() const {
     Block g{};
     g.header.height = 0;
     // Testnet keeps previous_hash=0 so the live ADDITION_TESTNET_V1 genesis is unchanged.
-    // Mainnet and --regtest bind the genesis header to network_id so hashes cannot match.
-    if (cfg_.network_id == kMainnetNetworkId || cfg_.network_id == kRegtestNetworkId) {
+    // Mainnet, regtest, and fast bind the genesis header to network_id so hashes cannot match.
+    if (cfg_.network_id == kMainnetNetworkId || cfg_.network_id == kRegtestNetworkId ||
+        cfg_.network_id == kFastNetworkId) {
         g.header.previous_hash = std::string("genesis:") + cfg_.network_id;
     } else {
         g.header.previous_hash = "0";

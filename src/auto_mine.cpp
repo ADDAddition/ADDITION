@@ -42,6 +42,7 @@ bool AutoMiner::enabled() const {
         return settings_.enabled;
     case NetworkMode::Mainnet:
     case NetworkMode::Regtest:
+    case NetworkMode::Fast:
         return false;
     }
     return false;
@@ -70,6 +71,7 @@ bool AutoMiner::maybe_mine(std::chrono::steady_clock::time_point now,
         break;
     case NetworkMode::Mainnet:
     case NetworkMode::Regtest:
+    case NetworkMode::Fast:
         error = "auto-mine is testnet only";
         return false;
     }
