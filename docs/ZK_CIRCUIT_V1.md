@@ -1,29 +1,40 @@
-# ZK Circuit v1 — interface + schema (fail-closed progress)
+# ZK Circuit v1 — real building blocks + fail-closed product path
 
-Status: **circuit work in progress / not live**. No production zero-knowledge
-proof system ships in this PR. Live privacy remains SHA3-512 opening with
-`privacy_claim=opening_not_zk`. The zk RPC path stays fail-closed
-(`claim=zk_pending`). See `docs/PRIVACY_REAL_V1.md`.
+Status: **circuit work in progress / not live**. Live privacy remains SHA3-512
+opening with `privacy_claim=opening_not_zk`. The zk RPC path stays fail-closed
+(`claim=zk_pending`). `zk_circuit_status` remains `not_proven` until Jeremy GO
+wires a production verifier for the opening circuit. See `docs/PRIVACY_REAL_V1.md`.
 
 Brand: **ADDITION** only.
 
-## What this PR is (REAL vs scaffold)
+## REAL vs still-pending
 
-| Piece | Status |
-| :--- | :--- |
-| Circuit statement + witness / public-input schema | **REAL** (documented + typed in C++) |
-| Canonical public-input encoding (domain-separated) | **REAL** (byte string for a future Fiat–Shamir transcript) |
-| Constraint scaffolding (named opening-relation constraints) | **REAL** (interface + enumeration; not a SNARK/STARK) |
-| Self-test hook: witness → recompute SHA3-512 opening | **REAL** hash check; **NOT** zero-knowledge |
-| Lab Groth16 SNARK (Poseidon opening) | **REAL** prove+verify behind `ADDITION_ZK_SNARK_V1` — see `docs/ZK_SNARK_V1.md` |
-| Prover that emits acceptances / proving keys for **SHA3** zk_v1 | **Scaffold** — fail-closed; refuses to emit |
-| On-node verifier that accepts **production SHA3** proofs | **Scaffold** — fail-closed; `backend_wired()==false` |
-| Live product claim `zk_v1` | **Forbidden** until a proven backend verifies the production privacy statement |
+| Piece | Status | Label / caveat |
+| :--- | :--- | :--- |
+| Circuit statement + witness / public-input schema | **REAL** | typed C++ |
+| Canonical public-input encoding (domain-separated) | **REAL** | Fiat–Shamir-ready string |
+| Named constraints enum (`C_cm`, `C_nf`, …) | **REAL** | enumeration only until evaluated |
+| SHA3-512 opening self-test | **REAL** hash check | **NOT** ZK |
+| Named-constraint evaluator (`C_cm`/`C_nf` via opening) | **REAL** | **`constraint_check_not_zk`** (witness visible) |
+| R1CS field evaluator + value-conservation / square circuits | **REAL** arithmetic CS | **`constraint_check_not_zk`** — not a SNARK |
+| Toy Fiat–Shamir Schnorr PoK (discrete log) prove + verify | **REAL** NIZK for toy DL statement | **toy only** — not SHA3 opening; not PQ; not live |
+| Lab Groth16 SNARK (Poseidon opening) | **REAL** prove+verify behind `ADDITION_ZK_SNARK_V1` | lab only — see `docs/ZK_SNARK_V1.md`; not live SHA3 claim |
+| Production prover that emits opening-circuit acceptances | **Scaffold** | fail-closed; refuses to emit |
+| On-node `PrivacyZkVerifier` for mint/spend | **Scaffold** | `backend_wired()==false` |
+| Live product claim `zk_v1` / `zk_circuit_status=proven` | **Forbidden** | needs Jeremy GO + real opening-circuit verifier |
 
-Do **not** market this as live ZK. Do **not** treat the opening self-test as a
-proof. Do **not** weaken mainnet `memory_hard` / `0x000000FFFFFFFFFF`.
+**Constraint check ≠ ZK.** Passing `zk_r1cs_evaluate` or
+`zk_circuit_v1_eval_opening_constraints` means the witness satisfies the named
+relation under a local evaluator that **sees the witness**. That is not
+zero-knowledge and must not be marketed as a proof system for private mint/spend.
 
-## Goal statement
+**Toy Schnorr ≠ opening ZK.** `zk_toy_schnorr_*` generates and verifies a real
+Fiat–Shamir Schnorr proof of knowledge of `x` for `Y = g^x mod p` over a fixed
+~256-bit safeprime group (OpenSSL BN). Tests prove accept/reject. It does **not**
+encode `C_cm`/`C_nf`, does **not** hide a SHA3 trapdoor from a node, is **not**
+post-quantum, and must **not** flip `privacy_claim` or `zk_circuit_v1_proven()`.
+
+## Goal statement (still the target)
 
 Prove knowledge of trapdoor `r` such that commitment `cm` and nullifier `nf`
 match the existing v1 opening relation — **without** sending `r` to the node.
@@ -35,8 +46,8 @@ cm = SHA3-512("cm|v1|" || decimal(amount) || "|" || trapdoor_hex)
 nf = SHA3-512("nf|v1|" || cm || "|" || trapdoor_hex)
 ```
 
-Target zk_v1: same relation inside a proof system; verifier sees only public
-inputs + proof validity.
+Target zk_v1: same relation inside a production proof system; verifier sees only
+public inputs + proof validity.
 
 ## Public inputs / witness schema
 
@@ -71,29 +82,35 @@ Canonical public-input domain string:
 addition.zk_circuit_v1|spend|<amount>|<note_commitment_hex>|<nullifier_hex>|<recipient_tag>
 ```
 
-Value conservation across recipient + change notes is **out of scope** for this
-slice (future constraint IDs). Membership against a note Merkle root is also
-future work.
+Value conservation across recipient + change notes has a **REAL R1CS evaluator**
+for the linear toy `in == out + change` (`zk_circuit_v1_eval_value_conservation_r1cs`).
+Full spend conservation + Merkle membership remain future work.
 
-## Constraint scaffolding (named, not proven)
+## Constraint scaffolding + evaluation
 
-These are the algebraic / hash constraints a future backend must implement.
-Listing them here does **not** mean they are proven in-process.
+| ID | Kind | Informal constraint | Evaluator |
+| :--- | :--- | :--- | :--- |
+| `C_cm` | Mint + Spend | `cm == SHA3-512("cm\|v1\|" \|\| amount \|\| "|" \|\| r)` | REAL SHA3 opening check (**not ZK**) |
+| `C_nf` | Mint + Spend | `nf == SHA3-512("nf\|v1\|" \|\| cm \|\| "|" \|\| r)` | REAL SHA3 opening check (**not ZK**) |
+| `C_nf_fresh` | Spend (ledger) | nullifier not previously used | unimplemented in circuit eval |
+| `C_value_conserved` | Spend | `in == out + change` (toy linear) | REAL R1CS field eval (**not ZK**) |
+| `C_note_member` | Spend (future) | note in committed set / Merkle root | unimplemented |
 
-| ID | Kind | Informal constraint |
-| :--- | :--- | :--- |
-| `C_cm` | Mint + Spend | `cm == SHA3-512("cm|v1|" \|\| amount \|\| "|" \|\| r)` |
-| `C_nf` | Mint + Spend | `nf == SHA3-512("nf|v1|" \|\| cm \|\| "|" \|\| r)` |
-| `C_nf_fresh` | Spend (ledger) | nullifier not previously used (public set check) |
-| `C_value_conserved` | Spend (future) | in_value == out_value + change |
-| `C_note_member` | Spend (future) | note in committed set / Merkle root |
+Self-test API (`zk_circuit_v1_self_test_opening`) and named-constraint eval share
+the opening relation. They must not set `claim=zk_v1`.
 
-Self-test API (`zk_circuit_v1_self_test_opening`) recomputes `C_cm` / `C_nf`
-with the witness via the same SHA3-512 path as `PrivacyPool::verify_opening`.
-That proves the **relation hash** is wired correctly. It is **not** a ZK proof
-and must not set `claim=zk_v1`.
+## Toy proof module (real prove + verify in tests)
 
-## Prover / verifier contract (fail-closed)
+```text
+zk_toy_schnorr_keygen → (Y, x)
+zk_toy_schnorr_prove  → (R, s)   Fiat–Shamir via SHA3-512
+zk_toy_schnorr_verify → accept / reject
+```
+
+Domain: `addition.zk_toy_schnorr|v1|p|g|Y|R`. Invalid / tampered / empty proofs
+reject. Success does **not** wire `FailClosedPrivacyZkVerifier`.
+
+## Prover / verifier contract (fail-closed product path)
 
 ```text
 zk_circuit_v1_proven() == false   →  no acceptances
@@ -105,24 +122,24 @@ live getinfo privacy_claim        →  opening_not_zk
 ```
 
 Fake proof blobs (empty, garbage hex, magic “CLAIM_ZK_V1” prefixes, ML-DSA wrap
-bytes) must be rejected. Claiming “zk” without a valid verified proof fails
-closed.
+bytes, toy Schnorr bytes reused as mint proofs) must be rejected.
 
-## Backend candidates (none claimed live for SHA3)
+## Backend candidates (none claimed live for opening)
 
-Same as `PRIVACY_REAL_V1.md`. A **lab** Groth16 / Poseidon path ships in
-`docs/ZK_SNARK_V1.md` (opt-in flag; trusted setup; **not** the live SHA3 statement).
-PR #82 toy Fiat–Shamir Schnorr is a different HOLD path and is not this SNARK.
+PQ-friendly hash argument (FRI/STARK-style) for SHA3-in-circuit, lattice/hash ZK
+library, or hybrid with ML-DSA-87 envelopes. The toy Schnorr DL proof is a
+**building-block demo only** (classical assumption). A separate **lab** Groth16 /
+Poseidon path ships in `docs/ZK_SNARK_V1.md` (opt-in `ADDITION_ZK_SNARK_V1`;
+trusted setup; **not** the live SHA3 statement; not the toy Schnorr path).
 
-Pick and wire a production-SHA3 (or explicit hash-migration) backend in a later PR
-only when compile + tests prove verify can succeed **and** product claims are
-updated deliberately.
+Pick and wire a production opening backend only when compile + tests prove verify
+can succeed **and** Jeremy GO allows claim cutover.
 
 ## Checklist (PR gate)
 
 - [x] Mainnet `memory_hard` target `0x000000FFFFFFFFFF` untouched
-- [x] No fake ZK claims; self-test labeled not-ZK
-- [x] `opening_not_zk` remains live product claim
-- [x] Prover/verifier fail-closed while `zk_circuit_v1_proven()==false`
+- [x] No fake ZK product claims; constraint eval labeled `constraint_check_not_zk`
+- [x] Toy Schnorr prove+verify covered by tests; live claim stays `opening_not_zk`
+- [x] `zk_circuit_v1_proven()==false`; production prover/verifier fail-closed
 - [x] ML-DSA-87 + SHA3-512 `pq_mode=strict` kept
 - [x] Ship only what tests prove

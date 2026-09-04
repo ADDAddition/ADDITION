@@ -60,6 +60,8 @@ add_library(addition_core
     src/privacy_zk.cpp
     src/zk_circuit_v1.cpp
     src/zk_snark_v1.cpp
+    src/zk_r1cs.cpp
+    src/zk_toy_proof.cpp
     src/fast_path.cpp
     src/pouw_storage.cpp
     src/pouw_compute.cpp
@@ -146,6 +148,14 @@ if(ADDITION_BUILD_TESTS)
         add_test(NAME test_zk_snark_v1 COMMAND test_zk_snark_v1)
         set_tests_properties(test_zk_snark_v1 PROPERTIES TIMEOUT 180)
     endif()
+
+    add_executable(test_zk_r1cs tests/test_zk_r1cs.cpp)
+    target_link_libraries(test_zk_r1cs PRIVATE addition_core)
+    add_test(NAME test_zk_r1cs COMMAND test_zk_r1cs)
+
+    add_executable(test_zk_toy_proof tests/test_zk_toy_proof.cpp)
+    target_link_libraries(test_zk_toy_proof PRIVATE addition_core)
+    add_test(NAME test_zk_toy_proof COMMAND test_zk_toy_proof)
 
     add_executable(test_fast_path tests/test_fast_path.cpp)
     target_link_libraries(test_fast_path PRIVATE addition_core)

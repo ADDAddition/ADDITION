@@ -1,6 +1,8 @@
 #include "addition/zk_circuit_v1.hpp"
 
 #include "addition/privacy.hpp"
+#include "addition/zk_r1cs.hpp"
+#include "addition/zk_toy_proof.hpp"
 
 #include <cctype>
 #include <sstream>
@@ -196,6 +198,86 @@ bool zk_circuit_v1_self_test_opening(std::uint64_t amount,
     return true;
 }
 
+bool zk_circuit_v1_eval_opening_constraints(std::uint64_t amount,
+                                            const std::string& trapdoor_hex,
+                                            const std::string& commitment_hex,
+                                            const std::string& nullifier_hex,
+                                            std::vector<ZkConstraintEvalResult>& results_out,
+                                            std::string& error) {
+    results_out.clear();
+    std::string local;
+    const bool ok = PrivacyPool::verify_opening(amount, trapdoor_hex, commitment_hex,
+                                                nullifier_hex, local);
+    // C_cm and C_nf share the opening relation check (both must hold together).
+    results_out.push_back(ZkConstraintEvalResult{
+        ZkConstraintId::CCm,
+        ok,
+        true,
+        "sha3_opening_check_not_zk",
+        kZkR1csHonestyLabel,
+    });
+    results_out.push_back(ZkConstraintEvalResult{
+        ZkConstraintId::CNf,
+        ok,
+        true,
+        "sha3_opening_check_not_zk",
+        kZkR1csHonestyLabel,
+    });
+    results_out.push_back(ZkConstraintEvalResult{
+        ZkConstraintId::CNfFresh,
+        false,
+        false,
+        "unimplemented_ledger_set_check",
+        kZkR1csHonestyLabel,
+    });
+    results_out.push_back(ZkConstraintEvalResult{
+        ZkConstraintId::CValueConserved,
+        false,
+        false,
+        "use_zk_circuit_v1_eval_value_conservation_r1cs",
+        kZkR1csHonestyLabel,
+    });
+    results_out.push_back(ZkConstraintEvalResult{
+        ZkConstraintId::CNoteMember,
+        false,
+        false,
+        "unimplemented_merkle_membership",
+        kZkR1csHonestyLabel,
+    });
+    if (!ok) {
+        error = local.empty() ? "opening constraints not satisfied" : local;
+        return false;
+    }
+    error.clear();
+    return true;
+}
+
+bool zk_circuit_v1_eval_value_conservation_r1cs(std::uint64_t in_value,
+                                                std::uint64_t out_value,
+                                                std::uint64_t change,
+                                                ZkConstraintEvalResult& result_out,
+                                                std::string& error) {
+    result_out = ZkConstraintEvalResult{
+        ZkConstraintId::CValueConserved,
+        false,
+        true,
+        kZkR1csBackendId,
+        kZkR1csHonestyLabel,
+    };
+    ZkR1csAssignment z;
+    if (!zk_r1cs_value_conservation_witness(in_value, out_value, change, z, error)) {
+        return false;
+    }
+    const auto inst = zk_r1cs_value_conservation_circuit();
+    std::size_t failed = 0;
+    if (!zk_r1cs_evaluate(inst, z, error, failed)) {
+        return false;
+    }
+    result_out.satisfied = true;
+    error.clear();
+    return true;
+}
+
 ZkCircuitMintStatement zk_circuit_mint_from_rpc(const ZkMintPublicInputs& in) {
     return ZkCircuitMintStatement{in.amount, in.commitment, in.nullifier};
 }
@@ -251,7 +333,11 @@ std::string zk_circuit_v1_info_fields() {
         << " zk_circuit_status=" << zk_circuit_v1_status_label()
         << " zk_circuit_proven=" << (zk_circuit_v1_proven() ? "true" : "false")
         << " zk_circuit_prover=" << default_zk_circuit_v1_prover().backend_id()
-        << " zk_circuit_constraints=" << zk_circuit_v1_constraint_specs().size();
+        << " zk_circuit_constraints=" << zk_circuit_v1_constraint_specs().size()
+        << " zk_r1cs_evaluator=" << kZkR1csBackendId
+        << " zk_r1cs_honesty=" << kZkR1csHonestyLabel
+        << " zk_toy_proof_id=" << kZkToyProofId
+        << " zk_toy_proof_honesty=" << kZkToyProofHonesty;
     return out.str();
 }
 

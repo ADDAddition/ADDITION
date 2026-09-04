@@ -21,9 +21,16 @@ mint/spend string. A garbage proof returns `error:`. They are not a circuit.
 future proof backend (`FailClosedPrivacyZkVerifier`). They always reject today and
 label `claim=zk_pending`. Circuit schema + fail-closed prover live in
 `docs/ZK_CIRCUIT_V1.md` / `zk_circuit_v1.*` (`zk_circuit_status=not_proven`).
+Additional REAL building blocks (still not live product ZK):
+
+- R1CS field evaluator (`zk_r1cs.*`) — constraint satisfaction; **`constraint_check_not_zk`**
+- Toy Fiat–Shamir Schnorr DL prove/verify (`zk_toy_proof.*`) — real NIZK for a toy
+  statement only; must not flip `privacy_claim`
+
 A separate **lab** Groth16/Poseidon path is documented in `docs/ZK_SNARK_V1.md`
 (opt-in `ADDITION_ZK_SNARK_V1`; not live privacy; not PR #82 toy Schnorr).
-See `docs/PRIVACY_REAL_V1.md`.
+
+See `docs/PRIVACY_REAL_V1.md` and `docs/ZK_CIRCUIT_V1.md`.
 
 `tools/zk_verify_wrapper.py` exits with an error if invoked. Do not set
 `ADDITION_ZK_VERIFY_CMD` and do not advertise a ZK backend as live.

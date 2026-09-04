@@ -58,11 +58,17 @@ Prefer a **PQ-friendly hybrid** that reuses the existing commitment/nullifier st
    Typed witness / public-input schema, constraint scaffolding, SHA3 opening
    self-test (not ZK), and fail-closed prover. Still **not live ZK**.
 
-7. **Lab SNARK slice (`docs/ZK_SNARK_V1.md`)**  
+7. **Real building blocks (#82 / this slice)**  
+   - REAL R1CS field evaluator + named-constraint eval (`constraint_check_not_zk`)  
+   - REAL Fiat–Shamir Schnorr toy prove+verify (DL statement only; not opening ZK)  
+   - Live `privacy_claim` / `zk_circuit_status` remain fail-closed until Jeremy GO  
+   See REAL vs pending table in `docs/ZK_CIRCUIT_V1.md`.
+
+8. **Lab SNARK slice (`docs/ZK_SNARK_V1.md`)**  
    Real Groth16 prove+verify (arkworks / BN254) for a **Poseidon** opening
    analogous to `C_cm` / `C_nf`. Opt-in via `ADDITION_ZK_SNARK_V1=1`. Trusted
    setup. Does **not** flip `privacy_claim` or mark the SHA3 circuit `proven`.
-   Not PR #82 toy Schnorr.
+   Not the PR #82 toy Schnorr path.
 
 ## Migration
 
