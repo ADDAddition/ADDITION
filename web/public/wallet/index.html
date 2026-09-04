@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Wallet — ADDITION</title>
-  <meta name="description" content="ADDITION wallet. Keys stay on your local node. Public hosted pages cannot spend.">
+  <meta name="description" content="ADDITION wallet. Prefers public mainnet RPC 38546 write (createwallet/mine/send). Falls back to home-node loopback if offline.">
   <meta name="theme-color" content="#f3f6fa">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/favicon.ico">
@@ -14,7 +14,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="Wallet" data-sub="local node" class="wallet-page">
+<body data-title="Wallet" data-sub="mainnet RPC" class="wallet-page">
   <header id="site-header"></header>
   <main>
     <div class="wallet-shell">
@@ -23,28 +23,32 @@
         <span id="conn-pill" class="pill pill-warn">Checking…</span>
       </div>
       <p class="note" style="margin-top:0">
-        Keys stay in your local node file. This page only talks to
-        loopback write RPC through <code>/local-rpc</code>
-        (<code>127.0.0.1:8546</code> mainnet / <code>8545</code> testnet).
-        Public <code>wallet_send</code> stays off <code>38546</code>.
+        Prefers public mainnet write on seed <code>34.27.30.115:38546</code> via
+        <code>/api/rpc</code> (CoS allowlist: <code>createwallet</code>, <code>mine</code>,
+        <code>wallet_send</code>, sign, <code>tx_build</code>).
+        Falls back to home-node loopback via <code>/local-rpc</code>
+        (<code>127.0.0.1:8546</code>) when public RPC is offline.
       </p>
 
-      <!-- Offline / connect home node -->
+      <!-- Offline / connect -->
       <section id="panel-offline" class="panel wallet-panel" hidden>
-        <h2>Connect your home node</h2>
-        <p class="note">Spending needs a node on this device (or LAN loopback). Public sites never hold your keys.</p>
+        <h2>RPC offline</h2>
+        <p class="note">
+          Public <code>38546</code> / <code>/api/rpc</code> did not answer, and no home-node
+          <code>/local-rpc</code> is available. Retry, or run a local node.
+        </p>
         <ol class="connect-steps">
           <li>
-            <strong>Run additiond locally</strong>
+            <strong>Public path (preferred)</strong>
+            <span>Seed <code>http://34.27.30.115:38546</code> — write allowlist includes create / mine / send when CoS has it open. Site uses <code>/api/rpc</code>.</span>
+          </li>
+          <li>
+            <strong>Or run additiond locally</strong>
             <span>Start <code>additiond --mainnet</code> with write RPC on <code>127.0.0.1:8546</code> only — never bind write on <code>0.0.0.0</code>.</span>
           </li>
           <li>
             <strong>Serve this site next to the node</strong>
-            <span>From the repo: <code>ADDITION_NETWORK=mainnet python3 web/serve.py</code> so <code>/local-rpc</code> can reach loopback.</span>
-          </li>
-          <li>
-            <strong>Refresh this page</strong>
-            <span>When the node answers, Create wallet or Open existing appears here. Public read is <code>38546</code> / <code>/api/rpc</code>; send stays loopback-only.</span>
+            <span>From the repo: <code>ADDITION_NETWORK=mainnet python3 web/serve.py</code> so <code>/local-rpc</code> can reach loopback as fallback.</span>
           </li>
         </ol>
         <div class="cta-row" style="margin-top:1rem">
@@ -57,7 +61,7 @@
       <!-- Setup: create / open -->
       <section id="panel-setup" class="panel wallet-panel" hidden>
         <h2>Set up this wallet</h2>
-        <p class="note">Pick a name for the wallet file on your node. No seed phrase UI — the node stores ML-DSA-87 keys in <code>data/wallets/&lt;name&gt;.wal</code>.</p>
+        <p class="note">Pick a name for the wallet file on the node that answers. No seed phrase UI — the node stores ML-DSA-87 keys in <code>data/wallets/&lt;name&gt;.wal</code>.</p>
         <label for="name">Wallet name</label>
         <input id="name" value="default" autocomplete="off" spellcheck="false">
         <div class="wallet-setup">
@@ -113,7 +117,7 @@
       <!-- Send -->
       <section id="panel-send" class="panel wallet-panel" hidden>
         <h2>Send</h2>
-        <p class="note">Signs and broadcasts from your local node only via <code>/local-rpc</code>. Never goes to public <code>:80</code>, <code>38545</code>, or <code>38546</code>.</p>
+        <p class="note">Signs and broadcasts via the active RPC path (public <code>38546</code> / <code>/api/rpc</code> when available, else loopback <code>/local-rpc</code>).</p>
         <label for="to">Recipient address</label>
         <input id="to" autocomplete="off" spellcheck="false" placeholder="128-hex address">
         <label for="amount">Amount (whole ADD)</label>
@@ -146,9 +150,9 @@
 
         <h3>Mine to this wallet</h3>
         <p class="note">
-          Calls <code>mine</code> on your local write RPC via <code>/local-rpc</code>
-          (<code>127.0.0.1:8546</code> mainnet (<code>memory_hard</code>) or <code>8545</code> testnet (SHA3-512).
-          Coinbase is 50 ADD, 100% to the finding miner. This page never opens public send.
+          Calls <code>mine</code> on the active write path (public <code>38546</code> when available,
+          else <code>/local-rpc</code> → <code>127.0.0.1:8546</code> mainnet / <code>8545</code> testnet).
+          Coinbase is 50 ADD, 100% to the finding miner.
         </p>
         <div class="btn-row">
           <button type="button" class="btn btn-secondary" id="mine-btn">Mine one block</button>

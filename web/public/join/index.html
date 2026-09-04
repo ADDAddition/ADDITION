@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Get started — ADDITION</title>
-  <meta name="description" content="Join ADDITION_MAINNET_V1. Public seed P2P 34.27.30.115:28546, RPC 38546. Bitcoin-like self-custody.">
+  <meta name="description" content="Join ADDITION_MAINNET_V1. Public seed P2P 34.27.30.115:28546, RPC 38546 (read + write). Bitcoin-like self-custody.">
   <meta name="theme-color" content="#f3f6fa">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/favicon.ico">
@@ -22,8 +22,9 @@
       <h1>Get started</h1>
       <p class="lede">
         Run <code>additiond --mainnet</code> on your machine — the same model as Bitcoin.
-        The public site explorer and <code>/api/rpc</code> follow <code>ADDITION_MAINNET_V1</code>
-        (seed <code>34.27.30.115:38546</code>). Research testnet remains available as a separate chain.
+        Network <code>ADDITION_MAINNET_V1</code>, P2P bootstrap <code>34.27.30.115:28546</code>,
+        public RPC <code>http://34.27.30.115:38546</code> (read + write allowlist open).
+        Research testnet remains available as a separate chain.
       </p>
       <div class="cta-row">
         <a class="btn btn-primary" href="#mainnet">Mainnet node</a>
@@ -34,21 +35,23 @@
 
     <div class="banner">
       Binary from <a href="https://github.com/ADDAddition/ADDITION">this repo</a> on <code>main</code>.
-      Public read is <code>/rpc?cmd=getinfo</code>, not <code>/getinfo</code>.
-      Write/send stays on <code>127.0.0.1</code> for the site wallet — never publish <code>8545</code> / <code>8546</code>.
+      Public RPC is <code>/rpc?cmd=getinfo</code> on seed <code>38546</code> (site <code>/api/rpc</code>).
+      Write allowlist on that port includes <code>createwallet</code>, <code>mine</code>, <code>wallet_send</code>, sign, <code>tx_build</code> (CoS).
+      Home-node write stays on <code>127.0.0.1:8546</code> — never publish <code>8545</code> / <code>8546</code>.
+      Height from live <code>getinfo</code> may be <code>0</code>.
     </div>
 
     <section class="panel" id="mainnet">
       <h2>Public mainnet</h2>
       <p>
         Public product: <code>network_id=ADDITION_MAINNET_V1</code>.
-        Anyone can run a home node, sync from the public seed, and mine —
+        Anyone can run a home node, sync from the public seed, mine, and use wallet RPCs —
         the same model as <code>bitcoind</code> against a known bootstrap peer.
       </p>
       <p>
         Public seed: <strong>34.27.30.115:28546</strong> (P2P) and
         <strong>34.27.30.115:38546</strong> (HTTP).
-        Site <code>/api/rpc</code> proxies that read path.
+        Site <code>/api/rpc</code> proxies that path.
         Separate chain from research testnet (<code>28545</code> / <code>38545</code>).
       </p>
       <p>Full runbook: <a href="https://github.com/ADDAddition/ADDITION/blob/main/docs/MAINNET_RUNBOOK.md">docs/MAINNET_RUNBOOK.md</a>.</p>
@@ -56,9 +59,9 @@
       <h3>Mainnet ports</h3>
       <table>
         <tr><th>Port</th><th>Role</th></tr>
-        <tr><td>38546</td><td>Public HTTP on the seed (<code>/rpc?cmd=getinfo</code>). Site <code>/api/rpc</code> points here.</td></tr>
+        <tr><td>38546</td><td>Public HTTP on the seed (<code>/rpc?cmd=…</code>). Site <code>/api/rpc</code>. Write allowlist open (createwallet / mine / wallet_send / sign / tx_build).</td></tr>
         <tr><td>28546</td><td>Public P2P bootstrap on the seed</td></tr>
-        <tr><td>8546</td><td>Write RPC on <code>127.0.0.1</code> only — never publish. Site wallet send uses this via <code>/local-rpc</code>.</td></tr>
+        <tr><td>8546</td><td>Home-node write RPC on <code>127.0.0.1</code> only — never publish. Wallet falls back here via <code>/local-rpc</code> if public RPC is offline.</td></tr>
       </table>
 
       <h3>Start a mainnet node</h3>
@@ -66,14 +69,14 @@
       <pre>export ADDITION_PRIVACY_MASTER_KEY='replace-with-32-or-more-chars____'
 export ADDITION_ENABLE_P2P_RPC=1
 additiond --mainnet --data-dir $HOME/addition-mainnet --local-rpc-port 8546 --p2p-port 28547 --bootstrap 34.27.30.115:28546</pre>
-      <p>Type <code>sync</code> on the daemon stdin (or send it to write RPC on <code>127.0.0.1:8546</code>), then <code>getinfo</code>. Mine on that same loopback write RPC when you want to produce blocks (<code>memory_hard</code>).</p>
+      <p>Type <code>sync</code> on the daemon stdin (or send it to write RPC on <code>127.0.0.1:8546</code> or public <code>38546</code>), then <code>getinfo</code>. Mine with <code>memory_hard</code> on either path when you want to produce blocks.</p>
       <p>Never <code>--bootstrap 34.27.30.115:28545</code> for mainnet (that is the research testnet seed). Never publish port <code>8546</code>. Auto-mine is refused on mainnet.</p>
 
-      <h3>Mainnet public read</h3>
+      <h3>Mainnet public RPC</h3>
       <pre>curl -s 'http://34.27.30.115:38546/rpc?cmd=getinfo'
 curl -s 'https://additionblockchain.com/api/rpc?cmd=getinfo'</pre>
       <p>Expect <code>network=mainnet</code> and <code>network_id=ADDITION_MAINNET_V1</code>. Height may still be <code>0</code>; copy only fields the node prints. Do not invent peer counts or TPS.</p>
-      <p>On the seed, <code>createwallet</code> / <code>mine</code> may answer on <code>38546</code>. <code>wallet_send</code> / keys stay disabled on that public port. The site wallet never opens public send — it spends only through <code>/local-rpc</code> → loopback.</p>
+      <p>On the seed, <code>createwallet</code> / <code>mine</code> / <code>wallet_send</code> / sign / <code>tx_build</code> answer on <code>38546</code> (CoS write allowlist). The site wallet prefers that public path via <code>/api/rpc</code>, with honest fallback to loopback <code>/local-rpc</code> if offline.</p>
       <p>Seed operator: <code>ADDITION_ADVERTISED_P2P=34.27.30.115:28546</code> so public <code>getinfo</code> / <code>peers</code> list that IPv4 endpoint and do not list <code>self</code>.</p>
     </section>
 
@@ -100,17 +103,15 @@ curl -s 'https://additionblockchain.com/api/rpc?cmd=getinfo'</pre>
     </section>
 
     <section class="panel">
-      <h2>Local wallet after your node is up</h2>
+      <h2>Wallet</h2>
       <p>
-        The <a href="/wallet/">Wallet</a> page talks only to <code>/local-rpc</code> →
-        <code>127.0.0.1:8546</code> (mainnet) or <code>127.0.0.1:8545</code> (testnet)
-        when you run <code>python3 web/serve.py</code> next to the node
-        (<code>ADDITION_NETWORK=mainnet</code> selects 8546).
-        On additionblockchain.com, local write is unavailable and the wallet explains how to connect a home node.
-        Public <code>wallet_send</code> stays disabled on <code>38546</code>.
+        The <a href="/wallet/">Wallet</a> page prefers public mainnet write on
+        <code>38546</code> via <code>/api/rpc</code>.
+        If that path is offline, run <code>ADDITION_NETWORK=mainnet python3 web/serve.py</code>
+        next to a home node so <code>/local-rpc</code> reaches <code>127.0.0.1:8546</code>.
       </p>
       <div class="tool-grid">
-        <a href="/wallet/"><strong>Wallet</strong><span>Receive, send, activity — local node required to spend</span></a>
+        <a href="/wallet/"><strong>Wallet</strong><span>Receive, send, activity — public 38546 or home node</span></a>
         <a href="/download/"><strong>Download</strong><span>Desktop helper, loopback RPC only</span></a>
         <a href="/local/"><strong>Local tools</strong><span>Operator forms (tokens, swap, privacy)</span></a>
         <a href="/status/"><strong>Status</strong><span>Public mainnet getinfo</span></a>

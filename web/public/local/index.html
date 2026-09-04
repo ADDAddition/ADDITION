@@ -14,23 +14,23 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="Local tools" data-sub="127.0.0.1 via /local-rpc">
+<body data-title="Local tools" data-sub="operator / loopback">
   <header id="site-header"></header>
   <main>
     <section class="product-hero" style="padding-top:1rem;padding-bottom:0.25rem">
       <p class="eyebrow">Operator toolbox</p>
       <h1>Local tools</h1>
       <p class="lede">
-        Forms call <code>/local-rpc</code> → write RPC <code>127.0.0.1:8545</code> (testnet)
-        or <code>127.0.0.1:8546</code> (<code>additiond --mainnet</code>).
-        Everyday receive/send lives in <a href="/wallet/">Wallet</a>.
-        The public host has no write RPC — panels stay offline there.
+        Forms call <code>/local-rpc</code> → write RPC <code>127.0.0.1:8546</code>
+        (<code>additiond --mainnet</code>) or <code>127.0.0.1:8545</code> (research testnet).
+        Everyday receive/send lives in <a href="/wallet/">Wallet</a>, which prefers public
+        <code>38546</code> write via <code>/api/rpc</code>.
       </p>
     </section>
     <div class="banner">
-      Do not point additionblockchain.com write paths at a public port.
-      Never bind write RPC on <code>0.0.0.0:8545</code> or <code>0.0.0.0:8546</code>.
-      Public <code>wallet_send</code> stays disabled on <code>38546</code>; site spend uses <code>/local-rpc</code> only.
+      Never bind home-node write RPC on <code>0.0.0.0:8545</code> or <code>0.0.0.0:8546</code>.
+      Public seed <code>38546</code> write allowlist is open (createwallet / mine / wallet_send / sign / tx_build per CoS).
+      These operator panels still use <code>/local-rpc</code> → loopback only.
     </div>
     <p id="rpc-state" class="offline">Checking local RPC…</p>
     <p id="height-line" class="note"></p>

@@ -29,7 +29,7 @@
     <ol>
       <li><strong>Quantum</strong> — ML-DSA-87 (FIPS 204). <code>getinfo</code> prints <code>pq_mode</code> when the process answers.</li>
       <li><strong>Privacy</strong> — SHA3-512 commitment + nullifier opening (<code>privacy_mint_open</code> / <code>privacy_spend_open</code>). Hash relation. Not Groth16. <code>ADDITION_PRIVACY_MASTER_KEY</code> must be ≥32 characters. Notes are a side ledger, not a native ADD lock.</li>
-      <li><strong>RPC</strong> — public read on seed :38546 (<code>getinfo</code>, <code>getblock</code>, …; site <code>/api/rpc</code>). Write/send for the site wallet on <code>127.0.0.1:8546</code>.</li>
+      <li><strong>RPC</strong> — public seed :38546 (<code>getinfo</code>, <code>getblock</code>, …; site <code>/api/rpc</code>). Write allowlist open per CoS (<code>createwallet</code>, <code>mine</code>, <code>wallet_send</code>, sign, <code>tx_build</code>). Home-node write on <code>127.0.0.1:8546</code>.</li>
       <li><strong>Fees</strong> — spec <code>min_fee=0</code>. Congestion can raise <code>recommended_min_fee</code>.</li>
       <li><strong>Bridges</strong> — in-process <code>bridge_*</code> and <code>web/evm/evm_rpc_bridge.py</code> on localhost. <code>eth_sendRawTransaction</code> disabled.</li>
     </ol>

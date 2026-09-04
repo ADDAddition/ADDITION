@@ -23,6 +23,21 @@ PUBLIC_ALLOWLIST = {
     "getblock",
     "getblockhash",
     "getblockraw",
+    # Seed CoS open write on 38546 (create/mine/send/sign/tx_build).
+    "createwallet",
+    "wallet_list",
+    "wallet_info",
+    "wallet_balance",
+    "wallet_send",
+    "wallet_sign",
+    "mine",
+    "tx_build",
+    "sendtx_signed",
+    "sendtx_signed_hash",
+    "sign_message",
+    "verify_message",
+    "getbalance",
+    "getbalance_instant",
 }
 
 

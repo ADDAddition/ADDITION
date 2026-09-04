@@ -6,6 +6,7 @@
 
   const state = {
     online: false,
+    via: "none",
     hasWallet: false,
     name: "default",
     address: "",
@@ -159,7 +160,12 @@
       : "No address yet — create or open a wallet";
     el("recv-addr").value = state.address || "";
     const meta = el("home-meta");
-    meta.textContent = "Wallet “" + state.name + "” · loopback write only";
+    const pathLabel = state.via === "public"
+      ? "public 38546 write"
+      : state.via === "local"
+        ? "loopback write"
+        : "RPC";
+    meta.textContent = "Wallet “" + state.name + "” · " + pathLabel;
   }
 
   function shorten(addr) {
@@ -203,8 +209,9 @@
     setPill("warn", "Checking…");
     const r = await L.ping(null);
     state.online = !r.offline;
+    state.via = r.via || "none";
     if (r.offline) {
-      setPill("off", "Local node offline");
+      setPill("off", "RPC offline");
       L.setButtons(false);
       const retry = el("retry-btn");
       if (retry) {
@@ -218,9 +225,10 @@
       showPanel("panel-offline");
       return;
     }
-    const net = r.fields.network || "local";
-    const height = r.fields.height || "?";
-    setPill("ok", "Local · " + net + " · h=" + height);
+    const net = r.fields.network || "mainnet";
+    const height = r.fields.height || "0";
+    const tag = state.via === "public" ? "Public" : "Local";
+    setPill("ok", tag + " · " + net + " · h=" + height);
     L.setButtons(true);
     await enterApp();
   }

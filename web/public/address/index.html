@@ -22,9 +22,9 @@
       <div id="address-fields"></div>
       <pre id="address-raw" class="raw"></pre>
       <p class="note">
-        Public-read RPC does not expose <code>getbalance</code>, address history, or receipts.
-        Those stay on loopback write RPC (<code>127.0.0.1:8545</code>).
-        See <a href="/rpc/">public allowlist</a> and <a href="/docs/wallet.md">wallet docs</a>.
+        Address history / receipts are not a full explorer index.
+        <code>getbalance</code> may answer on public <code>38546</code> when the write allowlist is open.
+        See <a href="/rpc/">public RPC</a> and <a href="/docs/wallet.md">wallet docs</a>.
       </p>
     </section>
   </main>

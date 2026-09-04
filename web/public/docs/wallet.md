@@ -1,21 +1,31 @@
-# Local testnet wallet
+# ADDITION wallet
 
-Research prototype / **testnet only**. This is not a live mainnet, not a token
-sale, and not a hosted web wallet.
-
-A stranger with `additiond --network testnet` running can create an address,
-read a balance, and send a post-quantum signed transaction **without putting a
-private key on the TEXT RPC socket**.
+Public product: **ADDITION_MAINNET_V1**. Anyone can sync, mine, and use wallet
+RPCs against the public seed, or run a home node with loopback write.
 
 Public contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com)
 
+## Networks
+
+| | Public mainnet | Research testnet (secondary) |
+|---|---|---|
+| Flag | `additiond --mainnet` | `additiond --network testnet` |
+| `network_id` | `ADDITION_MAINNET_V1` | `ADDITION_TESTNET_V1` |
+| Home-node write RPC | `127.0.0.1:8546` | `127.0.0.1:8545` |
+| Public RPC | `34.27.30.115:38546` | `34.27.30.115:38545` |
+| P2P bootstrap | `34.27.30.115:28546` | `34.27.30.115:28545` |
+
+Public seed **38546** write allowlist is open (CoS): `createwallet`, `mine`,
+`wallet_send`, `wallet_sign` / `sign_message`, `tx_build` / `sendtx_signed*`.
+Site `/wallet/` prefers `/api/rpc` → that public path; falls back to
+`/local-rpc` → loopback when public RPC is offline. Height from live `getinfo`
+may still be `0` — never invent TPS or a USD ticker.
+
+Never bind home-node write RPC to `0.0.0.0`. Never publish `8545` / `8546`.
+
 ## What already exists on the daemon
 
-Trusted local TEXT RPC (one command line in, one line out), **not JSON-RPC**:
-
-```text
-127.0.0.1:8545
-```
+Trusted TEXT RPC (one command line in, one line out), **not JSON-RPC**.
 
 Relevant commands (see [FINAL_COMMANDS.md](FINAL_COMMANDS.md)):
 
@@ -30,8 +40,8 @@ Relevant commands (see [FINAL_COMMANDS.md](FINAL_COMMANDS.md)):
 | `hygiene_classify [path]` | Offline Bitcoin script hygiene over operator samples / `fixtures/btc_hygiene_samples.json`. Does not move Bitcoin. Not BIP-360. Trusted RPC only. |
 | `hygiene_attest <wallet> <btc_addr> <height> <class> [reuse] [pubkey_on_chain]` | Signed ADDITION receipt (`ADDITION-HYGIENE-REHEARSAL`, `moves_bitcoin=0`, `claim=attestation_not_bip360`). Attestation rehearsal, not a consensus change. |
 | `hygiene_verify <receipt_note>` | Verify the signed receipt. A mutated note is rejected. |
-| `mine <address>` | Local trusted RPC. Testnet: SHA3-512, 30s deadline, coinbase 50. Mainnet profile: memory_hard, no 30s deadline (not a live public network). |
-| `getinfo` | `network=testnet`, `height`, `peers`, `pq_mode=strict`, `allowed_sig_algs`, `max_supply=50000000` |
+| `mine <address>` | Mainnet: memory_hard, no 30s deadline, coinbase 50. Testnet: SHA3-512, 30s deadline. |
+| `getinfo` | `network`, `network_id`, `height` (may be `0`), `peers`, `pq_mode=strict`, `allowed_sig_algs`, `max_supply=50000000` |
 
 Legacy `sendtx` / `sendtx_hash` (private key on the RPC line) stay **disabled**
 unless `ADDITION_ALLOW_INSECURE_TX_COMMANDS=1`. Leave that unset.
@@ -39,8 +49,10 @@ unless `ADDITION_ALLOW_INSECURE_TX_COMMANDS=1`. Leave that unset.
 `sign_message <privkey_hex> ...` still exists on the daemon. The standalone
 client does **not** call it.
 
-The node GUI / `/wallet/` page uses `wallet_send` and `data/wallets/`. This
-document is the **caller-disk** CLI: keys never enter the daemon wallet store.
+The site `/wallet/` page uses `wallet_send` against public `38546` when
+available (via `/api/rpc`), or `data/wallets/` on a home node via `/local-rpc`.
+This document also covers the **caller-disk** CLI: keys never enter the daemon
+wallet store.
 
 ## Standalone CLI (keys on the caller disk)
 
@@ -62,39 +74,43 @@ mode `0600`) and is used only in-process to sign `sign_hash`.
 
 ### Prerequisites
 
-* A running local daemon: `./build/additiond --network testnet`
+* A reachable TEXT RPC: home node `127.0.0.1:8546` (mainnet) / `8545` (testnet), or public `34.27.30.115:38546` when write is open
 * Python 3.10+
 * `liboqs` on the library path (the same library used to build `additiond`)
 
 If CMake cannot find liboqs, the daemon will not build. The wallet client loads
-`liboqs` via ctypes (`ADDITION_LIBOQS` overrides the path).
+`liboqs` via ctypes (`ADDITION_LIBOQS` overrides the path). The packaged desktop
+helper still refuses non-loopback RPC hosts (self-custody on your disk).
 
 ### Exact commands
 
-From the repository root, with the daemon already listening on `127.0.0.1:8545`:
+From the repository root, with a mainnet home node on `127.0.0.1:8546`:
 
 ```bash
 # 1. Create a local address (keys stay on disk; priv_printed=0)
-python3 web/addition_wallet.py createwallet
+python3 web/addition_wallet.py --rpc-port 8546 createwallet
 
-# 2. Confirm the node is the research testnet
-python3 web/addition_wallet.py getinfo
-# expect: network=testnet  pq_mode=strict  max_supply=50000000
+# 2. Confirm the node is public mainnet
+python3 web/addition_wallet.py --rpc-port 8546 getinfo
+# expect: network=mainnet  network_id=ADDITION_MAINNET_V1  pq_mode=strict
 
-# 3. Optional local demo: mine a coinbase to that address
-python3 web/addition_wallet.py mine
-python3 web/addition_wallet.py balance
+# 3. Optional: mine a coinbase to that address
+python3 web/addition_wallet.py --rpc-port 8546 mine
+python3 web/addition_wallet.py --rpc-port 8546 balance
 
 # 4. Send: tx_build on the node, ML-DSA-87 sign locally, sendtx_signed_hash
-python3 web/addition_wallet.py send <to_address> <amount>
+python3 web/addition_wallet.py --rpc-port 8546 send <to_address> <amount>
 # fee defaults to fee_info.recommended_min_fee (0 when the mempool is empty)
 ```
+
+Research testnet (secondary): use `--rpc-port 8545` and
+`additiond --network testnet`.
 
 Optional flags:
 
 ```bash
 python3 web/addition_wallet.py --wallet data/addition.wallet \
-  --rpc-host 127.0.0.1 --rpc-port 8545 \
+  --rpc-host 127.0.0.1 --rpc-port 8546 \
   createwallet
 
 # If ADDITION_RPC_TOKEN is set on the daemon, export the same value
@@ -125,8 +141,9 @@ The client refuses to emit `sendtx`, `sendtx_hash`, or `sign_message`.
 
 Windows: `powershell -File scripts\build_wallet.ps1`. Details in
 [`packaging/README.md`](../packaging/README.md). The public `/download/` page
-links those files as mainnet helpers (default write `127.0.0.1:8546`). RPC stays
-loopback-only. Public `38546` has no `wallet_send`.
+links those files as mainnet helpers (default write `127.0.0.1:8546`). The
+desktop helper refuses non-loopback RPC hosts. The in-browser `/wallet/` page
+prefers public `38546` write via `/api/rpc` when available.
 
 ### Tests without a running daemon
 
@@ -139,5 +156,5 @@ These tests mock the TEXT RPC and fail if a private key appears on the wire.
 
 ### Out of scope
 
-This path does not add ZK-Shield, a DEX, tokens, EVM/MetaMask, a public
-explorer, wallet-connect, a miner pool, or a live mainnet.
+This path does not add ZK-Shield, a DEX, tokens, EVM/MetaMask, wallet-connect,
+or a NiceHash pool. Brand is ADDITION only.
