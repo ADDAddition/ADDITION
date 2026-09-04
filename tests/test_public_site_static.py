@@ -109,6 +109,8 @@ class PublicSiteStaticTests(unittest.TestCase):
         footer_video = videos[0]
         self.assertIn("addition-banner-2.mp4", footer_video)
         self.assertIn("footer-banner", footer_video)
+        self.assertIn("data-src=", footer_video)
+        self.assertRegex(footer_video, re.compile(r'\bpreload=["\']none["\']', re.IGNORECASE))
         self.assertRegex(footer_video, re.compile(r"\bmuted\b", re.IGNORECASE))
         self.assertNotRegex(footer_video, re.compile(r"\bautoplay\b", re.IGNORECASE))
         self.assertRegex(footer_video, re.compile(r"\bloop\b", re.IGNORECASE))
@@ -120,10 +122,15 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn('querySelector(".hero-stinger")', chrome)
         self.assertIn("video.muted = true", chrome)
         self.assertIn("video.play()", chrome)
+        self.assertIn("lazyFooterBanner", chrome)
+        self.assertIn("IntersectionObserver", chrome)
+        self.assertIn('width="172"', chrome)
+        self.assertIn('height="34"', chrome)
         css = read("common.css")
         self.assertIn(".footer-banner", css)
         self.assertIn("object-fit: contain", css)
         self.assertIn("@media (max-width: 840px)", css)
+        self.assertIn(":focus-visible", css)
         # Full-bleed hero stinger: break out of centered main to 100vw.
         self.assertIn("width: 100vw", css)
         self.assertIn("margin-left: calc(50% - 50vw)", css)
@@ -165,6 +172,12 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("/compare/", index)
         self.assertIn("compare-teaser", index)
         self.assertIn("opening_not_zk", index)
+        # Hero CTAs: wallet + join only — Compare is the teaser (no duplicate ghost button).
+        self.assertNotRegex(
+            index,
+            re.compile(r'class="cta-row"[\s\S]*?btn-ghost[^>]*>\s*Compare\s*<', re.IGNORECASE),
+        )
+        self.assertEqual(index.count('href="/compare/"'), 2)  # teaser + cards
         self.assertNotIn("Vision vs Live", index)
         self.assertNotIn("research_goal", index)
         self.assertNotIn("zk_pending", index)
@@ -175,6 +188,7 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertEqual(len(videos), 1, "homepage must have exactly one hero <video>")
         hero = videos[0]
         self.assertIn("addition-stinger.mp4", hero)
+        self.assertIn('poster="/og.png"', hero)
         self.assertRegex(hero, re.compile(r"\bmuted\b", re.IGNORECASE))
         self.assertRegex(hero, re.compile(r"\bautoplay\b", re.IGNORECASE))
         self.assertRegex(hero, re.compile(r"\bloop\b", re.IGNORECASE))
@@ -206,6 +220,7 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("34.27.30.115:28546", compare)
         self.assertIn("live-strip", compare)
         self.assertIn("getinfo", compare)
+        self.assertIn("renderLiveStrip", compare)
         self.assertNotIn("Vision vs Live", compare)
         self.assertNotIn("research_goal", compare)
         self.assertNotIn("zk_pending", compare)
@@ -221,15 +236,21 @@ class PublicSiteStaticTests(unittest.TestCase):
         privacy = read("privacy/index.html")
         self.assertIn("opening_not_zk", privacy)
         self.assertIn("live-strip", privacy)
+        self.assertIn("renderLiveStrip", privacy)
         self.assertNotIn("Vision vs Live", privacy)
         self.assertNotIn("zk_pending", privacy)
         self.assertNotIn('id="mint-btn"', privacy)
         self.assertNotIn("Prepare note", privacy)
         self.assertNotIn("scaffold", privacy.lower())
         status = read("status/index.html")
+        self.assertIn("renderLiveStrip", status)
         self.assertNotIn("Vision vs Live", status)
         self.assertNotIn("research_goal", status)
         self.assertNotIn("ADDITION_FAST_V1", status)
+        join = read("join/index.html")
+        self.assertIn("live-strip", join)
+        self.assertIn("renderLiveStrip", join)
+        self.assertIn("/common.js", join)
 
     def test_download_is_mainnet_helper(self) -> None:
         download = read("download/index.html")
@@ -383,6 +404,9 @@ class PublicSiteStaticTests(unittest.TestCase):
         self.assertIn("tx_status", common)
         self.assertIn("getblockraw", common)
         self.assertIn("explorerCommand", common)
+        self.assertIn("renderLiveStrip", common)
+        self.assertIn('status-strip ok', common)
+        self.assertIn("Preserve real zeros", common)
 
     def test_no_hardcoded_fake_stats(self) -> None:
         index = read("index.html")
@@ -422,12 +446,51 @@ const vm = require("vm");
 const path = require("path");
 const code = fs.readFileSync(path.join("web", "public", "common.js"), "utf8");
 const window = { location: { search: "" } };
-function run(fetchImpl) {
-  const sandbox = { window, URLSearchParams, fetch: fetchImpl };
+
+function makeDocument() {
+  const stripEl = { className: "" };
+  const flagEl = { textContent: "" };
+  const cellsEl = {
+    firstChild: null,
+    childNodes: [],
+    appendChild(node) {
+      this.childNodes.push(node);
+      this.firstChild = this.childNodes[0] || null;
+    },
+    removeChild() {
+      this.childNodes.shift();
+      this.firstChild = this.childNodes[0] || null;
+    }
+  };
+  return {
+    stripEl,
+    flagEl,
+    cellsEl,
+    document: {
+      getElementById(id) {
+        if (id === "live-strip") return stripEl;
+        if (id === "strip-flag") return flagEl;
+        if (id === "strip-cells") return cellsEl;
+        return null;
+      },
+      createElement() {
+        return {
+          textContent: "",
+          childNodes: [],
+          appendChild(n) { this.childNodes.push(n); }
+        };
+      }
+    }
+  };
+}
+
+function run(fetchImpl, document) {
+  const sandbox = { window, URLSearchParams, fetch: fetchImpl, document };
   vm.runInNewContext(code, sandbox);
   return window.AdditionSite;
 }
-const S = run(async () => { throw new Error("offline"); });
+
+const S = run(async () => { throw new Error("offline"); }, makeDocument().document);
 const fields = S.parseFields("network=mainnet network_id=ADDITION_MAINNET_V1 height=0 peers=0 pq_mode=strict pow_algorithm=memory_hard privacy_claim=opening_not_zk max_supply=50000000 next_reward=50 last_tps=9.99");
 const strip = S.stripFields(fields);
 if (strip.height !== "0" || strip.peers !== "0" || strip.network !== "mainnet" || strip.network_id !== "ADDITION_MAINNET_V1" || strip.privacy_claim !== "opening_not_zk" || strip.pq_mode !== "strict") {
@@ -445,6 +508,25 @@ if (S.fieldOrNull(fields, "peers") !== "0") {
 if (S.fieldOrNull({}, "height") !== null) {
   throw new Error("missing height must stay null (do not invent 0)");
 }
+if (typeof S.renderLiveStrip !== "function") {
+  throw new Error("renderLiveStrip missing");
+}
+
+const dom = makeDocument();
+const Sdom = run(async () => { throw new Error("offline"); }, dom.document);
+Sdom.renderLiveStrip({ offline: false, ok: true, fields: fields });
+if (dom.stripEl.className !== "status-strip ok" || dom.flagEl.textContent !== "live") {
+  throw new Error("renderLiveStrip online state failed: " + dom.stripEl.className + "/" + dom.flagEl.textContent);
+}
+const heightWrap = dom.cellsEl.childNodes.find((n) => n.childNodes[0] && n.childNodes[0].textContent === "height");
+if (!heightWrap || heightWrap.childNodes[1].textContent !== "0") {
+  throw new Error("renderLiveStrip must show height=0");
+}
+Sdom.renderLiveStrip({ offline: true, ok: false, fields: {} });
+if (dom.stripEl.className !== "status-strip offline" || dom.flagEl.textContent !== "RPC offline") {
+  throw new Error("renderLiveStrip offline state failed");
+}
+
 if (S.explorerAllowed("mine") || S.explorerAllowed("wallet_send")) {
   throw new Error("explorer must reject spend/mine");
 }
@@ -457,7 +539,7 @@ S.rpcCommand("getinfo").then((offline) => {
     status: 502,
     text: async () => "<!DOCTYPE html><html><body>bad gateway</body></html>"
   });
-  const S2 = run(htmlFetch);
+  const S2 = run(htmlFetch, makeDocument().document);
   return S2.rpcCommand("getinfo").then((htmlOffline) => {
     if (!htmlOffline.offline || htmlOffline.raw !== "RPC offline") {
       throw new Error("HTML error body must fail closed without sample JSON");

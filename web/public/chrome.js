@@ -139,7 +139,7 @@
     el.innerHTML =
       '<div class="site-chrome-inner">' +
       '<a class="brand" href="' + withQ("/") + '">' +
-      '<img class="brand-logo" src="/logo-transparent.png" alt="ADDITION">' +
+      '<img class="brand-logo" src="/logo-transparent.png" alt="ADDITION" width="172" height="34" decoding="async">' +
       '<span class="brand-text"><span class="brand-name">ADDITION</span>' +
       '<span class="brand-tag">Layer 1 · ML-DSA-87</span></span></a>' +
       '<div class="chrome-right">' +
@@ -224,19 +224,52 @@
 
   function fillFooter(el) {
     el.className = "site-footer-wrap";
+    // Footer banner is ~22MB on CDN — do not set src until near viewport (lazy).
     el.innerHTML =
       '<video' +
       ' class="footer-banner"' +
       ' muted' +
       ' loop' +
       ' playsinline' +
-      ' preload="metadata"' +
-      ' src="https://additionblockchain.com/banners/addition-banner-2.mp4"></video>' +
+      ' preload="none"' +
+      ' data-src="https://additionblockchain.com/banners/addition-banner-2.mp4"></video>' +
       '<div class="site-footer-copy">' +
       '<p>ADDITION · public product is <strong>MAINNET</strong> · keys stay on your device or local node</p>' +
       '<p><a href="/compare/">Compare</a> · <a href="/download/">Download</a> · <a href="/docs/">Docs</a> · ' +
       '<a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>' +
       "</div>";
+    lazyFooterBanner(el.querySelector(".footer-banner"));
+  }
+
+  function lazyFooterBanner(video) {
+    if (!video) {
+      return;
+    }
+    const url = video.getAttribute("data-src");
+    if (!url) {
+      return;
+    }
+    function load() {
+      if (video.getAttribute("src")) {
+        return;
+      }
+      video.setAttribute("src", url);
+      video.load();
+    }
+    if (typeof IntersectionObserver === "function") {
+      const io = new IntersectionObserver(function (entries) {
+        for (let i = 0; i < entries.length; i += 1) {
+          if (entries[i].isIntersecting) {
+            load();
+            io.disconnect();
+            return;
+          }
+        }
+      }, { rootMargin: "240px 0px" });
+      io.observe(video);
+      return;
+    }
+    window.addEventListener("load", load, { once: true });
   }
 
   function kickHeroStinger() {
@@ -264,4 +297,19 @@
   }
   fillBottomTabs();
   kickHeroStinger();
+
+  // Close mobile drawer on Escape (a11y).
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape") {
+      return;
+    }
+    const toggle = document.getElementById("menu-toggle");
+    const drawer = document.getElementById("mobile-drawer");
+    if (!toggle || !drawer || drawer.hasAttribute("hidden")) {
+      return;
+    }
+    drawer.setAttribute("hidden", "");
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.focus();
+  });
 }());

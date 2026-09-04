@@ -100,6 +100,20 @@ body {
 }
 a { color: var(--accent); text-decoration: none; }
 a:hover { color: var(--accent-hover); }
+a:focus-visible,
+button:focus-visible,
+.btn:focus-visible,
+.bottom-tab:focus-visible,
+.menu-toggle:focus-visible,
+.more-menu summary:focus-visible,
+.site-nav-desktop a:focus-visible,
+.mobile-drawer-nav a:focus-visible,
+.compare-teaser:focus-visible,
+.cards a:focus-visible,
+.tool-grid a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 
 /* —— Chrome —— */
 .site-chrome {
@@ -341,7 +355,8 @@ a:hover { color: var(--accent-hover); }
   font-weight: 700;
 }
 .status-strip.offline .status-flag { color: var(--bad); }
-.status-strip.ok .status-flag { color: var(--ok); }
+.status-strip.ok .status-flag,
+.status-strip.online .status-flag { color: var(--ok); }
 .status-strip.pending .status-flag { color: var(--muted); }
 .status-cells {
   display: flex;
@@ -1082,6 +1097,15 @@ code { font-family: var(--mono); font-size: 0.9em; }
   padding-left: 1.2rem;
 }
 .compare-ships li { margin: 0.35rem 0; }
+@media (max-width: 840px) {
+  .compare-table thead th:first-child,
+  .compare-table tbody th[scope="row"] {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    box-shadow: 2px 0 6px rgba(21, 32, 51, 0.08);
+  }
+}
 
 @media (max-width: 840px) {
   .site-nav-desktop,

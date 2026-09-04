@@ -12,6 +12,9 @@
   <meta property="og:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="/common.css">
 </head>
 <body>
@@ -157,32 +160,8 @@
   <script>
     (function () {
       const S = window.AdditionSite;
-      function renderStrip(status) {
-        const strip = document.getElementById("live-strip");
-        const flag = document.getElementById("strip-flag");
-        const cells = document.getElementById("strip-cells");
-        if (!strip || !flag || !cells) {
-          return;
-        }
-        strip.className = "status-strip " + (status.offline ? "offline" : "online");
-        flag.textContent = status.offline ? "RPC offline" : "Live getinfo";
-        cells.innerHTML = "";
-        if (status.offline) {
-          return;
-        }
-        const stripFields = S.stripFields(status.fields || {});
-        const keys = Object.keys(stripFields);
-        for (let i = 0; i < keys.length; i += 1) {
-          const dt = document.createElement("dt");
-          dt.textContent = keys[i];
-          const dd = document.createElement("dd");
-          dd.textContent = stripFields[keys[i]];
-          cells.appendChild(dt);
-          cells.appendChild(dd);
-        }
-      }
       S.rpcCommand("getinfo").then(function (info) {
-        renderStrip(info);
+        S.renderLiveStrip(info);
       });
     }());
   </script>
