@@ -1013,6 +1013,76 @@ code { font-family: var(--mono); font-size: 0.9em; }
 }
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
+/* —— Compare (live-only desk) —— */
+.compare-teaser {
+  display: block;
+  margin: 0.75rem 0 1.25rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(15, 122, 146, 0.1), rgba(47, 95, 138, 0.06)),
+    var(--panel);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.compare-teaser:hover {
+  border-color: rgba(15, 122, 146, 0.45);
+  color: inherit;
+  transform: translateY(-1px);
+}
+.compare-teaser strong {
+  display: block;
+  font-size: 1.05rem;
+  margin-bottom: 0.25rem;
+  color: var(--ink);
+}
+.compare-teaser span {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+.compare-panel .compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  min-width: 52rem;
+}
+.compare-table th,
+.compare-table td {
+  border: 1px solid var(--line);
+  padding: 0.65rem 0.7rem;
+  vertical-align: top;
+  text-align: left;
+}
+.compare-table thead th {
+  background: var(--panel-2);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.compare-table tbody th[scope="row"] {
+  background: var(--panel-2);
+  font-weight: 600;
+  white-space: nowrap;
+  min-width: 7.5rem;
+}
+.compare-table .col-addition {
+  background: rgba(15, 122, 146, 0.08);
+  font-weight: 500;
+}
+.compare-table thead .col-addition {
+  background: rgba(15, 122, 146, 0.16);
+  color: var(--accent-hover);
+  font-weight: 700;
+}
+.compare-ships {
+  margin: 0.4rem 0 0.85rem;
+  padding-left: 1.2rem;
+}
+.compare-ships li { margin: 0.35rem 0; }
+
 @media (max-width: 840px) {
   .site-nav-desktop,
   .more-menu { display: none; }

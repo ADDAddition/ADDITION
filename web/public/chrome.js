@@ -7,12 +7,14 @@
   ];
 
   const MORE = [
+    ["/compare/", "Compare"],
+    ["/privacy/", "Privacy"],
     ["/download/", "Download"],
-    ["/local/", "Local tools"],
-    ["/launch/", "Launch"],
-    ["/embed/", "Embed"],
+    ["/whitepaper/", "Whitepaper"],
     ["/rpc/", "Public RPC"],
-    ["/docs/", "Docs"]
+    ["/docs/", "Docs"],
+    ["/local/", "Local tools"],
+    ["/embed/", "Embed"]
   ];
 
   function rpcQuerySuffix() {
@@ -232,7 +234,7 @@
       ' src="https://additionblockchain.com/banners/addition-banner-2.mp4"></video>' +
       '<div class="site-footer-copy">' +
       '<p>ADDITION · public product is <strong>MAINNET</strong> · keys stay on your device or local node</p>' +
-      '<p><a href="/download/">Download</a> · <a href="/docs/">Docs</a> · ' +
+      '<p><a href="/compare/">Compare</a> · <a href="/download/">Download</a> · <a href="/docs/">Docs</a> · ' +
       '<a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>' +
       "</div>";
   }

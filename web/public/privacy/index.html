@@ -2,141 +2,89 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ADDITION privacy opening (local)</title>
-  <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Privacy — ADDITION</title>
+  <meta name="description" content="Live ADDITION privacy claim: opening_not_zk. SHA3-512 commitment + nullifier opening on ADDITION_MAINNET_V1.">
+  <meta name="theme-color" content="#f3f6fa">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:image" content="https://additionblockchain.com/og.png">
+  <meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="Privacy" data-sub="SHA3-512 opening on 127.0.0.1:8545">
+<body>
   <header id="site-header"></header>
-  <main>
-    <div class="banner">
-      <strong>Vision vs Live.</strong>
-      Live privacy is SHA3-512 commitment + nullifier opening:
-      the node sees the trapdoor. <code>claim=opening_not_zk</code>.
-      Not Groth16, Bulletproofs, or ZK-Shield.
-      <code>privacy_mint_zk</code> is an ML-DSA wrap, not a circuit — this page does not call it.
-      ZK path is scaffold / fail-closed (<code>zk_pending</code> → future <code>zk_v1</code> only after verify works).
-      Design: <a href="/docs/privacy-real/">privacy-real</a>
-      (repo <code>docs/PRIVACY_REAL_V1.md</code>).
-      Fast path is separate (<a href="/docs/fast-path/">ADDITION_FAST_V1</a> · <code>docs/FAST_PATH_V1.md</code>) —
-      not this page’s product surface.
-      Mint/spend need <code>ADDITION_PRIVACY_MASTER_KEY</code> (≥32 chars) on the daemon. Without it the node returns <code>error: ADDITION_PRIVACY_MASTER_KEY not set or too short (min 32)</code>.
+  <div id="live-strip" class="status-strip pending" aria-live="polite">
+    <div class="status-strip-inner">
+      <span id="strip-flag" class="status-flag">…</span>
+      <dl id="strip-cells" class="status-cells"></dl>
     </div>
-    <section class="panel">
-      <h2>What ships today</h2>
-      <p class="note">
-        Opening RPCs on loopback: <code>privacy_note_prepare</code>,
-        <code>privacy_mint_open</code>, <code>privacy_spend_open</code>.
-        Live <code>getinfo</code> / <code>privacy_status</code> keep
-        <code>privacy_claim=opening_not_zk</code>.
+  </div>
+  <main>
+    <section class="product-hero" style="padding-top:1rem;padding-bottom:0.25rem">
+      <p class="eyebrow"><span class="net-badge">MAINNET</span> Live privacy</p>
+      <h1>Opening privacy</h1>
+      <p class="lede">
+        On <code>ADDITION_MAINNET_V1</code>, the live privacy claim is
+        <code>opening_not_zk</code>: SHA3-512 commitment + nullifier opening.
+        The node sees the trapdoor. This is not zero-knowledge and not Monero/Zcash privacy.
       </p>
-      <h2>What is scaffold</h2>
-      <p class="note">
-        <code>privacy_mint_zk_v1</code> / <code>privacy_spend_zk_v1</code> reject every proof
-        (<code>claim=zk_pending</code>). Circuit work in progress / not live:
-        <a href="/docs/zk-circuit/">zk-circuit</a> · <code>docs/ZK_CIRCUIT_V1.md</code>
-        (<code>zk_circuit_status=not_proven</code>).
-        See <a href="/docs/privacy-real/">privacy-real</a>
-        / <code>docs/PRIVACY_REAL_V1.md</code>.
-      </p>
-      <h2>What is research goal</h2>
-      <p class="note">
-        Real <code>zk_v1</code> only when a verifier accepts proofs on-node.
-        No fake ZK marketing. PQ stays ML-DSA-87 / SHA3-512 <code>pq_mode=strict</code>.
-      </p>
-    </section>
-    <p id="rpc-state" class="offline">Checking local RPC…</p>
-    <p id="status-line" class="note"></p>
-
-    <section class="panel">
-      <h2>privacy_note_prepare</h2>
-      <div class="form-grid">
-        <div><label for="amount">amount</label><input id="amount" value="5"></div>
-        <div><label for="owner">owner</label><input id="owner" value="alice"></div>
-      </div>
-      <div class="btn-row">
-        <button id="prep-btn" type="button" disabled>Prepare note</button>
-        <button id="status-btn" type="button" disabled>privacy_status</button>
-      </div>
-      <div id="prep-fields"></div>
-      <pre id="prep-raw" class="raw"></pre>
     </section>
 
     <section class="panel">
-      <h2>privacy_mint_open</h2>
-      <div class="form-grid">
-        <div><label for="cm">commitment</label><input id="cm"></div>
-        <div><label for="nf">nullifier</label><input id="nf"></div>
-        <div><label for="td">trapdoor</label><input id="td"></div>
+      <h2>What is live</h2>
+      <ul>
+        <li><code>privacy_claim=opening_not_zk</code> on live <code>getinfo</code> / <code>privacy_status</code></li>
+        <li>Opening RPCs on a home node (loopback write): <code>privacy_note_prepare</code>,
+          <code>privacy_mint_open</code>, <code>privacy_spend_open</code></li>
+        <li>Requires <code>ADDITION_PRIVACY_MASTER_KEY</code> (≥32 chars) on the daemon</li>
+      </ul>
+      <p class="note">
+        Public Pages do not host mint/spend forms — those need your node’s loopback write RPC
+        via <a href="/local/">local tools</a> next to <code>additiond</code>.
+        Confirm the claim on <a href="/status/">network status</a> (live strip includes <code>privacy_claim</code>).
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="/status/">Live status</a>
+        <a class="btn btn-secondary" href="/compare/">Compare</a>
+        <a class="btn btn-ghost" href="/local/">Local tools</a>
       </div>
-      <div class="btn-row">
-        <button id="mint-btn" type="button" disabled>Mint open</button>
-      </div>
-      <div id="mint-fields"></div>
-      <pre id="mint-raw" class="raw"></pre>
-    </section>
-
-    <section class="panel">
-      <h2>privacy_spend_open</h2>
-      <div class="form-grid">
-        <div><label for="note">note_id</label><input id="note"></div>
-        <div><label for="recv">recipient</label><input id="recv" value="bob"></div>
-        <div><label for="spend-amt">amount</label><input id="spend-amt" value="5"></div>
-        <div><label for="spend-td">trapdoor</label><input id="spend-td"></div>
-      </div>
-      <div class="btn-row">
-        <button id="spend-btn" type="button" disabled>Spend open</button>
-      </div>
-      <div id="spend-fields"></div>
-      <pre id="spend-raw" class="raw"></pre>
     </section>
   </main>
   <footer id="site-footer"></footer>
   <script src="/common.js"></script>
-  <script src="/local-rpc.js"></script>
   <script src="/chrome.js"></script>
-  <script src="/local-nav.js"></script>
   <script>
-    const L = window.AdditionLocal;
-    async function loadStatus() {
-      const r = await L.cmd("privacy_status");
-      document.getElementById("status-line").textContent = r.offline ? "" : r.raw;
-    }
-    L.ping(document.getElementById("rpc-state")).then(function (info) {
-      if (!info.offline) {
-        loadStatus();
-      } else {
-        document.getElementById("prep-raw").textContent = "RPC offline";
-        document.getElementById("mint-raw").textContent = "RPC offline";
-        document.getElementById("spend-raw").textContent = "RPC offline";
+    (function () {
+      const S = window.AdditionSite;
+      function renderStrip(status) {
+        const strip = document.getElementById("live-strip");
+        const flag = document.getElementById("strip-flag");
+        const cells = document.getElementById("strip-cells");
+        if (!strip || !flag || !cells) {
+          return;
+        }
+        strip.className = "status-strip " + (status.offline ? "offline" : "online");
+        flag.textContent = status.offline ? "RPC offline" : "Live getinfo";
+        cells.innerHTML = "";
+        if (status.offline) {
+          return;
+        }
+        const stripFields = S.stripFields(status.fields || {});
+        const keys = Object.keys(stripFields);
+        for (let i = 0; i < keys.length; i += 1) {
+          const dt = document.createElement("dt");
+          dt.textContent = keys[i];
+          const dd = document.createElement("dd");
+          dd.textContent = stripFields[keys[i]];
+          cells.appendChild(dt);
+          cells.appendChild(dd);
+        }
       }
-    });
-    document.getElementById("status-btn").addEventListener("click", loadStatus);
-    document.getElementById("prep-btn").addEventListener("click", async function () {
-      const r = await L.cmd("privacy_note_prepare " + L.val("amount"));
-      L.showResult(document.getElementById("prep-raw"), document.getElementById("prep-fields"), r);
-      L.setVal("cm", r.fields.commitment);
-      L.setVal("nf", r.fields.nullifier);
-      L.setVal("td", r.fields.trapdoor);
-      L.setVal("spend-td", r.fields.trapdoor);
-      L.setVal("spend-amt", r.fields.amount || L.val("amount"));
-    });
-    document.getElementById("mint-btn").addEventListener("click", async function () {
-      const r = await L.cmd("privacy_mint_open " + L.val("owner") + " " + L.val("amount") + " " +
-        L.val("cm") + " " + L.val("nf") + " " + L.val("td"));
-      L.showResult(document.getElementById("mint-raw"), document.getElementById("mint-fields"), r);
-      L.setVal("note", r.fields.note_id);
-      loadStatus();
-    });
-    document.getElementById("spend-btn").addEventListener("click", async function () {
-      const r = await L.cmd("privacy_spend_open " + L.val("owner") + " " + L.val("note") + " " +
-        L.val("recv") + " " + L.val("spend-amt") + " " + L.val("spend-td"));
-      L.showResult(document.getElementById("spend-raw"), document.getElementById("spend-fields"), r);
-      loadStatus();
-    });
+      S.rpcCommand("getinfo").then(renderStrip);
+    }());
   </script>
 </body>
 </html>

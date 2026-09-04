@@ -275,6 +275,90 @@ def write_doc(
     )
 
 
+WHITEPAPER_LIVE_SCRIPT = """
+  <script src="/common.js"></script>
+  <script src="/chrome.js"></script>
+  <script>
+    (function () {
+      const S = window.AdditionSite;
+      const pre = document.getElementById("live-getinfo-snapshot");
+      const note = document.getElementById("live-getinfo-note");
+      if (!S || !pre) {
+        return;
+      }
+      const monetary = document.getElementById("live-monetary-snapshot");
+      S.explorerCommand("getinfo").then(function (result) {
+        if (result.offline || !result.ok) {
+          pre.textContent = "RPC offline";
+          if (monetary) {
+            monetary.textContent = "RPC offline";
+          }
+          if (note) {
+            note.textContent = "Fail closed — no sample getinfo substituted.";
+          }
+          return;
+        }
+        pre.textContent = result.raw || "";
+        if (note) {
+          const h = S.fieldOrNull(result.fields || {}, "height");
+          const p = S.fieldOrNull(result.fields || {}, "peers");
+          note.textContent = "Copied from live getinfo"
+            + (h !== null ? (" · height=" + h) : "")
+            + (p !== null ? (" · peers=" + p) : "")
+            + ".";
+        }
+      });
+      if (monetary) {
+        S.explorerCommand("monetary_info").then(function (result) {
+          if (result.offline || !result.ok) {
+            monetary.textContent = "RPC offline";
+            return;
+          }
+          monetary.textContent = result.raw || "";
+        });
+      }
+    }());
+  </script>
+"""
+
+
+def write_whitepaper() -> None:
+    """Render live-only whitepaper with getinfo/monetary fail-closed panels."""
+    rel_md = "docs/whitepaper.md"
+    dest = OUT / "whitepaper" / "index.html"
+    md = (ROOT / rel_md).read_text(encoding="utf-8")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    body = md_to_html(md, with_anchors=True, skip_md_toc=True)
+    body = build_toc(md) + "\n" + body
+    body = body.replace(
+        "<p>@@LIVE_MONETARY_SNAPSHOT@@</p>",
+        '<pre id="live-monetary-snapshot" class="raw">Loading live monetary_info…</pre>',
+    )
+    body = body.replace(
+        "<p>@@LIVE_GETINFO_SNAPSHOT@@</p>",
+        '<pre id="live-getinfo-snapshot" class="raw">Loading live getinfo…</pre>\n'
+        '<p id="live-getinfo-note" class="note"></p>',
+    )
+    html_out = SHELL.format(
+        title=html.escape("ADDITION technical whitepaper"),
+        heading=html.escape("White paper"),
+        sub="ADDITION_MAINNET_V1",
+        banner=(
+            "Complete technical whitepaper from <code>docs/whitepaper.md</code>. "
+            "Live <code>getinfo</code>, code, and docs. Brand: <strong>ADDITION</strong>."
+        ),
+        body=body,
+        github="https://github.com/ADDAddition/ADDITION/blob/main/" + rel_md,
+        source=rel_md,
+        extra_head=TOC_STYLE,
+    )
+    html_out = html_out.replace(
+        '<script src="/chrome.js"></script>\n</body>',
+        WHITEPAPER_LIVE_SCRIPT.strip() + "\n</body>",
+    )
+    dest.write_text(html_out, encoding="utf-8")
+
+
 def main() -> None:
     write_doc(
         "docs/ARCHITECTURE.md",
@@ -353,14 +437,7 @@ def main() -> None:
         "Fast path v1",
         "From <code>docs/FAST_PATH_V1.md</code>. Separate <code>ADDITION_FAST_V1</code> profile — typed stages REAL; leader/execution still scaffold; <code>--fast</code> fail-closed. Live product remains memory_hard mainnet.",
     )
-    write_doc(
-        "docs/whitepaper.md",
-        OUT / "whitepaper" / "index.html",
-        "ADDITION technical whitepaper",
-        "White paper",
-        "Complete technical whitepaper from <code>docs/whitepaper.md</code>. Live <code>getinfo</code>, code, and docs only — Vision vs Live made explicit. Brand: <strong>ADDITION</strong>.",
-        with_toc=True,
-    )
+    write_whitepaper()
     publish_raw("docs/TESTNET_PUBLIC_RPC_RUNBOOK.md", OUT / "docs" / "testnet-rpc-runbook.md")
     publish_raw("docs/WALLET.md", OUT / "docs" / "wallet.md")
     publish_raw("web/public/join.md", OUT / "docs" / "join.md")
