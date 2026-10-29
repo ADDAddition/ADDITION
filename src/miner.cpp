@@ -131,6 +131,30 @@ bool Miner::mine_next_block(const std::string& reward_address,
         }
     }
 
+    // Keep the block relayable: stop at the P2P line budget and return the
+    // rest (fee-ordered tail) to the mempool for the next block.
+    {
+        const auto budget = relay_budget_bytes_ > kBlockWireOverheadBytes
+                                ? relay_budget_bytes_ - kBlockWireOverheadBytes
+                                : 0;
+        // coinbase is built by the chain; reserve a generous slot for it
+        std::size_t used = 2048;
+        std::size_t keep = 0;
+        for (; keep < valid.size(); ++keep) {
+            const auto w = tx_wire_bytes(valid[keep]);
+            if (used + w > budget) {
+                break;
+            }
+            used += w;
+        }
+        last_deferred_for_size_ = valid.size() - keep;
+        for (std::size_t i = keep; i < valid.size(); ++i) {
+            mempool_.submit(valid[i]);
+        }
+        valid.resize(keep);
+        last_block_wire_bytes_ = used + kBlockWireOverheadBytes;
+    }
+
     const auto tx_count = valid.size();
     if (!chain_.mine_and_add_block(reward_address, valid, threads, mined_hash, error, &stop_)) {
         for (const auto& tx : valid) {
@@ -146,6 +170,18 @@ bool Miner::mine_next_block(const std::string& reward_address,
     const double sec = static_cast<double>(last_mine_ms_) / 1000.0;
     last_tps_ = sec > 0.0 ? static_cast<double>(last_mined_txs_) / sec : static_cast<double>(last_mined_txs_);
     return true;
+}
+
+void Miner::set_relay_budget_bytes(std::size_t bytes) {
+    relay_budget_bytes_ = bytes;
+}
+
+std::size_t Miner::last_deferred_for_size() const {
+    return last_deferred_for_size_;
+}
+
+std::size_t Miner::last_block_wire_bytes() const {
+    return last_block_wire_bytes_;
 }
 
 void Miner::request_stop() {

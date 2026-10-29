@@ -2,6 +2,7 @@
 
 #include "addition/chain.hpp"
 #include "addition/consensus_engine.hpp"
+#include "addition/dandelion.hpp"
 #include "addition/mempool.hpp"
 #include "addition/p2p.hpp"
 
@@ -59,6 +60,16 @@ public:
     bool commit_identity_rotation(std::string& error);
     std::string identity_rotation_status() const;
 
+    // Dandelion++ tx relay (off by default). When on, locally submitted txs
+    // and inbound STEM| txs go to a stem relay instead of being broadcast.
+    void set_dandelion(bool enabled);
+    bool dandelion_enabled() const;
+    std::size_t stempool_size() const;
+    DandelionRouter& dandelion_router();
+    // Our own reachable address (IPv4 or .onion), sent as ADVERTISE| after a
+    // successful outbound handshake so peers can learn inbound-only nodes.
+    void set_advertised_p2p(const std::string& endpoint);
+
 private:
     std::string self_id_;
     std::string node_public_key_;
@@ -96,6 +107,18 @@ private:
     };
 
     std::optional<PendingRotation> pending_rotation_;
+
+    bool dandelion_ = false;
+    DandelionRouter dandelion_router_;
+    std::unordered_map<std::string, Transaction> stempool_;
+    std::vector<std::pair<std::string, std::string>> stem_outbound_;  // relay -> STEM|...
+    std::string advertised_p2p_;
+    static constexpr std::size_t kMaxStempool = 5000;
+
+    bool fluff_transaction(const Transaction& tx, std::string& error);
+    bool stem_transaction(const Transaction& tx, const std::string& source, std::string& error);
+    std::vector<std::string> outbound_relay_peers() const;
+    std::size_t flush_stem(std::string& last);
 
     std::string encode_tx_payload(const Transaction& tx) const;
     bool relay_rotation_messages_to_peer(const std::string& peer, std::string& error);

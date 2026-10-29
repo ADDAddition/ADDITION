@@ -4,6 +4,8 @@
 #include "addition/config.hpp"
 #include "addition/crypto.hpp"
 #include "addition/net_io.hpp"
+#include "addition/net_transport.hpp"
+#include "addition/dandelion.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -111,45 +113,31 @@ bool send_p2p_request(const std::string& endpoint, const std::string& request, s
     }
 #endif
 
-    SocketT sock = ::socket(AF_INET, SOCK_STREAM, 0);
-    if (sock == kInvalidSocket) {
+    std::uintptr_t raw_sock = 0;
+    std::string terr;
+    // transport_connect honors the Tor/SOCKS policy: .onion via SOCKS5 (ATYP
+    // domain, no local DNS), clearnet refused in onion_only mode.
+    if (!transport_connect(ip, port, is_onion_v3_host(ip) ? 60000 : kConnectTimeoutMs, raw_sock, terr)) {
 #ifdef _WIN32
         WSACleanup();
 #endif
         return false;
     }
-
+    SocketT sock = static_cast<SocketT>(raw_sock);
     socket_apply_wan_opts(static_cast<std::uintptr_t>(sock));
-
+    {
+        const int io_ms = is_onion_v3_host(ip) ? 90000 : kSocketTimeoutMs;
 #ifdef _WIN32
-    DWORD timeout_ms = static_cast<DWORD>(kSocketTimeoutMs);
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout_ms), sizeof(timeout_ms));
-    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&timeout_ms), sizeof(timeout_ms));
+        DWORD timeout_ms = static_cast<DWORD>(io_ms);
+        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout_ms), sizeof(timeout_ms));
+        setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&timeout_ms), sizeof(timeout_ms));
 #else
-    timeval tv{};
-    tv.tv_sec = kSocketTimeoutMs / 1000;
-    tv.tv_usec = (kSocketTimeoutMs % 1000) * 1000;
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+        timeval tv{};
+        tv.tv_sec = io_ms / 1000;
+        tv.tv_usec = (io_ms % 1000) * 1000;
+        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+        setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 #endif
-
-    sockaddr_in addr{};
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
-    if (inet_pton(AF_INET, ip.c_str(), &addr.sin_addr) != 1) {
-        close_socket(sock);
-#ifdef _WIN32
-        WSACleanup();
-#endif
-        return false;
-    }
-
-    if (!socket_connect(static_cast<std::uintptr_t>(sock), &addr, sizeof(addr), kConnectTimeoutMs)) {
-        close_socket(sock);
-#ifdef _WIN32
-        WSACleanup();
-#endif
-        return false;
     }
 
     const std::string payload = request + "\n";
@@ -439,13 +427,15 @@ bool send_http_rpc(const std::string& endpoint, const std::string& cmd, std::str
         return false;
     }
 #endif
-    SocketT sock = ::socket(AF_INET, SOCK_STREAM, 0);
-    if (sock == kInvalidSocket) {
+    std::uintptr_t raw_sock = 0;
+    std::string terr;
+    if (!transport_connect(ip, port, is_onion_v3_host(ip) ? 60000 : kConnectTimeoutMs, raw_sock, terr)) {
 #ifdef _WIN32
         WSACleanup();
 #endif
         return false;
     }
+    SocketT sock = static_cast<SocketT>(raw_sock);
     socket_apply_wan_opts(static_cast<std::uintptr_t>(sock));
 #ifdef _WIN32
     DWORD timeout_ms = static_cast<DWORD>(kSocketTimeoutMs);
@@ -458,17 +448,6 @@ bool send_http_rpc(const std::string& endpoint, const std::string& cmd, std::str
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
     setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 #endif
-    sockaddr_in addr{};
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
-    if (inet_pton(AF_INET, ip.c_str(), &addr.sin_addr) != 1 ||
-        !socket_connect(static_cast<std::uintptr_t>(sock), &addr, sizeof(addr), kConnectTimeoutMs)) {
-        close_socket(sock);
-#ifdef _WIN32
-        WSACleanup();
-#endif
-        return false;
-    }
     std::ostringstream req;
     req << "GET /rpc?cmd=" << url_encode_cmd(cmd) << " HTTP/1.0\r\n"
         << "Host: " << ip << "\r\n"
@@ -743,6 +722,110 @@ std::string DecentralizedNode::identity_rotation_status() const {
 }
 
 bool DecentralizedNode::submit_transaction(const Transaction& tx, std::string& error) {
+    if (dandelion_) {
+        return stem_transaction(tx, "", error);
+    }
+    return fluff_transaction(tx, error);
+}
+
+void DecentralizedNode::set_dandelion(bool enabled) {
+    dandelion_ = enabled;
+}
+
+bool DecentralizedNode::dandelion_enabled() const {
+    return dandelion_;
+}
+
+std::size_t DecentralizedNode::stempool_size() const {
+    return stempool_.size();
+}
+
+DandelionRouter& DecentralizedNode::dandelion_router() {
+    return dandelion_router_;
+}
+
+void DecentralizedNode::set_advertised_p2p(const std::string& endpoint) {
+    advertised_p2p_ = endpoint;
+}
+
+std::vector<std::string> DecentralizedNode::outbound_relay_peers() const {
+    std::vector<std::string> out;
+    for (const auto& p : peers_.select_peers(0)) {
+        if (is_peer_endpoint(p) && !is_self_peer_label(p) && !peers_.is_banned(p)) {
+            out.push_back(p);
+        }
+    }
+    return out;
+}
+
+bool DecentralizedNode::stem_transaction(const Transaction& tx, const std::string& source, std::string& error) {
+    if (!chain_.validate_transaction(tx, error)) {
+        return false;
+    }
+    const auto txid = hash_transaction(tx);
+    if (seen_txids_.count(txid) != 0 || stempool_.count(txid) != 0) {
+        return true;  // already known (stem loop or already fluffed)
+    }
+    const auto d = dandelion_router_.route(source, outbound_relay_peers());
+    if (d.fluff || stempool_.size() >= kMaxStempool) {
+        dandelion_router_.mark_fluffed(txid);
+        return fluff_transaction(tx, error);
+    }
+    stempool_.emplace(txid, tx);
+    dandelion_router_.embargo(txid);
+    const auto gossip = encode_tx_gossip(tx);  // "TX|<payload>"
+    stem_outbound_.emplace_back(d.relay, "STEM|" + gossip.substr(3));
+    return true;
+}
+
+std::size_t DecentralizedNode::flush_stem(std::string& last) {
+    std::size_t sent = 0;
+    // Embargo expired without seeing the tx fluffed: fluff it ourselves.
+    for (const auto& txid : dandelion_router_.expired_embargoes()) {
+        auto it = stempool_.find(txid);
+        if (it == stempool_.end()) {
+            continue;
+        }
+        const auto tx = it->second;
+        stempool_.erase(it);
+        std::string ferr;
+        fluff_transaction(tx, ferr);
+    }
+    auto queue = std::move(stem_outbound_);
+    stem_outbound_.clear();
+    for (const auto& item : queue) {
+        const auto& relay = item.first;
+        std::string wire_id;
+        std::string hs_err;
+        std::string resp;
+        bool ok = handshake_with_peer(relay, wire_id, hs_err);
+        if (ok) {
+            if (wire_id.empty()) {
+                wire_id = self_id_;
+            }
+            ok = send_p2p_request(relay, wire_id + " " + item.second, resp) && resp.rfind("error:", 0) != 0;
+        }
+        if (ok) {
+            ++sent;
+            peers_.mark_peer_good(relay);
+            continue;
+        }
+        last = "stem relay failed to " + relay;
+        peers_.mark_peer_bad(relay);
+        // Relay unreachable: fall back to fluffing (embargo semantics).
+        Transaction tx{};
+        std::string derr;
+        if (decode_tx_gossip(item.second.substr(5), tx, derr)) {
+            const auto txid = hash_transaction(tx);
+            stempool_.erase(txid);
+            dandelion_router_.mark_fluffed(txid);
+            fluff_transaction(tx, derr);
+        }
+    }
+    return sent;
+}
+
+bool DecentralizedNode::fluff_transaction(const Transaction& tx, std::string& error) {
     if (!chain_.validate_transaction(tx, error)) {
         return false;
     }
@@ -1149,7 +1232,24 @@ bool DecentralizedNode::ingest_from_public_rpc(const std::string& p2p_peer, std:
 
 bool DecentralizedNode::sync_once(std::string& error) {
     error.clear();
-    auto peers = peers_.peers();
+    // Try a few unverified candidates (from ADDR / ADVERTISE); a successful
+    // signed handshake promotes them into the peer table.
+    {
+        std::size_t tried = 0;
+        for (const auto& cand : peers_.candidates()) {
+            if (tried++ >= 2) {
+                break;
+            }
+            std::string wid;
+            std::string herr;
+            if (handshake_with_peer(cand, wid, herr)) {
+                peers_.promote_candidate(cand);
+            } else {
+                peers_.remove_candidate(cand);
+            }
+        }
+    }
+    auto peers = peers_.select_peers(0);
     if (peers.empty()) {
         error = "no peer";
         return false;
@@ -1191,6 +1291,10 @@ bool DecentralizedNode::sync_once(std::string& error) {
         {
             std::string learn_err;
             learn_peers_from(peer, wire_id, learn_err);
+            if (!advertised_p2p_.empty() && is_peer_endpoint(peer)) {
+                std::string adv_resp;
+                send_p2p_request(peer, wire_id + " ADVERTISE|" + advertised_p2p_, adv_resp);
+            }
         }
 
         {
@@ -1331,6 +1435,10 @@ bool DecentralizedNode::is_push_gossip_message(const std::string& message) const
 bool DecentralizedNode::flush_outbound_gossip(std::size_t& sent, std::string& error) {
     error.clear();
     sent = 0;
+    {
+        std::string stem_last;
+        sent += flush_stem(stem_last);
+    }
     const auto msgs = pull_outbound_messages();
     if (msgs.empty()) {
         return true;
@@ -1408,10 +1516,12 @@ bool DecentralizedNode::learn_peers_from(const std::string& peer, const std::str
         if (item.empty()) {
             continue;
         }
-        if (!is_external_advertised_peer(item)) {
+        if (!is_external_advertised_peer(item) || item == advertised_p2p_) {
             continue;
         }
-        peers_.add_peer(item);
+        if (!peers_.has_peer(item)) {
+            peers_.add_candidate(item);
+        }
     }
     return true;
 }
@@ -1478,6 +1588,7 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         (message.rfind("REQINV|", 0) == 0) ||
         (message.rfind("BLKDATA|", 0) == 0) ||
         (message.rfind("REQADDR|", 0) == 0) ||
+        (message.rfind("ADVERTISE|", 0) == 0) ||
         (message.rfind("IDROTATE|", 0) == 0) ||
         (message.rfind("IDVOTE|", 0) == 0);
     if (!allow_peer_message(peer, expensive, error)) {
@@ -1619,7 +1730,10 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
             peers_.mark_peer_bad(peer);
             return false;
         }
-        const auto ok = submit_transaction(tx, error);
+        const auto txid = hash_transaction(tx);
+        stempool_.erase(txid);
+        dandelion_router_.mark_fluffed(txid);
+        const auto ok = fluff_transaction(tx, error);
         if (ok) {
             peers_.mark_peer_good(peer);
         } else {
@@ -1728,14 +1842,47 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         return true;
     }
 
+    if (message.rfind("STEM|", 0) == 0) {
+        Transaction tx{};
+        if (!decode_tx_gossip(message.substr(5), tx, error)) {
+            peers_.mark_peer_bad(peer);
+            return false;
+        }
+        const bool ok = dandelion_ ? stem_transaction(tx, peer, error) : fluff_transaction(tx, error);
+        if (ok) {
+            peers_.mark_peer_good(peer);
+        } else {
+            peers_.mark_peer_bad(peer);
+        }
+        return ok;
+    }
+
+    if (message.rfind("ADVERTISE|", 0) == 0) {
+        // Unverified: stored as a candidate, promoted only after we complete
+        // an outbound signed handshake with it.
+        const auto addr = message.substr(10);
+        if (!is_external_advertised_peer(addr)) {
+            error = "bad advertise address";
+            return false;
+        }
+        peers_.add_candidate(addr);
+        reply = "ADVERTISE_OK";
+        return true;
+    }
+
     if (message.rfind("REQADDR|", 0) == 0) {
         // IPv4 ip:port only. Never advertise self / node-id labels.
         std::ostringstream out;
         out << "ADDR|";
         bool first = true;
-        for (const auto& p : peers_.peers()) {
-            if (!is_ipv4_endpoint(p) || is_self_peer_label(p)) {
+        std::size_t emitted = 0;
+        for (const auto& p : peers_.select_peers(0)) {
+            // Only routable addresses (IPv4 / v3 onion), never loopback or labels.
+            if (!is_external_advertised_peer(p)) {
                 continue;
+            }
+            if (++emitted > 64) {
+                break;
             }
             if (!first) {
                 out << ',';

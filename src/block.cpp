@@ -61,4 +61,18 @@ std::string hash_block_header(const BlockHeader& header) {
     return strong_hash(oss.str());
 }
 
+std::size_t tx_wire_bytes(const Transaction& tx) {
+    std::size_t bin = 4;                                     // TXB2 magic
+    bin += 4 + tx.signer.size();
+    bin += 4 + tx.signer_pubkey.size();
+    bin += 4 + tx.signature.size();
+    bin += 8 + 8;                                            // fee, nonce
+    bin += 4;
+    for (const auto& in : tx.inputs) bin += 4 + in.previous_txid.size() + 4;
+    bin += 4;
+    for (const auto& out : tx.outputs) bin += 4 + out.recipient.size() + 8;
+    bin += 4;                                                // checksum
+    return 2 * (4 + bin);                                    // u32 len in block, hex x2
+}
+
 } // namespace addition

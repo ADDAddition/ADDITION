@@ -1,4 +1,5 @@
 #include "addition/config.hpp"
+#include "addition/net_transport.hpp"
 #include "addition/fast_path.hpp"
 
 #include <algorithm>
@@ -206,13 +207,31 @@ bool apply_kv(NodeConfig& cfg, const std::string& table, const std::string& key,
             return false;
         }
         for (const auto& peer : peers) {
-            if (!is_ipv4_endpoint(peer)) {
-                error = "bootstrap_peers must be IPv4 host:port (got " + peer + ")";
+            if (!is_peer_endpoint(peer)) {
+                error = "bootstrap_peers must be IPv4 or v3 .onion host:port (got " + peer + ")";
                 return false;
             }
         }
         cfg.bootstrap_peers = peers;
         cfg.chain.bootstrap_peers = peers;
+        return true;
+    }
+    if (full == "tor_socks_proxy" || full == "tor.socks_proxy") {
+        if (!value.empty() && !is_ipv4_endpoint(value)) {
+            error = "tor_socks_proxy must be IPv4 host:port";
+            return false;
+        }
+        cfg.tor_socks_proxy = value;
+        return true;
+    }
+    if (full == "onion_only" || full == "tor.onion_only") {
+        return parse_bool(value, cfg.onion_only);
+    }
+    if (full == "dandelion" || full == "p2p.dandelion") {
+        return parse_bool(value, cfg.dandelion);
+    }
+    if (full == "p2p_bind" || full == "p2p.bind") {
+        cfg.p2p_bind = value;
         return true;
     }
     if (full == "ports.local_rpc" || full == "local_rpc_port") {
@@ -454,7 +473,7 @@ bool is_self_peer_label(const std::string& endpoint) {
     if (endpoint == "self" || endpoint == "probe-self") {
         return true;
     }
-    if (endpoint.rfind("self", 0) == 0 && !is_ipv4_endpoint(endpoint)) {
+    if (endpoint.rfind("self", 0) == 0 && !is_peer_endpoint(endpoint)) {
         return true;
     }
     if (endpoint.rfind("probe-self", 0) == 0) {
@@ -464,7 +483,7 @@ bool is_self_peer_label(const std::string& endpoint) {
 }
 
 bool is_external_advertised_peer(const std::string& endpoint) {
-    return is_ipv4_endpoint(endpoint) && !is_loopback_endpoint(endpoint) && !is_self_peer_label(endpoint);
+    return is_peer_endpoint(endpoint) && !is_loopback_endpoint(endpoint) && !is_self_peer_label(endpoint);
 }
 
 bool parse_advertised_p2p(const std::string& value, std::string& out, std::string& error) {
@@ -474,7 +493,7 @@ bool parse_advertised_p2p(const std::string& value, std::string& out, std::strin
         return true;
     }
     if (!is_external_advertised_peer(trimmed)) {
-        error = "advertised_p2p must be a non-loopback IPv4 host:port (got " + trimmed + ")";
+        error = "advertised_p2p must be a non-loopback IPv4 or v3 .onion host:port (got " + trimmed + ")";
         return false;
     }
     out = trimmed;
@@ -1087,6 +1106,10 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
     std::string cli_public_rpc_port;
     std::string cli_public_rpc_bind;
     std::string cli_local_rpc_port;
+    std::string cli_tor_proxy;
+    std::string cli_p2p_bind;
+    bool cli_onion_only = false;
+    bool cli_dandelion = false;
     std::string cli_p2p_port;
     std::vector<std::string> cli_bootstrap;
     std::string cli_auto_mine_interval;
@@ -1199,6 +1222,42 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
         }
         if (arg.rfind("--local-rpc-port=", 0) == 0) {
             cli_local_rpc_port = arg.substr(17);
+            continue;
+        }
+        if (arg == "--tor-proxy") {
+            std::string v;
+            if (!take_value(v)) {
+                return false;
+            }
+            if (!is_ipv4_endpoint(v)) {
+                error = "invalid --tor-proxy (IPv4 host:port)";
+                return false;
+            }
+            cli_tor_proxy = v;
+            continue;
+        }
+        if (arg.rfind("--tor-proxy=", 0) == 0) {
+            cli_tor_proxy = arg.substr(12);
+            if (!is_ipv4_endpoint(cli_tor_proxy)) {
+                error = "invalid --tor-proxy (IPv4 host:port)";
+                return false;
+            }
+            continue;
+        }
+        if (arg == "--onion-only") {
+            cli_onion_only = true;
+            continue;
+        }
+        if (arg == "--dandelion") {
+            cli_dandelion = true;
+            continue;
+        }
+        if (arg == "--p2p-bind") {
+            std::string v;
+            if (!take_value(v)) {
+                return false;
+            }
+            cli_p2p_bind = v;
             continue;
         }
         if (arg == "--p2p-port") {
@@ -1367,13 +1426,33 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
     }
     if (!cli_bootstrap.empty()) {
         for (const auto& peer : cli_bootstrap) {
-            if (!is_ipv4_endpoint(peer)) {
-                error = "invalid --bootstrap (IPv4 host:port only): " + peer;
+            if (!is_peer_endpoint(peer)) {
+                error = "invalid --bootstrap (IPv4 or v3 .onion host:port only): " + peer;
                 return false;
             }
         }
         cfg.bootstrap_peers = cli_bootstrap;
         cfg.chain.bootstrap_peers = cli_bootstrap;
+    }
+    if (!cli_tor_proxy.empty()) {
+        cfg.tor_socks_proxy = cli_tor_proxy;
+    }
+    if (cli_onion_only) {
+        cfg.onion_only = true;
+    }
+    if (cli_dandelion) {
+        cfg.dandelion = true;
+    }
+    if (!cli_p2p_bind.empty()) {
+        cfg.p2p_bind = cli_p2p_bind;
+    }
+    if (cfg.onion_only) {
+        if (cfg.tor_socks_proxy.empty()) {
+            cfg.tor_socks_proxy = "127.0.0.1:9050";
+        }
+        // Never accept clearnet inbound: the onion service forwards to loopback.
+        cfg.p2p_bind = "127.0.0.1";
+        cfg.public_rpc_bind = "127.0.0.1";
     }
     if (auto_mine_from_cli) {
         cfg.enable_auto_mine = true;
@@ -1425,8 +1504,8 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
         cfg.chain.bootstrap_peers = cfg.bootstrap_peers;
     }
     for (const auto& peer : cfg.bootstrap_peers) {
-        if (!is_ipv4_endpoint(peer)) {
-            error = "bootstrap_peers must be IPv4 host:port (got " + peer + ")";
+        if (!is_peer_endpoint(peer)) {
+            error = "bootstrap_peers must be IPv4 or v3 .onion host:port (got " + peer + ")";
             return false;
         }
     }
@@ -1483,7 +1562,10 @@ std::string daemon_help_text() {
            "  HTTP: curl 'http://HOST:38545/rpc?cmd=getinfo'\n"
            "LAN RPC stays token-gated (ADDITION_ENABLE_LAN_RPC=1 + ADDITION_LAN_RPC_TOKEN).\n"
            "P2P stays off unless ADDITION_ENABLE_P2P_RPC=1. --p2p-port / ADDITION_P2P_PORT (second node: 28546).\n"
-           "--bootstrap IP:PORT replaces bootstrap_peers (IPv4 only; hostnames are not resolved).\n"
+           "--bootstrap HOST:PORT replaces bootstrap_peers (repeatable; IPv4 or v3 .onion; no DNS).\n"
+           "Tor: --tor-proxy 127.0.0.1:9050 enables .onion peers via SOCKS5; --onion-only refuses all\n"
+           "  clearnet connections and binds P2P/public RPC to 127.0.0.1 (expose via HiddenServicePort).\n"
+           "  --dandelion enables Dandelion++ stem/fluff tx relay. --p2p-bind ADDR sets the P2P listen addr.\n"
            "  Testnet public P2P (current): 34.27.30.115:28545 — HTTP :80 sync is the reliable join path.\n"
            "  Mainnet public P2P (current): 34.27.30.115:28546 — HTTP :38546 and/or P2P HELLO+REQBLK.\n"
            "  Seed operators set ADDITION_ADVERTISED_P2P to the matching seed so public getinfo/peers\n"

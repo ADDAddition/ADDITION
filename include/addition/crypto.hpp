@@ -71,6 +71,11 @@ bool verify_message_signature_hybrid(const std::string& public_key,
 									 const std::string& signature,
 									 const std::string& pq_context = "ml-dsa-87");
 
+// Verified-signature cache controls (bench/test). Enabled by default.
+void sig_cache_set_enabled(bool enabled);
+void sig_cache_clear();
+void sig_cache_stats(std::uint64_t& hits, std::uint64_t& misses, std::size_t& entries);
+
 bool pq_sign_message(const std::vector<std::uint8_t>& secret_key,
 					 const std::string& message,
 					 std::vector<std::uint8_t>& signature,
