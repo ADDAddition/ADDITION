@@ -17,13 +17,13 @@
 namespace addition {
 namespace {
 
-bool signer_binds_pubkey(const Transaction& tx, std::string& error) {
-    const auto scheme = infer_sig_scheme_from_pubkey_hex(tx.signer_pubkey);
+bool signer_binds_pubkey(const std::string& signer, const std::string& pubkey_hex, std::string& error) {
+    const auto scheme = infer_sig_scheme_from_pubkey_hex(pubkey_hex);
     if (scheme == SigScheme::Unknown || !sig_scheme_allowed_strict(scheme)) {
         error = "unknown scheme rejected in strict mode";
         return false;
     }
-    return address_binds_pubkey(tx.signer, scheme, tx.signer_pubkey, error);
+    return address_binds_pubkey(signer, scheme, pubkey_hex, error);
 }
 
 std::uint64_t now_seconds() {
@@ -68,6 +68,7 @@ void Chain::reset() {
     address_index_.clear();
     signer_last_nonce_.clear();
     seen_transactions_.clear();
+    pubkey_registry_.clear();
     difficulty_target_ = cfg_.initial_difficulty_target;
     total_emitted_ = 0;
     total_fees_last_block_ = 0;
@@ -657,16 +658,18 @@ bool Chain::validate_transaction_signature(const Transaction& tx, std::string& e
         error = "missing signer";
         return false;
     }
-    if (tx.signer_pubkey.empty()) {
-        error = "missing signer public key";
-        return false;
-    }
     if (tx.signature.empty()) {
         error = "missing signature";
         return false;
     }
+    if (!tx.shielded.empty()) {
+        // Shielded bundles are validated by feat/shielded; never accept unverified ones here.
+        error = "shielded tx not supported by this build";
+        return false;
+    }
 
-    if (!signer_binds_pubkey(tx, error)) {
+    std::string pubkey;
+    if (!resolve_signer_pubkey(tx, nullptr, pubkey, error)) {
         return false;
     }
 
@@ -703,11 +706,42 @@ bool Chain::validate_transaction_signature(const Transaction& tx, std::string& e
     Transaction unsigned_tx = tx;
     unsigned_tx.signature.clear();
     const auto msg = hash_transaction(unsigned_tx);
-    if (!verify_message_signature_hybrid(tx.signer_pubkey, msg, tx.signature)) {
+    if (!verify_message_signature_hybrid(pubkey, msg, tx.signature)) {
         error = "invalid signature";
         return false;
     }
     return true;
+}
+
+bool Chain::registered_pubkey(const std::string& address, std::string& pubkey_hex) const {
+    const auto it = pubkey_registry_.find(address);
+    if (it == pubkey_registry_.end()) {
+        return false;
+    }
+    pubkey_hex = it->second;
+    return true;
+}
+
+bool Chain::resolve_signer_pubkey(const Transaction& tx,
+                                  const std::unordered_map<std::string, std::string>* overlay,
+                                  std::string& pubkey_hex,
+                                  std::string& error) const {
+    if (!tx.signer_pubkey.empty()) {
+        pubkey_hex = tx.signer_pubkey;
+        return signer_binds_pubkey(tx.signer, pubkey_hex, error);
+    }
+    if (overlay != nullptr) {
+        const auto it = overlay->find(tx.signer);
+        if (it != overlay->end()) {
+            pubkey_hex = it->second;
+            return true;  // bound when registered
+        }
+    }
+    if (registered_pubkey(tx.signer, pubkey_hex)) {
+        return true;  // bound when registered
+    }
+    error = "missing signer public key (not in registry)";
+    return false;
 }
 
 bool Chain::apply_transaction(const Transaction& tx, const std::string& txid, std::string& error) {
@@ -761,6 +795,10 @@ bool Chain::apply_transaction(const Transaction& tx,
 
     if (!tx.inputs.empty()) {
         signer_last_nonce_[tx.signer] = tx.nonce;
+        // Registry: first confirmed full key wins (validated + bound above).
+        if (!tx.signer_pubkey.empty()) {
+            pubkey_registry_.emplace(tx.signer, tx.signer_pubkey);
+        }
     }
 
     seen_transactions_.insert(txid);
@@ -826,6 +864,10 @@ bool Chain::validate_block_header(const Block& candidate, std::string& error) co
 bool Chain::validate_block_transactions(const Block& candidate, std::string& error) const {
     if (candidate.transactions.empty()) {
         error = "block must include coinbase";
+        return false;
+    }
+    if (block_weight(candidate) > cfg_.max_block_weight) {
+        error = "block weight exceeds max_block_weight";
         return false;
     }
 
@@ -952,18 +994,27 @@ bool Chain::validate_block_transactions(const Block& candidate, std::string& err
 
     std::vector<PqVerifyItem> jobs;
     jobs.reserve(candidate.transactions.size() > 0 ? candidate.transactions.size() - 1 : 0);
+    std::unordered_map<std::string, std::string> registry_overlay;  // same-block registrations
     for (std::size_t i = 1; i < candidate.transactions.size(); ++i) {
         const auto& tx = candidate.transactions[i];
-        if (tx.signer.empty() || tx.signer_pubkey.empty() || tx.signature.rfind("pq=", 0) != 0) {
+        if (tx.signer.empty() || tx.signature.rfind("pq=", 0) != 0) {
             error = "non-coinbase tx missing PQ signature";
             return false;
         }
-        if (!signer_binds_pubkey(tx, error)) {
+        if (!tx.shielded.empty()) {
+            error = "shielded tx not supported by this build";
             return false;
+        }
+        std::string pubkey;
+        if (!resolve_signer_pubkey(tx, &registry_overlay, pubkey, error)) {
+            return false;
+        }
+        if (!tx.signer_pubkey.empty() && !tx.inputs.empty() && pubkey_registry_.count(tx.signer) == 0) {
+            registry_overlay.emplace(tx.signer, tx.signer_pubkey);
         }
         Transaction unsigned_tx = tx;
         unsigned_tx.signature.clear();
-        jobs.push_back(PqVerifyItem{tx.signer_pubkey, hash_transaction(unsigned_tx), tx.signature});
+        jobs.push_back(PqVerifyItem{std::move(pubkey), hash_transaction(unsigned_tx), tx.signature});
     }
     if (!jobs.empty()) {
         std::size_t accepted = 0;
@@ -999,6 +1050,11 @@ double Chain::last_batch_verify_per_sec() const {
 }
 
 bool Chain::add_block(const Block& block, std::string& error) {
+    // Cheap size rule first (before PoW / signature work).
+    if (block_weight(block) > cfg_.max_block_weight) {
+        error = "block weight exceeds max_block_weight";
+        return false;
+    }
     if (!validate_block_header(block, error)) {
         return false;
     }
@@ -1010,6 +1066,7 @@ bool Chain::add_block(const Block& block, std::string& error) {
     auto index_snapshot = address_index_;
     auto seen_snapshot = seen_transactions_;
     auto nonce_snapshot = signer_last_nonce_;
+    auto registry_snapshot = pubkey_registry_;
     const auto emitted_snapshot = total_emitted_;
     const auto fees_snapshot = total_fees_last_block_;
     const auto blocks_snapshot_size = blocks_.size();
@@ -1033,6 +1090,7 @@ bool Chain::add_block(const Block& block, std::string& error) {
             address_index_ = std::move(index_snapshot);
             seen_transactions_ = std::move(seen_snapshot);
             signer_last_nonce_ = std::move(nonce_snapshot);
+            pubkey_registry_ = std::move(registry_snapshot);
             total_emitted_ = emitted_snapshot;
             total_fees_last_block_ = fees_snapshot;
             if (blocks_.size() > blocks_snapshot_size) {
@@ -1113,6 +1171,7 @@ bool Chain::replace_with_chain(const std::vector<Block>& candidate,
     auto old_index = address_index_;
     auto old_seen = seen_transactions_;
     auto old_nonce = signer_last_nonce_;
+    auto old_registry = pubkey_registry_;
     auto old_difficulty = difficulty_target_;
     auto old_emitted = total_emitted_;
     auto old_fees = total_fees_last_block_;
@@ -1134,6 +1193,7 @@ bool Chain::replace_with_chain(const std::vector<Block>& candidate,
                 address_index_ = std::move(old_index);
                 seen_transactions_ = std::move(old_seen);
                 signer_last_nonce_ = std::move(old_nonce);
+                pubkey_registry_ = std::move(old_registry);
                 difficulty_target_ = old_difficulty;
                 total_emitted_ = old_emitted;
                 total_fees_last_block_ = old_fees;
@@ -1153,6 +1213,7 @@ bool Chain::replace_with_chain(const std::vector<Block>& candidate,
             address_index_ = std::move(old_index);
             seen_transactions_ = std::move(old_seen);
             signer_last_nonce_ = std::move(old_nonce);
+            pubkey_registry_ = std::move(old_registry);
             difficulty_target_ = old_difficulty;
             total_emitted_ = old_emitted;
             total_fees_last_block_ = old_fees;

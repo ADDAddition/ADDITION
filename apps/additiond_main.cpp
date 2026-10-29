@@ -8,6 +8,7 @@
 #include "addition/mempool.hpp"
 #include "addition/miner.hpp"
 #include "addition/p2p.hpp"
+#include "addition/net_transport.hpp"
 #include "addition/pouw_compute.hpp"
 #include "addition/pouw_storage.hpp"
 #include "addition/private_messaging.hpp"
@@ -319,7 +320,7 @@ int main(int argc, char** argv) {
         }
     });
 
-    addition::RpcNetworkServer p2p_rpc("0.0.0.0", node_cfg.p2p_port, [&](const std::string& cmd) {
+    addition::RpcNetworkServer p2p_rpc(node_cfg.p2p_bind, node_cfg.p2p_port, [&](const std::string& cmd) {
         return node.handle_p2p_line(cmd);
     });
 
@@ -367,6 +368,10 @@ int main(int argc, char** argv) {
             node_cfg.public_rpc_bind = bind;
         }
     }
+    if (node_cfg.onion_only) {
+        // Env may have re-enabled public RPC: keep every listener on loopback.
+        node_cfg.public_rpc_bind = "127.0.0.1";
+    }
     parse_env_u16("ADDITION_LOCAL_RPC_PORT", node_cfg.local_rpc_port);
     parse_env_u16("ADDITION_P2P_PORT", node_cfg.p2p_port);
     addition::apply_advertised_p2p_env(node_cfg);
@@ -383,9 +388,26 @@ int main(int argc, char** argv) {
         if (!node_cfg.advertised_p2p.empty() && peer == node_cfg.advertised_p2p) {
             continue;
         }
-        if (peers.add_peer(peer)) {
+        if (peers.add_seed(peer)) {
             std::cout << "bootstrap addpeer " << peer << '\n';
         }
+    }
+    peers.set_limits(node_cfg.max_peers, 1000, 3600);
+    {
+        addition::TransportPolicy tp;
+        tp.socks_proxy = node_cfg.tor_socks_proxy;
+        tp.onion_only = node_cfg.onion_only;
+        tp.proxy_all = node_cfg.onion_only;
+        addition::set_transport_policy(tp);
+        if (!tp.socks_proxy.empty()) {
+            std::cout << "tor socks_proxy=" << tp.socks_proxy << " onion_only=" << (tp.onion_only ? 1 : 0)
+                      << " p2p_bind=" << node_cfg.p2p_bind << '\n';
+        }
+    }
+    node.set_dandelion(node_cfg.dandelion);
+    node.set_advertised_p2p(node_cfg.advertised_p2p);
+    if (node_cfg.dandelion) {
+        std::cout << "dandelion++ tx relay enabled\n";
     }
 
     std::string local_rpc_token;

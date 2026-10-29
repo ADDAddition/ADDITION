@@ -190,11 +190,27 @@ void RpcNetworkServer::run_loop() {
             continue;
         }
 
+        char ipbuf[INET_ADDRSTRLEN] = {0};
+        inet_ntop(AF_INET, &client_addr.sin_addr, ipbuf, sizeof(ipbuf));
+        const std::string ip(ipbuf);
+        if (!admit(ip)) {
+            // Over cap: drop immediately, no thread, no buffer.
+            close_socket(client);
+            continue;
+        }
+
         {
             std::lock_guard<std::mutex> lk(clients_mu_);
-            client_threads_.emplace_back([this, client]() {
+            reap_finished_locked();
+            auto done = std::make_shared<std::atomic<bool>>(false);
+            ClientThread ct;
+            ct.done = done;
+            ct.th = std::thread([this, client, ip, done]() {
                 this->serve_client(static_cast<std::uintptr_t>(client));
+                this->release(ip);
+                done->store(true);
             });
+            client_threads_.push_back(std::move(ct));
         }
     }
 
@@ -207,16 +223,70 @@ void RpcNetworkServer::run_loop() {
 }
 
 void RpcNetworkServer::join_client_threads() {
-    std::vector<std::thread> local;
+    std::vector<ClientThread> local;
     {
         std::lock_guard<std::mutex> lk(clients_mu_);
         local.swap(client_threads_);
     }
-    for (auto& th : local) {
-        if (th.joinable()) {
-            th.join();
+    for (auto& ct : local) {
+        if (ct.th.joinable()) {
+            ct.th.join();
         }
     }
+}
+
+void RpcNetworkServer::reap_finished_locked() {
+    for (auto it = client_threads_.begin(); it != client_threads_.end();) {
+        if (it->done->load()) {
+            if (it->th.joinable()) {
+                it->th.join();
+            }
+            it = client_threads_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+bool RpcNetworkServer::admit(const std::string& ip) {
+    std::lock_guard<std::mutex> lk(clients_mu_);
+    if (active_ >= kMaxInboundConnections) {
+        ++rejected_total_cap_;
+        return false;
+    }
+    const bool loopback = ip.rfind("127.", 0) == 0;
+    const auto cap = loopback ? kMaxInboundLoopback : kMaxInboundPerIp;
+    auto& n = per_ip_[ip];
+    if (n >= cap) {
+        ++rejected_ip_cap_;
+        return false;
+    }
+    ++n;
+    ++active_;
+    return true;
+}
+
+void RpcNetworkServer::release(const std::string& ip) {
+    std::lock_guard<std::mutex> lk(clients_mu_);
+    auto it = per_ip_.find(ip);
+    if (it != per_ip_.end()) {
+        if (--it->second == 0) {
+            per_ip_.erase(it);
+        }
+    }
+    if (active_ > 0) {
+        --active_;
+    }
+}
+
+RpcNetworkServer::Stats RpcNetworkServer::stats() const {
+    std::lock_guard<std::mutex> lk(clients_mu_);
+    Stats s;
+    s.active = active_;
+    s.rejected_total_cap = rejected_total_cap_;
+    s.rejected_ip_cap = rejected_ip_cap_;
+    s.large_slots_in_use = large_slots_.load();
+    return s;
 }
 
 void RpcNetworkServer::serve_client(std::uintptr_t client_raw) {
@@ -238,8 +308,32 @@ void RpcNetworkServer::serve_client(std::uintptr_t client_raw) {
     setsockopt(client, SOL_SOCKET, SO_SNDTIMEO, &send_tv, sizeof(send_tv));
 #endif
 
+    // Per-connection memory: only kMaxLargeSlots connections at once may buffer
+    // a full 4 MiB line; the others are capped at kSmallLineBytes.
+    std::size_t limit = kSmallLineBytes;
+    bool large = false;
+    {
+        auto cur = large_slots_.load();
+        while (cur < kMaxLargeSlots) {
+            if (large_slots_.compare_exchange_weak(cur, cur + 1)) {
+                large = true;
+                limit = kMaxLineBytes;
+                break;
+            }
+        }
+    }
+    struct SlotGuard {
+        std::atomic<std::size_t>& c;
+        bool on;
+        ~SlotGuard() {
+            if (on) {
+                c.fetch_sub(1);
+            }
+        }
+    } slot_guard{large_slots_, large};
+
     std::string req;
-    if (!socket_recv_request(static_cast<std::uintptr_t>(client), req, kMaxLineBytes)) {
+    if (!socket_recv_request(static_cast<std::uintptr_t>(client), req, limit)) {
         close_socket(client);
         return;
     }
@@ -247,7 +341,7 @@ void RpcNetworkServer::serve_client(std::uintptr_t client_raw) {
         req.rfind("OPTIONS ", 0) != 0 && req.rfind("HEAD ", 0) != 0) {
         req = trim_eol(req);
     }
-    if (req.size() > kMaxLineBytes) {
+    if (req.size() > limit) {
         const std::string resp = "error: request too large\n";
         socket_send_all(static_cast<std::uintptr_t>(client), resp.c_str(), resp.size());
         close_socket(client);

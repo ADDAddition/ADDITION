@@ -2,8 +2,11 @@
 
 #include "addition/block.hpp"
 #include "addition/config.hpp"
+#include "addition/wire_v3.hpp"
 #include "addition/crypto.hpp"
 #include "addition/net_io.hpp"
+#include "addition/net_transport.hpp"
+#include "addition/dandelion.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -32,7 +35,12 @@ namespace addition {
 
 namespace {
 
-constexpr const char* kProtoVersion = "2";
+// v3: binary keys/sigs (TXV3/BLV3, base64). v2 peers still accepted (transcoded).
+constexpr const char* kProtoVersion = "3";
+constexpr const char* kProtoVersionLegacy = "2";
+bool proto_supported(const std::string& v) {
+    return v == "3" || v == "2";
+}
 constexpr std::uint64_t kMsgSkewSec = 90;
 constexpr int kSocketTimeoutMs = 20000;
 constexpr int kConnectTimeoutMs = 3000;
@@ -111,45 +119,31 @@ bool send_p2p_request(const std::string& endpoint, const std::string& request, s
     }
 #endif
 
-    SocketT sock = ::socket(AF_INET, SOCK_STREAM, 0);
-    if (sock == kInvalidSocket) {
+    std::uintptr_t raw_sock = 0;
+    std::string terr;
+    // transport_connect honors the Tor/SOCKS policy: .onion via SOCKS5 (ATYP
+    // domain, no local DNS), clearnet refused in onion_only mode.
+    if (!transport_connect(ip, port, is_onion_v3_host(ip) ? 60000 : kConnectTimeoutMs, raw_sock, terr)) {
 #ifdef _WIN32
         WSACleanup();
 #endif
         return false;
     }
-
+    SocketT sock = static_cast<SocketT>(raw_sock);
     socket_apply_wan_opts(static_cast<std::uintptr_t>(sock));
-
+    {
+        const int io_ms = is_onion_v3_host(ip) ? 90000 : kSocketTimeoutMs;
 #ifdef _WIN32
-    DWORD timeout_ms = static_cast<DWORD>(kSocketTimeoutMs);
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout_ms), sizeof(timeout_ms));
-    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&timeout_ms), sizeof(timeout_ms));
+        DWORD timeout_ms = static_cast<DWORD>(io_ms);
+        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout_ms), sizeof(timeout_ms));
+        setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&timeout_ms), sizeof(timeout_ms));
 #else
-    timeval tv{};
-    tv.tv_sec = kSocketTimeoutMs / 1000;
-    tv.tv_usec = (kSocketTimeoutMs % 1000) * 1000;
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+        timeval tv{};
+        tv.tv_sec = io_ms / 1000;
+        tv.tv_usec = (io_ms % 1000) * 1000;
+        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+        setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 #endif
-
-    sockaddr_in addr{};
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
-    if (inet_pton(AF_INET, ip.c_str(), &addr.sin_addr) != 1) {
-        close_socket(sock);
-#ifdef _WIN32
-        WSACleanup();
-#endif
-        return false;
-    }
-
-    if (!socket_connect(static_cast<std::uintptr_t>(sock), &addr, sizeof(addr), kConnectTimeoutMs)) {
-        close_socket(sock);
-#ifdef _WIN32
-        WSACleanup();
-#endif
-        return false;
     }
 
     const std::string payload = request + "\n";
@@ -440,13 +434,15 @@ bool send_http_rpc(const std::string& endpoint, const std::string& cmd, std::str
         return false;
     }
 #endif
-    SocketT sock = ::socket(AF_INET, SOCK_STREAM, 0);
-    if (sock == kInvalidSocket) {
+    std::uintptr_t raw_sock = 0;
+    std::string terr;
+    if (!transport_connect(ip, port, is_onion_v3_host(ip) ? 60000 : kConnectTimeoutMs, raw_sock, terr)) {
 #ifdef _WIN32
         WSACleanup();
 #endif
         return false;
     }
+    SocketT sock = static_cast<SocketT>(raw_sock);
     socket_apply_wan_opts(static_cast<std::uintptr_t>(sock));
 #ifdef _WIN32
     DWORD timeout_ms = static_cast<DWORD>(kSocketTimeoutMs);
@@ -459,17 +455,6 @@ bool send_http_rpc(const std::string& endpoint, const std::string& cmd, std::str
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
     setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 #endif
-    sockaddr_in addr{};
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
-    if (inet_pton(AF_INET, ip.c_str(), &addr.sin_addr) != 1 ||
-        !socket_connect(static_cast<std::uintptr_t>(sock), &addr, sizeof(addr), kConnectTimeoutMs)) {
-        close_socket(sock);
-#ifdef _WIN32
-        WSACleanup();
-#endif
-        return false;
-    }
     std::ostringstream req;
     req << "GET /rpc?cmd=" << url_encode_cmd(cmd) << " HTTP/1.0\r\n"
         << "Host: " << ip << "\r\n"
@@ -744,6 +729,110 @@ std::string DecentralizedNode::identity_rotation_status() const {
 }
 
 bool DecentralizedNode::submit_transaction(const Transaction& tx, std::string& error) {
+    if (dandelion_) {
+        return stem_transaction(tx, "", error);
+    }
+    return fluff_transaction(tx, error);
+}
+
+void DecentralizedNode::set_dandelion(bool enabled) {
+    dandelion_ = enabled;
+}
+
+bool DecentralizedNode::dandelion_enabled() const {
+    return dandelion_;
+}
+
+std::size_t DecentralizedNode::stempool_size() const {
+    return stempool_.size();
+}
+
+DandelionRouter& DecentralizedNode::dandelion_router() {
+    return dandelion_router_;
+}
+
+void DecentralizedNode::set_advertised_p2p(const std::string& endpoint) {
+    advertised_p2p_ = endpoint;
+}
+
+std::vector<std::string> DecentralizedNode::outbound_relay_peers() const {
+    std::vector<std::string> out;
+    for (const auto& p : peers_.select_peers(0)) {
+        if (is_peer_endpoint(p) && !is_self_peer_label(p) && !peers_.is_banned(p)) {
+            out.push_back(p);
+        }
+    }
+    return out;
+}
+
+bool DecentralizedNode::stem_transaction(const Transaction& tx, const std::string& source, std::string& error) {
+    if (!chain_.validate_transaction(tx, error)) {
+        return false;
+    }
+    const auto txid = hash_transaction(tx);
+    if (seen_txids_.count(txid) != 0 || stempool_.count(txid) != 0) {
+        return true;  // already known (stem loop or already fluffed)
+    }
+    const auto d = dandelion_router_.route(source, outbound_relay_peers());
+    if (d.fluff || stempool_.size() >= kMaxStempool) {
+        dandelion_router_.mark_fluffed(txid);
+        return fluff_transaction(tx, error);
+    }
+    stempool_.emplace(txid, tx);
+    dandelion_router_.embargo(txid);
+    const auto gossip = encode_tx_gossip(tx);  // "TX|<payload>"
+    stem_outbound_.emplace_back(d.relay, "STEM|" + gossip.substr(3));
+    return true;
+}
+
+std::size_t DecentralizedNode::flush_stem(std::string& last) {
+    std::size_t sent = 0;
+    // Embargo expired without seeing the tx fluffed: fluff it ourselves.
+    for (const auto& txid : dandelion_router_.expired_embargoes()) {
+        auto it = stempool_.find(txid);
+        if (it == stempool_.end()) {
+            continue;
+        }
+        const auto tx = it->second;
+        stempool_.erase(it);
+        std::string ferr;
+        fluff_transaction(tx, ferr);
+    }
+    auto queue = std::move(stem_outbound_);
+    stem_outbound_.clear();
+    for (const auto& item : queue) {
+        const auto& relay = item.first;
+        std::string wire_id;
+        std::string hs_err;
+        std::string resp;
+        bool ok = handshake_with_peer(relay, wire_id, hs_err);
+        if (ok) {
+            if (wire_id.empty()) {
+                wire_id = self_id_;
+            }
+            ok = send_p2p_request(relay, wire_id + " " + adapt_for_peer(item.second, peer_proto(relay)), resp) && resp.rfind("error:", 0) != 0;
+        }
+        if (ok) {
+            ++sent;
+            peers_.mark_peer_good(relay);
+            continue;
+        }
+        last = "stem relay failed to " + relay;
+        peers_.mark_peer_bad(relay);
+        // Relay unreachable: fall back to fluffing (embargo semantics).
+        Transaction tx{};
+        std::string derr;
+        if (decode_tx_gossip(item.second.substr(5), tx, derr)) {
+            const auto txid = hash_transaction(tx);
+            stempool_.erase(txid);
+            dandelion_router_.mark_fluffed(txid);
+            fluff_transaction(tx, derr);
+        }
+    }
+    return sent;
+}
+
+bool DecentralizedNode::fluff_transaction(const Transaction& tx, std::string& error) {
     if (!chain_.validate_transaction(tx, error)) {
         return false;
     }
@@ -969,10 +1058,12 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
     wire_id.clear();
 
     int transport_fails = 0;
+    std::string hello_version = kProtoVersion;
+    bool downgraded = false;
     for (int attempt = 0; attempt < 8; ++attempt) {
         const auto hello_ts = now_seconds();
         const std::string hello_nonce = "s" + std::to_string(attempt) + "-" + std::to_string(hello_ts % 1000000ULL);
-        const std::string hello_body = std::string(kProtoVersion) + "|" + active_network_id(chain_) + "|" +
+        const std::string hello_body = hello_version + "|" + active_network_id(chain_) + "|" +
                                        std::to_string(hello_ts) + "|" + hello_nonce + "|" +
                                        node_public_key_;
         std::string hello_sig;
@@ -985,7 +1076,7 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
 
         const std::string attempt_id = (attempt == 0) ? self_id_ : (self_id_ + "x" + std::to_string(attempt));
         std::ostringstream hello_req;
-        hello_req << attempt_id << " HELLO|" << kProtoVersion << '|' << active_network_id(chain_)
+        hello_req << attempt_id << " HELLO|" << hello_version << '|' << active_network_id(chain_)
                   << '|' << hello_ts << '|' << hello_nonce << '|' << node_public_key_ << '|' << hello_sig;
 
         std::string hello_resp;
@@ -1017,7 +1108,9 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
                 error = "invalid HELLO_ACK fields";
                 return false;
             }
-            if (v != kProtoVersion || n != active_network_id(chain_) || nonce != hello_nonce ||
+            // Server answers min(ours, theirs); never accept a version above what we offered.
+            if (!proto_supported(v) || (v == "3" && hello_version != "3") ||
+                n != active_network_id(chain_) || nonce != hello_nonce ||
                 peer_pk.empty() || sig.empty()) {
                 error = "HELLO_ACK mismatch";
                 return false;
@@ -1033,7 +1126,7 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
                 error = "peer pubkey pin mismatch";
                 return false;
             }
-            const std::string ack_body = std::string(kProtoVersion) + "|" + active_network_id(chain_) + "|" + ts +
+            const std::string ack_body = v + "|" + active_network_id(chain_) + "|" + ts +
                                          "|" + nonce + "|" + peer_pk;
             if (!verify_message_signature_hybrid(peer_pk, ack_body, sig)) {
                 error = "invalid HELLO_ACK signature";
@@ -1042,6 +1135,7 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
             peer_pubkeys_[peer] = peer_pk;
             pinned_peer_pubkeys_.emplace(peer, peer_pk);
             handshake_ok_[peer] = true;
+            peer_proto_[peer] = (v == "3") ? 3 : 2;
             wire_id = attempt_id;
             return true;
         }
@@ -1069,6 +1163,12 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
         }
 
         error = "expected HELLO_ACK, got: " + hello_resp;
+        if (hello_resp.rfind("error: handshake mismatch", 0) == 0 && !downgraded) {
+            // Legacy (v2-only) peer: retry once offering v2.
+            hello_version = kProtoVersionLegacy;
+            downgraded = true;
+            continue;
+        }
         if (hello_resp.rfind("error: hello timestamp", 0) == 0 ||
             hello_resp.rfind("error: handshake mismatch", 0) == 0 ||
             hello_resp.rfind("error: peer pubkey pin", 0) == 0 ||
@@ -1157,7 +1257,24 @@ bool DecentralizedNode::sync_once(std::string& error) {
 
 bool DecentralizedNode::sync_once_impl(std::string& error) {
     error.clear();
-    auto peers = peers_.peers();
+    // Try a few unverified candidates (from ADDR / ADVERTISE); a successful
+    // signed handshake promotes them into the peer table.
+    {
+        std::size_t tried = 0;
+        for (const auto& cand : peers_.candidates()) {
+            if (tried++ >= 2) {
+                break;
+            }
+            std::string wid;
+            std::string herr;
+            if (handshake_with_peer(cand, wid, herr)) {
+                peers_.promote_candidate(cand);
+            } else {
+                peers_.remove_candidate(cand);
+            }
+        }
+    }
+    auto peers = peers_.select_peers(0);
     if (peers.empty()) {
         error = "no peer";
         return false;
@@ -1199,6 +1316,10 @@ bool DecentralizedNode::sync_once_impl(std::string& error) {
         {
             std::string learn_err;
             learn_peers_from(peer, wire_id, learn_err);
+            if (!advertised_p2p_.empty() && is_peer_endpoint(peer)) {
+                std::string adv_resp;
+                send_p2p_request(peer, wire_id + " ADVERTISE|" + advertised_p2p_, adv_resp);
+            }
         }
 
         {
@@ -1340,15 +1461,21 @@ bool DecentralizedNode::is_push_gossip_message(const std::string& message) const
 bool DecentralizedNode::flush_outbound_gossip(std::size_t& sent, std::string& error) {
     error.clear();
     sent = 0;
+    {
+        std::string stem_last;
+        sent += flush_stem(stem_last);
+    }
     auto msgs = pull_outbound_messages();
-    // Best-effort rebroadcast of still-pending mempool txs (one-shot gossip can be
-    // lost on a transient handshake/transport failure). Bounded; peers dedup.
+    // Best-effort rebroadcast of still-pending (already fluffed) mempool txs: one-shot
+    // gossip can be lost on a transient failure. Stem-phase txs are never rebroadcast.
     {
         const auto pending = mempool_.snapshot();
-        const std::size_t cap = std::min<std::size_t>(pending.size(), 32);
-        for (std::size_t i = 0; i < cap; ++i) {
-            auto m = encode_tx_gossip(pending[i]);
-            if (std::find(msgs.begin(), msgs.end(), m) == msgs.end()) msgs.push_back(std::move(m));
+        std::size_t added = 0;
+        for (const auto& tx : pending) {
+            if (added >= 32) break;
+            if (stempool_.count(hash_transaction(tx)) != 0) continue;
+            auto m = encode_tx_gossip(tx);
+            if (std::find(msgs.begin(), msgs.end(), m) == msgs.end()) { msgs.push_back(std::move(m)); ++added; }
         }
     }
     if (msgs.empty()) {
@@ -1382,7 +1509,7 @@ bool DecentralizedNode::flush_outbound_gossip(std::size_t& sent, std::string& er
         }
         for (const auto& msg : pushable) {
             std::string resp;
-            if (!send_p2p_request(peer, wire_id + " " + msg, resp)) {
+            if (!send_p2p_request(peer, wire_id + " " + adapt_for_peer(msg, peer_proto(peer)), resp)) {
                 last = "gossip transport failed to " + peer;
                 peers_.mark_peer_bad(peer);
                 break;
@@ -1427,10 +1554,12 @@ bool DecentralizedNode::learn_peers_from(const std::string& peer, const std::str
         if (item.empty()) {
             continue;
         }
-        if (!is_external_advertised_peer(item)) {
+        if (!is_external_advertised_peer(item) || item == advertised_p2p_) {
             continue;
         }
-        peers_.add_peer(item);
+        if (!peers_.has_peer(item)) {
+            peers_.add_candidate(item);
+        }
     }
     return true;
 }
@@ -1497,6 +1626,7 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         (message.rfind("REQINV|", 0) == 0) ||
         (message.rfind("BLKDATA|", 0) == 0) ||
         (message.rfind("REQADDR|", 0) == 0) ||
+        (message.rfind("ADVERTISE|", 0) == 0) ||
         (message.rfind("IDROTATE|", 0) == 0) ||
         (message.rfind("IDVOTE|", 0) == 0) ||
         (message.rfind("SVOTE|", 0) == 0);
@@ -1526,7 +1656,7 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
             return false;
         }
 
-        if (version != kProtoVersion || network != active_network_id(chain_)) {
+        if (!proto_supported(version) || network != active_network_id(chain_)) {
             error = "handshake mismatch";
             peers_.mark_peer_bad(peer);
             handshake_ok_[peer] = false;
@@ -1605,7 +1735,8 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         peer_pubkeys_[peer] = peer_pk;
         pinned_peer_pubkeys_.emplace(peer, peer_pk);
 
-        const std::string ack_body = std::string(kProtoVersion) + "|" + active_network_id(chain_) + "|" +
+        const std::string negotiated = (version == "3") ? std::string("3") : std::string(kProtoVersionLegacy);
+        const std::string ack_body = negotiated + "|" + active_network_id(chain_) + "|" +
                                      std::to_string(now) + "|" + nonce + "|" + node_public_key_;
         std::string ack_sig;
         try {
@@ -1618,11 +1749,12 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         }
 
         std::ostringstream ack;
-        ack << "HELLO_ACK|" << kProtoVersion << '|' << active_network_id(chain_) << '|' << now << '|' << nonce
+        ack << "HELLO_ACK|" << negotiated << '|' << active_network_id(chain_) << '|' << now << '|' << nonce
             << '|' << node_public_key_ << '|' << ack_sig;
         reply = ack.str();
         peers_.mark_peer_good(peer);
         handshake_ok_[peer] = true;
+        peer_proto_[peer] = (negotiated == "3") ? 3 : 2;
         return true;
     }
 
@@ -1639,7 +1771,10 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
             peers_.mark_peer_bad(peer);
             return false;
         }
-        const auto ok = submit_transaction(tx, error);
+        const auto txid = hash_transaction(tx);
+        stempool_.erase(txid);
+        dandelion_router_.mark_fluffed(txid);
+        const auto ok = fluff_transaction(tx, error);
         if (ok) {
             peers_.mark_peer_good(peer);
         } else {
@@ -1714,7 +1849,7 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
             return false;
         }
 
-        reply = "BLKDATA|" + payload;
+        reply = adapt_for_peer("BLKDATA|" + payload, peer_proto(peer));
         peers_.mark_peer_good(peer);
         return true;
     }
@@ -1766,14 +1901,47 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         return true;
     }
 
+    if (message.rfind("STEM|", 0) == 0) {
+        Transaction tx{};
+        if (!decode_tx_gossip(message.substr(5), tx, error)) {
+            peers_.mark_peer_bad(peer);
+            return false;
+        }
+        const bool ok = dandelion_ ? stem_transaction(tx, peer, error) : fluff_transaction(tx, error);
+        if (ok) {
+            peers_.mark_peer_good(peer);
+        } else {
+            peers_.mark_peer_bad(peer);
+        }
+        return ok;
+    }
+
+    if (message.rfind("ADVERTISE|", 0) == 0) {
+        // Unverified: stored as a candidate, promoted only after we complete
+        // an outbound signed handshake with it.
+        const auto addr = message.substr(10);
+        if (!is_external_advertised_peer(addr)) {
+            error = "bad advertise address";
+            return false;
+        }
+        peers_.add_candidate(addr);
+        reply = "ADVERTISE_OK";
+        return true;
+    }
+
     if (message.rfind("REQADDR|", 0) == 0) {
         // IPv4 ip:port only. Never advertise self / node-id labels.
         std::ostringstream out;
         out << "ADDR|";
         bool first = true;
-        for (const auto& p : peers_.peers()) {
-            if (!is_ipv4_endpoint(p) || is_self_peer_label(p)) {
+        std::size_t emitted = 0;
+        for (const auto& p : peers_.select_peers(0)) {
+            // Only routable addresses (IPv4 / v3 onion), never loopback or labels.
+            if (!is_external_advertised_peer(p)) {
                 continue;
+            }
+            if (++emitted > 64) {
+                break;
             }
             if (!first) {
                 out << ',';
@@ -1919,6 +2087,47 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
 }
 
 std::string DecentralizedNode::encode_tx_payload(const Transaction& tx) const {
+    return std::string(wire::kB64Prefix) + wire::base64_encode(wire::encode_tx_v3(tx));
+}
+
+std::string DecentralizedNode::encode_block_payload(const Block& block) const {
+    return std::string(wire::kB64Prefix) + wire::base64_encode(wire::encode_block_v3(block));
+}
+
+int DecentralizedNode::peer_proto(const std::string& peer) const {
+    const auto it = peer_proto_.find(peer);
+    return it == peer_proto_.end() ? 2 : it->second;
+}
+
+std::string DecentralizedNode::adapt_for_peer(const std::string& msg, int proto) const {
+    if (proto >= 3) {
+        return msg;
+    }
+    static const char* kPrefixes[] = {"TX|", "STEM|", "BLK|", "BLKDATA|"};
+    for (const char* pre : kPrefixes) {
+        const std::string p(pre);
+        if (msg.rfind(p, 0) != 0 || msg.compare(p.size(), 4, wire::kB64Prefix) != 0) {
+            continue;
+        }
+        std::string err;
+        const auto body = msg.substr(p.size());
+        if (p == "BLK|" || p == "BLKDATA|") {
+            Block b{};
+            if (decode_block_payload(body, b, err)) {
+                return p + encode_block_payload_v2(b);
+            }
+        } else {
+            Transaction t{};
+            if (decode_tx_payload(body, t, err)) {
+                return p + encode_tx_payload_v2(t);
+            }
+        }
+        return msg;
+    }
+    return msg;
+}
+
+std::string DecentralizedNode::encode_tx_payload_v2(const Transaction& tx) const {
     std::string bin;
     bin.reserve(256);
     bin.append("TXB2", 4);
@@ -1951,6 +2160,15 @@ bool DecentralizedNode::decode_tx_payload(const std::string& payload,
                                           std::string& error) const {
     tx = Transaction{};
 
+    if (payload.rfind(wire::kB64Prefix, 0) == 0) {
+        std::string raw;
+        if (!wire::base64_decode(payload.substr(4), raw)) {
+            error = "invalid tx payload base64";
+            return false;
+        }
+        return wire::decode_tx_v3(raw, tx, error);
+    }
+
     std::string bin;
     if (!from_hex(payload, bin)) {
         error = "invalid tx payload hex";
@@ -1979,7 +2197,7 @@ bool DecentralizedNode::decode_tx_payload(const std::string& payload,
         error = "invalid tx payload inputs count";
         return false;
     }
-    tx.inputs.reserve(in_count);
+    tx.inputs.reserve(std::min<std::uint32_t>(in_count, 1024));
     for (std::uint32_t i = 0; i < in_count; ++i) {
         TxInput in{};
         if (!read_string(bin, off, in.previous_txid) || !read_u32(bin, off, in.output_index)) {
@@ -1994,7 +2212,7 @@ bool DecentralizedNode::decode_tx_payload(const std::string& payload,
         error = "invalid tx payload outputs count";
         return false;
     }
-    tx.outputs.reserve(out_count);
+    tx.outputs.reserve(std::min<std::uint32_t>(out_count, 1024));
     for (std::uint32_t i = 0; i < out_count; ++i) {
         TxOutput out{};
         if (!read_string(bin, off, out.recipient) || !read_u64(bin, off, out.amount)) {
@@ -2031,7 +2249,7 @@ bool DecentralizedNode::decode_tx_payload(const std::string& payload,
     return true;
 }
 
-std::string DecentralizedNode::encode_block_payload(const Block& block) const {
+std::string DecentralizedNode::encode_block_payload_v2(const Block& block) const {
     std::string bin;
     bin.reserve(1024);
     const bool staked = !block.votes.empty() || !block.slashes.empty();
@@ -2046,7 +2264,7 @@ std::string DecentralizedNode::encode_block_payload(const Block& block) const {
 
     write_u32(bin, static_cast<std::uint32_t>(block.transactions.size()));
     for (const auto& tx : block.transactions) {
-        const auto tx_payload_hex = encode_tx_payload(tx);
+        const auto tx_payload_hex = encode_tx_payload_v2(tx);
         std::string tx_payload_bin;
         if (!from_hex(tx_payload_hex, tx_payload_bin)) {
             return {};
@@ -2083,6 +2301,15 @@ bool DecentralizedNode::decode_block_payload(const std::string& payload,
                                              std::string& error) const {
     block = Block{};
 
+    if (payload.rfind(wire::kB64Prefix, 0) == 0) {
+        std::string raw;
+        if (!wire::base64_decode(payload.substr(4), raw)) {
+            error = "invalid block payload base64";
+            return false;
+        }
+        return wire::decode_block_v3(raw, block, error);
+    }
+
     std::string bin;
     if (!from_hex(payload, bin)) {
         error = "invalid block payload hex";
@@ -2113,7 +2340,7 @@ bool DecentralizedNode::decode_block_payload(const std::string& payload,
         return false;
     }
 
-    block.transactions.reserve(tx_count);
+    block.transactions.reserve(std::min<std::uint32_t>(tx_count, 4096));
     for (std::uint32_t i = 0; i < tx_count; ++i) {
         std::uint32_t tx_sz = 0;
         if (!read_u32(bin, off, tx_sz)) {

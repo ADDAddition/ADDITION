@@ -48,6 +48,10 @@ public:
     // relayed vote pool). When set, blocks are mined through the vote path.
     void set_vote_source(std::function<std::vector<StakeVote>()> source) { vote_source_ = std::move(source); }
     void request_stop();
+    // Max BLKDATA wire bytes for a mined block (default: kMaxRelayBlockWireBytes).
+    void set_relay_budget_bytes(std::size_t bytes);
+    std::size_t last_deferred_for_size() const;
+    std::size_t last_block_wire_bytes() const;
     void clear_stop();
     double last_tps() const;
     std::uint64_t last_mine_ms() const;
@@ -64,6 +68,9 @@ private:
     std::uint64_t last_mine_ms_{0};
     std::size_t last_mined_txs_{0};
     std::size_t last_dropped_junk_{0};
+    std::size_t relay_budget_bytes_{kMaxRelayBlockWireBytes};
+    std::size_t last_deferred_for_size_{0};
+    std::size_t last_block_wire_bytes_{0};
     std::size_t last_threads_{0};
 };
 

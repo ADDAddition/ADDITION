@@ -2,6 +2,7 @@
 
 #include "addition/chain.hpp"
 #include "addition/consensus_engine.hpp"
+#include "addition/dandelion.hpp"
 #include "addition/mempool.hpp"
 #include "addition/p2p.hpp"
 
@@ -65,6 +66,7 @@ public:
     static bool decode_stake_vote(const std::string& payload, StakeVote& vote, std::string& error);
     // Test hook: exposes the block payload encoder (BLB2/BLB3) for unit tests.
     std::string encode_block_payload_for_test(const Block& block) const { return encode_block_payload(block); }
+    std::string encode_block_payload_v2_for_test(const Block& block) const { return encode_block_payload_v2(block); }
     const std::string& self_id() const;
     const std::string& node_public_key() const;
     const std::string& node_private_key() const;
@@ -79,6 +81,16 @@ public:
     bool commit_identity_rotation(std::string& error);
     std::string identity_rotation_status() const;
 
+    // Dandelion++ tx relay (off by default). When on, locally submitted txs
+    // and inbound STEM| txs go to a stem relay instead of being broadcast.
+    void set_dandelion(bool enabled);
+    bool dandelion_enabled() const;
+    std::size_t stempool_size() const;
+    DandelionRouter& dandelion_router();
+    // Our own reachable address (IPv4 or .onion), sent as ADVERTISE| after a
+    // successful outbound handshake so peers can learn inbound-only nodes.
+    void set_advertised_p2p(const std::string& endpoint);
+
 private:
     std::string self_id_;
     std::string node_public_key_;
@@ -92,6 +104,14 @@ private:
     std::unordered_set<std::string> seen_block_hashes_;
     std::vector<std::string> outbound_;
     std::unordered_map<std::string, bool> handshake_ok_;
+    // Negotiated wire protocol per peer (2 = hex TXB2/BLB2, 3 = base64 TXV3/BLV3).
+    // Unknown peers are treated as v2 (always decodable by both).
+    std::unordered_map<std::string, int> peer_proto_;
+    int peer_proto(const std::string& peer) const;
+    // Transcode canonical v3 TX|/BLK|/STEM|/BLKDATA| lines to v2 for legacy peers.
+    std::string adapt_for_peer(const std::string& msg, int proto) const;
+    std::string encode_tx_payload_v2(const Transaction& tx) const;
+    std::string encode_block_payload_v2(const Block& block) const;
     std::unordered_map<std::string, std::unordered_set<std::string>> seen_nonces_;
     std::unordered_map<std::string, std::string> peer_pubkeys_;
     std::unordered_map<std::string, std::string> pinned_peer_pubkeys_;
@@ -125,6 +145,18 @@ private:
     };
 
     std::optional<PendingRotation> pending_rotation_;
+
+    bool dandelion_ = false;
+    DandelionRouter dandelion_router_;
+    std::unordered_map<std::string, Transaction> stempool_;
+    std::vector<std::pair<std::string, std::string>> stem_outbound_;  // relay -> STEM|...
+    std::string advertised_p2p_;
+    static constexpr std::size_t kMaxStempool = 5000;
+
+    bool fluff_transaction(const Transaction& tx, std::string& error);
+    bool stem_transaction(const Transaction& tx, const std::string& source, std::string& error);
+    std::vector<std::string> outbound_relay_peers() const;
+    std::size_t flush_stem(std::string& last);
 
     std::string encode_tx_payload(const Transaction& tx) const;
     bool relay_rotation_messages_to_peer(const std::string& peer, std::string& error);

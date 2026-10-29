@@ -175,17 +175,26 @@ int main() {
     check(chain.balance_of(k[1].address) == b1 + per_vote && chain.balance_of(k[2].address) == b2 + per_vote && per_vote > 0,
           "voters paid per_vote in coinbase");
 
-    // BLB3 payload roundtrip through the node codec (test hook).
+    // BLV3 (wire v3, reserved extension slot) and legacy BLB3 (v2 peers) roundtrips.
     {
         const auto payload = node.encode_block_payload_for_test(*voted);
-        check(payload.rfind("424c4233", 0) == 0 || payload.rfind("424C4233", 0) == 0, "payload uses BLB3 magic");
         Block d{};
-        check(node.decode_block_payload(payload, d, err), "BLB3 decode " + err);
+        check(node.decode_block_payload(payload, d, err), "BLV3 decode " + err);
         check(hash_block_header(d.header) == hash_block_header(voted->header) && d.votes.size() == 3 &&
-                  d.votes[0].signature == voted->votes[0].signature && d.votes[2].ticket_id == voted->votes[2].ticket_id,
-              "BLB3 roundtrip preserves header and votes");
-        const auto plain = node.encode_block_payload_for_test(*chain.block_at(1));
+                  d.votes[0].signature == voted->votes[0].signature && d.votes[2].ticket_id == voted->votes[2].ticket_id &&
+                  compute_block_commitment(d) == compute_block_commitment(*voted),
+              "BLV3 roundtrip preserves header and votes");
+        const auto v2 = node.encode_block_payload_v2_for_test(*voted);
+        check(v2.rfind("424c4233", 0) == 0 || v2.rfind("424C4233", 0) == 0, "v2 peers get BLB3 magic");
+        Block d2{};
+        check(node.decode_block_payload(v2, d2, err) && d2.votes.size() == 3, "BLB3 decode " + err);
+        const auto plain = node.encode_block_payload_v2_for_test(*chain.block_at(1));
         check(plain.rfind("424c4232", 0) == 0 || plain.rfind("424C4232", 0) == 0, "vote-less block stays BLB2");
+        Block nov = *voted;
+        nov.votes.clear();
+        check(stake_extension_weight(*voted) > 0 &&
+                  block_weight(*voted) == block_weight(nov) + stake_extension_weight(*voted),
+              "block_weight counts votes");
     }
 
     // Equivocation: two conflicting votes by one ticket burn it.

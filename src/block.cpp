@@ -1,6 +1,7 @@
 #include "addition/block.hpp"
 
 #include "addition/crypto.hpp"
+#include "addition/wire_v3.hpp"
 
 #include <sstream>
 
@@ -22,6 +23,9 @@ std::string hash_transaction(const Transaction& tx) {
         oss << out.recipient << ':' << out.amount << ';';
     }
     oss << "]signer=" << tx.signer << "|pub=" << tx.signer_pubkey << "|fee=" << tx.fee << "|nonce=" << tx.nonce;
+    if (!tx.shielded.empty()) {
+        oss << "|sh=" << strong_hash(tx.shielded);
+    }
     return strong_hash(oss.str());
 }
 
@@ -100,6 +104,28 @@ std::size_t stake_extension_weight(const Block& block) {
     for (const auto& v : block.votes) w += stake_vote_weight(v);
     for (const auto& s : block.slashes) w += stake_vote_weight(s.a) + stake_vote_weight(s.b);
     return w;
+}
+
+std::size_t tx_weight(const Transaction& tx) {
+    return 4 + wire::encode_tx_v3(tx).size();
+}
+
+std::size_t block_weight(const Block& block) {
+    // BLV3 magic + height + tagged prev hash + ts/nonce/target + tagged merkle + count + checksum.
+    std::string hdr;
+    wire::write_tagged(hdr, block.header.previous_hash);
+    wire::write_tagged(hdr, block.header.merkle_root);
+    std::size_t w = 4 + 8 + 24 + hdr.size() + 4 + 4 + 4;  // + ext count
+    for (const auto& tx : block.transactions) {
+        w += tx_weight(tx);
+    }
+    // Staking extension (BLV3 reserved slot): votes/slashes count toward weight.
+    w += stake_extension_weight(block);
+    return w;
+}
+
+std::size_t tx_wire_bytes(const Transaction& tx) {
+    return (tx_weight(tx) * 4 + 2) / 3 + 1;  // base64 framing
 }
 
 } // namespace addition

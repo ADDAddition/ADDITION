@@ -14,6 +14,9 @@ enum class SigScheme {
 	Unknown = 0,
 	MlDsa87 = 1,
 	SlhDsaShake256s = 2,
+	// FN-DSA / Falcon-1024 (liboqs OQS_SIG_alg_falcon_1024). Additional scheme;
+	// ML-DSA-87 stays the default. Address type is versioned by scheme_id below.
+	Falcon1024 = 3,
 };
 
 Hash512 sha3_512_bytes(const std::vector<std::uint8_t>& data);
@@ -35,6 +38,8 @@ bool hex_to_bytes(const std::string& hex,
 // scheme_id is in the preimage so ML-DSA-87 and SLH-DSA addresses differ.
 inline constexpr const char* kMlDsa87SchemeId = "ml-dsa-87";
 inline constexpr const char* kSlhDsaShake256sSchemeId = "slh-dsa-shake-256s";
+// Versioned address type for Falcon: SHA3-512("fn-dsa-1024-v1" || 0x00 || pk).
+inline constexpr const char* kFalcon1024SchemeId = "fn-dsa-1024-v1";
 inline constexpr std::size_t kHashCommittedAddressHexLen = 128;
 
 const char* sig_scheme_id(SigScheme scheme);
@@ -70,6 +75,11 @@ bool verify_message_signature_hybrid(const std::string& public_key,
 									 const std::string& message,
 									 const std::string& signature,
 									 const std::string& pq_context = "ml-dsa-87");
+
+// Verified-signature cache controls (bench/test). Enabled by default.
+void sig_cache_set_enabled(bool enabled);
+void sig_cache_clear();
+void sig_cache_stats(std::uint64_t& hits, std::uint64_t& misses, std::size_t& entries);
 
 bool pq_sign_message(const std::vector<std::uint8_t>& secret_key,
 					 const std::string& message,

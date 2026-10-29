@@ -39,6 +39,7 @@ add_library(addition_core
     src/config.cpp
     src/crypto.cpp
     src/block.cpp
+    src/wire_v3.cpp
     src/chain.cpp
     src/consensus_rules.cpp
     src/mempool.cpp
@@ -55,6 +56,8 @@ add_library(addition_core
     src/bridge.cpp
     src/decentralized_node.cpp
     src/net_io.cpp
+    src/net_transport.cpp
+    src/dandelion.cpp
     src/p2p.cpp
     src/consensus_engine.cpp
     src/privacy.cpp
@@ -98,6 +101,17 @@ if(ADDITION_BUILD_TESTS)
     target_link_libraries(test_chain PRIVATE addition_core)
     add_test(NAME test_chain COMMAND test_chain)
 
+    add_executable(test_net_tor tests/test_net_tor.cpp)
+    target_link_libraries(test_net_tor PRIVATE addition_core)
+    add_test(NAME test_net_tor COMMAND test_net_tor)
+
+    add_executable(test_speed_v3 tests/test_speed_v3.cpp)
+    target_link_libraries(test_speed_v3 PRIVATE addition_core)
+    add_test(NAME test_speed_v3 COMMAND test_speed_v3)
+    set_tests_properties(test_speed_v3 PROPERTIES TIMEOUT 120)
+
+    add_executable(bench_throughput tests/bench_throughput.cpp)
+    target_link_libraries(bench_throughput PRIVATE addition_core)
     add_executable(test_consensus_rules tests/test_consensus_rules.cpp)
     target_link_libraries(test_consensus_rules PRIVATE addition_core)
     add_test(NAME test_consensus_rules COMMAND test_consensus_rules)

@@ -22,7 +22,7 @@ bool Mempool::looks_spendable(const Transaction& tx) const {
     if (tx.inputs.empty() || tx.outputs.empty()) {
         return false;
     }
-    if (tx.signer.empty() || tx.signer_pubkey.empty()) {
+    if (tx.signer.empty()) {  // empty pubkey => on-chain registry (chain validates)
         return false;
     }
     if (tx.signature.rfind("pq=", 0) != 0) {

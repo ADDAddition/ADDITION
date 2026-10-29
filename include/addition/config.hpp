@@ -124,6 +124,8 @@ struct ChainConfig {
     std::uint32_t stake_vote_quorum{3U};           // approving votes required
     std::uint64_t stake_min_live_tickets{5ULL};    // below this pool size, votes are optional
     std::uint32_t stake_reward_bps{3000U};         // stakers' share of subsidy+fees (30%)
+    // Consensus: max canonical binary block weight (bytes). See block.hpp.
+    std::uint64_t max_block_weight{2ULL * 1024ULL * 1024ULL};
     std::vector<std::string> bootstrap_peers{"127.0.0.1:28545"};
 };
 
@@ -142,6 +144,12 @@ struct NodeConfig {
     std::vector<std::string> bootstrap_peers{"127.0.0.1:28545"};
     // Public advertisement only. Not added to the internal peer set (avoids self-sync).
     std::string advertised_p2p{};
+    // Tor / privacy networking (all off by default).
+    std::string tor_socks_proxy{};     // e.g. "127.0.0.1:9050"; enables .onion peers
+    bool onion_only{false};            // refuse every clearnet connection; bind P2P to 127.0.0.1
+    std::string p2p_bind{"0.0.0.0"};   // forced to 127.0.0.1 when onion_only
+    bool dandelion{false};             // Dandelion++ stem/fluff tx relay
+    std::size_t max_peers{125};        // address-manager cap
     std::string data_dir{"data"};
     std::string config_path{};
     std::string genesis_path{};
