@@ -94,6 +94,8 @@ struct ChainConfig {
     bool require_privacy_pool{true};
     bool allow_zero_reward_blocks{true};
     std::uint64_t min_fee{0ULL};
+    // Consensus: max canonical binary block weight (bytes). See block.hpp.
+    std::uint64_t max_block_weight{2ULL * 1024ULL * 1024ULL};
     std::vector<std::string> bootstrap_peers{"127.0.0.1:28545"};
 };
 

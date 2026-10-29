@@ -295,6 +295,15 @@ bool apply_kv(NodeConfig& cfg, const std::string& table, const std::string& key,
     if (full == "chain.genesis_timestamp" || full == "genesis_timestamp") {
         return parse_u64(value, cfg.chain.genesis_timestamp);
     }
+    if (full == "chain.max_block_weight" || full == "max_block_weight") {
+        // Must stay relayable: base64 (x4/3) of the block under the 4 MiB line cap.
+        std::uint64_t w = 0;
+        if (!parse_u64(value, w) || w < 65536ULL || w > 3ULL * 1024ULL * 1024ULL - 65536ULL) {
+            return false;
+        }
+        cfg.chain.max_block_weight = w;
+        return true;
+    }
     if (full == "chain.min_fee" || full == "min_fee") {
         return parse_u64(value, cfg.chain.min_fee);
     }

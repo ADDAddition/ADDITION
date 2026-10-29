@@ -139,13 +139,18 @@ bool Miner::mine_next_block(const std::string& reward_address,
                                 : 0;
         // coinbase is built by the chain; reserve a generous slot for it
         std::size_t used = 2048;
+        // Consensus weight cap (canonical binary bytes); header+coinbase reserve.
+        const std::size_t weight_cap = chain_.config().max_block_weight;
+        std::size_t weight = 4096;
         std::size_t keep = 0;
         for (; keep < valid.size(); ++keep) {
             const auto w = tx_wire_bytes(valid[keep]);
-            if (used + w > budget) {
+            const auto tw = tx_weight(valid[keep]);
+            if (used + w > budget || weight + tw > weight_cap) {
                 break;
             }
             used += w;
+            weight += tw;
         }
         last_deferred_for_size_ = valid.size() - keep;
         for (std::size_t i = keep; i < valid.size(); ++i) {

@@ -86,6 +86,18 @@ public:
     std::uint64_t tx_confirmations(const std::string& tx_hash) const;
     bool tx_in_best_chain(const std::string& tx_hash) const;
 
+    // On-chain public-key registry: address -> pubkey hex, recorded the first
+    // time a confirmed tx carries the full key. Later txs from that address may
+    // leave signer_pubkey empty (saves 2592 B ML-DSA-87 / 1793 B Falcon-1024).
+    // Deterministic: rebuilt by replay; snapshotted/restored like the UTXO set.
+    bool registered_pubkey(const std::string& address, std::string& pubkey_hex) const;
+    std::size_t registry_size() const { return pubkey_registry_.size(); }
+    // Pubkey to put in a new tx: "" when this exact key is already registered.
+    std::string pubkey_field_for(const std::string& address, const std::string& pubkey_hex) const {
+        const auto it = pubkey_registry_.find(address);
+        return (it != pubkey_registry_.end() && it->second == pubkey_hex) ? std::string() : pubkey_hex;
+    }
+
 private:
     struct UTXO {
         std::string owner;
@@ -99,6 +111,7 @@ private:
     std::unordered_map<std::string, std::uint64_t> address_index_;
     std::unordered_map<std::string, std::uint64_t> signer_last_nonce_;
     std::unordered_set<std::string> seen_transactions_;
+    std::unordered_map<std::string, std::string> pubkey_registry_;
     std::uint64_t difficulty_target_{0};
     std::uint64_t total_emitted_{0};
     std::uint64_t total_fees_last_block_{0};
@@ -117,6 +130,11 @@ private:
     bool validate_block_transactions(const Block& candidate, std::string& error) const;
     bool validate_transaction_signature(const Transaction& tx, std::string& error) const;
     bool validate_transaction_signature(const Transaction& tx, std::string& error, bool check_crypto) const;
+    // signer_pubkey, or the registry entry (optionally overlaid by same-block registrations).
+    bool resolve_signer_pubkey(const Transaction& tx,
+                               const std::unordered_map<std::string, std::string>* overlay,
+                               std::string& pubkey_hex,
+                               std::string& error) const;
     std::uint64_t compute_next_difficulty_target() const;
     std::uint64_t compute_legacy_difficulty_target() const;
     std::uint64_t max_mintable_at(std::uint64_t height) const;

@@ -999,7 +999,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         }
 
         tx.signer = from;
-        tx.signer_pubkey = pubkey;
+        tx.signer_pubkey = chain_.pubkey_field_for(from, pubkey);
         const auto msg = hash_transaction(tx);
         try {
             tx.signature = sign_message_hybrid(privkey, msg);
@@ -1045,7 +1045,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         }
 
         tx.signer = from;
-        tx.signer_pubkey = pubkey;
+        tx.signer_pubkey = chain_.pubkey_field_for(from, pubkey);
         const auto msg = hash_transaction(tx);
         try {
             tx.signature = sign_message_hybrid(privkey, msg);
@@ -1096,7 +1096,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         }
 
         tx.signer = from;
-        tx.signer_pubkey = pubkey;
+        tx.signer_pubkey = chain_.pubkey_field_for(from, pubkey);
         tx.signature.clear();
         const auto sign_hash = hash_transaction(tx);
         return "sign_hash=" + sign_hash;
@@ -1128,7 +1128,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         }
 
         tx.signer = from;
-        tx.signer_pubkey = pubkey;
+        tx.signer_pubkey = chain_.pubkey_field_for(from, pubkey);
         tx.signature = std::string("pq=") + sig_hex;
 
         if (!chain_.validate_transaction(tx, error)) {
@@ -1167,7 +1167,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         }
 
         tx.signer = from;
-        tx.signer_pubkey = pubkey;
+        tx.signer_pubkey = chain_.pubkey_field_for(from, pubkey);
         tx.signature = std::string("pq=") + sig_hex;
 
         if (!chain_.validate_transaction(tx, error)) {

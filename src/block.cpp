@@ -1,6 +1,7 @@
 #include "addition/block.hpp"
 
 #include "addition/crypto.hpp"
+#include "addition/wire_v3.hpp"
 
 #include <sstream>
 
@@ -22,6 +23,9 @@ std::string hash_transaction(const Transaction& tx) {
         oss << out.recipient << ':' << out.amount << ';';
     }
     oss << "]signer=" << tx.signer << "|pub=" << tx.signer_pubkey << "|fee=" << tx.fee << "|nonce=" << tx.nonce;
+    if (!tx.shielded.empty()) {
+        oss << "|sh=" << strong_hash(tx.shielded);
+    }
     return strong_hash(oss.str());
 }
 
@@ -61,18 +65,24 @@ std::string hash_block_header(const BlockHeader& header) {
     return strong_hash(oss.str());
 }
 
+std::size_t tx_weight(const Transaction& tx) {
+    return 4 + wire::encode_tx_v3(tx).size();
+}
+
+std::size_t block_weight(const Block& block) {
+    // BLV3 magic + height + tagged prev hash + ts/nonce/target + tagged merkle + count + checksum.
+    std::string hdr;
+    wire::write_tagged(hdr, block.header.previous_hash);
+    wire::write_tagged(hdr, block.header.merkle_root);
+    std::size_t w = 4 + 8 + 24 + hdr.size() + 4 + 4 + 4;  // + ext count
+    for (const auto& tx : block.transactions) {
+        w += tx_weight(tx);
+    }
+    return w;
+}
+
 std::size_t tx_wire_bytes(const Transaction& tx) {
-    std::size_t bin = 4;                                     // TXB2 magic
-    bin += 4 + tx.signer.size();
-    bin += 4 + tx.signer_pubkey.size();
-    bin += 4 + tx.signature.size();
-    bin += 8 + 8;                                            // fee, nonce
-    bin += 4;
-    for (const auto& in : tx.inputs) bin += 4 + in.previous_txid.size() + 4;
-    bin += 4;
-    for (const auto& out : tx.outputs) bin += 4 + out.recipient.size() + 8;
-    bin += 4;                                                // checksum
-    return 2 * (4 + bin);                                    // u32 len in block, hex x2
+    return (tx_weight(tx) * 4 + 2) / 3 + 1;  // base64 framing
 }
 
 } // namespace addition

@@ -101,7 +101,7 @@ void socket_apply_wan_opts(std::uintptr_t sock_raw) {
     int one = 1;
 #ifdef _WIN32
     setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&one), sizeof(one));
-    int buf = static_cast<int>(kMaxLineBytes);
+    int buf = kSocketBufBytes;
     setsockopt(sock, SOL_SOCKET, SO_SNDBUF, reinterpret_cast<const char*>(&buf), sizeof(buf));
     setsockopt(sock, SOL_SOCKET, SO_RCVBUF, reinterpret_cast<const char*>(&buf), sizeof(buf));
 #else
@@ -110,7 +110,7 @@ void socket_apply_wan_opts(std::uintptr_t sock_raw) {
     int mss = kWanMss;
     setsockopt(sock, IPPROTO_TCP, TCP_MAXSEG, &mss, sizeof(mss));
 #endif
-    int buf = static_cast<int>(kMaxLineBytes);
+    int buf = kSocketBufBytes;
     setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &buf, sizeof(buf));
     setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &buf, sizeof(buf));
 #endif

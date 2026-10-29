@@ -48,3 +48,36 @@ first (~100-500x headroom) and consider a rollup/DA layer later. No sharding cod
 * Known limits: inbound peers are identified by self-chosen labels (Sybil-able, can fill the
   table; Dandelion may stem back to the sender), no handshake gating of inbound messages,
   the node core is not thread-safe (all pre-existing).
+
+## Phase 2 — speed (wire v3, weight, registry, Falcon)
+
+Approved by Jeremy ("C'est sur je veux optimiser toute").
+
+- **Wire v3**: binary `TXV3`/`BLV3` records (hex fields stored as raw bytes,
+  SHA3-512 checksum32), framed as `b64:<base64>` on the line protocol. Proto
+  `"3"`; `"2"` still accepted. Handshake ACK returns the negotiated version
+  (signed); client retries once with v2 on mismatch. v3 payloads are transcoded
+  to hex v2 for v2 peers. `BLV3` carries an extension-section count (0 here),
+  reserved for fix/core's staking votes/slashes. (fix/core WIP already uses the
+  magic `BLB3` for its hex staked blocks, hence the V3 names.)
+- **Consensus weight** = TXV3 bytes (+framing). `max_block_weight` = 2 MiB
+  (config, 64 KiB..3 MiB-64 KiB), checked first in `add_block`.
+- **Pubkey registry**: first key-carrying spend registers signer->pubkey; later
+  txs may omit the ~2.6 KB key. Snapshotted/restored on reorg, rebuilt on replay.
+- **Falcon-1024** (`fn-dsa-1024-v1`, liboqs constant-time impl, versioned address).
+- **Caps**: 4 MiB max line, 256 KiB default; 128 inbound / 8 per IP (64 loopback
+  for Tor); 16 large-message slots; ~92 MiB worst-case buffering.
+- **Shielded** field: carried/hashed/weighted, consensus-rejected (fail closed).
+  A 228 KB bundle weighs 238,369 B -> 8 per block.
+
+`bench_throughput 1500` (20 s blocks, 2 MiB weight, this box):
+
+| scheme / key | tx weight | txs/block | tx/s | peer cold add_block |
+|---|---|---|---|---|
+| ML-DSA-87 + pubkey | 7505 | 278 | 13.9 | 108 ms |
+| ML-DSA-87 registry | 4913 | 426 | 21.3 | 65 ms |
+| Falcon-1024 + pubkey | 3350 | 624 | 31.2 | 338 ms |
+| Falcon-1024 registry | 1557 | 1344 | 67.2 | 109 ms |
+
+Full blocks are ~2.79 MB on the wire (< 3 MiB relay, < 4 MiB line).
+Previous hex v2: ~0.4 tx/s.

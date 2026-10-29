@@ -2,6 +2,7 @@
 // fake local proxy, PeerNetwork scoring/bans/seeds/cap/candidates, Dandelion++
 // router behaviour, Tor CLI flags, and miner relay byte budget helpers.
 #include "addition/block.hpp"
+#include "addition/net_io.hpp"
 #include "addition/config.hpp"
 #include "addition/dandelion.hpp"
 #include "addition/net_transport.hpp"
@@ -248,11 +249,21 @@ void test_wire_budget() {
     tx.inputs.push_back({std::string(128, 'c'), 0});
     tx.outputs.push_back({std::string(64, 'd'), 1});
     tx.outputs.push_back({std::string(64, 'e'), 1});
+    // v3 wire: raw key/sig bytes, base64 framing (was ~30 KB with hex-in-hex).
     const auto w = tx_wire_bytes(tx);
-    CHECK(w > 29000 && w < 31000);
-    const auto per_block = (kMaxRelayBlockWireBytes - kBlockWireOverheadBytes - 2048) / w;
-    std::cout << "ml-dsa-87 tx wire bytes=" << w << " max relayable txs/block=" << per_block << "\n";
-    CHECK(per_block >= 7 && per_block <= 9);
+    CHECK(w > 9000 && w < 11000);
+    const auto weight = tx_weight(tx);
+    CHECK(weight > 7000 && weight < 8000);
+    const auto per_block = (kMaxBlockWeight - 8192) / weight;
+    std::cout << "ml-dsa-87 tx weight=" << weight << " wire=" << w << " txs/block=" << per_block << "\n";
+    CHECK(per_block >= 250);
+    // Registry: same tx without the 2592-byte pubkey.
+    Transaction reg = tx;
+    reg.signer_pubkey.clear();
+    CHECK(tx_weight(reg) + 2500 < weight);
+    // A max-weight block fits one P2P line in base64.
+    CHECK((kMaxBlockWeight * 4) / 3 + 64 < kMaxLineBytes);
+    CHECK(kMaxRelayBlockWireBytes < kMaxLineBytes);
 }
 } // namespace
 

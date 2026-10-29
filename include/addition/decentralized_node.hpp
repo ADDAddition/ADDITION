@@ -83,6 +83,14 @@ private:
     std::unordered_set<std::string> seen_block_hashes_;
     std::vector<std::string> outbound_;
     std::unordered_map<std::string, bool> handshake_ok_;
+    // Negotiated wire protocol per peer (2 = hex TXB2/BLB2, 3 = base64 TXV3/BLV3).
+    // Unknown peers are treated as v2 (always decodable by both).
+    std::unordered_map<std::string, int> peer_proto_;
+    int peer_proto(const std::string& peer) const;
+    // Transcode canonical v3 TX|/BLK|/STEM|/BLKDATA| lines to v2 for legacy peers.
+    std::string adapt_for_peer(const std::string& msg, int proto) const;
+    std::string encode_tx_payload_v2(const Transaction& tx) const;
+    std::string encode_block_payload_v2(const Block& block) const;
     std::unordered_map<std::string, std::unordered_set<std::string>> seen_nonces_;
     std::unordered_map<std::string, std::string> peer_pubkeys_;
     std::unordered_map<std::string, std::string> pinned_peer_pubkeys_;

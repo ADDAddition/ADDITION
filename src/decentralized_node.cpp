@@ -2,6 +2,7 @@
 
 #include "addition/block.hpp"
 #include "addition/config.hpp"
+#include "addition/wire_v3.hpp"
 #include "addition/crypto.hpp"
 #include "addition/net_io.hpp"
 #include "addition/net_transport.hpp"
@@ -34,7 +35,12 @@ namespace addition {
 
 namespace {
 
-constexpr const char* kProtoVersion = "2";
+// v3: binary keys/sigs (TXV3/BLV3, base64). v2 peers still accepted (transcoded).
+constexpr const char* kProtoVersion = "3";
+constexpr const char* kProtoVersionLegacy = "2";
+bool proto_supported(const std::string& v) {
+    return v == "3" || v == "2";
+}
 constexpr std::uint64_t kMsgSkewSec = 90;
 constexpr int kSocketTimeoutMs = 20000;
 constexpr int kConnectTimeoutMs = 3000;
@@ -803,7 +809,7 @@ std::size_t DecentralizedNode::flush_stem(std::string& last) {
             if (wire_id.empty()) {
                 wire_id = self_id_;
             }
-            ok = send_p2p_request(relay, wire_id + " " + item.second, resp) && resp.rfind("error:", 0) != 0;
+            ok = send_p2p_request(relay, wire_id + " " + adapt_for_peer(item.second, peer_proto(relay)), resp) && resp.rfind("error:", 0) != 0;
         }
         if (ok) {
             ++sent;
@@ -1050,10 +1056,12 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
     wire_id.clear();
 
     int transport_fails = 0;
+    std::string hello_version = kProtoVersion;
+    bool downgraded = false;
     for (int attempt = 0; attempt < 8; ++attempt) {
         const auto hello_ts = now_seconds();
         const std::string hello_nonce = "s" + std::to_string(attempt) + "-" + std::to_string(hello_ts % 1000000ULL);
-        const std::string hello_body = std::string(kProtoVersion) + "|" + active_network_id(chain_) + "|" +
+        const std::string hello_body = hello_version + "|" + active_network_id(chain_) + "|" +
                                        std::to_string(hello_ts) + "|" + hello_nonce + "|" +
                                        node_public_key_;
         std::string hello_sig;
@@ -1066,7 +1074,7 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
 
         const std::string attempt_id = (attempt == 0) ? self_id_ : (self_id_ + "x" + std::to_string(attempt));
         std::ostringstream hello_req;
-        hello_req << attempt_id << " HELLO|" << kProtoVersion << '|' << active_network_id(chain_)
+        hello_req << attempt_id << " HELLO|" << hello_version << '|' << active_network_id(chain_)
                   << '|' << hello_ts << '|' << hello_nonce << '|' << node_public_key_ << '|' << hello_sig;
 
         std::string hello_resp;
@@ -1098,7 +1106,9 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
                 error = "invalid HELLO_ACK fields";
                 return false;
             }
-            if (v != kProtoVersion || n != active_network_id(chain_) || nonce != hello_nonce ||
+            // Server answers min(ours, theirs); never accept a version above what we offered.
+            if (!proto_supported(v) || (v == "3" && hello_version != "3") ||
+                n != active_network_id(chain_) || nonce != hello_nonce ||
                 peer_pk.empty() || sig.empty()) {
                 error = "HELLO_ACK mismatch";
                 return false;
@@ -1114,7 +1124,7 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
                 error = "peer pubkey pin mismatch";
                 return false;
             }
-            const std::string ack_body = std::string(kProtoVersion) + "|" + active_network_id(chain_) + "|" + ts +
+            const std::string ack_body = v + "|" + active_network_id(chain_) + "|" + ts +
                                          "|" + nonce + "|" + peer_pk;
             if (!verify_message_signature_hybrid(peer_pk, ack_body, sig)) {
                 error = "invalid HELLO_ACK signature";
@@ -1123,6 +1133,7 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
             peer_pubkeys_[peer] = peer_pk;
             pinned_peer_pubkeys_.emplace(peer, peer_pk);
             handshake_ok_[peer] = true;
+            peer_proto_[peer] = (v == "3") ? 3 : 2;
             wire_id = attempt_id;
             return true;
         }
@@ -1150,6 +1161,12 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
         }
 
         error = "expected HELLO_ACK, got: " + hello_resp;
+        if (hello_resp.rfind("error: handshake mismatch", 0) == 0 && !downgraded) {
+            // Legacy (v2-only) peer: retry once offering v2.
+            hello_version = kProtoVersionLegacy;
+            downgraded = true;
+            continue;
+        }
         if (hello_resp.rfind("error: hello timestamp", 0) == 0 ||
             hello_resp.rfind("error: handshake mismatch", 0) == 0 ||
             hello_resp.rfind("error: peer pubkey pin", 0) == 0 ||
@@ -1471,7 +1488,7 @@ bool DecentralizedNode::flush_outbound_gossip(std::size_t& sent, std::string& er
         }
         for (const auto& msg : pushable) {
             std::string resp;
-            if (!send_p2p_request(peer, wire_id + " " + msg, resp)) {
+            if (!send_p2p_request(peer, wire_id + " " + adapt_for_peer(msg, peer_proto(peer)), resp)) {
                 last = "gossip transport failed to " + peer;
                 peers_.mark_peer_bad(peer);
                 break;
@@ -1617,7 +1634,7 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
             return false;
         }
 
-        if (version != kProtoVersion || network != active_network_id(chain_)) {
+        if (!proto_supported(version) || network != active_network_id(chain_)) {
             error = "handshake mismatch";
             peers_.mark_peer_bad(peer);
             handshake_ok_[peer] = false;
@@ -1696,7 +1713,8 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         peer_pubkeys_[peer] = peer_pk;
         pinned_peer_pubkeys_.emplace(peer, peer_pk);
 
-        const std::string ack_body = std::string(kProtoVersion) + "|" + active_network_id(chain_) + "|" +
+        const std::string negotiated = (version == "3") ? std::string("3") : std::string(kProtoVersionLegacy);
+        const std::string ack_body = negotiated + "|" + active_network_id(chain_) + "|" +
                                      std::to_string(now) + "|" + nonce + "|" + node_public_key_;
         std::string ack_sig;
         try {
@@ -1709,11 +1727,12 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         }
 
         std::ostringstream ack;
-        ack << "HELLO_ACK|" << kProtoVersion << '|' << active_network_id(chain_) << '|' << now << '|' << nonce
+        ack << "HELLO_ACK|" << negotiated << '|' << active_network_id(chain_) << '|' << now << '|' << nonce
             << '|' << node_public_key_ << '|' << ack_sig;
         reply = ack.str();
         peers_.mark_peer_good(peer);
         handshake_ok_[peer] = true;
+        peer_proto_[peer] = (negotiated == "3") ? 3 : 2;
         return true;
     }
 
@@ -1790,7 +1809,7 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
             return false;
         }
 
-        reply = "BLKDATA|" + payload;
+        reply = adapt_for_peer("BLKDATA|" + payload, peer_proto(peer));
         peers_.mark_peer_good(peer);
         return true;
     }
@@ -2028,6 +2047,47 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
 }
 
 std::string DecentralizedNode::encode_tx_payload(const Transaction& tx) const {
+    return std::string(wire::kB64Prefix) + wire::base64_encode(wire::encode_tx_v3(tx));
+}
+
+std::string DecentralizedNode::encode_block_payload(const Block& block) const {
+    return std::string(wire::kB64Prefix) + wire::base64_encode(wire::encode_block_v3(block));
+}
+
+int DecentralizedNode::peer_proto(const std::string& peer) const {
+    const auto it = peer_proto_.find(peer);
+    return it == peer_proto_.end() ? 2 : it->second;
+}
+
+std::string DecentralizedNode::adapt_for_peer(const std::string& msg, int proto) const {
+    if (proto >= 3) {
+        return msg;
+    }
+    static const char* kPrefixes[] = {"TX|", "STEM|", "BLK|", "BLKDATA|"};
+    for (const char* pre : kPrefixes) {
+        const std::string p(pre);
+        if (msg.rfind(p, 0) != 0 || msg.compare(p.size(), 4, wire::kB64Prefix) != 0) {
+            continue;
+        }
+        std::string err;
+        const auto body = msg.substr(p.size());
+        if (p == "BLK|" || p == "BLKDATA|") {
+            Block b{};
+            if (decode_block_payload(body, b, err)) {
+                return p + encode_block_payload_v2(b);
+            }
+        } else {
+            Transaction t{};
+            if (decode_tx_payload(body, t, err)) {
+                return p + encode_tx_payload_v2(t);
+            }
+        }
+        return msg;
+    }
+    return msg;
+}
+
+std::string DecentralizedNode::encode_tx_payload_v2(const Transaction& tx) const {
     std::string bin;
     bin.reserve(256);
     bin.append("TXB2", 4);
@@ -2060,6 +2120,15 @@ bool DecentralizedNode::decode_tx_payload(const std::string& payload,
                                           std::string& error) const {
     tx = Transaction{};
 
+    if (payload.rfind(wire::kB64Prefix, 0) == 0) {
+        std::string raw;
+        if (!wire::base64_decode(payload.substr(4), raw)) {
+            error = "invalid tx payload base64";
+            return false;
+        }
+        return wire::decode_tx_v3(raw, tx, error);
+    }
+
     std::string bin;
     if (!from_hex(payload, bin)) {
         error = "invalid tx payload hex";
@@ -2088,7 +2157,7 @@ bool DecentralizedNode::decode_tx_payload(const std::string& payload,
         error = "invalid tx payload inputs count";
         return false;
     }
-    tx.inputs.reserve(in_count);
+    tx.inputs.reserve(std::min<std::uint32_t>(in_count, 1024));
     for (std::uint32_t i = 0; i < in_count; ++i) {
         TxInput in{};
         if (!read_string(bin, off, in.previous_txid) || !read_u32(bin, off, in.output_index)) {
@@ -2103,7 +2172,7 @@ bool DecentralizedNode::decode_tx_payload(const std::string& payload,
         error = "invalid tx payload outputs count";
         return false;
     }
-    tx.outputs.reserve(out_count);
+    tx.outputs.reserve(std::min<std::uint32_t>(out_count, 1024));
     for (std::uint32_t i = 0; i < out_count; ++i) {
         TxOutput out{};
         if (!read_string(bin, off, out.recipient) || !read_u64(bin, off, out.amount)) {
@@ -2140,7 +2209,7 @@ bool DecentralizedNode::decode_tx_payload(const std::string& payload,
     return true;
 }
 
-std::string DecentralizedNode::encode_block_payload(const Block& block) const {
+std::string DecentralizedNode::encode_block_payload_v2(const Block& block) const {
     std::string bin;
     bin.reserve(1024);
     bin.append("BLB2", 4);
@@ -2154,7 +2223,7 @@ std::string DecentralizedNode::encode_block_payload(const Block& block) const {
 
     write_u32(bin, static_cast<std::uint32_t>(block.transactions.size()));
     for (const auto& tx : block.transactions) {
-        const auto tx_payload_hex = encode_tx_payload(tx);
+        const auto tx_payload_hex = encode_tx_payload_v2(tx);
         std::string tx_payload_bin;
         if (!from_hex(tx_payload_hex, tx_payload_bin)) {
             return {};
@@ -2172,6 +2241,15 @@ bool DecentralizedNode::decode_block_payload(const std::string& payload,
                                              Block& block,
                                              std::string& error) const {
     block = Block{};
+
+    if (payload.rfind(wire::kB64Prefix, 0) == 0) {
+        std::string raw;
+        if (!wire::base64_decode(payload.substr(4), raw)) {
+            error = "invalid block payload base64";
+            return false;
+        }
+        return wire::decode_block_v3(raw, block, error);
+    }
 
     std::string bin;
     if (!from_hex(payload, bin)) {
@@ -2201,7 +2279,7 @@ bool DecentralizedNode::decode_block_payload(const std::string& payload,
         return false;
     }
 
-    block.transactions.reserve(tx_count);
+    block.transactions.reserve(std::min<std::uint32_t>(tx_count, 4096));
     for (std::uint32_t i = 0; i < tx_count; ++i) {
         std::uint32_t tx_sz = 0;
         if (!read_u32(bin, off, tx_sz)) {

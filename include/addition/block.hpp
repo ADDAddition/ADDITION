@@ -24,6 +24,9 @@ struct Transaction {
     std::string signature;
     std::uint64_t fee{0};
     std::uint64_t nonce{0};
+    // Optional shielded bundle (hex, see shielded.hpp on feat/shielded). Empty =>
+    // legacy transparent tx. Same field/hash rule as feat/shielded for merge.
+    std::string shielded;
 };
 
 struct BlockHeader {
@@ -42,15 +45,21 @@ struct Block {
 
 std::string hash_transaction(const Transaction& tx);
 
-// Exact size of a tx inside a BLKDATA/BLK| line (TXB2 binary, length-prefixed,
-// then hex-encoded by the block payload => x2).
+// Consensus weight of a tx = its canonical binary (wire v3 TXV3) size in bytes,
+// plus the 4-byte length prefix inside a block. Raw key/signature bytes, not hex.
+std::size_t tx_weight(const Transaction& tx);
+// Weight of a full block (header + all txs). Consensus-enforced <= max_block_weight.
+std::size_t block_weight(const Block& block);
+// Consensus max block weight (bytes of canonical binary). 2 MiB:
+// base64 framing (x4/3) => ~2.8 MiB line, under the 4 MiB P2P line cap.
+constexpr std::size_t kMaxBlockWeight = 2u * 1024u * 1024u;
+// Exact size of a tx inside a v3 BLKDATA/BLK| line (base64 of the binary).
 std::size_t tx_wire_bytes(const Transaction& tx);
 // Header + framing of an otherwise empty block on the wire (conservative).
 constexpr std::size_t kBlockWireOverheadBytes = 8192;
-// Relay budget for a mined block. Every BLKDATA line must fit the P2P line
-// limit (net_io kMaxLineBytes = 256 KiB) or peers can never fetch it and the
-// miner orphans itself. Policy only (not a consensus rule).
-constexpr std::size_t kMaxRelayBlockWireBytes = 262144;
+// Relay budget for a mined block (policy). Must stay below net_io kMaxLineBytes
+// (4 MiB). With kMaxBlockWeight = 2 MiB the consensus cap binds first.
+constexpr std::size_t kMaxRelayBlockWireBytes = 3u * 1024u * 1024u;
 std::string compute_merkle_root(const std::vector<Transaction>& txs);
 std::string hash_block_header(const BlockHeader& header);
 
