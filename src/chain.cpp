@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <ctime>
 #include <limits>
 #include <optional>
 #include <string>
@@ -178,15 +179,12 @@ bool Chain::hash_meets_target(const std::string& hex_hash, std::uint64_t target)
 }
 
 std::uint64_t Chain::compute_block_reward(std::uint64_t h) const {
-    const auto halvings = h / cfg_.halving_interval;
-    if (halvings >= 63) {
-        return cfg_.tail_emission_reward;
-    }
-    const auto shifted = cfg_.block_reward >> halvings;
-    if (shifted == 0) {
-        return cfg_.tail_emission_reward;
-    }
-    return shifted;
+    return scheduled_block_subsidy(h, cfg_.block_reward, cfg_.halving_interval, cfg_.tail_emission_reward);
+}
+
+std::uint64_t Chain::max_mintable_at(std::uint64_t h) const {
+    return max_mintable_subsidy(h, total_emitted_, cfg_.max_supply, cfg_.block_reward,
+                                cfg_.halving_interval, cfg_.tail_emission_reward);
 }
 
 std::uint64_t Chain::clamp_difficulty_target(std::uint64_t target) const {
@@ -200,14 +198,44 @@ std::uint64_t Chain::clamp_difficulty_target(std::uint64_t target) const {
 }
 
 std::uint64_t Chain::compute_next_difficulty_target() const {
+    const std::uint64_t next_height = blocks_.empty() ? 0ULL : blocks_.back().header.height + 1;
+    if (next_height < cfg_.difficulty_fork_height) {
+        return compute_legacy_difficulty_target();
+    }
+    // LWMA over the last `lwma_window` solvetimes. Genesis is excluded: its
+    // timestamp is a fixed constant, not a mined solvetime.
+    const std::size_t window = std::max<std::size_t>(2, cfg_.lwma_window);
+    if (blocks_.size() < 3) {
+        return clamp_difficulty_target(cfg_.initial_difficulty_target);
+    }
+    const std::size_t first = std::max<std::size_t>(1, blocks_.size() - std::min(blocks_.size(), window + 1));
+    std::vector<std::uint64_t> ts;
+    std::vector<std::uint64_t> tg;
+    ts.reserve(blocks_.size() - first);
+    tg.reserve(blocks_.size() - first);
+    for (std::size_t i = first; i < blocks_.size(); ++i) {
+        ts.push_back(blocks_[i].header.timestamp);
+        tg.push_back(blocks_[i].header.difficulty_target);
+    }
+    return lwma_next_target(ts, tg, cfg_.target_block_time_sec, cfg_.min_difficulty_target,
+                            cfg_.max_difficulty_target, difficulty_target_);
+}
+
+std::uint64_t Chain::compute_legacy_difficulty_target() const {
+    const std::uint64_t legacy_min = cfg_.legacy_min_difficulty_target != 0
+                                         ? std::max(cfg_.legacy_min_difficulty_target, cfg_.min_difficulty_target)
+                                         : cfg_.min_difficulty_target;
+    const auto clamp_legacy = [&](std::uint64_t t) {
+        return std::min(std::max(t, legacy_min), cfg_.max_difficulty_target);
+    };
     const auto window = static_cast<std::size_t>(cfg_.retarget_window);
     // Need genesis + at least `window` mined blocks. Retarget only on window boundaries
     // so a 2-block CI mine stays at the easy bound.
     if (window == 0 || blocks_.size() < window + 1) {
-        return clamp_difficulty_target(difficulty_target_);
+        return clamp_legacy(difficulty_target_);
     }
     if ((blocks_.back().header.height % static_cast<std::uint64_t>(window)) != 0) {
-        return clamp_difficulty_target(difficulty_target_);
+        return clamp_legacy(difficulty_target_);
     }
 
     // Skip genesis as the oldest bound. Its frozen timestamp (Nov 2025) vs "now"
@@ -217,7 +245,7 @@ std::uint64_t Chain::compute_next_difficulty_target() const {
         oldest_index = 1;
     }
     if (oldest_index >= blocks_.size() - 1) {
-        return clamp_difficulty_target(difficulty_target_);
+        return clamp_legacy(difficulty_target_);
     }
 
     const auto& newest = blocks_.back();
@@ -227,7 +255,7 @@ std::uint64_t Chain::compute_next_difficulty_target() const {
                               : 1ULL;
     const auto expected = static_cast<std::uint64_t>(window) * cfg_.target_block_time_sec;
     if (expected == 0) {
-        return clamp_difficulty_target(difficulty_target_);
+        return clamp_legacy(difficulty_target_);
     }
 
     const std::uint64_t floor_span = std::max<std::uint64_t>(1ULL, expected / 4ULL);
@@ -240,7 +268,7 @@ std::uint64_t Chain::compute_next_difficulty_target() const {
     } else {
         next = (difficulty_target_ * observed_capped) / expected;
     }
-    return clamp_difficulty_target(next);
+    return clamp_legacy(next);
 }
 
 std::uint64_t Chain::balance_of(const std::string& address) const {
@@ -391,7 +419,7 @@ bool Chain::validate_transaction(const Transaction& tx, std::string& error, bool
             error = "coinbase must not be signed";
             return false;
         }
-        if (outputs_total > cfg_.block_reward + tx.fee) {
+        if (outputs_total > std::max(cfg_.block_reward, cfg_.tail_emission_reward) + tx.fee) {
             error = "coinbase exceeds allowed emission";
             return false;
         }
@@ -475,8 +503,7 @@ bool Chain::mine_and_add_block(const std::string& reward_address,
                                std::string& mined_hash,
                                std::string& error,
                                std::atomic<bool>* stop) {
-    const auto emission_left = (cfg_.max_supply > total_emitted_) ? (cfg_.max_supply - total_emitted_) : 0ULL;
-    const auto reward = std::min<std::uint64_t>(current_block_reward(), emission_left);
+    const auto reward = max_mintable_at(height() + 1);
     auto b = make_block_template(reward_address, std::move(txs), reward);
 
     PowSearchConfig search_cfg{};
@@ -639,6 +666,16 @@ bool Chain::validate_block_header(const Block& candidate, std::string& error) co
         error = "timestamp regression";
         return false;
     }
+    if (candidate.header.height >= cfg_.difficulty_fork_height) {
+        // Future-time limit bounds LWMA timestamp manipulation. Only applied
+        // post-fork so legacy history replays unchanged.
+        const auto now = static_cast<std::uint64_t>(std::time(nullptr));
+        const auto ftl = kFutureTimeLimitBlocks * std::max<std::uint64_t>(1, cfg_.target_block_time_sec);
+        if (candidate.header.timestamp > now + ftl) {
+            error = "timestamp too far in future";
+            return false;
+        }
+    }
 
     if (candidate.header.difficulty_target > cfg_.max_difficulty_target) {
         error = "min-diff: toy difficulty rejected";
@@ -715,7 +752,7 @@ bool Chain::validate_block_transactions(const Block& candidate, std::string& err
     }
 
     const auto minted = (coinbase_total > fees) ? (coinbase_total - fees) : 0ULL;
-    if (minted > (cfg_.max_supply - total_emitted_)) {
+    if (minted > max_mintable_at(candidate.header.height)) {
         error = "max supply exceeded";
         return false;
     }
@@ -888,7 +925,7 @@ bool Chain::add_block(const Block& block, std::string& error) {
             coinbase_total += out.amount;
         }
         const auto minted = (coinbase_total > fees) ? (coinbase_total - fees) : 0ULL;
-        if (minted > (cfg_.max_supply - total_emitted_)) {
+        if (minted > max_mintable_at(block.header.height)) {
             error = "max supply exceeded";
             return false;
         }

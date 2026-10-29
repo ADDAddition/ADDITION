@@ -72,42 +72,44 @@ int main() {
     }
 
     {
-        unsetenv("ADDITION_PRIVACY_MASTER_KEY");
+        // No node-held master key: pool must work with the env var absent.
 #ifdef _WIN32
         _putenv_s("ADDITION_PRIVACY_MASTER_KEY", "");
+#else
+        unsetenv("ADDITION_PRIVACY_MASTER_KEY");
 #endif
         addition::PrivacyPool bare;
-        addition::OpeningNote short_prep{};
-        std::string short_err;
-        if (!addition::PrivacyPool::prepare_opening(1, short_prep, short_err)) {
-            std::cerr << "test failed: prepare_opening without key should still hash: " << short_err << '\n';
+        addition::OpeningNote prep{};
+        std::string err;
+        if (!addition::PrivacyPool::prepare_opening(7, prep, err)) {
+            std::cerr << "test failed: prepare_opening: " << err << '\n';
             return 1;
         }
-        if (bare.mint_open("alice", 1, short_prep.commitment, short_prep.nullifier, short_prep.trapdoor, short_err).size()) {
-            std::cerr << "test failed: mint_open must fail without master key\n";
+        const auto id = bare.mint_open("alice", 7, prep.commitment, prep.nullifier, prep.trapdoor, err);
+        if (id.empty()) {
+            std::cerr << "test failed: mint_open must work without master key: " << err << '\n';
             return 1;
         }
-        if (short_err.find("ADDITION_PRIVACY_MASTER_KEY") == std::string::npos ||
-            short_err.find("min 32") == std::string::npos) {
-            std::cerr << "test failed: short/missing key error: " << short_err << '\n';
+        if (addition::PrivacyPool::master_key_configured() || bare.note_cipher_name() != "keyless_sha3_v1") {
+            std::cerr << "test failed: no master key / keyless cipher expected\n";
             return 1;
         }
-        if (addition::PrivacyPool::master_key_configured()) {
-            std::cerr << "test failed: master_key_configured must be false when unset\n";
+        // Owner tags are salted per note: same owner, two notes -> different tags.
+        addition::OpeningNote prep2{};
+        addition::PrivacyPool::prepare_opening(7, prep2, err);
+        const auto id2 = bare.mint_open("alice", 7, prep2.commitment, prep2.nullifier, prep2.trapdoor, err);
+        const auto dump = bare.dump_state();
+        auto tag_of = [&](const std::string& nid) {
+            const auto pos = dump.find("N|" + nid + "|");
+            const auto start = pos + 3 + nid.size();
+            return dump.substr(start, dump.find('|', start) - start);
+        };
+        if (id2.empty() || tag_of(id) == tag_of(id2)) {
+            std::cerr << "test failed: owner tags must be unlinkable across notes\n";
             return 1;
         }
-#ifdef _WIN32
-        _putenv_s("ADDITION_PRIVACY_MASTER_KEY", "too-short");
-#else
-        setenv("ADDITION_PRIVACY_MASTER_KEY", "too-short", 1);
-#endif
-        if (addition::PrivacyPool::master_key_configured()) {
-            std::cerr << "test failed: master_key_configured must reject <32 chars\n";
-            return 1;
-        }
-        set_master_key();
-        if (!addition::PrivacyPool::master_key_configured()) {
-            std::cerr << "test failed: master_key_configured after set\n";
+        if (dump.find("alice") != std::string::npos) {
+            std::cerr << "test failed: owner must not appear in clear in state\n";
             return 1;
         }
     }

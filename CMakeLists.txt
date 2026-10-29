@@ -40,6 +40,7 @@ add_library(addition_core
     src/crypto.cpp
     src/block.cpp
     src/chain.cpp
+    src/consensus_rules.cpp
     src/mempool.cpp
     src/miner.cpp
     src/rpc_server.cpp
@@ -96,6 +97,10 @@ if(ADDITION_BUILD_TESTS)
     add_executable(test_chain tests/test_chain.cpp)
     target_link_libraries(test_chain PRIVATE addition_core)
     add_test(NAME test_chain COMMAND test_chain)
+
+    add_executable(test_consensus_rules tests/test_consensus_rules.cpp)
+    target_link_libraries(test_consensus_rules PRIVATE addition_core)
+    add_test(NAME test_consensus_rules COMMAND test_consensus_rules)
 
     add_executable(test_mainnet_chain tests/test_mainnet_chain.cpp)
     target_link_libraries(test_mainnet_chain PRIVATE addition_core)

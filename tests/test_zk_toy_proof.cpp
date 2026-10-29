@@ -24,7 +24,7 @@ int main() {
     const auto mainnet = addition::mainnet_chain_config();
     if (mainnet.pow_algorithm != addition::PowAlgorithm::MemoryHard ||
         mainnet.initial_difficulty_target != 0x000000FFFFFFFFFFULL ||
-        mainnet.min_difficulty_target != 0x000000FFFFFFFFFFULL) {
+        mainnet.min_difficulty_target != addition::kMainnetMinDifficultyTarget) {
         std::cerr << "test failed: mainnet memory_hard target must stay 0x000000FFFFFFFFFF\n";
         return 1;
     }

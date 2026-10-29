@@ -53,7 +53,7 @@ int main() {
     if (mainnet.network_id != addition::kMainnetNetworkId ||
         mainnet.pow_algorithm != addition::PowAlgorithm::MemoryHard ||
         mainnet.initial_difficulty_target != 0x000000FFFFFFFFFFULL ||
-        mainnet.min_difficulty_target != 0x000000FFFFFFFFFFULL ||
+        mainnet.min_difficulty_target != 0x0000000000FFFFFFULL ||
         mainnet.max_difficulty_target != 0x000000FFFFFFFFFFULL) {
         std::cerr << "test failed: mainnet memory_hard target must stay 0x000000FFFFFFFFFF\n";
         return 1;
