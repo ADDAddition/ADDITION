@@ -202,7 +202,13 @@ RpcServer::RpcServer(Chain& chain,
             node_(node),
             allow_insecure_tx_commands_(allow_insecure_tx_commands),
             strict_admin_mode_(strict_admin_mode),
-            wallets_(std::move(wallet_dir)) {}
+            wallets_(std::move(wallet_dir)) {
+    // Miner path: include relayed + locally cast stake votes on the tip.
+    miner_.set_vote_source([this]() {
+        node_.refresh_local_votes();
+        return node_.usable_stake_votes();
+    });
+}
 
 void RpcServer::set_auto_mine_status(bool enabled, std::uint32_t interval_sec) {
     auto_mine_enabled_ = enabled;
@@ -215,8 +221,7 @@ void RpcServer::set_advertised_p2p(std::string endpoint) {
 
 std::uint64_t RpcServer::unlocked_balance(const std::string& address) const {
     const auto confirmed = chain_.balance_of(address);
-    const auto staked = staking_.staked_of(address);
-    return confirmed > staked ? (confirmed - staked) : 0ULL;
+    return confirmed; // locked stake is held by @stake, not in the owner's balance
 }
 
 std::string RpcServer::public_rpc_banner() const {
@@ -456,25 +461,34 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         return out.str();
     }
 
+    // sign_message <wallet_name> <message_hex>: signs with a key from the local
+    // wallet store. Passing a raw private key over RPC is no longer accepted.
     if (cmd == "sign_message") {
-        std::string privkey;
+        std::string name;
         std::string message_hex;
-        iss >> privkey >> message_hex;
-        if (privkey.empty() || message_hex.empty()) {
-            return "error: usage sign_message <privkey_hex> <message_hex_utf8>";
+        std::string extra;
+        iss >> name >> message_hex >> extra;
+        if (name.empty() || message_hex.empty() || !extra.empty()) {
+            return "error: usage sign_message <wallet_name> <message_hex_utf8>";
+        }
+        if (name.size() > 128) {
+            return "error: raw private keys are not accepted over RPC; use a local wallet name";
+        }
+        StoredWallet stored{};
+        std::string error;
+        if (!wallets_.load(name, stored, error, true)) {
+            return "error: " + error;
         }
         std::vector<std::uint8_t> msg_bytes;
-        std::string error;
         if (!hex_to_bytes(message_hex, msg_bytes, error)) {
             return "error: invalid message_hex: " + error;
         }
         if (msg_bytes.empty() || msg_bytes.size() > 8192) {
             return "error: message size invalid";
         }
-
         const std::string msg(reinterpret_cast<const char*>(msg_bytes.data()), msg_bytes.size());
         try {
-            return sign_message_hybrid(privkey, msg);
+            return sign_message_hybrid(stored.private_key, msg);
         } catch (const std::exception& e) {
             return std::string("error: signing failed: ") + e.what();
         }
@@ -722,7 +736,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " path=" << stored.path
             << " next_nonce=" << chain_.next_nonce(stored.address)
             << " confirmed=" << unlocked_balance(stored.address)
-            << " staked=" << staking_.staked_of(stored.address);
+            << " staked=" << chain_.staked_of(stored.address);
         return out.str();
     }
 
@@ -741,7 +755,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         out << "name=" << stored.name
             << " address=" << stored.address
             << " confirmed=" << unlocked_balance(stored.address)
-            << " staked=" << staking_.staked_of(stored.address);
+            << " staked=" << chain_.staked_of(stored.address);
         return out.str();
     }
 
@@ -1269,42 +1283,80 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         }
     }
 
-    if (cmd == "stake") {
-        std::string addr;
-        std::uint64_t amount = 0;
-        iss >> addr >> amount;
-        if (addr.empty() || amount == 0) {
-            return "error: usage stake <address> <amount>";
+    // ---- on-chain staking (tickets). Keys come from the local wallet store
+    // and are used in-process only; no private key crosses RPC. ----
+    if (cmd == "stake" || cmd == "unstake") {
+        std::string name;
+        std::string arg;
+        std::uint64_t fee = 0;
+        iss >> name >> arg >> fee;
+        if (name.empty() || arg.empty()) {
+            return cmd == "stake" ? "error: usage stake <wallet_name> <amount> [fee]"
+                                  : "error: usage unstake <wallet_name> <ticket_id> [fee]";
         }
-        if (chain_.balance_of(addr) < amount) {
-            return "error: insufficient on-chain balance to stake";
-        }
-        if (staking_.staked_of(addr) > (std::numeric_limits<std::uint64_t>::max() - amount)) {
-            return "error: stake overflow";
-        }
-        const auto effective_balance = chain_.balance_of(addr) - staking_.staked_of(addr);
-        if (effective_balance < amount) {
-            return "error: insufficient unlocked balance to stake";
-        }
+        StoredWallet stored{};
         std::string error;
-        if (!staking_.stake(addr, amount, error)) {
+        if (!wallets_.load(name, stored, error, true)) {
             return "error: " + error;
         }
-        return "ok";
-    }
-
-    if (cmd == "unstake") {
-        std::string addr;
-        std::uint64_t amount = 0;
-        iss >> addr >> amount;
-        if (addr.empty() || amount == 0) {
-            return "error: usage unstake <address> <amount>";
+        const auto required_fee = std::max<std::uint64_t>(chain_.config().min_fee,
+            std::max(recommended_min_fee(mempool_.size(), chain_.total_fees_last_block()),
+                     ai_optimizer_.recommended_fee_floor()));
+        if (fee == 0) fee = required_fee;
+        if (fee < required_fee) {
+            return "error: fee too low, required>=" + std::to_string(required_fee);
         }
-        std::string error;
-        if (!staking_.unstake(addr, amount, error)) {
+        Transaction tx{};
+        const auto nonce = chain_.next_nonce(stored.address);
+        if (cmd == "stake") {
+            std::uint64_t amount = 0;
+            try {
+                amount = std::stoull(arg);
+            } catch (const std::exception&) {
+                return "error: invalid amount";
+            }
+            if (!chain_.build_stake_lock(stored.address, amount, fee, nonce, tx, error)) {
+                return "error: " + error;
+            }
+        } else {
+            const auto t = chain_.ticket(arg);
+            if (!t) return "error: unknown ticket";
+            if (t->owner != stored.address) return "error: ticket not owned by wallet";
+            if (!chain_.build_stake_unlock(arg, fee, nonce, tx, error)) {
+                return "error: " + error;
+            }
+        }
+        tx.signer = stored.address;
+        tx.signer_pubkey = stored.public_key;
+        tx.signature.clear();
+        try {
+            tx.signature = sign_message_hybrid(stored.private_key, hash_transaction(tx));
+        } catch (const std::exception& e) {
+            return std::string("error: signing failed: ") + e.what();
+        }
+        if (!node_.submit_transaction(tx, error)) {
             return "error: " + error;
         }
-        return "ok";
+        {
+            std::size_t sent = 0;
+            std::string gossip_err;
+            node_.flush_outbound_gossip(sent, gossip_err);
+        }
+        const auto txid = hash_transaction(tx);
+        std::ostringstream out;
+        if (cmd == "stake") {
+            std::uint32_t idx = 0;
+            for (std::uint32_t k = 0; k < tx.outputs.size(); ++k) {
+                if (tx.outputs[k].recipient == kStakeAddress) { idx = k; break; }
+            }
+            out << "ok:stake_lock hash=" << txid << " ticket=" << txid << ':' << idx
+                << " maturity_blocks=" << chain_.config().stake_maturity;
+        } else {
+            out << "ok:stake_unlock hash=" << txid << " ticket=" << arg
+                << " unbond_blocks=" << chain_.config().stake_unbond_delay;
+        }
+        out << " fee=" << fee << " nonce=" << tx.nonce;
+        return out.str();
     }
 
     if (cmd == "staked") {
@@ -1313,74 +1365,88 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         if (addr.empty()) {
             return "error: usage staked <address>";
         }
-        return std::to_string(staking_.staked_of(addr));
+        return std::to_string(chain_.staked_of(addr));
     }
 
-    if (cmd == "stake_reward") {
-        std::uint64_t pool = 0;
-        iss >> pool;
-        if (pool == 0) {
-            return "error: usage stake_reward <amount>";
-        }
-        staking_.distribute_epoch_rewards(pool);
-        return "ok";
-    }
-
-    if (cmd == "stake_policy") {
-        std::string mode;
-        iss >> mode;
-        if (mode.empty() || mode == "get") {
-            return "reward_cap_bps=" + std::to_string(staking_.reward_cap_bps());
-        }
-        if (mode != "set") {
-            return "error: usage stake_policy <get|set> [cap_bps]";
-        }
-        std::uint64_t cap_bps = 0;
-        std::string admin_addr;
-        std::string admin_pubkey;
-        std::string admin_sig;
-        iss >> cap_bps >> admin_addr >> admin_pubkey >> admin_sig;
-        if (cap_bps == 0 || admin_addr.empty() || admin_pubkey.empty() || admin_sig.empty()) {
-            return "error: usage stake_policy set <cap_bps> <admin_addr> <admin_pubkey_hex> <admin_sig_hex>";
-        }
-        const std::string payload = "stake_policy_set|" + std::to_string(cap_bps);
-        if (!verify_admin_signature(admin_addr, admin_pubkey, admin_sig, payload)) {
-            return "error: invalid admin signature";
-        }
-        staking_.set_reward_cap_bps(cap_bps);
-        return "ok:reward_cap_bps=" + std::to_string(staking_.reward_cap_bps());
-    }
-
-    if (cmd == "stake_claim") {
+    if (cmd == "stake_tickets") {
         std::string addr;
         iss >> addr;
-        if (addr.empty()) {
-            return "error: usage stake_claim <address>";
+        const auto list = addr.empty() ? chain_.tickets() : chain_.tickets_of(addr);
+        const auto mat = chain_.config().stake_maturity;
+        std::ostringstream out;
+        out << "count=" << list.size();
+        for (const auto& t : list) {
+            out << "\nticket=" << t.id << " owner=" << t.owner << " amount=" << t.amount
+                << " lock_height=" << t.lock_height
+                << " mature=" << ((t.lock_height + mat <= chain_.height()) ? 1 : 0);
         }
-        const auto reward = staking_.claim(addr);
-        if (reward == 0) {
-            return "0";
-        }
-
-        std::string error;
-        if (!chain_.credit_balance(addr, reward, "staking_claim", error)) {
-            return "error: failed to credit claim reward: " + error;
-        }
-        return std::to_string(reward);
+        return out.str();
     }
 
-    if (cmd == "consume_stake_credit") {
-        std::string addr;
-        std::uint64_t amount = 0;
-        iss >> addr >> amount;
-        if (addr.empty() || amount == 0) {
-            return "error: usage consume_stake_credit <address> <amount>";
+    if (cmd == "stake_selected") {
+        const auto sel = chain_.selected_tickets_for_next_block();
+        std::ostringstream out;
+        out << "voted_height=" << chain_.height() << " required=" << (chain_.stake_votes_required_for_next_block() ? 1 : 0)
+            << " pool=" << node_.vote_pool_size() << " usable=" << node_.usable_stake_votes().size()
+            << " selected=";
+        for (std::size_t k = 0; k < sel.size(); ++k) out << (k ? "," : "") << sel[k];
+        return out.str();
+    }
+
+    if (cmd == "stake_info") {
+        const auto& c = chain_.config();
+        std::ostringstream out;
+        out << "active=" << (chain_.staking_active_at(chain_.height() + 1) ? 1 : 0)
+            << " activation_height=" << c.staking_activation_height
+            << " total_staked=" << chain_.total_staked()
+            << " total_slashed=" << chain_.total_slashed()
+            << " tickets=" << chain_.tickets().size()
+            << " eligible=" << chain_.eligible_tickets_for_next_block().size()
+            << " min_amount=" << c.stake_min_amount
+            << " maturity=" << c.stake_maturity
+            << " unbond=" << c.stake_unbond_delay
+            << " votes_per_block=" << c.stake_votes_per_block
+            << " quorum=" << c.stake_vote_quorum
+            << " min_live_tickets=" << c.stake_min_live_tickets
+            << " reward_bps=" << c.stake_reward_bps;
+        return out.str();
+    }
+
+    if (cmd == "stake_autovote") {
+        std::string mode;
+        std::string name;
+        iss >> mode >> name;
+        if (mode.empty() || mode == "status") {
+            std::ostringstream out;
+            const auto addrs = node_.auto_vote_addresses();
+            out << "auto_vote=" << (addrs.empty() ? "off" : "on") << " addresses=";
+            for (std::size_t k = 0; k < addrs.size(); ++k) out << (k ? "," : "") << addrs[k];
+            return out.str();
         }
+        if ((mode != "on" && mode != "off") || name.empty()) {
+            return "error: usage stake_autovote <on|off|status> [wallet_name]";
+        }
+        StoredWallet stored{};
         std::string error;
-        if (!staking_.consume_staked_credit(addr, amount, error)) {
+        if (!wallets_.load(name, stored, error, mode == "on")) {
             return "error: " + error;
         }
-        return "ok";
+        if (mode == "on") {
+            node_.set_auto_vote_key(stored.address, stored.public_key, stored.private_key);
+            const auto cast = node_.refresh_local_votes();
+            std::size_t sent = 0;
+            std::string gossip_err;
+            node_.flush_outbound_gossip(sent, gossip_err);
+            return "ok:auto_vote=on address=" + stored.address + " votes_cast=" + std::to_string(cast);
+        }
+        node_.clear_auto_vote_key(stored.address);
+        return "ok:auto_vote=off address=" + stored.address;
+    }
+
+    if (cmd == "stake_reward" || cmd == "stake_claim" || cmd == "consume_stake_credit" ||
+        cmd == "stake_claimable" || cmd == "stake_policy") {
+        return "error: off-chain staking removed; stake rewards are paid in the coinbase to voting tickets "
+               "(see stake_info, stake_tickets)";
     }
 
     if (cmd == "contract_deploy") {
@@ -2732,15 +2798,6 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
 
     if (cmd == "ai_status") {
         return ai_optimizer_.status();
-    }
-
-    if (cmd == "stake_claimable") {
-        std::string addr;
-        iss >> addr;
-        if (addr.empty()) {
-            return "error: usage stake_claimable <address>";
-        }
-        return std::to_string(staking_.claimable_of(addr));
     }
 
     return "error: unknown command";

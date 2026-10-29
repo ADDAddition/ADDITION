@@ -45,6 +45,26 @@ public:
                                 std::string& reply,
                                 std::string& error);
     std::string handle_p2p_line(const std::string& line);
+
+    // ---- stake vote relay ----
+    // Validate a vote on the current tip (selected ticket, valid signature),
+    // add it to the vote pool and queue it for gossip ("SVOTE|...").
+    bool submit_stake_vote(const StakeVote& vote, std::string& error);
+    // Valid, selected, unique votes for the block the miner builds next.
+    std::vector<StakeVote> usable_stake_votes() const;
+    std::size_t vote_pool_size() const { return vote_pool_.size(); }
+    // Local auto-voter. Keys live only in this process (loaded from the local
+    // wallet store); they are never sent over RPC or P2P.
+    void set_auto_vote_key(const std::string& address, const std::string& public_key,
+                           const std::string& private_key);
+    void clear_auto_vote_key(const std::string& address);
+    std::vector<std::string> auto_vote_addresses() const;
+    // Sign+gossip votes for every selected ticket owned by an auto-vote key.
+    std::size_t refresh_local_votes();
+    static std::string encode_stake_vote(const StakeVote& vote);
+    static bool decode_stake_vote(const std::string& payload, StakeVote& vote, std::string& error);
+    // Test hook: exposes the block payload encoder (BLB2/BLB3) for unit tests.
+    std::string encode_block_payload_for_test(const Block& block) const { return encode_block_payload(block); }
     const std::string& self_id() const;
     const std::string& node_public_key() const;
     const std::string& node_private_key() const;
@@ -77,6 +97,15 @@ private:
     std::unordered_map<std::string, std::string> pinned_peer_pubkeys_;
     std::unordered_set<std::string> seen_rotation_ids_;
     std::unordered_set<std::string> seen_vote_signatures_;
+    std::vector<StakeVote> vote_pool_;
+    std::unordered_set<std::string> seen_stake_votes_; // ticket|height|hash|approve
+    struct AutoVoteKey {
+        std::string public_key;
+        std::string private_key;
+    };
+    std::unordered_map<std::string, AutoVoteKey> auto_vote_keys_;
+    void prune_vote_pool();
+    bool sync_once_impl(std::string& error);
     std::unordered_map<std::string, std::unordered_set<std::string>> relayed_message_ids_by_peer_;
 
     struct RateBucket {

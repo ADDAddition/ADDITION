@@ -165,6 +165,21 @@ void apply_network_profile_chain(ChainConfig& chain, NetworkMode mode) {
     chain.target_block_time_sec = profile.target_block_time_sec;
 }
 
+// Returns 1 ok, 0 bad value, -1 not a staking key.
+int apply_staking_key(ChainConfig& c, const std::string& k, const std::string& v) {
+    std::uint64_t n = 0;
+    auto num = [&](std::uint64_t lo, std::uint64_t hi) { return parse_u64(v, n) && n >= lo && n <= hi; };
+    if (k == "staking_activation_height") { return parse_u64(v, c.staking_activation_height) ? 1 : 0; }
+    if (k == "stake_min_amount") { if (!num(1, UINT64_MAX)) return 0; c.stake_min_amount = n; return 1; }
+    if (k == "stake_maturity") { if (!num(1, 1000000)) return 0; c.stake_maturity = n; return 1; }
+    if (k == "stake_unbond_delay") { if (!num(0, 1000000)) return 0; c.stake_unbond_delay = n; return 1; }
+    if (k == "stake_votes_per_block") { if (!num(1, 64)) return 0; c.stake_votes_per_block = static_cast<std::uint32_t>(n); return 1; }
+    if (k == "stake_vote_quorum") { if (!num(1, 64)) return 0; c.stake_vote_quorum = static_cast<std::uint32_t>(n); return 1; }
+    if (k == "stake_min_live_tickets") { if (!num(1, UINT64_MAX)) return 0; c.stake_min_live_tickets = n; return 1; }
+    if (k == "stake_reward_bps") { if (!num(0, 10000)) return 0; c.stake_reward_bps = static_cast<std::uint32_t>(n); return 1; }
+    return -1;
+}
+
 void apply_network_mode(NodeConfig& cfg, NetworkMode mode) {
     cfg.mode = mode;
     apply_network_profile_chain(cfg.chain, mode);
@@ -271,7 +286,16 @@ bool apply_kv(NodeConfig& cfg, const std::string& table, const std::string& key,
         return parse_u64(value, cfg.chain.max_supply);
     }
     if (full == "chain.tail_emission_reward" || full == "tail_emission_reward") {
-        return parse_u64(value, cfg.chain.tail_emission_reward);
+        // Tail emission was removed (hard 50M cap). Only 0 is accepted.
+        std::uint64_t v = 1;
+        return parse_u64(value, v) && v == 0;
+    }
+    {
+        const std::string sk = (full.rfind("chain.", 0) == 0) ? full.substr(6) : full;
+        int r = apply_staking_key(cfg.chain, sk, value);
+        if (r >= 0) {
+            return r == 1;
+        }
     }
     if (full == "chain.genesis_timestamp" || full == "genesis_timestamp") {
         return parse_u64(value, cfg.chain.genesis_timestamp);
@@ -286,6 +310,9 @@ bool apply_kv(NodeConfig& cfg, const std::string& table, const std::string& key,
         }
         cfg.chain.target_block_time_sec = static_cast<std::uint32_t>(v);
         return true;
+    }
+    if (full == "chain.subsidy_floor" || full == "subsidy_floor") {
+        return parse_u64(value, cfg.chain.subsidy_floor);
     }
     if (full == "chain.halving_interval" || full == "halving_interval") {
         std::uint64_t v = 0;
@@ -581,10 +608,9 @@ ChainConfig mainnet_chain_config() {
     cfg.network_name = kMainnetNetworkName;
     cfg.network_id = kMainnetNetworkId;
     cfg.genesis_timestamp = kMainnetGenesisTimestamp;
-    cfg.max_supply = 50'000'000ULL;
-    cfg.block_reward = 50ULL;
-    cfg.tail_emission_reward = 1ULL;
-    cfg.target_block_time_sec = 60U;
+    cfg.max_supply = kMainnetMaxSupply;
+    cfg.block_reward = kMainnetBlockReward;
+    cfg.target_block_time_sec = kMainnetTargetBlockTimeSec;
     cfg.difficulty_window = 120U;
     cfg.pow_algorithm = PowAlgorithm::MemoryHard;
     cfg.initial_difficulty_target = kMainnetDifficultyTarget;
@@ -593,8 +619,12 @@ ChainConfig mainnet_chain_config() {
     cfg.legacy_min_difficulty_target = kMainnetDifficultyTarget;
     cfg.retarget_window = 30U;
     cfg.difficulty_fork_height = kMainnetDifficultyForkHeight;
-    cfg.lwma_window = kDefaultLwmaWindow;
-    cfg.halving_interval = 210000U;
+    cfg.lwma_window = kMainnetLwmaWindow;
+    cfg.halving_interval = kMainnetHalvingInterval;
+    cfg.subsidy_floor = kMainnetSubsidyFloor;
+    cfg.stake_maturity = kMainnetStakeMaturity;
+    cfg.stake_unbond_delay = kMainnetStakeUnbondDelay;
+    cfg.staking_activation_height = kStakingNever;
     cfg.require_pq_signatures = true;
     cfg.require_privacy_pool = true;
     cfg.allow_zero_reward_blocks = true;
@@ -615,7 +645,6 @@ ChainConfig fast_chain_config() {
     cfg.genesis_timestamp = kFastGenesisTimestamp;
     cfg.max_supply = 50'000'000ULL;
     cfg.block_reward = 50ULL;
-    cfg.tail_emission_reward = 1ULL;
     cfg.difficulty_window = 120U;
     cfg.retarget_window = 30U;
     cfg.halving_interval = 210000U;
@@ -707,6 +736,24 @@ bool validate_network_profile(const NodeConfig& cfg, std::string& error) {
             cfg.chain.max_difficulty_target != kMainnetMaxDifficultyTarget ||
             cfg.chain.initial_difficulty_target != kMainnetDifficultyTarget) {
             error = "mainnet difficulty: initial/max must be 0x000000FFFFFFFFFF and min 0x0000000000FFFFFF";
+            return false;
+        }
+        if (cfg.chain.max_supply != kMainnetMaxSupply || cfg.chain.block_reward != kMainnetBlockReward ||
+            cfg.chain.halving_interval != kMainnetHalvingInterval ||
+            cfg.chain.subsidy_floor != kMainnetSubsidyFloor ||
+            cfg.chain.target_block_time_sec != kMainnetTargetBlockTimeSec) {
+            error = "mainnet emission: max_supply=50000000 block_reward=4 halving_interval=5681819 "
+                    "subsidy_floor=1 target_block_time_sec=20 (hard cap)";
+            return false;
+        }
+        if (scheduled_total_emission(cfg.chain.max_supply, cfg.chain.block_reward, cfg.chain.halving_interval,
+                                     nullptr, cfg.chain.subsidy_floor) != cfg.chain.max_supply) {
+            error = "mainnet emission schedule must reach max_supply exactly";
+            return false;
+        }
+        if (cfg.chain.stake_vote_quorum == 0 || cfg.chain.stake_vote_quorum > cfg.chain.stake_votes_per_block ||
+            cfg.chain.stake_reward_bps > 10000) {
+            error = "mainnet staking parameters invalid";
             return false;
         }
         if (cfg.chain.pow_algorithm != PowAlgorithm::MemoryHard) {
@@ -967,7 +1014,14 @@ bool load_genesis_json(const std::string& path, ChainConfig& chain, std::string&
             return parse_u64(v, chain.block_reward);
         }
         if (k == "tail_emission_reward") {
-            return parse_u64(v, chain.tail_emission_reward);
+            std::uint64_t t = 1;
+            return parse_u64(v, t) && t == 0;
+        }
+        {
+            int r = apply_staking_key(chain, k, v);
+            if (r >= 0) {
+                return r == 1;
+            }
         }
         if (k == "min_fee") {
             return parse_u64(v, chain.min_fee);
@@ -979,6 +1033,9 @@ bool load_genesis_json(const std::string& path, ChainConfig& chain, std::string&
             }
             chain.target_block_time_sec = static_cast<std::uint32_t>(n);
             return true;
+        }
+        if (k == "subsidy_floor") {
+            return parse_u64(v, chain.subsidy_floor);
         }
         if (k == "halving_interval") {
             std::uint64_t n = 0;

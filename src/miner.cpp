@@ -132,7 +132,14 @@ bool Miner::mine_next_block(const std::string& reward_address,
     }
 
     const auto tx_count = valid.size();
-    if (!chain_.mine_and_add_block(reward_address, valid, threads, mined_hash, error, &stop_)) {
+    bool mined = false;
+    if (vote_source_ && chain_.staking_active_at(chain_.height() + 1)) {
+        mined = chain_.mine_and_add_block_with_votes(reward_address, valid, vote_source_(), {}, threads,
+                                                     mined_hash, error, &stop_);
+    } else {
+        mined = chain_.mine_and_add_block(reward_address, valid, threads, mined_hash, error, &stop_);
+    }
+    if (!mined) {
         for (const auto& tx : valid) {
             mempool_.submit(tx);
         }

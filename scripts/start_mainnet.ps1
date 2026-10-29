@@ -28,9 +28,7 @@ if (-not (Test-Path $exe)) {
     throw "additiond.exe not found"
 }
 
-if (-not $env:ADDITION_PRIVACY_MASTER_KEY -or $env:ADDITION_PRIVACY_MASTER_KEY.Length -lt 32) {
-    throw "ADDITION_PRIVACY_MASTER_KEY must be set (min 32 chars) for --mainnet"
-}
+# No ADDITION_PRIVACY_MASTER_KEY: privacy notes are keyless (no node-held secret).
 if (-not $env:ADDITION_RPC_TOKEN) {
     Write-Host "[mainnet][WARN] ADDITION_RPC_TOKEN not set (local RPC auth disabled)."
 }

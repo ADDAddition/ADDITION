@@ -34,25 +34,31 @@ std::uint64_t lwma_next_target(const std::vector<std::uint64_t>& timestamps,
                                std::uint64_t max_target,
                                std::uint64_t fallback);
 
-// Scheduled subsidy at `height` (halving phase, then tail emission).
+// subsidy_floor: the halved reward never drops below this (mainnet: 1) until
+// the hard cap is hit; it is NOT a tail (max_mintable clips it at max_supply).
+// Scheduled subsidy at `height`: block_reward >> (height / halving_interval),
+// reaching 0 after the last halving. There is NO tail emission: once the
+// schedule (or the hard cap) is exhausted, miners and stakers live on fees.
 std::uint64_t scheduled_block_subsidy(std::uint64_t height,
                                       std::uint64_t block_reward,
                                       std::uint64_t halving_interval,
-                                      std::uint64_t tail_emission_reward);
+                                      std::uint64_t subsidy_floor = 0);
 
-// True once the halving schedule has decayed to zero (tail phase).
-bool in_tail_emission(std::uint64_t height, std::uint64_t block_reward, std::uint64_t halving_interval);
-
-// Max new coins a block at `height` may mint, given `total_emitted` so far.
-// Halving phase: min(scheduled, max_supply - total_emitted) (cap enforced).
-// Tail phase: tail_emission_reward unconditionally (perpetual, Monero-style:
-// the tail is NOT bounded by max_supply; max_supply caps only the halving
-// schedule).
+// Max new coins a block at `height` may mint: min(scheduled, max_supply - total_emitted).
+// max_supply is a hard consensus cap.
 std::uint64_t max_mintable_subsidy(std::uint64_t height,
                                    std::uint64_t total_emitted,
                                    std::uint64_t max_supply,
                                    std::uint64_t block_reward,
                                    std::uint64_t halving_interval,
-                                   std::uint64_t tail_emission_reward);
+                                   std::uint64_t subsidy_floor = 0);
+
+// Total the schedule can ever emit (clipped at max_supply). If `cap_height`
+// is set, receives the height of the block that reaches max_supply (0 if never).
+std::uint64_t scheduled_total_emission(std::uint64_t max_supply,
+                                       std::uint64_t block_reward,
+                                       std::uint64_t halving_interval,
+                                       std::uint64_t* cap_height = nullptr,
+                                       std::uint64_t subsidy_floor = 0);
 
 } // namespace addition

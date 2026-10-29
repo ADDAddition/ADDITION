@@ -315,7 +315,8 @@ bool persist_leftover_reply(const std::string& resp) {
            resp.rfind("ok:HAVE", 0) == 0 ||
            resp.rfind("ok:INV|", 0) == 0 ||
            resp.rfind("ok:IDROTATE|", 0) == 0 ||
-           resp.rfind("ok:IDVOTE|", 0) == 0;
+           resp.rfind("ok:IDVOTE|", 0) == 0 ||
+           resp.rfind("ok:SVOTE|", 0) == 0;
 }
 
 bool persist_truncated_hello(const std::string& resp) {
@@ -771,6 +772,7 @@ bool DecentralizedNode::ingest_block(const Block& block, std::string& error) {
 
     consensus_.submit_vote(self_id_, block.header.height, bh);
     outbound_.push_back(encode_block_announce(block));
+    refresh_local_votes(); // our selected tickets vote on the new tip
     return true;
 }
 
@@ -1148,6 +1150,12 @@ bool DecentralizedNode::ingest_from_public_rpc(const std::string& p2p_peer, std:
 }
 
 bool DecentralizedNode::sync_once(std::string& error) {
+    const bool ok = sync_once_impl(error);
+    refresh_local_votes(); // vote on whatever tip we ended up on
+    return ok;
+}
+
+bool DecentralizedNode::sync_once_impl(std::string& error) {
     error.clear();
     auto peers = peers_.peers();
     if (peers.empty()) {
@@ -1325,13 +1333,24 @@ bool DecentralizedNode::announce_tip(std::string& error) {
 
 bool DecentralizedNode::is_push_gossip_message(const std::string& message) const {
     return message.rfind("TX|", 0) == 0 || message.rfind("BLK|", 0) == 0 ||
-           message.rfind("IDROTATE|", 0) == 0 || message.rfind("IDVOTE|", 0) == 0;
+           message.rfind("IDROTATE|", 0) == 0 || message.rfind("IDVOTE|", 0) == 0 ||
+           message.rfind("SVOTE|", 0) == 0;
 }
 
 bool DecentralizedNode::flush_outbound_gossip(std::size_t& sent, std::string& error) {
     error.clear();
     sent = 0;
-    const auto msgs = pull_outbound_messages();
+    auto msgs = pull_outbound_messages();
+    // Best-effort rebroadcast of still-pending mempool txs (one-shot gossip can be
+    // lost on a transient handshake/transport failure). Bounded; peers dedup.
+    {
+        const auto pending = mempool_.snapshot();
+        const std::size_t cap = std::min<std::size_t>(pending.size(), 32);
+        for (std::size_t i = 0; i < cap; ++i) {
+            auto m = encode_tx_gossip(pending[i]);
+            if (std::find(msgs.begin(), msgs.end(), m) == msgs.end()) msgs.push_back(std::move(m));
+        }
+    }
     if (msgs.empty()) {
         return true;
     }
@@ -1479,7 +1498,8 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         (message.rfind("BLKDATA|", 0) == 0) ||
         (message.rfind("REQADDR|", 0) == 0) ||
         (message.rfind("IDROTATE|", 0) == 0) ||
-        (message.rfind("IDVOTE|", 0) == 0);
+        (message.rfind("IDVOTE|", 0) == 0) ||
+        (message.rfind("SVOTE|", 0) == 0);
     if (!allow_peer_message(peer, expensive, error)) {
         peers_.mark_peer_bad(peer);
         return false;
@@ -1626,6 +1646,24 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
             peers_.mark_peer_bad(peer);
         }
         return ok;
+    }
+
+    if (message.rfind("SVOTE|", 0) == 0) {
+        StakeVote v{};
+        if (!decode_stake_vote(message.substr(6), v, error)) {
+            peers_.mark_peer_bad(peer);
+            return false;
+        }
+        const auto ok = submit_stake_vote(v, error);
+        // A vote for a tip we have not seen yet (or already pruned) is not misbehaviour.
+        if (ok || error.find("duplicate") != std::string::npos || error.find("stale") != std::string::npos) {
+            // Benign for re-announced votes: ack so the sender's batch (txs too) continues.
+            peers_.mark_peer_good(peer);
+            error.clear();
+            return true;
+        }
+        peers_.mark_peer_bad(peer);
+        return false;
     }
 
     if (message.rfind("BLK|", 0) == 0) {
@@ -1996,7 +2034,8 @@ bool DecentralizedNode::decode_tx_payload(const std::string& payload,
 std::string DecentralizedNode::encode_block_payload(const Block& block) const {
     std::string bin;
     bin.reserve(1024);
-    bin.append("BLB2", 4);
+    const bool staked = !block.votes.empty() || !block.slashes.empty();
+    bin.append(staked ? "BLB3" : "BLB2", 4);
 
     write_u64(bin, block.header.height);
     write_string(bin, block.header.previous_hash);
@@ -2015,6 +2054,24 @@ std::string DecentralizedNode::encode_block_payload(const Block& block) const {
         write_u32(bin, static_cast<std::uint32_t>(tx_payload_bin.size()));
         bin.append(tx_payload_bin);
     }
+    if (staked) {
+        auto write_vote = [&](const StakeVote& v) {
+            write_string(bin, v.ticket_id);
+            write_u64(bin, v.voted_height);
+            write_string(bin, v.voted_hash);
+            write_u32(bin, v.approve ? 1U : 0U);
+            write_string(bin, v.signature);
+        };
+        write_u32(bin, static_cast<std::uint32_t>(block.votes.size()));
+        for (const auto& v : block.votes) {
+            write_vote(v);
+        }
+        write_u32(bin, static_cast<std::uint32_t>(block.slashes.size()));
+        for (const auto& sl : block.slashes) {
+            write_vote(sl.a);
+            write_vote(sl.b);
+        }
+    }
 
     write_u32(bin, payload_checksum32(bin));
 
@@ -2031,11 +2088,13 @@ bool DecentralizedNode::decode_block_payload(const std::string& payload,
         error = "invalid block payload hex";
         return false;
     }
-    if (bin.size() < 4 || (bin.compare(0, 4, "BLB1") != 0 && bin.compare(0, 4, "BLB2") != 0)) {
+    if (bin.size() < 4 || (bin.compare(0, 4, "BLB1") != 0 && bin.compare(0, 4, "BLB2") != 0 &&
+                           bin.compare(0, 4, "BLB3") != 0)) {
         error = "invalid block payload magic";
         return false;
     }
-    const bool has_checksum = (bin.compare(0, 4, "BLB2") == 0);
+    const bool staked = (bin.compare(0, 4, "BLB3") == 0);
+    const bool has_checksum = staked || (bin.compare(0, 4, "BLB2") == 0);
 
     std::size_t off = 4;
     if (!read_u64(bin, off, block.header.height) ||
@@ -2074,6 +2133,44 @@ bool DecentralizedNode::decode_block_payload(const std::string& payload,
             return false;
         }
         block.transactions.push_back(std::move(tx));
+    }
+    if (staked) {
+        auto read_vote = [&](StakeVote& v) {
+            std::uint32_t a = 0;
+            if (!read_string(bin, off, v.ticket_id) || !read_u64(bin, off, v.voted_height) ||
+                !read_string(bin, off, v.voted_hash) || !read_u32(bin, off, a) ||
+                !read_string(bin, off, v.signature)) {
+                return false;
+            }
+            v.approve = (a != 0);
+            return true;
+        };
+        std::uint32_t nv = 0;
+        if (!read_u32(bin, off, nv) || nv > 4096) {
+            error = "invalid block payload vote count";
+            return false;
+        }
+        for (std::uint32_t i = 0; i < nv; ++i) {
+            StakeVote v{};
+            if (!read_vote(v)) {
+                error = "invalid block payload vote";
+                return false;
+            }
+            block.votes.push_back(std::move(v));
+        }
+        std::uint32_t ns = 0;
+        if (!read_u32(bin, off, ns) || ns > 4096) {
+            error = "invalid block payload slash count";
+            return false;
+        }
+        for (std::uint32_t i = 0; i < ns; ++i) {
+            SlashEvidence sl{};
+            if (!read_vote(sl.a) || !read_vote(sl.b)) {
+                error = "invalid block payload slash";
+                return false;
+            }
+            block.slashes.push_back(std::move(sl));
+        }
     }
 
     if (has_checksum) {
@@ -2121,6 +2218,152 @@ bool DecentralizedNode::decode_block_announce(const std::string& payload,
                                                Block& block,
                                                std::string& error) const {
     return decode_block_payload(payload, block, error);
+}
+
+// ---- stake vote relay ----
+
+std::string DecentralizedNode::encode_stake_vote(const StakeVote& v) {
+    const std::vector<std::uint8_t> sig(v.signature.begin(), v.signature.end());
+    std::ostringstream out;
+    out << v.ticket_id << '|' << v.voted_height << '|' << v.voted_hash << '|' << (v.approve ? 1 : 0) << '|'
+        << bytes_to_hex(sig);
+    return out.str();
+}
+
+bool DecentralizedNode::decode_stake_vote(const std::string& payload, StakeVote& v, std::string& error) {
+    std::vector<std::string> parts;
+    std::size_t start = 0;
+    while (true) {
+        const auto pos = payload.find('|', start);
+        parts.push_back(payload.substr(start, pos == std::string::npos ? std::string::npos : pos - start));
+        if (pos == std::string::npos) break;
+        start = pos + 1;
+    }
+    if (parts.size() != 5 || parts[0].empty() || parts[2].empty() || (parts[3] != "0" && parts[3] != "1") ||
+        parts[4].empty() || payload.size() > 32768) {
+        error = "invalid stake vote payload";
+        return false;
+    }
+    try {
+        v.voted_height = std::stoull(parts[1]);
+    } catch (const std::exception&) {
+        error = "invalid stake vote height";
+        return false;
+    }
+    std::vector<std::uint8_t> sig;
+    if (!hex_to_bytes(parts[4], sig, error)) {
+        error = "invalid stake vote signature hex";
+        return false;
+    }
+    v.ticket_id = parts[0];
+    v.voted_hash = parts[2];
+    v.approve = parts[3] == "1";
+    v.signature.assign(sig.begin(), sig.end());
+    return true;
+}
+
+void DecentralizedNode::prune_vote_pool() {
+    const auto tip = chain_.height();
+    std::vector<StakeVote> kept;
+    for (auto& v : vote_pool_) {
+        if (v.voted_height >= tip) kept.push_back(std::move(v));
+    }
+    vote_pool_.swap(kept);
+    if (seen_stake_votes_.size() > 100000) seen_stake_votes_.clear();
+}
+
+bool DecentralizedNode::submit_stake_vote(const StakeVote& v, std::string& error) {
+    prune_vote_pool();
+    const auto tip = chain_.height();
+    if (v.voted_height != tip) {
+        error = "stale stake vote";
+        return false;
+    }
+    const auto key = v.ticket_id + "|" + std::to_string(v.voted_height) + "|" + v.voted_hash + "|" +
+                     (v.approve ? "1" : "0");
+    if (seen_stake_votes_.count(key) != 0) {
+        error = "duplicate stake vote";
+        return false;
+    }
+    if (!chain_.verify_stake_vote(v, error)) {
+        return false;
+    }
+    const auto sel = chain_.selected_tickets_for_next_block();
+    if (std::find(sel.begin(), sel.end(), v.ticket_id) == sel.end()) {
+        error = "ticket not selected for this block";
+        return false;
+    }
+    seen_stake_votes_.insert(key);
+    vote_pool_.push_back(v);
+    outbound_.push_back("SVOTE|" + encode_stake_vote(v));
+    return true;
+}
+
+std::vector<StakeVote> DecentralizedNode::usable_stake_votes() const {
+    return chain_.usable_votes_for_next_block(vote_pool_);
+}
+
+void DecentralizedNode::set_auto_vote_key(const std::string& address, const std::string& public_key,
+                                          const std::string& private_key) {
+    auto_vote_keys_[address] = AutoVoteKey{public_key, private_key};
+}
+
+void DecentralizedNode::clear_auto_vote_key(const std::string& address) {
+    auto_vote_keys_.erase(address);
+}
+
+std::vector<std::string> DecentralizedNode::auto_vote_addresses() const {
+    std::vector<std::string> out;
+    for (const auto& kv : auto_vote_keys_) out.push_back(kv.first);
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
+std::size_t DecentralizedNode::refresh_local_votes() {
+    if (auto_vote_keys_.empty() || !chain_.staking_active_at(chain_.height() + 1)) {
+        return 0;
+    }
+    const auto tip = chain_.height();
+    const auto tip_block = chain_.block_at(tip);
+    if (!tip_block) return 0;
+    const auto tip_hash = hash_block_header(tip_block->header);
+    std::size_t cast = 0;
+    for (const auto& id : chain_.selected_tickets_for_next_block()) {
+        const auto t = chain_.ticket(id);
+        if (!t) continue;
+        const auto k = auto_vote_keys_.find(t->owner);
+        if (k == auto_vote_keys_.end() || k->second.public_key != t->owner_pubkey) continue;
+        StakeVote v{};
+        v.ticket_id = id;
+        v.voted_height = tip;
+        v.voted_hash = tip_hash;
+        v.approve = true;
+        // Never sign a second, conflicting vote at this height (equivocation burns the ticket).
+        // Re-announce our own existing vote instead (gossip is best-effort; dedup is cheap).
+        bool already = false;
+        for (const auto& p : vote_pool_) {
+            if (p.ticket_id == id && p.voted_height == tip) {
+                already = true;
+                if (p.voted_hash == tip_hash) {
+                    const std::string msg = "SVOTE|" + encode_stake_vote(p);
+                    if (std::find(outbound_.begin(), outbound_.end(), msg) == outbound_.end()) {
+                        outbound_.push_back(msg);
+                    }
+                }
+                break;
+            }
+        }
+        if (already) continue;
+        try {
+            v.signature = sign_message_hybrid(k->second.private_key,
+                                              chain_.stake_vote_message_for(tip, tip_hash, id, true));
+        } catch (const std::exception&) {
+            continue;
+        }
+        std::string err;
+        if (submit_stake_vote(v, err)) ++cast;
+    }
+    return cast;
 }
 
 } // namespace addition

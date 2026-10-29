@@ -102,6 +102,10 @@ if(ADDITION_BUILD_TESTS)
     target_link_libraries(test_consensus_rules PRIVATE addition_core)
     add_test(NAME test_consensus_rules COMMAND test_consensus_rules)
 
+    add_executable(test_staking tests/test_staking.cpp)
+    target_link_libraries(test_staking PRIVATE addition_core)
+    add_test(NAME test_staking COMMAND test_staking)
+
     add_executable(test_mainnet_chain tests/test_mainnet_chain.cpp)
     target_link_libraries(test_mainnet_chain PRIVATE addition_core)
     add_test(NAME test_mainnet_chain COMMAND test_mainnet_chain)
@@ -305,5 +309,13 @@ if(ADDITION_BUILD_TESTS)
         set_tests_properties(test_regtest_two_node PROPERTIES
             ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
             TIMEOUT 120)
+        add_test(
+            NAME test_regtest_staking_three_node
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_regtest_staking_three_node.py
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        )
+        set_tests_properties(test_regtest_staking_three_node PROPERTIES
+            ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
+            TIMEOUT 300)
     endif()
 endif()

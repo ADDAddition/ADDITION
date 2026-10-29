@@ -70,6 +70,12 @@ int main() {
     easy.initial_difficulty_target = 0xFFFFFFFFFFFFFFFFULL;
     easy.min_difficulty_target = 0xFFFFFFFFFFFFFFFFULL;
     easy.max_difficulty_target = 0xFFFFFFFFFFFFFFFFULL;
+    // On-chain staking with small throwaway parameters for the RPC flow.
+    easy.staking_activation_height = 0;
+    easy.stake_min_amount = 10;
+    easy.stake_maturity = 1;
+    easy.stake_unbond_delay = 2;
+    easy.stake_min_live_tickets = 1000; // votes optional in this single-node test
     addition::Chain chain(easy);
     addition::Mempool mempool;
     addition::Miner miner(chain, mempool);
@@ -149,39 +155,53 @@ int main() {
         return 1;
     }
 
-    const auto stake = rpc.handle_command("stake " + miner_addr + " 40");
-    if (!expect_eq(stake, "ok", "stake")) {
+    if (!miner.mine_next_block(miner_addr, 200, 1, mined_hash, error)) {
+        std::cerr << "test failed: mine 2: " << error << '\n';
         return 1;
     }
-    if (!expect_eq(rpc.handle_command("getbalance " + miner_addr), "10", "getbalance after stake") ||
-        !expect_eq(rpc.handle_command("staked " + miner_addr), "40", "staked after stake")) {
+    // Legacy off-chain staking (minted outside the cap) is gone.
+    if (!expect_contains(rpc.handle_command("stake_reward 100"), "off-chain staking removed", "stake_reward removed") ||
+        !expect_contains(rpc.handle_command("stake_claim " + miner_addr), "off-chain staking removed", "stake_claim removed")) {
         return 1;
     }
-    const auto reward = rpc.handle_command("stake_reward 100");
-    if (!expect_eq(reward, "ok", "stake_reward")) {
+    // sign_message no longer takes a private key.
+    if (!expect_contains(rpc.handle_command("sign_message " + std::string(200, 'a') + " 6869"),
+                         "raw private keys are not accepted", "sign_message rejects raw key") ||
+        !expect_contains(rpc.handle_command("sign_message miner 6869"), "pq=", "sign_message by wallet name")) {
         return 1;
     }
-    const auto claimed = rpc.handle_command("stake_claim " + miner_addr);
-    if (claimed == "0" || claimed.rfind("error:", 0) == 0) {
-        std::cerr << "test failed: stake_claim should credit a reward, got " << claimed << '\n';
+    if (!expect_contains(rpc.handle_command("stake miner 5"), "stake below minimum", "stake min")) {
         return 1;
     }
-    const auto after_claim = std::stoull(rpc.handle_command("getbalance " + miner_addr));
-    if (after_claim <= 10) {
-        std::cerr << "test failed: getbalance after stake_claim must rise, got " << after_claim << '\n';
+    const auto stake = rpc.handle_command("stake miner 40");
+    if (!expect_contains(stake, "ok:stake_lock", "stake")) {
         return 1;
     }
-    const auto unstake = rpc.handle_command("unstake " + miner_addr + " 40");
-    if (!expect_eq(unstake, "ok", "unstake")) {
+    const auto tpos = stake.find("ticket=") + 7;
+    const auto ticket_id = stake.substr(tpos, stake.find(' ', tpos) - tpos);
+    if (!miner.mine_next_block(miner_addr, 200, 1, mined_hash, error)) {
+        std::cerr << "test failed: mine stake: " << error << '\n';
+        return 1;
+    }
+    if (!expect_eq(rpc.handle_command("staked " + miner_addr), "40", "staked after stake") ||
+        !expect_contains(rpc.handle_command("stake_tickets " + miner_addr), "ticket=" + ticket_id, "stake_tickets") ||
+        !expect_contains(rpc.handle_command("stake_info"), "total_staked=40", "stake_info")) {
+        return 1;
+    }
+    if (!expect_contains(rpc.handle_command("stake_autovote on miner"), "ok:auto_vote=on", "autovote on") ||
+        !expect_contains(rpc.handle_command("stake_autovote status"), miner_addr, "autovote status") ||
+        !expect_contains(rpc.handle_command("stake_autovote off miner"), "ok:auto_vote=off", "autovote off")) {
+        return 1;
+    }
+    const auto unstake = rpc.handle_command("unstake miner " + ticket_id);
+    if (!expect_contains(unstake, "ok:stake_unlock", "unstake")) {
+        return 1;
+    }
+    if (!miner.mine_next_block(miner_addr, 200, 1, mined_hash, error)) {
+        std::cerr << "test failed: mine unstake: " << error << '\n';
         return 1;
     }
     if (!expect_eq(rpc.handle_command("staked " + miner_addr), "0", "staked after unstake")) {
-        return 1;
-    }
-    const auto after_unstake = std::stoull(rpc.handle_command("getbalance " + miner_addr));
-    if (after_unstake <= after_claim) {
-        std::cerr << "test failed: unstake must unlock coins, got " << after_unstake
-                  << " after claim " << after_claim << '\n';
         return 1;
     }
 

@@ -1,8 +1,9 @@
-// Unit tests: LWMA per-block retarget + block subsidy / tail emission.
+// Unit tests: LWMA per-block retarget + block subsidy (hard cap).
 #include "addition/chain.hpp"
 #include "addition/config.hpp"
 #include "addition/consensus_rules.hpp"
 
+#include <algorithm>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -77,22 +78,39 @@ int main() {
         (void)t;
     }
 
-    // --- subsidy / tail emission (mainnet params: 50, halving 210000, tail 1) ---
-    check(scheduled_block_subsidy(1, 50, 210000, 1) == 50, "era0 reward 50");
-    check(scheduled_block_subsidy(210000, 50, 210000, 1) == 25, "era1 reward 25");
-    check(scheduled_block_subsidy(210000 * 5, 50, 210000, 1) == 1, "era5 reward 1");
-    check(scheduled_block_subsidy(210000 * 6, 50, 210000, 1) == 1, "era6 -> tail 1");
-    check(scheduled_block_subsidy(210000ULL * 1000, 50, 210000, 1) == 1, "far future tail 1");
-    check(in_tail_emission(210000 * 6, 50, 210000) && !in_tail_emission(210000 * 5, 50, 210000), "tail boundary");
-    check(max_mintable_subsidy(1, 0, 50'000'000, 50, 210000, 1) == 50, "cap room -> full reward");
-    check(max_mintable_subsidy(1, 49'999'990, 50'000'000, 50, 210000, 1) == 10, "halving phase capped by remaining");
-    check(max_mintable_subsidy(1, 50'000'000, 50'000'000, 50, 210000, 1) == 1, "cap hit: miners still get tail");
-    check(max_mintable_subsidy(210000 * 7, 60'000'000, 50'000'000, 50, 210000, 1) == 1, "tail exceeds cap forever");
+    // --- subsidy: hard cap, no tail ---
+    check(scheduled_block_subsidy(1, 50, 210000) == 50, "era0 reward 50");
+    check(scheduled_block_subsidy(210000, 50, 210000) == 25, "era1 reward 25");
+    check(scheduled_block_subsidy(210000 * 5, 50, 210000) == 1, "era5 reward 1");
+    check(scheduled_block_subsidy(210000 * 6, 50, 210000) == 0, "era6 -> 0 (no tail)");
+    check(scheduled_block_subsidy(210000ULL * 1000, 50, 210000) == 0, "far future 0");
+    check(scheduled_block_subsidy(210000ULL * 1000, 50, 210000, 1) == 1, "floor keeps 1/block");
+    check(max_mintable_subsidy(1, 0, 50'000'000, 50, 210000) == 50, "cap room -> full reward");
+    check(max_mintable_subsidy(1, 49'999'990, 50'000'000, 50, 210000) == 10, "capped by remaining");
+    check(max_mintable_subsidy(1, 50'000'000, 50'000'000, 50, 210000, 1) == 0, "cap hit: floor clipped to 0");
     {
-        // Total emitted by the halving schedule alone (before tail) for mainnet params.
-        std::uint64_t total = 0;
-        for (std::uint64_t era = 0; era < 6; ++era) total += (50ULL >> era) * 210000ULL;
-        check(total == 20'370'000ULL, "halving schedule emits 20.37M (< 50M cap)");
+        // Mainnet (20 s blocks): 4/block, halving 5,681,819, floor 1 -> exactly 50M.
+        std::uint64_t cap_h = 0;
+        const auto total = scheduled_total_emission(kMainnetMaxSupply, kMainnetBlockReward,
+                                                    kMainnetHalvingInterval, &cap_h, kMainnetSubsidyFloor);
+        check(total == 50'000'000ULL, "mainnet schedule reaches exactly 50M");
+        check(cap_h == kMainnetCapHeight, "mainnet cap height 27,272,727");
+        const double years = static_cast<double>(cap_h) * kMainnetTargetBlockTimeSec / 31'557'600.0;
+        check(years > 17.0 && years < 17.6, "cap reached in ~17.3 years");
+        // Brute-force replay of the per-block rule agrees with the closed form.
+        std::uint64_t emitted = 0, h = 0;
+        while (emitted < kMainnetMaxSupply) {
+            ++h;
+            emitted += max_mintable_subsidy(h, emitted, kMainnetMaxSupply, kMainnetBlockReward,
+                                            kMainnetHalvingInterval, kMainnetSubsidyFloor);
+        }
+        check(emitted == 50'000'000ULL && h == kMainnetCapHeight, "per-block replay hits cap at 27,272,727");
+        check(max_mintable_subsidy(h + 1, emitted, kMainnetMaxSupply, kMainnetBlockReward,
+                                   kMainnetHalvingInterval, kMainnetSubsidyFloor) == 0, "after cap: 0");
+        const auto mc = mainnet_chain_config();
+        check(mc.target_block_time_sec == 20 && mc.lwma_window == 180, "mainnet 20s / LWMA 180");
+        check(mc.stake_maturity == 768 && mc.stake_unbond_delay == 4320, "mainnet staking windows x3");
+        check(kFutureTimeLimitBlocks * mc.target_block_time_sec == 300, "mainnet FTL 300 s");
     }
 
     // --- Chain integration: retarget is applied and consensus-validated ---

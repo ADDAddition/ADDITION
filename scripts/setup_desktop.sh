@@ -6,7 +6,7 @@
 # Modes (what "mode" means here):
 #   testnet  — --network testnet, write 127.0.0.1:8545  (default product)
 #   mainnet  — --mainnet,         write 127.0.0.1:8546  (local/operator profile;
-#              not a live public network; needs ADDITION_PRIVACY_MASTER_KEY ≥32)
+#              not a live public network)
 #   regtest  — --regtest,         write 127.0.0.1:8547  (local min-diff; not public)
 #
 # Usage:
@@ -55,7 +55,7 @@ ADDITION desktop first-run (Linux)
 
 Modes / write RPC (loopback only):
   testnet  127.0.0.1:8545  (default; bootstraps operator P2P unless --no-bootstrap)
-  mainnet  127.0.0.1:8546  (local/operator; height follows getinfo; needs ADDITION_PRIVACY_MASTER_KEY ≥32)
+  mainnet  127.0.0.1:8546  (local/operator; height follows getinfo)
   regtest  127.0.0.1:8547
 
 Requires OpenSSL (libssl-dev) and liboqs — no fallback.
@@ -211,17 +211,7 @@ start_node() {
 
   [[ -x "$bin" ]] || die "additiond not found at $bin — run without --start-only first"
 
-  if [[ "$mode" == "mainnet" ]]; then
-    if [[ -z "${ADDITION_PRIVACY_MASTER_KEY:-}" ]] || [[ "${#ADDITION_PRIVACY_MASTER_KEY}" -lt 32 ]]; then
-      die "mainnet requires ADDITION_PRIVACY_MASTER_KEY (≥32 chars). Example: export ADDITION_PRIVACY_MASTER_KEY=\$(python3 -c 'print(\"x\"*32)')"
-    fi
-  else
-    # Privacy opening commands need the key; set a local desktop default if unset.
-    if [[ -z "${ADDITION_PRIVACY_MASTER_KEY:-}" ]]; then
-      export ADDITION_PRIVACY_MASTER_KEY="addition-desktop-local-key-do-not-use-in-prod"
-      info "Set temporary ADDITION_PRIVACY_MASTER_KEY for local desktop (override in env)"
-    fi
-  fi
+  # No ADDITION_PRIVACY_MASTER_KEY needed: privacy notes are keyless (no node-held secret).
 
   stop_node "$mode"
 

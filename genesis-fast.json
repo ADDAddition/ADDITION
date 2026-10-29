@@ -6,7 +6,7 @@
   "genesis_timestamp": 1780000000,
   "max_supply": 50000000,
   "block_reward": 50,
-  "tail_emission_reward": 1,
+  "tail_emission_reward": 0,
   "target_block_time_sec": 1,
   "halving_interval": 210000,
   "min_fee": 0,

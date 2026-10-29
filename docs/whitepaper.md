@@ -181,9 +181,9 @@ Mainnet difficulty floor (initial = min = max): **`0x000000FFFFFFFFFF`**. Smalle
 
 | Parameter | Value (code / genesis) |
 | --- | --- |
-| `target_block_time_sec` | **60** |
-| `retarget_window` | **30** |
-| Retarget compare window | `30 × 60s` of timestamps (`chain.cpp`) |
+| `target_block_time_sec` | **20** |
+| LWMA difficulty window | **180** blocks (~1 hour) |
+| Future-timestamp bound | **300 s** (15 blocks × 20 s) |
 | Early blocks | target × `9/10` (harder) |
 | Late blocks | target scaled up, clamped to `[min, max]` |
 | Mainnet mine deadline | `mine_deadline_sec=0` (search until found) |
@@ -194,9 +194,19 @@ Because mainnet clamps min and max to the same hard floor, retarget cannot climb
 
 `auto_mine` is **refused on mainnet** (`src/auto_mine.cpp`). Live `getinfo` reports `auto_mine=off`. Config `enable_auto_mine = false` in `config-mainnet.toml` does not override that refusal.
 
-### 5.4 Coinbase
+### 5.4 Coinbase and hybrid PoW/PoS
 
-Block template builds a single coinbase output to the **finding miner’s** reward address (`chain.cpp` `make_block_template`). There is **no** 70/25/5 miner/staker/treasury split. Coinbase is 100% to the finding miner.
+Consensus code implements hybrid PoW/PoS (tickets on chain), but **on mainnet it is dormant**: `staking_activation_height` is unset (never), so today the coinbase is 100% to the finding miner. Activation needs a chosen height and a coordinated release.
+
+When active (regtest/testnet configs can enable it):
+
+- **Tickets:** a stake-lock tx sends ≥ `stake_min_amount` (default **1000**) to `@stake`; it becomes a ticket after `stake_maturity` blocks (mainnet **768** ≈ 4.3 h).
+- **Selection:** for block *h*, **5** tickets are chosen deterministically from the hash of block *h−1*. Each signs an ML-DSA-87 vote on *h−1*; votes relay over P2P (`SVOTE`) and miners include them (block payload `BLB3`).
+- **Quorum:** a block needs **3** approving votes once at least `stake_min_live_tickets` tickets are live.
+- **Reward split:** **30%** of the block subsidy+fees is split equally among the approving voters in the coinbase; the miner gets the rest.
+- **Slashing:** two conflicting votes from one ticket at the same height (equivocation) are evidence; including it burns the ticket. Missed votes are not penalized.
+- **Unbonding:** a stake-unlock tx returns funds, frozen for `stake_unbond_delay` blocks (mainnet **4320** ≈ 1 day).
+- **Keys stay local:** the wallet signs `stake`/`unstake`/votes locally; RPC never accepts a raw private key.
 
 ---
 
@@ -207,13 +217,14 @@ From `genesis-mainnet.json`, `config-mainnet.toml`, and `mainnet_chain_config()`
 | Parameter | Value |
 | --- | --- |
 | `max_supply` | **50,000,000** whole units |
-| `block_reward` | **50** |
-| `halving_interval` | **210,000** blocks |
-| `tail_emission_reward` | 1 (after deep halvings / policy in chain) |
+| `block_reward` | **4** (20 s blocks) |
+| `halving_interval` | **5,681,819** blocks (~3.6 years) |
+| `subsidy_floor` | **1** per block until the cap, then **0** (no tail emission) |
+| Schedule | 4/block (heights 1–5,681,819), 2/block (to 11,363,638), then 1/block until exactly 50,000,000 at height **27,272,727** (~17.3 years); 99% by height ~26.77M (~17.0 years) |
 | `min_fee` (spec / genesis) | **0** |
 | Precision | Whole integers only — no 8-decimal satoshi subunit |
 
-**Coinbase:** 100% of the block reward (plus collected fees, subject to validation) goes to the finding miner’s address. No token sale, no pre-mine claim in genesis beyond the empty height-0 chain, no ICO language.
+**Coinbase:** while staking is dormant, 100% of the block reward (plus collected fees, subject to validation) goes to the finding miner’s address. Supply is hard-capped at 50,000,000; no subsidy is minted past it. No token sale, no pre-mine claim in genesis beyond the empty height-0 chain, no ICO language.
 
 **Fees:** Spec / genesis / `mainnet_chain_config()` floor is `min_fee=0`. Congestion heuristics may raise `recommended_min_fee` / `dynamic_min_fee` from mempool size and last-block fees. Copy live fields from the node; do not invent a fee market narrative.
 

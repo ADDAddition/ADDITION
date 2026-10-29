@@ -21,10 +21,9 @@ Unit file: [`deploy/systemd/additiond-mainnet.service`](../deploy/systemd/additi
 
 ## Join mainnet (home node)
 
-Build `additiond` from this repository on `main`. Set `ADDITION_PRIVACY_MASTER_KEY` to at least 32 characters. Then:
+Build `additiond` from this repository on `main`. No privacy master key is needed (privacy notes are keyless). Then:
 
 ```bash
-export ADDITION_PRIVACY_MASTER_KEY='replace-with-32-or-more-chars____'
 export ADDITION_ENABLE_P2P_RPC=1
 ./build/additiond --mainnet \
   --data-dir $HOME/addition-mainnet \
@@ -67,7 +66,7 @@ Expect `network=mainnet` and `network_id=ADDITION_MAINNET_V1`. Height may still 
 
 A testnet process still reports `network=testnet`. Mixing a testnet `blocks.dat` or `network.dat` into a mainnet `--data-dir` is refused.
 
-`ADDITION_PRIVACY_MASTER_KEY` (min 32 characters) is required to start `--mainnet`. Auto-mine is refused.
+`ADDITION_PRIVACY_MASTER_KEY` is no longer required or used (a warning is logged if set). Auto-mine is refused.
 
 ## Mine (local write RPC only)
 
@@ -112,7 +111,6 @@ This is a target/retarget choice, not a throughput claim. Do not invent TPS.
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --target additiond
-export ADDITION_PRIVACY_MASTER_KEY='replace-with-32-or-more-chars____'
 ./build/additiond --mainnet --data-dir /tmp/addition-mainnet --local-rpc-port 8546
 printf 'getinfo\n' | nc 127.0.0.1 8546
 # expect: network=mainnet network_id=ADDITION_MAINNET_V1
@@ -128,7 +126,6 @@ sudo mkdir -p /opt/addition /var/lib/addition/mainnet /etc/addition
 sudo cp -a . /opt/addition
 sudo chown -R addition:addition /var/lib/addition/mainnet
 # /etc/addition/mainnet.env  (mode 0640, owner root:addition)
-# ADDITION_PRIVACY_MASTER_KEY=<32+ chars>
 # ADDITION_RPC_TOKEN=<optional write-RPC token>
 # ADDITION_ENABLE_P2P_RPC=1
 # ADDITION_ADVERTISED_P2P=34.27.30.115:28546   # public seed operator

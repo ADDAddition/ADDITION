@@ -23,7 +23,7 @@ enable_public_rpc = false
 
 # Auto-mine is refused on mainnet even if this is set.
 enable_auto_mine = false
-auto_mine_interval_sec = 60
+auto_mine_interval_sec = 20
 auto_mine_reward = "miner1"
 
 [ports]
@@ -36,25 +36,36 @@ public_rpc = 38546
 public_rpc_bind = "0.0.0.0"
 
 [chain]
-block_reward = 50
+block_reward = 4
 max_supply = 50000000
-target_block_time_sec = 60
-halving_interval = 210000
-# Tail emission: once the halving schedule decays to 0 (~height 1.26M, ~20.4M
-# coins emitted), every block mints tail_emission_reward forever. The tail is
-# NOT bounded by max_supply (Monero-style); max_supply caps the halving phase.
-tail_emission_reward = 1
+target_block_time_sec = 20
+halving_interval = 5681819
+subsidy_floor = 1
+# Hard cap: 50,000,000 total, exactly. 20 s blocks, 4/block halving every
+# 5,681,819 blocks (~3.6y): 4, 2, then a floor of 1/block until the cap.
+# Emission lands on exactly 50M at height 27,272,727 (~17.3y); ~99% by ~17.0y.
+# No tail emission: after the cap, miners and stakers are paid by fees only.
+tail_emission_reward = 0
+# Hybrid PoW/PoS (Decred-style). Activation is a launch decision (see report).
+# staking_activation_height = 0
+stake_min_amount = 1000
+stake_maturity = 768  # ~4.3 h at 20 s
+stake_unbond_delay = 4320  # ~1 day at 20 s
+stake_votes_per_block = 5
+stake_vote_quorum = 3
+stake_min_live_tickets = 5
+stake_reward_bps = 3000
 # Consensus minimum fee per tx (base units). Nonzero to price spam.
 min_fee = 1
 genesis_timestamp = 1770000000
 pow_algorithm = "memory_hard"
-# LWMA per-block retarget (window 60). Easiest bound (max) stays the testnet
+# LWMA per-block retarget (window 180 = ~1 h at 20 s; future-time limit 15 blocks = 300 s). Easiest bound (max) stays the testnet
 # *hard* target so mainnet can never get easier than 0x000000FFFFFFFFFF; it can
 # get up to 2^16x harder (min). See docs/MAINNET_RUNBOOK.md.
 initial_difficulty_target = 0x000000FFFFFFFFFF
 min_difficulty_target = 0x0000000000FFFFFF
 max_difficulty_target = 0x000000FFFFFFFFFF
 retarget_window = 30
-lwma_window = 60
+lwma_window = 180
 # 0 = LWMA from genesis (needs a mainnet relaunch). For an in-place fork set tip+margin.
 difficulty_fork_height = 0

@@ -65,6 +65,26 @@ std::string tx_to_line(const Transaction& tx) {
     return oss.str();
 }
 
+std::string vote_fields(const StakeVote& v) {
+    std::ostringstream oss;
+    oss << v.ticket_id << '|' << v.voted_height << '|' << v.voted_hash << '|' << (v.approve ? 1 : 0) << '|'
+        << v.signature;
+    return oss.str();
+}
+
+bool parse_vote_fields(std::istringstream& is, StakeVote& v) {
+    std::string h;
+    std::string a;
+    if (!std::getline(is, v.ticket_id, '|') || !std::getline(is, h, '|') ||
+        !std::getline(is, v.voted_hash, '|') || !std::getline(is, a, '|') ||
+        !std::getline(is, v.signature, '|')) {
+        return false;
+    }
+    v.voted_height = std::stoull(h);
+    v.approve = (a == "1");
+    return true;
+}
+
 bool parse_tx_lines(std::istringstream& iss, Transaction& tx, std::string& error) {
     tx = Transaction{};
 
@@ -195,6 +215,12 @@ bool StateStore::save_chain(const Chain& chain, std::string& error) const {
         for (const auto& tx : b.transactions) {
             blocks << tx_to_line(tx);
         }
+        for (const auto& v : b.votes) {
+            blocks << "V|" << vote_fields(v) << '\n';
+        }
+        for (const auto& sl : b.slashes) {
+            blocks << "S|" << vote_fields(sl.a) << '|' << vote_fields(sl.b) << '\n';
+        }
         blocks << "Z\n";
     }
     return write_text(blocks_path(), blocks.str(), error);
@@ -247,6 +273,26 @@ bool StateStore::load_chain(Chain& chain, std::string& error) const {
         for (std::string tline; std::getline(iss, tline);) {
             if (tline == "Z") {
                 break;
+            }
+            if (tline.rfind("V|", 0) == 0) {
+                std::istringstream vs(tline.substr(2));
+                StakeVote v{};
+                if (!parse_vote_fields(vs, v)) {
+                    error = "chain load failed: invalid vote line";
+                    return false;
+                }
+                b.votes.push_back(std::move(v));
+                continue;
+            }
+            if (tline.rfind("S|", 0) == 0) {
+                std::istringstream vs(tline.substr(2));
+                SlashEvidence sl{};
+                if (!parse_vote_fields(vs, sl.a) || !parse_vote_fields(vs, sl.b)) {
+                    error = "chain load failed: invalid slash line";
+                    return false;
+                }
+                b.slashes.push_back(std::move(sl));
+                continue;
             }
             if (tline.rfind("T|", 0) == 0) {
                 Transaction tx{};

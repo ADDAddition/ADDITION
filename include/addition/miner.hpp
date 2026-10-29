@@ -8,7 +8,9 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <string>
+#include <vector>
 
 namespace addition {
 
@@ -42,6 +44,9 @@ public:
                          std::size_t threads,
                          std::string& mined_hash,
                          std::string& error);
+    // Optional source of stake votes on the current tip (e.g. the node's
+    // relayed vote pool). When set, blocks are mined through the vote path.
+    void set_vote_source(std::function<std::vector<StakeVote>()> source) { vote_source_ = std::move(source); }
     void request_stop();
     void clear_stop();
     double last_tps() const;
@@ -54,6 +59,7 @@ private:
     Chain& chain_;
     Mempool& mempool_;
     std::atomic<bool> stop_{false};
+    std::function<std::vector<StakeVote>()> vote_source_;
     double last_tps_{0.0};
     std::uint64_t last_mine_ms_{0};
     std::size_t last_mined_txs_{0};

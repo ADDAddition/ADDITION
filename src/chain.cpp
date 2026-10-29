@@ -11,6 +11,7 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <unordered_set>
 #include <vector>
 
 namespace addition {
@@ -71,6 +72,9 @@ void Chain::reset() {
     total_emitted_ = 0;
     total_fees_last_block_ = 0;
     cumulative_work_ = 0;
+    tickets_.clear();
+    total_slashed_ = 0;
+    applying_height_ = 0;
 
     auto g = make_genesis();
     blocks_.push_back(g);
@@ -179,12 +183,12 @@ bool Chain::hash_meets_target(const std::string& hex_hash, std::uint64_t target)
 }
 
 std::uint64_t Chain::compute_block_reward(std::uint64_t h) const {
-    return scheduled_block_subsidy(h, cfg_.block_reward, cfg_.halving_interval, cfg_.tail_emission_reward);
+    return scheduled_block_subsidy(h, cfg_.block_reward, cfg_.halving_interval, cfg_.subsidy_floor);
 }
 
 std::uint64_t Chain::max_mintable_at(std::uint64_t h) const {
     return max_mintable_subsidy(h, total_emitted_, cfg_.max_supply, cfg_.block_reward,
-                                cfg_.halving_interval, cfg_.tail_emission_reward);
+                                cfg_.halving_interval, cfg_.subsidy_floor);
 }
 
 std::uint64_t Chain::clamp_difficulty_target(std::uint64_t target) const {
@@ -350,7 +354,7 @@ bool Chain::build_transaction(const std::string& from,
     std::vector<TxInput> selected;
 
     for (const auto& [key, utxo] : utxo_set_) {
-        if (utxo.spent || utxo.owner != from) {
+        if (utxo.spent || utxo.owner != from || utxo.spendable_height > height() + 1) {
             continue;
         }
 
@@ -392,7 +396,7 @@ bool Chain::validate_transaction(const Transaction& tx, std::string& error) cons
 }
 
 bool Chain::validate_transaction(const Transaction& tx, std::string& error, bool check_signature) const {
-    if (tx.outputs.empty()) {
+    if (tx.outputs.empty() && !(tx.inputs.empty() && applying_height_ != 0)) {
         error = "transaction has no outputs";
         return false;
     }
@@ -419,7 +423,15 @@ bool Chain::validate_transaction(const Transaction& tx, std::string& error, bool
             error = "coinbase must not be signed";
             return false;
         }
-        if (outputs_total > std::max(cfg_.block_reward, cfg_.tail_emission_reward) + tx.fee) {
+        for (const auto& out : tx.outputs) {
+            if (out.recipient == kStakeAddress) {
+                error = "coinbase cannot lock stake";
+                return false;
+            }
+        }
+        // Inside a block the coinbase total (subsidy + fees) is enforced by
+        // validate_block_transactions; standalone it may not exceed the subsidy.
+        if (applying_height_ == 0 && outputs_total > cfg_.block_reward + tx.fee) {
             error = "coinbase exceeds allowed emission";
             return false;
         }
@@ -456,11 +468,42 @@ bool Chain::validate_transaction(const Transaction& tx, std::string& error, bool
             error = "input utxo not found or spent";
             return false;
         }
+        if (it->second.spendable_height > context_height()) {
+            error = "input still unbonding (spendable at height " +
+                    std::to_string(it->second.spendable_height) + ")";
+            return false;
+        }
         if (inputs_total > (std::numeric_limits<std::uint64_t>::max() - it->second.amount)) {
             error = "inputs overflow";
             return false;
         }
         inputs_total += it->second.amount;
+    }
+
+    {
+        bool spends_ticket = false;
+        for (const auto& in : tx.inputs) {
+            if (tickets_.count(outpoint_key(in.previous_txid, in.output_index)) > 0) {
+                spends_ticket = true;
+            }
+        }
+        for (const auto& out : tx.outputs) {
+            if (out.recipient != kStakeAddress) {
+                continue;
+            }
+            if (spends_ticket) {
+                error = "stake unlock cannot create new stake";
+                return false;
+            }
+            if (!staking_active_at(context_height())) {
+                error = "staking not active";
+                return false;
+            }
+            if (out.amount < cfg_.stake_min_amount) {
+                error = "stake below minimum (" + std::to_string(cfg_.stake_min_amount) + ")";
+                return false;
+            }
+        }
     }
 
     if (outputs_total > (std::numeric_limits<std::uint64_t>::max() - tx.fee)) {
@@ -486,14 +529,16 @@ Block Chain::make_block_template(const std::string& reward_address,
     b.header.difficulty_target = difficulty_target_;
 
     Transaction coinbase{};
-    coinbase.outputs.push_back(TxOutput{reward_address, reward});
+    if (reward > 0) {
+        coinbase.outputs.push_back(TxOutput{reward_address, reward});
+    }
     coinbase.nonce = b.header.height;
 
     b.transactions.push_back(std::move(coinbase));
     for (auto& tx : txs) {
         b.transactions.push_back(std::move(tx));
     }
-    b.header.merkle_root = compute_merkle_root(b.transactions);
+    b.header.merkle_root = compute_block_commitment(b);
     return b;
 }
 
@@ -503,9 +548,66 @@ bool Chain::mine_and_add_block(const std::string& reward_address,
                                std::string& mined_hash,
                                std::string& error,
                                std::atomic<bool>* stop) {
-    const auto reward = max_mintable_at(height() + 1);
-    auto b = make_block_template(reward_address, std::move(txs), reward);
+    return mine_and_add_block_with_votes(reward_address, std::move(txs), {}, {}, threads,
+                                         mined_hash, error, stop);
+}
 
+bool Chain::mine_and_add_block_with_votes(const std::string& reward_address,
+                                          std::vector<Transaction> txs,
+                                          std::vector<StakeVote> votes,
+                                          std::vector<SlashEvidence> slashes,
+                                          std::size_t threads,
+                                          std::string& mined_hash,
+                                          std::string& error,
+                                          std::atomic<bool>* stop) {
+    const auto h = height() + 1;
+    if (!staking_active_at(h)) {
+        votes.clear();
+        slashes.clear();
+    }
+    std::uint64_t fees = 0;
+    for (const auto& tx : txs) {
+        fees += tx.fee;
+    }
+    // Miners are paid subsidy + fees (fees were previously never collected).
+    const auto pot = max_mintable_at(h) + fees;
+    std::vector<const StakeVote*> approvals;
+    for (const auto& v : votes) {
+        if (v.approve) {
+            approvals.push_back(&v);
+        }
+    }
+    if (stake_votes_required_for_next_block() && approvals.size() < cfg_.stake_vote_quorum) {
+        error = "insufficient stake votes (" + std::to_string(approvals.size()) + "/" +
+                std::to_string(cfg_.stake_vote_quorum) + ")";
+        return false;
+    }
+    const auto per_vote = approvals.empty()
+                              ? 0ULL
+                              : stake_reward_per_vote(pot, cfg_.stake_reward_bps, approvals.size());
+    const auto stakers_total = per_vote * approvals.size();
+    auto b = make_block_template(reward_address, std::move(txs), pot - stakers_total);
+    if (pot - stakers_total == 0) {
+        b.transactions.front().outputs.clear();
+    }
+    if (per_vote > 0) {
+        for (const auto* v : approvals) {
+            const auto t = tickets_.find(v->ticket_id);
+            if (t == tickets_.end()) {
+                error = "vote for unknown ticket";
+                return false;
+            }
+            b.transactions.front().outputs.push_back(TxOutput{t->second.owner, per_vote});
+        }
+    }
+    b.votes = std::move(votes);
+    b.slashes = std::move(slashes);
+    b.header.merkle_root = compute_block_commitment(b);
+    return mine_block(std::move(b), threads, mined_hash, error, stop);
+}
+
+bool Chain::mine_block(Block b, std::size_t threads, std::string& mined_hash, std::string& error,
+                       std::atomic<bool>* stop) {
     PowSearchConfig search_cfg{};
     search_cfg.algorithm = cfg_.pow_algorithm;
     search_cfg.target = b.header.difficulty_target;
@@ -568,17 +670,28 @@ bool Chain::validate_transaction_signature(const Transaction& tx, std::string& e
         return false;
     }
 
-    bool owns_any_input = false;
+    // Every input must be controlled by the signer (a stake ticket by its owner).
+    bool owns_all_inputs = !tx.inputs.empty();
     for (const auto& in : tx.inputs) {
         const auto key = outpoint_key(in.previous_txid, in.output_index);
         const auto it = utxo_set_.find(key);
-        if (it != utxo_set_.end() && !it->second.spent && it->second.owner == tx.signer) {
-            owns_any_input = true;
+        if (it == utxo_set_.end() || it->second.spent) {
+            owns_all_inputs = false;
+            break;
+        }
+        if (it->second.owner == kStakeAddress) {
+            const auto t = tickets_.find(key);
+            if (t == tickets_.end() || t->second.owner != tx.signer) {
+                owns_all_inputs = false;
+                break;
+            }
+        } else if (it->second.owner != tx.signer) {
+            owns_all_inputs = false;
             break;
         }
     }
 
-    if (!owns_any_input) {
+    if (!owns_all_inputs) {
         error = "signer does not control inputs";
         return false;
     }
@@ -608,6 +721,7 @@ bool Chain::apply_transaction(const Transaction& tx,
     if (!validate_transaction(tx, error, check_signature)) {
         return false;
     }
+    bool unlocking = false;
 
     for (const auto& in : tx.inputs) {
         const auto key = outpoint_key(in.previous_txid, in.output_index);
@@ -622,11 +736,21 @@ bool Chain::apply_transaction(const Transaction& tx,
         } else {
             address_index_[it->second.owner] = 0;
         }
+        if (tickets_.erase(key) > 0) {
+            unlocking = true;
+        }
     }
 
+    const auto h = context_height();
     for (std::uint32_t i = 0; i < tx.outputs.size(); ++i) {
         const auto key = outpoint_key(txid, i);
         UTXO out{tx.outputs[i].recipient, tx.outputs[i].amount, false};
+        if (unlocking) {
+            out.spendable_height = h + cfg_.stake_unbond_delay;
+        }
+        if (out.owner == kStakeAddress) {
+            tickets_[key] = StakeTicket{key, tx.signer, tx.signer_pubkey, out.amount, h};
+        }
         utxo_set_[key] = out;
         if (address_index_[out.owner] > (std::numeric_limits<std::uint64_t>::max() - out.amount)) {
             error = "balance index overflow";
@@ -657,7 +781,7 @@ bool Chain::validate_block_header(const Block& candidate, std::string& error) co
         return false;
     }
 
-    if (candidate.header.merkle_root != compute_merkle_root(candidate.transactions)) {
+    if (candidate.header.merkle_root != compute_block_commitment(candidate)) {
         error = "invalid merkle root";
         return false;
     }
@@ -711,7 +835,8 @@ bool Chain::validate_block_transactions(const Block& candidate, std::string& err
         return false;
     }
     if (coinbase.outputs.empty()) {
-        if (!cfg_.allow_zero_reward_blocks) {
+        // Allowed once nothing is mintable (cap reached) or on zero-reward nets.
+        if (!cfg_.allow_zero_reward_blocks && max_mintable_at(candidate.header.height) != 0) {
             error = "coinbase must have output";
             return false;
         }
@@ -760,7 +885,7 @@ bool Chain::validate_block_transactions(const Block& candidate, std::string& err
     auto snapshot_utxo = utxo_set_;
     auto snapshot_index = address_index_;
     for (const auto& tx : candidate.transactions) {
-        if (tx.outputs.empty()) {
+        if (tx.outputs.empty() && !(&tx == &coinbase && coinbase_total == 0)) {
             error = "tx outputs empty";
             return false;
         }
@@ -784,6 +909,10 @@ bool Chain::validate_block_transactions(const Block& candidate, std::string& err
             auto it = snapshot_utxo.find(key);
             if (it == snapshot_utxo.end() || it->second.spent) {
                 error = "invalid or spent input in block";
+                return false;
+            }
+            if (it->second.spendable_height > candidate.header.height) {
+                error = "input still unbonding";
                 return false;
             }
             if (inputs_total > (std::numeric_limits<std::uint64_t>::max() - it->second.amount)) {
@@ -850,7 +979,7 @@ bool Chain::validate_block_transactions(const Block& candidate, std::string& err
         last_batch_verify_count_ = accepted;
     }
 
-    return true;
+    return validate_block_staking(candidate, error);
 }
 
 std::uint64_t Chain::last_batch_verify_ms() const {
@@ -886,10 +1015,20 @@ bool Chain::add_block(const Block& block, std::string& error) {
     const auto blocks_snapshot_size = blocks_.size();
     const auto work_snapshot = cumulative_work_;
     const auto diff_snapshot = difficulty_target_;
+    auto tickets_snapshot = tickets_;
+    const auto slashed_snapshot = total_slashed_;
+
+    struct ApplyGuard {
+        std::uint64_t& ref;
+        ~ApplyGuard() { ref = 0; }
+    } guard{applying_height_};
+    applying_height_ = block.header.height;
 
     for (const auto& tx : block.transactions) {
         const auto txid = hash_transaction(tx);
         if (!apply_transaction(tx, txid, error, false)) {
+            tickets_ = std::move(tickets_snapshot);
+            total_slashed_ = slashed_snapshot;
             utxo_set_ = std::move(utxo_snapshot);
             address_index_ = std::move(index_snapshot);
             seen_transactions_ = std::move(seen_snapshot);
@@ -914,6 +1053,22 @@ bool Chain::add_block(const Block& block, std::string& error) {
         fees += block.transactions[i].fee;
     }
     total_fees_last_block_ = fees;
+
+    // Equivocation: burn the ticket (coins destroyed, never re-minted).
+    for (const auto& ev : block.slashes) {
+        const auto t = tickets_.find(ev.a.ticket_id);
+        if (t == tickets_.end()) {
+            continue;
+        }
+        auto u = utxo_set_.find(ev.a.ticket_id);
+        if (u != utxo_set_.end() && !u->second.spent) {
+            u->second.spent = true;
+            auto& bal = address_index_[u->second.owner];
+            bal = bal >= u->second.amount ? bal - u->second.amount : 0;
+            total_slashed_ += u->second.amount;
+        }
+        tickets_.erase(t);
+    }
 
     if (!block.transactions.empty()) {
         std::uint64_t coinbase_total = 0;
@@ -962,6 +1117,8 @@ bool Chain::replace_with_chain(const std::vector<Block>& candidate,
     auto old_emitted = total_emitted_;
     auto old_fees = total_fees_last_block_;
     auto old_work = cumulative_work_;
+    auto old_tickets = tickets_;
+    auto old_slashed = total_slashed_;
 
     bool accepted = false;
     {
@@ -981,6 +1138,8 @@ bool Chain::replace_with_chain(const std::vector<Block>& candidate,
                 total_emitted_ = old_emitted;
                 total_fees_last_block_ = old_fees;
                 cumulative_work_ = old_work;
+                tickets_ = old_tickets;
+                total_slashed_ = old_slashed;
                 error = "invalid candidate at height " + std::to_string(i) + ": " + add_err;
                 --suppress_commit_;
                 return false;
@@ -998,6 +1157,8 @@ bool Chain::replace_with_chain(const std::vector<Block>& candidate,
             total_emitted_ = old_emitted;
             total_fees_last_block_ = old_fees;
             cumulative_work_ = old_work;
+            tickets_ = old_tickets;
+            total_slashed_ = old_slashed;
             error = "candidate work not higher";
             --suppress_commit_;
             return false;
@@ -1010,6 +1171,309 @@ bool Chain::replace_with_chain(const std::vector<Block>& candidate,
         notify_commit();
     }
     return true;
+}
+
+// ---------------------------------------------------------------------------
+// Consensus staking
+// ---------------------------------------------------------------------------
+
+std::uint64_t Chain::context_height() const {
+    return applying_height_ != 0 ? applying_height_ : height() + 1;
+}
+
+bool Chain::staking_active_at(std::uint64_t h) const {
+    return h >= cfg_.staking_activation_height;
+}
+
+std::vector<StakeTicket> Chain::tickets() const {
+    std::vector<StakeTicket> out;
+    for (const auto& [id, t] : tickets_) {
+        out.push_back(t);
+    }
+    return out;
+}
+
+std::vector<StakeTicket> Chain::tickets_of(const std::string& owner) const {
+    std::vector<StakeTicket> out;
+    for (const auto& [id, t] : tickets_) {
+        if (t.owner == owner) {
+            out.push_back(t);
+        }
+    }
+    return out;
+}
+
+std::optional<StakeTicket> Chain::ticket(const std::string& id) const {
+    const auto it = tickets_.find(id);
+    if (it == tickets_.end()) {
+        return std::nullopt;
+    }
+    return it->second;
+}
+
+std::uint64_t Chain::staked_of(const std::string& owner) const {
+    std::uint64_t sum = 0;
+    for (const auto& [id, t] : tickets_) {
+        if (t.owner == owner) {
+            sum += t.amount;
+        }
+    }
+    return sum;
+}
+
+std::uint64_t Chain::total_staked() const {
+    std::uint64_t sum = 0;
+    for (const auto& [id, t] : tickets_) {
+        sum += t.amount;
+    }
+    return sum;
+}
+
+std::vector<StakeTicket> Chain::eligible_tickets_at(std::uint64_t voted_height) const {
+    std::vector<StakeTicket> out;
+    for (const auto& [id, t] : tickets_) {
+        if (t.lock_height + cfg_.stake_maturity <= voted_height) {
+            out.push_back(t);
+        }
+    }
+    return out;
+}
+
+std::vector<StakeTicket> Chain::eligible_tickets_for_next_block() const {
+    return eligible_tickets_at(height());
+}
+
+std::vector<std::string> Chain::selected_tickets_for_next_block() const {
+    if (!staking_active_at(height() + 1)) {
+        return {};
+    }
+    return select_tickets(eligible_tickets_for_next_block(), hash_block_header(tip().header),
+                          cfg_.stake_votes_per_block);
+}
+
+bool Chain::stake_votes_required_for_next_block() const {
+    return staking_active_at(height() + 1) &&
+           eligible_tickets_for_next_block().size() >= cfg_.stake_min_live_tickets;
+}
+
+std::string Chain::stake_vote_message_for(std::uint64_t voted_height,
+                                          const std::string& voted_hash,
+                                          const std::string& ticket_id,
+                                          bool approve) const {
+    return stake_vote_message(cfg_.network_id, voted_height, voted_hash, ticket_id, approve);
+}
+
+namespace {
+bool vote_signature_ok(const StakeTicket& t, const std::string& network_id, const StakeVote& v) {
+    if (v.signature.rfind("pq=", 0) != 0) {
+        return false;
+    }
+    const auto msg = stake_vote_message(network_id, v.voted_height, v.voted_hash, v.ticket_id, v.approve);
+    return verify_message_signature_hybrid(t.owner_pubkey, msg, v.signature);
+}
+} // namespace
+
+bool Chain::verify_stake_vote(const StakeVote& v, std::string& error) const {
+    if (v.voted_height != height() || v.voted_hash != hash_block_header(tip().header)) {
+        error = "vote is not on the current tip";
+        return false;
+    }
+    const auto sel = selected_tickets_for_next_block();
+    if (std::find(sel.begin(), sel.end(), v.ticket_id) == sel.end()) {
+        error = "ticket not selected for this block";
+        return false;
+    }
+    const auto t = tickets_.find(v.ticket_id);
+    if (t == tickets_.end()) {
+        error = "unknown ticket";
+        return false;
+    }
+    if (!vote_signature_ok(t->second, cfg_.network_id, v)) {
+        error = "invalid vote signature";
+        return false;
+    }
+    return true;
+}
+
+std::vector<StakeVote> Chain::usable_votes_for_next_block(const std::vector<StakeVote>& pool) const {
+    std::vector<StakeVote> out;
+    std::unordered_set<std::string> used;
+    for (const auto& v : pool) {
+        if (!v.approve || used.count(v.ticket_id) > 0) {
+            continue;
+        }
+        std::string err;
+        if (!verify_stake_vote(v, err)) {
+            continue;
+        }
+        used.insert(v.ticket_id);
+        out.push_back(v);
+        if (out.size() >= cfg_.stake_votes_per_block) {
+            break;
+        }
+    }
+    return out;
+}
+
+bool Chain::validate_slash(const SlashEvidence& ev, std::string& error) const {
+    const auto& a = ev.a;
+    const auto& b = ev.b;
+    if (a.ticket_id != b.ticket_id || a.voted_height != b.voted_height) {
+        error = "slash: votes are not from the same ticket/height";
+        return false;
+    }
+    if (a.voted_hash == b.voted_hash && a.approve == b.approve) {
+        error = "slash: votes do not conflict";
+        return false;
+    }
+    const auto t = tickets_.find(a.ticket_id);
+    if (t == tickets_.end()) {
+        error = "slash: unknown or spent ticket";
+        return false;
+    }
+    if (!vote_signature_ok(t->second, cfg_.network_id, a) || !vote_signature_ok(t->second, cfg_.network_id, b)) {
+        error = "slash: invalid vote signature";
+        return false;
+    }
+    return true;
+}
+
+bool Chain::validate_block_staking(const Block& candidate, std::string& error) const {
+    const auto h = candidate.header.height;
+    if (!staking_active_at(h)) {
+        if (!candidate.votes.empty() || !candidate.slashes.empty()) {
+            error = "votes/slashes before staking activation";
+            return false;
+        }
+        return true;
+    }
+    std::unordered_set<std::string> slashed;
+    for (const auto& ev : candidate.slashes) {
+        if (!validate_slash(ev, error)) {
+            return false;
+        }
+        if (!slashed.insert(ev.a.ticket_id).second) {
+            error = "duplicate slash evidence";
+            return false;
+        }
+    }
+
+    // Votes are validated against the parent (current tip) state.
+    const auto voted_height = h - 1;
+    const auto& voted_hash = candidate.header.previous_hash;
+    const auto eligible = eligible_tickets_at(voted_height);
+    const auto selected = select_tickets(eligible, voted_hash, cfg_.stake_votes_per_block);
+    if (candidate.votes.size() > selected.size()) {
+        error = "too many votes";
+        return false;
+    }
+    std::unordered_set<std::string> seen;
+    std::vector<std::string> approving_owners;
+    for (const auto& v : candidate.votes) {
+        if (v.voted_height != voted_height || v.voted_hash != voted_hash) {
+            error = "vote not on parent block";
+            return false;
+        }
+        if (std::find(selected.begin(), selected.end(), v.ticket_id) == selected.end()) {
+            error = "vote from unselected ticket";
+            return false;
+        }
+        if (!seen.insert(v.ticket_id).second) {
+            error = "duplicate vote";
+            return false;
+        }
+        const auto t = tickets_.find(v.ticket_id);
+        if (t == tickets_.end() || !vote_signature_ok(t->second, cfg_.network_id, v)) {
+            error = "invalid stake vote signature";
+            return false;
+        }
+        if (v.approve) {
+            approving_owners.push_back(t->second.owner);
+        }
+    }
+    if (eligible.size() >= cfg_.stake_min_live_tickets && approving_owners.size() < cfg_.stake_vote_quorum) {
+        error = "insufficient stake votes";
+        return false;
+    }
+
+    // Coinbase layout: [miner?, one output per approving vote in vote order].
+    if (!approving_owners.empty()) {
+        std::uint64_t fees = 0;
+        for (std::size_t i = 1; i < candidate.transactions.size(); ++i) {
+            fees += candidate.transactions[i].fee;
+        }
+        const auto pot = max_mintable_at(h) + fees;
+        const auto per = stake_reward_per_vote(pot, cfg_.stake_reward_bps, approving_owners.size());
+        if (per > 0) {
+            const auto& outs = candidate.transactions.front().outputs;
+            const auto n = approving_owners.size();
+            if (outs.size() < n) {
+                error = "coinbase missing staker rewards";
+                return false;
+            }
+            const auto base = outs.size() - n;
+            for (std::size_t k = 0; k < n; ++k) {
+                if (outs[base + k].recipient != approving_owners[k] || outs[base + k].amount != per) {
+                    error = "coinbase staker reward mismatch";
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
+bool Chain::build_stake_lock(const std::string& from,
+                             std::uint64_t amount,
+                             std::uint64_t fee,
+                             std::uint64_t nonce,
+                             Transaction& out_tx,
+                             std::string& error) const {
+    if (!staking_active_at(height() + 1)) {
+        error = "staking not active";
+        return false;
+    }
+    if (amount < cfg_.stake_min_amount) {
+        error = "stake below minimum (" + std::to_string(cfg_.stake_min_amount) + ")";
+        return false;
+    }
+    Transaction tx;
+    if (!build_transaction(from, kStakeAddress, amount, fee, nonce, tx, error)) {
+        return false;
+    }
+    out_tx = std::move(tx);
+    return true;
+}
+
+bool Chain::build_stake_unlock(const std::string& ticket_id,
+                               std::uint64_t fee,
+                               std::uint64_t nonce,
+                               Transaction& out_tx,
+                               std::string& error) const {
+    const auto t = tickets_.find(ticket_id);
+    if (t == tickets_.end()) {
+        error = "unknown ticket";
+        return false;
+    }
+    if (t->second.amount <= fee) {
+        error = "fee exceeds ticket amount";
+        return false;
+    }
+    const auto sep = ticket_id.rfind(':');
+    TxInput in{};
+    in.previous_txid = ticket_id.substr(0, sep);
+    in.output_index = static_cast<std::uint32_t>(std::stoul(ticket_id.substr(sep + 1)));
+    out_tx = Transaction{};
+    out_tx.inputs.push_back(in);
+    out_tx.outputs.push_back(TxOutput{t->second.owner, t->second.amount - fee});
+    out_tx.fee = fee;
+    out_tx.nonce = nonce;
+    return true;
+}
+
+std::uint64_t Chain::spendable_height_of(const std::string& outpoint) const {
+    const auto it = utxo_set_.find(outpoint);
+    return it == utxo_set_.end() ? 0 : it->second.spendable_height;
 }
 
 } // namespace addition

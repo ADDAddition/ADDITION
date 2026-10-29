@@ -225,28 +225,22 @@ def main() -> int:
         if "owner=bob" not in nft_info or meta not in nft_info:
             return fail("nft_info: " + nft_info)
 
-        if tcp_rpc("127.0.0.1", ports["write"], "stake " + alice_addr + " 40") != "ok":
-            return fail("stake")
-        if tcp_rpc("127.0.0.1", ports["write"], "getbalance " + alice_addr) != "54":
-            # 50 coinbase + 50 second mine - 5 send - 1 fee - 40 stake = 54
-            live = tcp_rpc("127.0.0.1", ports["write"], "getbalance " + alice_addr)
-            if live != "54":
-                return fail("getbalance after stake: " + live)
-        if tcp_rpc("127.0.0.1", ports["write"], "staked " + alice_addr) != "40":
+        # On-chain staking: wallet-signed locally; testnet has staking inactive by default.
+        info_s = tcp_rpc("127.0.0.1", ports["write"], "stake_info")
+        if "total_staked=0" not in info_s or "active=" not in info_s:
+            return fail("stake_info: " + info_s)
+        st = tcp_rpc("127.0.0.1", ports["write"], "stake alice 40")
+        if not st.startswith("error:"):
+            return fail("stake should be rejected while inactive/below min: " + st)
+        if tcp_rpc("127.0.0.1", ports["write"], "staked " + alice_addr) != "0":
             return fail("staked")
-        if tcp_rpc("127.0.0.1", ports["write"], "stake_reward 100") != "ok":
-            return fail("stake_reward")
-        claimed = tcp_rpc("127.0.0.1", ports["write"], "stake_claim " + alice_addr)
-        if claimed in {"0", ""} or claimed.startswith("error:"):
-            return fail("stake_claim: " + claimed)
-        after_claim = int(tcp_rpc("127.0.0.1", ports["write"], "getbalance " + alice_addr))
-        if after_claim <= 54:
-            return fail("getbalance after claim: %s" % after_claim)
-        if tcp_rpc("127.0.0.1", ports["write"], "unstake " + alice_addr + " 40") != "ok":
-            return fail("unstake")
-        after_unstake = int(tcp_rpc("127.0.0.1", ports["write"], "getbalance " + alice_addr))
-        if after_unstake <= after_claim:
-            return fail("getbalance after unstake: %s" % after_unstake)
+        if "off-chain staking removed" not in tcp_rpc("127.0.0.1", ports["write"], "stake_reward 100"):
+            return fail("stake_reward must be removed")
+        if "raw private keys are not accepted" not in tcp_rpc(
+                "127.0.0.1", ports["write"], "sign_message " + "ab" * 100 + " 6869"):
+            return fail("sign_message must reject raw private keys")
+        if "pq=" not in tcp_rpc("127.0.0.1", ports["write"], "sign_message alice 6869"):
+            return fail("sign_message by wallet name")
 
         if tcp_rpc("127.0.0.1", ports["write"], "swap_tvl") != "tvl=0":
             return fail("swap_tvl empty")

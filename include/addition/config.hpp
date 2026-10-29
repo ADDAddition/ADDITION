@@ -55,6 +55,27 @@ inline constexpr std::uint64_t kMainnetDifficultyForkHeight = 0ULL;
 // Sentinel: never activate LWMA (legacy window retarget forever).
 // Mainnet minimum tx fee (base units). Consensus: txs below are rejected in blocks.
 inline constexpr std::uint64_t kMainnetMinFee = 1ULL;
+// Hard-capped emission (no tail), 20 s blocks. 4 coins/block, halving every
+// 5,681,819 blocks (~3.6 years) with a floor of 1 coin/block: 4 -> 2 -> 1,
+// then 1/block until the cap. Supply lands on exactly 50,000,000 at height
+// 27,272,727 (~17.3 years); ~99% by ~17.0 years. After that subsidy = 0 and
+// miners/stakers earn fees only. (The floor is clipped by max_supply, so it is
+// not a tail emission.)
+inline constexpr std::uint32_t kMainnetTargetBlockTimeSec = 20U;
+inline constexpr std::uint64_t kMainnetMaxSupply = 50'000'000ULL;
+inline constexpr std::uint64_t kMainnetBlockReward = 4ULL;
+inline constexpr std::uint32_t kMainnetHalvingInterval = 5'681'819U;
+inline constexpr std::uint64_t kMainnetSubsidyFloor = 1ULL;
+inline constexpr std::uint64_t kMainnetCapHeight = 27'272'727ULL;
+// LWMA window kept at ~1 hour of blocks (180 x 20 s).
+inline constexpr std::uint32_t kMainnetLwmaWindow = 180U;
+// Staking windows rescaled x3 in blocks to keep wall-clock time:
+// maturity 768 blocks (~4.3 h), unbonding 4320 blocks (~1 day).
+inline constexpr std::uint64_t kMainnetStakeMaturity = 768ULL;
+inline constexpr std::uint64_t kMainnetStakeUnbondDelay = 4320ULL;
+// Hybrid PoW/PoS defaults (see staking.hpp). Mainnet activation is a
+// launch decision; Never until vote gossip ships in the P2P layer.
+inline constexpr std::uint64_t kStakingNever = UINT64_MAX;
 inline constexpr std::uint64_t kDifficultyForkNever = 0xFFFFFFFFFFFFFFFFULL;
 
 // Testnet mine search deadline. Easy SHA3-512 should finish well inside this.
@@ -70,7 +91,6 @@ struct ChainConfig {
     std::uint64_t genesis_timestamp{1'763'000'000ULL};
     std::uint64_t max_supply{50'000'000ULL};
     std::uint64_t block_reward{50ULL};
-    std::uint64_t tail_emission_reward{1ULL};
     std::uint32_t target_block_time_sec{60U};
     std::uint32_t difficulty_window{120U};
     PowAlgorithm pow_algorithm{PowAlgorithm::Sha3_512};
@@ -90,10 +110,20 @@ struct ChainConfig {
     // Lets mainnet replay its frozen pre-fork history after min was widened.
     std::uint64_t legacy_min_difficulty_target{0ULL};
     std::uint32_t halving_interval{210000U};
+    std::uint64_t subsidy_floor{0ULL}; // min halved reward until the cap (mainnet 1)
     bool require_pq_signatures{true};
     bool require_privacy_pool{true};
     bool allow_zero_reward_blocks{true};
     std::uint64_t min_fee{0ULL};
+    // Hybrid PoW/PoS (Decred-style tickets). Consensus when height >= activation.
+    std::uint64_t staking_activation_height{UINT64_MAX};
+    std::uint64_t stake_min_amount{1000ULL};       // min coins per ticket
+    std::uint64_t stake_maturity{256ULL};          // blocks before a ticket can be selected
+    std::uint64_t stake_unbond_delay{1440ULL};     // blocks unlocked coins stay frozen
+    std::uint32_t stake_votes_per_block{5U};       // tickets selected per block
+    std::uint32_t stake_vote_quorum{3U};           // approving votes required
+    std::uint64_t stake_min_live_tickets{5ULL};    // below this pool size, votes are optional
+    std::uint32_t stake_reward_bps{3000U};         // stakers' share of subsidy+fees (30%)
     std::vector<std::string> bootstrap_peers{"127.0.0.1:28545"};
 };
 

@@ -46,8 +46,7 @@ Relevant commands (see [FINAL_COMMANDS.md](FINAL_COMMANDS.md)):
 Legacy `sendtx` / `sendtx_hash` (private key on the RPC line) stay **disabled**
 unless `ADDITION_ALLOW_INSECURE_TX_COMMANDS=1`. Leave that unset.
 
-`sign_message <privkey_hex> ...` still exists on the daemon. The standalone
-client does **not** call it.
+`sign_message <wallet_name> <msg_hex>` signs with a local wallet file; raw private keys are rejected over RPC.
 
 The site `/wallet/` page uses `wallet_send` against public `38546` when
 available (via `/api/rpc`), or `data/wallets/` on a home node via `/local-rpc`.
