@@ -1,4 +1,5 @@
 #include "addition/chain.hpp"
+#include "addition/script.hpp"
 
 #include "addition/crypto.hpp"
 #include "addition/miner.hpp"
@@ -431,11 +432,30 @@ bool Chain::validate_transaction(const Transaction& tx, std::string& error, bool
         return false;
     }
 
-    if (!validate_transaction_signature(tx, error, check_signature)) {
+    const bool script_tx = tx.signer.empty();
+    if (script_tx) {
+        // Script spend: no account signer/nonce; every input is authorized by its witness.
+        if (!tx.signature.empty() || !tx.signer_pubkey.empty()) {
+            error = "script tx must not carry a signer signature";
+            return false;
+        }
+        if (!validate_script_inputs(tx, error)) {
+            return false;
+        }
+    } else {
+        for (const auto& in : tx.inputs) {
+            if (!in.witness.empty()) {
+                error = "witness on signer-authorized input";
+                return false;
+            }
+        }
+    }
+
+    if (!script_tx && !validate_transaction_signature(tx, error, check_signature)) {
         return false;
     }
 
-    {
+    if (!script_tx) {
         const auto it = signer_last_nonce_.find(tx.signer);
         if (it != signer_last_nonce_.end() && tx.nonce <= it->second) {
             error = "nonce replay or out-of-order";
@@ -541,6 +561,27 @@ bool Chain::mine_and_add_block(const std::string& reward_address,
     return false;
 }
 
+bool Chain::validate_script_inputs(const Transaction& tx, std::string& error) const {
+    script::SpendContext ctx;
+    ctx.sighash = script::sighash(tx);
+    ctx.spend_height = height() + 1;  // tx is valid for inclusion in the next block
+    for (std::size_t i = 0; i < tx.inputs.size(); ++i) {
+        const auto& in = tx.inputs[i];
+        const auto it = utxo_set_.find(outpoint_key(in.previous_txid, in.output_index));
+        if (it == utxo_set_.end() || it->second.spent) {
+            error = "input utxo not found or spent";
+            return false;
+        }
+        ctx.utxo_height = it->second.height;
+        std::string e;
+        if (!script::verify_input(it->second.owner, in.witness, ctx, e)) {
+            error = "input " + std::to_string(i) + ": " + e;
+            return false;
+        }
+    }
+    return true;
+}
+
 bool Chain::validate_transaction_signature(const Transaction& tx, std::string& error) const {
     return validate_transaction_signature(tx, error, true);
 }
@@ -626,7 +667,7 @@ bool Chain::apply_transaction(const Transaction& tx,
 
     for (std::uint32_t i = 0; i < tx.outputs.size(); ++i) {
         const auto key = outpoint_key(txid, i);
-        UTXO out{tx.outputs[i].recipient, tx.outputs[i].amount, false};
+        UTXO out{tx.outputs[i].recipient, tx.outputs[i].amount, false, height() + 1};
         utxo_set_[key] = out;
         if (address_index_[out.owner] > (std::numeric_limits<std::uint64_t>::max() - out.amount)) {
             error = "balance index overflow";
@@ -635,7 +676,7 @@ bool Chain::apply_transaction(const Transaction& tx,
         address_index_[out.owner] += out.amount;
     }
 
-    if (!tx.inputs.empty()) {
+    if (!tx.inputs.empty() && !tx.signer.empty()) {
         signer_last_nonce_[tx.signer] = tx.nonce;
     }
 
@@ -811,7 +852,7 @@ bool Chain::validate_block_transactions(const Block& candidate, std::string& err
         const auto txid = hash_transaction(tx);
         for (std::uint32_t i = 0; i < tx.outputs.size(); ++i) {
             const auto key = outpoint_key(txid, i);
-            snapshot_utxo[key] = UTXO{tx.outputs[i].recipient, tx.outputs[i].amount, false};
+            snapshot_utxo[key] = UTXO{tx.outputs[i].recipient, tx.outputs[i].amount, false, candidate.header.height};
             if (snapshot_index[tx.outputs[i].recipient] >
                 (std::numeric_limits<std::uint64_t>::max() - tx.outputs[i].amount)) {
                 error = "balance index overflow";
@@ -825,6 +866,9 @@ bool Chain::validate_block_transactions(const Block& candidate, std::string& err
     jobs.reserve(candidate.transactions.size() > 0 ? candidate.transactions.size() - 1 : 0);
     for (std::size_t i = 1; i < candidate.transactions.size(); ++i) {
         const auto& tx = candidate.transactions[i];
+        if (tx.signer.empty() && tx.signature.empty() && tx.signer_pubkey.empty()) {
+            continue;  // script tx: witnesses verified in apply_transaction (always, even w/o check_signature)
+        }
         if (tx.signer.empty() || tx.signer_pubkey.empty() || tx.signature.rfind("pq=", 0) != 0) {
             error = "non-coinbase tx missing PQ signature";
             return false;

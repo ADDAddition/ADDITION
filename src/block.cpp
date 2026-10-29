@@ -25,6 +25,17 @@ std::string hash_transaction(const Transaction& tx) {
     return strong_hash(oss.str());
 }
 
+std::string hash_transaction_with_witness(const Transaction& tx) {
+    const auto txid = hash_transaction(tx);
+    bool any = false;
+    std::string w = txid + "|wit[";
+    for (const auto& in : tx.inputs) {
+        if (!in.witness.empty()) any = true;
+        w += strong_hash(in.witness) + ";";
+    }
+    return any ? strong_hash(w + "]") : txid;
+}
+
 std::string compute_merkle_root(const std::vector<Transaction>& txs) {
     if (txs.empty()) {
         return strong_hash("empty");
@@ -33,7 +44,7 @@ std::string compute_merkle_root(const std::vector<Transaction>& txs) {
     std::vector<std::string> layer;
     layer.reserve(txs.size());
     for (const auto& tx : txs) {
-        layer.push_back(hash_transaction(tx));
+        layer.push_back(hash_transaction_with_witness(tx));
     }
 
     while (layer.size() > 1) {

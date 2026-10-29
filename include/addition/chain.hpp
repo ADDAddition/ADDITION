@@ -91,6 +91,7 @@ private:
         std::string owner;
         std::uint64_t amount{0};
         bool spent{false};
+        std::uint64_t height{0};  // block height that created it (for older())
     };
 
     ChainConfig cfg_;
@@ -115,6 +116,7 @@ private:
                               std::uint64_t reward) const;
     bool validate_block_header(const Block& candidate, std::string& error) const;
     bool validate_block_transactions(const Block& candidate, std::string& error) const;
+    bool validate_script_inputs(const Transaction& tx, std::string& error) const;
     bool validate_transaction_signature(const Transaction& tx, std::string& error) const;
     bool validate_transaction_signature(const Transaction& tx, std::string& error, bool check_crypto) const;
     std::uint64_t compute_next_difficulty_target() const;

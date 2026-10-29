@@ -9,6 +9,8 @@ namespace addition {
 struct TxInput {
     std::string previous_txid;
     std::uint32_t output_index{0};
+    // Script witness (see script.hpp). Excluded from the txid, committed by the merkle root.
+    std::string witness;
 };
 
 struct TxOutput {
@@ -41,6 +43,7 @@ struct Block {
 };
 
 std::string hash_transaction(const Transaction& tx);
+std::string hash_transaction_with_witness(const Transaction& tx);  // wtxid
 std::string compute_merkle_root(const std::vector<Transaction>& txs);
 std::string hash_block_header(const BlockHeader& header);
 

@@ -40,6 +40,8 @@ add_library(addition_core
     src/crypto.cpp
     src/block.cpp
     src/chain.cpp
+    src/script.cpp
+    src/channel.cpp
     src/consensus_rules.cpp
     src/mempool.cpp
     src/miner.cpp
@@ -60,7 +62,6 @@ add_library(addition_core
     src/privacy.cpp
     src/privacy_zk.cpp
     src/zk_circuit_v1.cpp
-    src/zk_snark_v1.cpp
     src/zk_r1cs.cpp
     src/zk_toy_proof.cpp
     src/fast_path.cpp
@@ -78,6 +79,7 @@ target_include_directories(addition_core PUBLIC ${OQS_INCLUDE_DIR})
 target_link_libraries(addition_core PUBLIC ${OQS_LIBRARY} OpenSSL::SSL OpenSSL::Crypto)
 
 if(ADDITION_BUILD_ZK_SNARK)
+    target_sources(addition_core PRIVATE src/zk_snark_v1.cpp)
     target_include_directories(addition_core PUBLIC ${ADDITION_SNARK_CRATE_DIR}/include)
     add_dependencies(addition_core addition_snark_v1_rust)
     target_link_libraries(addition_core PUBLIC ${ADDITION_SNARK_LIB} pthread dl m)
@@ -97,6 +99,13 @@ if(ADDITION_BUILD_TESTS)
     add_executable(test_chain tests/test_chain.cpp)
     target_link_libraries(test_chain PRIVATE addition_core)
     add_test(NAME test_chain COMMAND test_chain)
+    add_executable(test_channels tests/test_channels.cpp)
+    target_link_libraries(test_channels PRIVATE addition_core)
+    add_test(NAME test_channels COMMAND test_channels)
+    set_tests_properties(test_channels PROPERTIES TIMEOUT 300)
+    add_executable(test_channel_rpc tests/test_channel_rpc.cpp)
+    target_link_libraries(test_channel_rpc PRIVATE addition_core)
+    add_test(NAME test_channel_rpc COMMAND test_channel_rpc)
 
     add_executable(test_consensus_rules tests/test_consensus_rules.cpp)
     target_link_libraries(test_consensus_rules PRIVATE addition_core)

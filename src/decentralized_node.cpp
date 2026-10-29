@@ -1883,7 +1883,11 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
 std::string DecentralizedNode::encode_tx_payload(const Transaction& tx) const {
     std::string bin;
     bin.reserve(256);
-    bin.append("TXB2", 4);
+    bool has_witness = false;
+    for (const auto& in : tx.inputs) has_witness |= !in.witness.empty();
+    // TXB3 = TXB2 + per-input script witness; only emitted when needed so
+    // legacy peers keep decoding ordinary txs.
+    bin.append(has_witness ? "TXB3" : "TXB2", 4);
 
     write_string(bin, tx.signer);
     write_string(bin, tx.signer_pubkey);
@@ -1895,6 +1899,7 @@ std::string DecentralizedNode::encode_tx_payload(const Transaction& tx) const {
     for (const auto& in : tx.inputs) {
         write_string(bin, in.previous_txid);
         write_u32(bin, in.output_index);
+        if (has_witness) write_string(bin, in.witness);
     }
 
     write_u32(bin, static_cast<std::uint32_t>(tx.outputs.size()));
@@ -1918,11 +1923,13 @@ bool DecentralizedNode::decode_tx_payload(const std::string& payload,
         error = "invalid tx payload hex";
         return false;
     }
-    if (bin.size() < 4 || (bin.compare(0, 4, "TXB1") != 0 && bin.compare(0, 4, "TXB2") != 0)) {
+    if (bin.size() < 4 || (bin.compare(0, 4, "TXB1") != 0 && bin.compare(0, 4, "TXB2") != 0 &&
+                           bin.compare(0, 4, "TXB3") != 0)) {
         error = "invalid tx payload magic";
         return false;
     }
-    const bool has_checksum = (bin.compare(0, 4, "TXB2") == 0);
+    const bool has_witness = (bin.compare(0, 4, "TXB3") == 0);
+    const bool has_checksum = (bin.compare(0, 4, "TXB2") == 0) || has_witness;
 
     std::size_t off = 4;
     if (!read_string(bin, off, tx.signer) ||
@@ -1944,7 +1951,8 @@ bool DecentralizedNode::decode_tx_payload(const std::string& payload,
     tx.inputs.reserve(in_count);
     for (std::uint32_t i = 0; i < in_count; ++i) {
         TxInput in{};
-        if (!read_string(bin, off, in.previous_txid) || !read_u32(bin, off, in.output_index)) {
+        if (!read_string(bin, off, in.previous_txid) || !read_u32(bin, off, in.output_index) ||
+            (has_witness && !read_string(bin, off, in.witness))) {
             error = "invalid tx payload input";
             return false;
         }
