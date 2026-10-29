@@ -5,8 +5,7 @@
 #include "addition/config.hpp"
 #include "addition/crypto.hpp"
 #include "addition/fast_path.hpp"
-#include "addition/privacy_zk.hpp"
-#include "addition/zk_circuit_v1.hpp"
+#include "addition/shielded.hpp"
 #include "addition/rpc_access.hpp"
 #include "addition/wallet.hpp"
 #include "addition/wallet_keys.hpp"
@@ -288,15 +287,15 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " mine_threads=" << default_mine_thread_count()
             << " privacy_verifier=sha3_opening"
             << " privacy_mode=sha3_opening"
-            << " privacy_claim=" << live_privacy_claim()
-            << " privacy_zk_roadmap=" << privacy_zk_roadmap_label()
-            << " privacy_zk_backend=" << default_privacy_zk_verifier().backend_id()
+            << " privacy_claim=" << "opening_not_zk"
+            << " privacy_zk_roadmap=" << "shielded_stark_v1_experimental_unaudited"
+            << " privacy_zk_backend=" << (shielded::proof_system_available() ? "risc0_stark_succinct" : "none_fail_closed")
             << " privacy_ok=true"
             << " require_privacy_pool=" << (net.require_privacy_pool ? "true" : "false")
             << " auto_mine=" << (auto_mine_enabled_ ? "on" : "off")
             << " auto_mine_interval_sec=" << auto_mine_interval_sec_
             << fast_path_info_fields(net)
-            << zk_circuit_v1_info_fields()
+            << (std::string(" shielded_enabled=") + (chain_.config().shielded_enabled ? "true" : "false"))
             << " research_goal_is_not_a_measurement=true";
         if (trusted) {
             out << " privacy_master_key=" << (PrivacyPool::master_key_configured() ? "set" : "missing");
@@ -317,15 +316,15 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " privacy_mode=sha3_opening"
             << " privacy_ok=true"
             << " privacy_verifier=sha3_opening"
-            << " privacy_claim=" << live_privacy_claim()
-            << " privacy_zk_roadmap=" << privacy_zk_roadmap_label()
-            << " privacy_zk_backend=" << default_privacy_zk_verifier().backend_id()
+            << " privacy_claim=" << "opening_not_zk"
+            << " privacy_zk_roadmap=" << "shielded_stark_v1_experimental_unaudited"
+            << " privacy_zk_backend=" << (shielded::proof_system_available() ? "risc0_stark_succinct" : "none_fail_closed")
             << " verifier_configured=" << (privacy_.verifier_configured() ? "true" : "false")
             << " pouw_storage_check=first_nibble_parity"
             << " research_goal_tps=" << std::fixed << std::setprecision(0) << kObjectiveTps
             << " research_goal_is_not_a_measurement=true"
             << fast_path_info_fields(chain_.config())
-            << zk_circuit_v1_info_fields();
+            << (std::string(" shielded_enabled=") + (chain_.config().shielded_enabled ? "true" : "false"));
         return out.str();
     }
 
@@ -928,8 +927,8 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << " bench_elapsed_ms=" << elapsed_ms
             << " bench_mempool_before=" << mempool_before
             << " bench_mempool_after=" << mempool_after
-            << " privacy_claim=" << live_privacy_claim()
-            << " privacy_zk_roadmap=" << privacy_zk_roadmap_label()
+            << " privacy_claim=" << "opening_not_zk"
+            << " privacy_zk_roadmap=" << "shielded_stark_v1_experimental_unaudited"
             << " research_goal_tps=" << std::fixed << std::setprecision(0) << kObjectiveTps
             << " research_goal_is_not_a_measurement=true";
         return out.str();
@@ -2316,109 +2315,28 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
     }
 
     if (cmd == "privacy_mint_zk") {
-        std::string owner;
-        std::uint64_t amount = 0;
-        std::string commitment;
-        std::string nullifier;
-        std::string proof_hex;
-        std::string vk_hex;
-        iss >> owner >> amount >> commitment >> nullifier >> proof_hex >> vk_hex;
-        if (owner.empty() || amount == 0 || commitment.empty() || nullifier.empty() || proof_hex.empty() || vk_hex.empty()) {
-            return "error: usage privacy_mint_zk <owner> <amount> <commitment_hex> <nullifier_hex> <proof_hex> <vk_hex>";
-        }
-        std::string error;
-        const auto note_id = privacy_.mint_zk(owner, amount, commitment, nullifier, proof_hex, vk_hex, error);
-        if (!error.empty()) {
-            return "error: " + error;
-        }
-        return note_id + " claim=mldsa_wrap_not_zk";
+        return "error: privacy_mint_zk removed (it was not zero-knowledge); use shielded (addz) transactions";
     }
-
     if (cmd == "privacy_spend_zk") {
-        std::string owner;
-        std::string note_id;
-        std::string recipient;
-        std::uint64_t amount = 0;
-        std::string nullifier;
-        std::string proof_hex;
-        std::string vk_hex;
-        iss >> owner >> note_id >> recipient >> amount >> nullifier >> proof_hex >> vk_hex;
-        if (owner.empty() || note_id.empty() || recipient.empty() || amount == 0 || nullifier.empty() || proof_hex.empty() || vk_hex.empty()) {
-            return "error: usage privacy_spend_zk <owner> <note_id> <recipient> <amount> <nullifier_hex> <proof_hex> <vk_hex>";
-        }
-        std::string new_note;
-        std::string error;
-        if (!privacy_.spend_zk(owner, note_id, recipient, amount, nullifier, proof_hex, vk_hex, new_note, error)) {
-            return "error: " + error;
-        }
-        return new_note + " claim=mldsa_wrap_not_zk";
+        return "error: privacy_spend_zk removed (it was not zero-knowledge); use shielded (addz) transactions";
     }
-
-    // Real ZK path scaffold: fail-closed until a proof backend is wired (see docs/PRIVACY_REAL_V1.md).
     if (cmd == "privacy_mint_zk_v1") {
-        std::string owner;
-        std::uint64_t amount = 0;
-        std::string commitment;
-        std::string nullifier;
-        std::string proof_hex;
-        std::string vk_hex;
-        iss >> owner >> amount >> commitment >> nullifier >> proof_hex >> vk_hex;
-        if (owner.empty() || amount == 0 || commitment.empty() || nullifier.empty() || proof_hex.empty() ||
-            vk_hex.empty()) {
-            return "error: usage privacy_mint_zk_v1 <owner> <amount> <commitment_hex> <nullifier_hex> <proof_hex> <vk_hex>";
-        }
-        ZkMintPublicInputs inputs{owner, amount, commitment, nullifier};
-        ZkProofMaterial proof{proof_hex, vk_hex};
-        std::string error;
-        PrivacyClaimLabel claim = PrivacyClaimLabel::ZkPending;
-        if (!privacy_zk_v1_mint_allowed(inputs, proof, error, claim)) {
-            std::ostringstream out;
-            out << "error: " << error << " claim=" << privacy_claim_label_string(claim);
-            return out.str();
-        }
-        // Unreachable with FailClosedPrivacyZkVerifier; kept for future wired backends.
-        return std::string("error: zk_v1 mint verify succeeded but note mint not implemented yet") +
-               " claim=" + privacy_claim_label_string(PrivacyClaimLabel::ZkPending);
+        return "error: privacy_mint_zk_v1 removed (it was not zero-knowledge); use shielded (addz) transactions";
     }
-
     if (cmd == "privacy_spend_zk_v1") {
-        std::string owner;
-        std::string note_id;
-        std::string recipient;
-        std::uint64_t amount = 0;
-        std::string nullifier;
-        std::string proof_hex;
-        std::string vk_hex;
-        iss >> owner >> note_id >> recipient >> amount >> nullifier >> proof_hex >> vk_hex;
-        if (owner.empty() || note_id.empty() || recipient.empty() || amount == 0 || nullifier.empty() ||
-            proof_hex.empty() || vk_hex.empty()) {
-            return "error: usage privacy_spend_zk_v1 <owner> <note_id> <recipient> <amount> <nullifier_hex> "
-                   "<proof_hex> <vk_hex>";
-        }
-        ZkSpendPublicInputs inputs{owner, note_id, recipient, amount, nullifier};
-        ZkProofMaterial proof{proof_hex, vk_hex};
-        std::string error;
-        PrivacyClaimLabel claim = PrivacyClaimLabel::ZkPending;
-        if (!privacy_zk_v1_spend_allowed(inputs, proof, error, claim)) {
-            std::ostringstream out;
-            out << "error: " << error << " claim=" << privacy_claim_label_string(claim);
-            return out.str();
-        }
-        return std::string("error: zk_v1 spend verify succeeded but note spend not implemented yet") +
-               " claim=" + privacy_claim_label_string(PrivacyClaimLabel::ZkPending);
+        return "error: privacy_spend_zk_v1 removed (it was not zero-knowledge); use shielded (addz) transactions";
     }
-
     if (cmd == "privacy_status") {
         std::ostringstream out;
         out << "opening_verifier=sha3_opening"
             << " privacy_verifier=sha3_opening"
             << " privacy_mode=sha3_opening"
             << " privacy_ok=true"
-            << " claim=" << live_privacy_claim()
-            << " privacy_zk_roadmap=" << privacy_zk_roadmap_label()
-            << " privacy_zk_backend=" << default_privacy_zk_verifier().backend_id()
-            << " zk_v1_wired=" << (default_privacy_zk_verifier().backend_wired() ? "true" : "false")
-            << zk_circuit_v1_info_fields()
+            << " claim=" << "opening_not_zk"
+            << " privacy_zk_roadmap=" << "shielded_stark_v1_experimental_unaudited"
+            << " privacy_zk_backend=" << (shielded::proof_system_available() ? "risc0_stark_succinct" : "none_fail_closed")
+            << " zk_v1_wired=" << (shielded::proof_system_available() ? "true" : "false")
+            << (std::string(" shielded_enabled=") + (chain_.config().shielded_enabled ? "true" : "false"))
             << " legacy_mldsa_wrap=" << privacy_.native_verifier_mode()
             << " verifier_configured=" << (privacy_.verifier_configured() ? "true" : "false")
             << " native_verifier_mode=" << privacy_.native_verifier_mode()

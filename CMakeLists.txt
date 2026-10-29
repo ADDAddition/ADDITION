@@ -6,24 +6,24 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(ADDITION_BUILD_TESTS "Build tests" OFF)
-option(ADDITION_BUILD_ZK_SNARK "Build arkworks Groth16 lab SNARK (Rust)" ON)
+option(ADDITION_BUILD_SHIELDED "Build the RISC Zero STARK shielded-pool prover/verifier (Rust, EXPERIMENTAL)" ON)
 
 find_package(OpenSSL REQUIRED)
 
-# Lab zkSNARK: arkworks Groth16 over BN254 (Poseidon opening). Optional; fail-closed
-# unless ADDITION_ZK_SNARK_V1=1 at runtime. Does not flip live privacy_claim.
-set(ADDITION_SNARK_CRATE_DIR ${CMAKE_SOURCE_DIR}/zk/snark_v1)
-set(ADDITION_SNARK_LIB ${ADDITION_SNARK_CRATE_DIR}/target/release/libaddition_snark_v1.a)
-if(ADDITION_BUILD_ZK_SNARK)
+# Shielded pool proof system: RISC Zero zkVM STARK (hash-based, no trusted setup).
+# EXPERIMENTAL / NOT AUDITED. Without it, nodes reject every shielded tx (fail-closed).
+set(ADDITION_SHIELDED_CRATE_DIR ${CMAKE_SOURCE_DIR}/zk/shielded_stark)
+set(ADDITION_SHIELDED_LIB ${ADDITION_SHIELDED_CRATE_DIR}/target/release/libaddition_shielded_ffi.a)
+if(ADDITION_BUILD_SHIELDED)
     find_program(CARGO_EXECUTABLE cargo REQUIRED)
     add_custom_command(
-        OUTPUT ${ADDITION_SNARK_LIB}
-        COMMAND ${CARGO_EXECUTABLE} build --release --manifest-path ${ADDITION_SNARK_CRATE_DIR}/Cargo.toml
-        WORKING_DIRECTORY ${ADDITION_SNARK_CRATE_DIR}
-        COMMENT "Building addition_snark_v1 (arkworks Groth16)"
+        OUTPUT ${ADDITION_SHIELDED_LIB}
+        COMMAND ${CARGO_EXECUTABLE} build --release --manifest-path ${ADDITION_SHIELDED_CRATE_DIR}/Cargo.toml -p addition-shielded-ffi
+        WORKING_DIRECTORY ${ADDITION_SHIELDED_CRATE_DIR}
+        COMMENT "Building addition-shielded-ffi (RISC Zero STARK)"
         VERBATIM
     )
-    add_custom_target(addition_snark_v1_rust DEPENDS ${ADDITION_SNARK_LIB})
+    add_custom_target(addition_shielded_rust DEPENDS ${ADDITION_SHIELDED_LIB})
 endif()
 
 find_path(OQS_INCLUDE_DIR oqs/oqs.h)
@@ -57,11 +57,7 @@ add_library(addition_core
     src/p2p.cpp
     src/consensus_engine.cpp
     src/privacy.cpp
-    src/privacy_zk.cpp
-    src/zk_circuit_v1.cpp
-    src/zk_snark_v1.cpp
-    src/zk_r1cs.cpp
-    src/zk_toy_proof.cpp
+    src/shielded.cpp
     src/fast_path.cpp
     src/pouw_storage.cpp
     src/pouw_compute.cpp
@@ -76,12 +72,12 @@ target_include_directories(addition_core PUBLIC include)
 target_include_directories(addition_core PUBLIC ${OQS_INCLUDE_DIR})
 target_link_libraries(addition_core PUBLIC ${OQS_LIBRARY} OpenSSL::SSL OpenSSL::Crypto)
 
-if(ADDITION_BUILD_ZK_SNARK)
-    target_include_directories(addition_core PUBLIC ${ADDITION_SNARK_CRATE_DIR}/include)
-    add_dependencies(addition_core addition_snark_v1_rust)
-    target_link_libraries(addition_core PUBLIC ${ADDITION_SNARK_LIB} pthread dl m)
-    # Ensure C++ objects re-link when the Rust archive changes.
-    set_source_files_properties(src/zk_snark_v1.cpp PROPERTIES OBJECT_DEPENDS ${ADDITION_SNARK_LIB})
+if(ADDITION_BUILD_SHIELDED)
+    target_include_directories(addition_core PUBLIC ${ADDITION_SHIELDED_CRATE_DIR}/include)
+    target_compile_definitions(addition_core PUBLIC ADDITION_HAVE_SHIELDED_STARK=1)
+    add_dependencies(addition_core addition_shielded_rust)
+    target_link_libraries(addition_core PUBLIC ${ADDITION_SHIELDED_LIB} pthread dl m stdc++)
+    set_source_files_properties(src/shielded.cpp PROPERTIES OBJECT_DEPENDS ${ADDITION_SHIELDED_LIB})
 endif()
 
 if(WIN32)
@@ -138,24 +134,10 @@ if(ADDITION_BUILD_TESTS)
     target_link_libraries(test_privacy PRIVATE addition_core)
     add_test(NAME test_privacy COMMAND test_privacy)
 
-    add_executable(test_zk_circuit_v1 tests/test_zk_circuit_v1.cpp)
-    target_link_libraries(test_zk_circuit_v1 PRIVATE addition_core)
-    add_test(NAME test_zk_circuit_v1 COMMAND test_zk_circuit_v1)
-
-    if(ADDITION_BUILD_ZK_SNARK)
-        add_executable(test_zk_snark_v1 tests/test_zk_snark_v1.cpp)
-        target_link_libraries(test_zk_snark_v1 PRIVATE addition_core)
-        add_test(NAME test_zk_snark_v1 COMMAND test_zk_snark_v1)
-        set_tests_properties(test_zk_snark_v1 PROPERTIES TIMEOUT 180)
-    endif()
-
-    add_executable(test_zk_r1cs tests/test_zk_r1cs.cpp)
-    target_link_libraries(test_zk_r1cs PRIVATE addition_core)
-    add_test(NAME test_zk_r1cs COMMAND test_zk_r1cs)
-
-    add_executable(test_zk_toy_proof tests/test_zk_toy_proof.cpp)
-    target_link_libraries(test_zk_toy_proof PRIVATE addition_core)
-    add_test(NAME test_zk_toy_proof COMMAND test_zk_toy_proof)
+    add_executable(test_shielded tests/test_shielded.cpp)
+    target_link_libraries(test_shielded PRIVATE addition_core)
+    add_test(NAME test_shielded COMMAND test_shielded)
+    set_tests_properties(test_shielded PROPERTIES TIMEOUT 3600)
 
     add_executable(test_fast_path tests/test_fast_path.cpp)
     target_link_libraries(test_fast_path PRIVATE addition_core)

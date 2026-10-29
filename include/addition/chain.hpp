@@ -1,5 +1,7 @@
 #pragma once
 
+#include "addition/shielded.hpp"
+
 #include "addition/block.hpp"
 #include "addition/config.hpp"
 
@@ -86,6 +88,9 @@ public:
     std::uint64_t tx_confirmations(const std::string& tx_hash) const;
     bool tx_in_best_chain(const std::string& tx_hash) const;
 
+public:
+    const shielded::State& shielded_state() const { return shielded_; }
+
 private:
     struct UTXO {
         std::string owner;
@@ -103,6 +108,7 @@ private:
     std::uint64_t total_emitted_{0};
     std::uint64_t total_fees_last_block_{0};
     std::uint64_t cumulative_work_{0};
+    shielded::State shielded_;
     std::function<void()> on_commit_;
     int suppress_commit_{0};
     mutable std::uint64_t last_batch_verify_ms_{0};
@@ -113,6 +119,11 @@ private:
     Block make_block_template(const std::string& reward_address,
                               std::vector<Transaction> txs,
                               std::uint64_t reward) const;
+    bool validate_shielded_part(const Transaction& tx,
+                                shielded::Bundle& bundle,
+                                const std::unordered_set<std::string>& pending_nfs,
+                                bool check_proof,
+                                std::string& error) const;
     bool validate_block_header(const Block& candidate, std::string& error) const;
     bool validate_block_transactions(const Block& candidate, std::string& error) const;
     bool validate_transaction_signature(const Transaction& tx, std::string& error) const;

@@ -22,6 +22,9 @@ std::string hash_transaction(const Transaction& tx) {
         oss << out.recipient << ':' << out.amount << ';';
     }
     oss << "]signer=" << tx.signer << "|pub=" << tx.signer_pubkey << "|fee=" << tx.fee << "|nonce=" << tx.nonce;
+    if (!tx.shielded.empty()) {
+        oss << "|sh=" << strong_hash(tx.shielded);
+    }
     return strong_hash(oss.str());
 }
 

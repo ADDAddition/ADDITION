@@ -23,6 +23,8 @@ struct OpeningNote {
     std::string nullifier;
 };
 
+// DEPRECATED: transparent "opening" notes. Amounts/owners are visible to the node;
+// this is NOT a privacy feature. Use shielded (addz) transactions (shielded.hpp).
 class PrivacyPool {
 public:
     bool set_native_verifier_mode(const std::string& mode, std::string& error);

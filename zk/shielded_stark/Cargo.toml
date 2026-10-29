@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+members = ["core", "methods", "ffi"]
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+debug = false
