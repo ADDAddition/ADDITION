@@ -25,6 +25,7 @@ namespace wire {
 
 inline constexpr int kProtoV2 = 2;
 inline constexpr int kProtoV3 = 3;
+inline constexpr int kProtoV4 = 4;  // TXV3 with optional script-witness section
 inline constexpr const char* kB64Prefix = "b64:";
 
 std::string base64_encode(const std::string& bin);

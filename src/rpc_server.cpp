@@ -785,6 +785,105 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         }
     }
 
+    if (cmd == "channel_open") {
+        std::string wa, wb;
+        std::uint64_t capacity = 0, push = 0;
+        iss >> wa >> wb >> capacity >> push;
+        if (wa.empty() || wb.empty() || capacity < 2) {
+            return "error: usage channel_open <funder_wallet> <peer_wallet> <capacity> [push_amount]";
+        }
+        StoredWallet sa{}, sb{};
+        std::string error;
+        if (!wallets_.load(wa, sa, error, true) || !wallets_.load(wb, sb, error, true)) {
+            return "error: " + error;
+        }
+        if (unlocked_balance(sa.address) < capacity + 1) {
+            return "error: insufficient unlocked balance";
+        }
+        LocalChannel lc;
+        lc.wallet_a = wa;
+        lc.wallet_b = wb;
+        std::vector<Transaction> funding;
+        WalletKeys ka{sa.private_key, sa.public_key, sa.address, ""};
+        WalletKeys kb{sb.private_key, sb.public_key, sb.address, ""};
+        if (!channel::open_channel(chain_, ka, kb, capacity, push, lc.a, lc.b, funding, error)) {
+            return "error: " + error;
+        }
+        if (!node_.submit_transaction(funding[0], error)) {
+            return "error: " + error;
+        }
+        {
+            std::size_t sent = 0;
+            std::string gossip_err;
+            node_.flush_outbound_gossip(sent, gossip_err);
+        }
+        const auto id = lc.a->info().funding_txid.substr(0, 16);
+        lc.status = "open";
+        channels_[id] = std::move(lc);
+        return "ok channel=" + id + " funding_txid=" + hash_transaction(funding[0]) +
+               " capacity=" + std::to_string(capacity);
+    }
+
+    if (cmd == "channel_pay") {
+        std::string id, from;
+        std::uint64_t amount = 0;
+        iss >> id >> from >> amount;
+        const auto it = channels_.find(id);
+        if (it == channels_.end() || amount == 0) {
+            return "error: usage channel_pay <channel> <from_wallet> <amount>";
+        }
+        auto& lc = it->second;
+        if (lc.status != "open") return "error: channel not open";
+        std::string error;
+        bool ok = false;
+        if (from == lc.wallet_a) ok = channel::pay(*lc.a, *lc.b, amount, error);
+        else if (from == lc.wallet_b) ok = channel::pay(*lc.b, *lc.a, amount, error);
+        else return "error: wallet is not a channel party";
+        if (!ok) return "error: " + error;
+        return "ok state=" + std::to_string(lc.a->state().n) + " bal_a=" + std::to_string(lc.a->state().bal_a) +
+               " bal_b=" + std::to_string(lc.a->state().bal_b);
+    }
+
+    if (cmd == "channel_close") {
+        std::string id, mode;
+        iss >> id >> mode;
+        const auto it = channels_.find(id);
+        if (it == channels_.end()) return "error: usage channel_close <channel> [force_a|force_b]";
+        auto& lc = it->second;
+        if (lc.status != "open") return "error: channel not open";
+        std::string error;
+        Transaction tx;
+        if (mode.empty()) {
+            if (!lc.a->assemble_coop_close(lc.b->sign_coop_close(), tx, error)) return "error: " + error;
+        } else if (mode == "force_a") {
+            tx = lc.a->signed_local_commitment();
+        } else if (mode == "force_b") {
+            tx = lc.b->signed_local_commitment();
+        } else {
+            return "error: unknown close mode";
+        }
+        if (!node_.submit_transaction(tx, error)) return "error: " + error;
+        {
+            std::size_t sent = 0;
+            std::string gossip_err;
+            node_.flush_outbound_gossip(sent, gossip_err);
+        }
+        lc.status = mode.empty() ? "closing_coop" : "closing_" + mode;
+        return "ok close_txid=" + hash_transaction(tx);
+    }
+
+    if (cmd == "channel_list") {
+        std::ostringstream out;
+        out << "channels=" << channels_.size();
+        for (const auto& [id, lc] : channels_) {
+            const auto& st = lc.a->state();
+            out << "\n" << id << " status=" << lc.status << " a=" << lc.wallet_a << " b=" << lc.wallet_b
+                << " capacity=" << lc.a->info().capacity << " state=" << st.n << " bal_a=" << st.bal_a
+                << " bal_b=" << st.bal_b << " htlcs=" << st.htlcs.size();
+        }
+        return out.str();
+    }
+
     if (cmd == "wallet_send") {
         std::string name;
         std::string to;

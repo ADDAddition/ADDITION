@@ -9,6 +9,8 @@ namespace addition {
 struct TxInput {
     std::string previous_txid;
     std::uint32_t output_index{0};
+    // Script witness (see script.hpp). Excluded from the txid, committed by the merkle root.
+    std::string witness;
 };
 
 struct TxOutput {
@@ -79,6 +81,7 @@ constexpr std::size_t kBlockWireOverheadBytes = 8192;
 // Relay budget for a mined block (policy). Must stay below net_io kMaxLineBytes
 // (4 MiB). With kMaxBlockWeight = 2 MiB the consensus cap binds first.
 constexpr std::size_t kMaxRelayBlockWireBytes = 3u * 1024u * 1024u;
+std::string hash_transaction_with_witness(const Transaction& tx);  // wtxid
 std::string compute_merkle_root(const std::vector<Transaction>& txs);
 std::string hash_block_header(const BlockHeader& header);
 std::string hash_stake_vote(const StakeVote& v);

@@ -197,6 +197,23 @@ int main() {
               "block_weight counts votes");
     }
 
+    // Version negotiation: witness txs only go to proto-4 peers.
+    {
+        Transaction wt{};
+        wt.signer = std::string(64, 'a');
+        wt.signature = "pq=" + std::string(64, 'b');
+        wt.inputs.push_back({std::string(64, 'c'), 0, "w"});
+        wt.outputs.push_back({std::string(64, 'e'), 5});
+        const auto line = "TX|" + node.encode_tx_payload_for_test(wt);
+        check(node.adapt_for_peer_for_test(line, 4) == line, "proto4 passthrough");
+        check(node.adapt_for_peer_for_test(line, 3).empty(), "witness tx withheld from proto3");
+        check(node.adapt_for_peer_for_test(line, 2).empty(), "witness tx withheld from proto2");
+        wt.inputs[0].witness.clear();
+        const auto plain = "TX|" + node.encode_tx_payload_for_test(wt);
+        check(node.adapt_for_peer_for_test(plain, 3) == plain, "plain tx to proto3 unchanged");
+        check(node.adapt_for_peer_for_test(plain, 2).rfind("TX|54584232", 0) == 0, "plain tx to proto2 is TXB2");
+    }
+
     // Equivocation: two conflicting votes by one ticket burn it.
     {
         const auto victim = chain.selected_tickets_for_next_block()[0];

@@ -41,6 +41,8 @@ add_library(addition_core
     src/block.cpp
     src/wire_v3.cpp
     src/chain.cpp
+    src/script.cpp
+    src/channel.cpp
     src/consensus_rules.cpp
     src/mempool.cpp
     src/miner.cpp
@@ -96,6 +98,13 @@ if(ADDITION_BUILD_TESTS)
     add_executable(test_chain tests/test_chain.cpp)
     target_link_libraries(test_chain PRIVATE addition_core)
     add_test(NAME test_chain COMMAND test_chain)
+    add_executable(test_channels tests/test_channels.cpp)
+    target_link_libraries(test_channels PRIVATE addition_core)
+    add_test(NAME test_channels COMMAND test_channels)
+    set_tests_properties(test_channels PROPERTIES TIMEOUT 300)
+    add_executable(test_channel_rpc tests/test_channel_rpc.cpp)
+    target_link_libraries(test_channel_rpc PRIVATE addition_core)
+    add_test(NAME test_channel_rpc COMMAND test_channel_rpc)
 
     add_executable(test_net_tor tests/test_net_tor.cpp)
     target_link_libraries(test_net_tor PRIVATE addition_core)

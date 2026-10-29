@@ -177,6 +177,8 @@ bool read_tagged(const std::string& in, std::size_t& off, std::string& s) {
     return true;
 }
 
+constexpr std::uint8_t kTxSectionWitness = 1;
+
 std::string encode_tx_v3(const Transaction& tx) {
     std::string b;
     b.reserve(64 + tx.signer_pubkey.size() / 2 + tx.signature.size() / 2 + tx.shielded.size() / 2 +
@@ -198,6 +200,17 @@ std::string encode_tx_v3(const Transaction& tx) {
         put_u64(b, o.amount);
     }
     write_tagged(b, tx.shielded);
+    // Optional witness section (proto 4). Absent => byte-identical to the
+    // proto-3 TXV3 encoding, so witness-free txs/weights are unchanged.
+    bool has_witness = false;
+    for (const auto& in : tx.inputs) has_witness |= !in.witness.empty();
+    if (has_witness) {
+        put_u8(b, kTxSectionWitness);
+        for (const auto& in : tx.inputs) {
+            put_u32(b, static_cast<std::uint32_t>(in.witness.size()));
+            b += in.witness;
+        }
+    }
     put_u32(b, checksum32(b));
     return b;
 }
@@ -242,6 +255,28 @@ bool decode_tx_v3(const std::string& bin, Transaction& tx, std::string& error) {
     if (!read_tagged(bin, off, tx.shielded)) {
         error = "invalid tx v3 shielded";
         return false;
+    }
+    if (bin.size() >= 4 && off + 4 < bin.size()) {
+        std::uint8_t sec = 0;
+        if (!get_u8(bin, off, sec) || sec != kTxSectionWitness) {
+            error = "unknown tx v3 section";
+            return false;
+        }
+        bool any = false;
+        for (auto& in : tx.inputs) {
+            std::uint32_t wl = 0;
+            if (!get_u32(bin, off, wl) || wl > kMaxFieldBytes || off + wl > bin.size()) {
+                error = "invalid tx v3 witness";
+                return false;
+            }
+            in.witness = bin.substr(off, wl);
+            off += wl;
+            any |= wl != 0;
+        }
+        if (!any) {
+            error = "non-canonical empty tx v3 witness section";
+            return false;
+        }
     }
     if (!check_tail(bin, off, error, "tx v3")) return false;
     if (tx.outputs.empty()) {

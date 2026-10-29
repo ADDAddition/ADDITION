@@ -36,10 +36,12 @@ namespace addition {
 namespace {
 
 // v3: binary keys/sigs (TXV3/BLV3, base64). v2 peers still accepted (transcoded).
-constexpr const char* kProtoVersion = "3";
+// Proto 4 = wire v3 + TXV3 script witnesses (payment channels). 3 = wire v3
+// without witnesses (feat/net-tor nodes). 2 = legacy hex (TXB2/BLB*).
+constexpr const char* kProtoVersion = "4";
 constexpr const char* kProtoVersionLegacy = "2";
 bool proto_supported(const std::string& v) {
-    return v == "3" || v == "2";
+    return v == "4" || v == "3" || v == "2";
 }
 constexpr std::uint64_t kMsgSkewSec = 90;
 constexpr int kSocketTimeoutMs = 20000;
@@ -810,7 +812,9 @@ std::size_t DecentralizedNode::flush_stem(std::string& last) {
             if (wire_id.empty()) {
                 wire_id = self_id_;
             }
-            ok = send_p2p_request(relay, wire_id + " " + adapt_for_peer(item.second, peer_proto(relay)), resp) && resp.rfind("error:", 0) != 0;
+            const auto adapted = adapt_for_peer(item.second, peer_proto(relay));
+            ok = !adapted.empty() && send_p2p_request(relay, wire_id + " " + adapted, resp) &&
+                 resp.rfind("error:", 0) != 0;
         }
         if (ok) {
             ++sent;
@@ -1109,7 +1113,7 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
                 return false;
             }
             // Server answers min(ours, theirs); never accept a version above what we offered.
-            if (!proto_supported(v) || (v == "3" && hello_version != "3") ||
+            if (!proto_supported(v) || (std::stoi(v) > std::stoi(hello_version)) ||
                 n != active_network_id(chain_) || nonce != hello_nonce ||
                 peer_pk.empty() || sig.empty()) {
                 error = "HELLO_ACK mismatch";
@@ -1135,7 +1139,7 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
             peer_pubkeys_[peer] = peer_pk;
             pinned_peer_pubkeys_.emplace(peer, peer_pk);
             handshake_ok_[peer] = true;
-            peer_proto_[peer] = (v == "3") ? 3 : 2;
+            peer_proto_[peer] = std::stoi(v);
             wire_id = attempt_id;
             return true;
         }
@@ -1164,9 +1168,9 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
 
         error = "expected HELLO_ACK, got: " + hello_resp;
         if (hello_resp.rfind("error: handshake mismatch", 0) == 0 && !downgraded) {
-            // Legacy (v2-only) peer: retry once offering v2.
-            hello_version = kProtoVersionLegacy;
-            downgraded = true;
+            // Older peer: step down 4 -> 3 -> 2 (min-version negotiation).
+            hello_version = (hello_version == "4") ? "3" : kProtoVersionLegacy;
+            downgraded = (hello_version == kProtoVersionLegacy);
             continue;
         }
         if (hello_resp.rfind("error: hello timestamp", 0) == 0 ||
@@ -1509,7 +1513,11 @@ bool DecentralizedNode::flush_outbound_gossip(std::size_t& sent, std::string& er
         }
         for (const auto& msg : pushable) {
             std::string resp;
-            if (!send_p2p_request(peer, wire_id + " " + adapt_for_peer(msg, peer_proto(peer)), resp)) {
+            const auto adapted = adapt_for_peer(msg, peer_proto(peer));
+            if (adapted.empty()) {
+                continue;  // not representable on this peer's protocol version
+            }
+            if (!send_p2p_request(peer, wire_id + " " + adapted, resp)) {
                 last = "gossip transport failed to " + peer;
                 peers_.mark_peer_bad(peer);
                 break;
@@ -1735,7 +1743,8 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         peer_pubkeys_[peer] = peer_pk;
         pinned_peer_pubkeys_.emplace(peer, peer_pk);
 
-        const std::string negotiated = (version == "3") ? std::string("3") : std::string(kProtoVersionLegacy);
+        const std::string negotiated =
+            (version == "4" || version == "3") ? version : std::string(kProtoVersionLegacy);
         const std::string ack_body = negotiated + "|" + active_network_id(chain_) + "|" +
                                      std::to_string(now) + "|" + nonce + "|" + node_public_key_;
         std::string ack_sig;
@@ -1754,7 +1763,7 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         reply = ack.str();
         peers_.mark_peer_good(peer);
         handshake_ok_[peer] = true;
-        peer_proto_[peer] = (negotiated == "3") ? 3 : 2;
+        peer_proto_[peer] = std::stoi(negotiated);
         return true;
     }
 
@@ -1850,6 +1859,10 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         }
 
         reply = adapt_for_peer("BLKDATA|" + payload, peer_proto(peer));
+        if (reply.empty()) {
+            error = "block requires a newer protocol version (4)";
+            return false;
+        }
         peers_.mark_peer_good(peer);
         return true;
     }
@@ -2099,8 +2112,19 @@ int DecentralizedNode::peer_proto(const std::string& peer) const {
     return it == peer_proto_.end() ? 2 : it->second;
 }
 
+namespace {
+bool tx_needs_proto4(const Transaction& t) {
+    for (const auto& in : t.inputs) {
+        if (!in.witness.empty()) return true;
+    }
+    return false;
+}
+} // namespace
+
+// Returns "" when the message cannot be represented for that peer's protocol
+// (witness txs need proto 4; shielded txs need wire v3). Callers skip it.
 std::string DecentralizedNode::adapt_for_peer(const std::string& msg, int proto) const {
-    if (proto >= 3) {
+    if (proto >= wire::kProtoV4) {
         return msg;
     }
     static const char* kPrefixes[] = {"TX|", "STEM|", "BLK|", "BLKDATA|"};
@@ -2114,12 +2138,16 @@ std::string DecentralizedNode::adapt_for_peer(const std::string& msg, int proto)
         if (p == "BLK|" || p == "BLKDATA|") {
             Block b{};
             if (decode_block_payload(body, b, err)) {
-                return p + encode_block_payload_v2(b);
+                for (const auto& t : b.transactions) {
+                    if (tx_needs_proto4(t) || (proto < wire::kProtoV3 && !t.shielded.empty())) return {};
+                }
+                return proto >= wire::kProtoV3 ? msg : p + encode_block_payload_v2(b);
             }
         } else {
             Transaction t{};
             if (decode_tx_payload(body, t, err)) {
-                return p + encode_tx_payload_v2(t);
+                if (tx_needs_proto4(t) || (proto < wire::kProtoV3 && !t.shielded.empty())) return {};
+                return proto >= wire::kProtoV3 ? msg : p + encode_tx_payload_v2(t);
             }
         }
         return msg;
@@ -2130,6 +2158,8 @@ std::string DecentralizedNode::adapt_for_peer(const std::string& msg, int proto)
 std::string DecentralizedNode::encode_tx_payload_v2(const Transaction& tx) const {
     std::string bin;
     bin.reserve(256);
+    // Legacy v2 hex. Witness txs are never sent here (adapt_for_peer filters
+    // them); script witnesses live only in TXV3 (proto 4). TXB3 is retired.
     bin.append("TXB2", 4);
 
     write_string(bin, tx.signer);

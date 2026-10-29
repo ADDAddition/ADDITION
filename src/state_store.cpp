@@ -57,6 +57,7 @@ std::string tx_to_line(const Transaction& tx) {
     oss << "T|" << tx.signer << '|' << tx.signer_pubkey << '|' << tx.signature << '|' << tx.fee << '|' << tx.nonce << '\n';
     for (const auto& in : tx.inputs) {
         oss << "I|" << in.previous_txid << '|' << in.output_index << '\n';
+        if (!in.witness.empty()) oss << "W|" << in.witness << '\n';
     }
     for (const auto& out : tx.outputs) {
         oss << "O|" << out.recipient << '|' << out.amount << '\n';
@@ -109,6 +110,12 @@ bool parse_tx_lines(std::istringstream& iss, Transaction& tx, std::string& error
             std::getline(ls, idx);
             in.output_index = static_cast<std::uint32_t>(std::stoul(idx));
             tx.inputs.push_back(in);
+        } else if (tag == 'W') {
+            if (tx.inputs.empty()) {
+                error = "witness without input";
+                return false;
+            }
+            tx.inputs.back().witness = line.substr(2);
         } else if (tag == 'O') {
             TxOutput out{};
             std::string amt;

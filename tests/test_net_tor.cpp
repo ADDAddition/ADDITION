@@ -7,6 +7,7 @@
 #include "addition/dandelion.hpp"
 #include "addition/net_transport.hpp"
 #include "addition/p2p.hpp"
+#include "addition/wire_v3.hpp"
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -265,6 +266,34 @@ void test_wire_budget() {
     CHECK((kMaxBlockWeight * 4) / 3 + 64 < kMaxLineBytes);
     CHECK(kMaxRelayBlockWireBytes < kMaxLineBytes);
 }
+void test_txv3_witness() {
+    using namespace addition;
+    Transaction tx{};
+    tx.signer = std::string(64, 'a');
+    tx.signature = "pq=" + std::string(64, 'b');
+    tx.inputs.push_back({std::string(64, 'c'), 0, ""});
+    tx.inputs.push_back({std::string(64, 'd'), 1, ""});
+    tx.outputs.push_back({std::string(64, 'e'), 5});
+    const auto plain = wire::encode_tx_v3(tx);
+    Transaction w = tx;
+    w.inputs[1].witness = std::string("\x01\x02script-witness\x00", 18);
+    const auto withw = wire::encode_tx_v3(w);
+    CHECK(withw.size() > plain.size());
+    Transaction d{};
+    std::string err;
+    CHECK(wire::decode_tx_v3(withw, d, err));
+    CHECK(d.inputs.size() == 2 && d.inputs[0].witness.empty() && d.inputs[1].witness == w.inputs[1].witness);
+    CHECK(wire::encode_tx_v3(d) == withw);  // canonical
+    Transaction d2{};
+    CHECK(wire::decode_tx_v3(plain, d2, err) && d2.inputs[1].witness.empty());
+    CHECK(tx_weight(w) > tx_weight(tx));      // witness bytes count in weight
+    CHECK(hash_transaction(w) == hash_transaction(tx));  // txid excludes witness
+    // Unknown section kind is rejected.
+    std::string bad = withw;
+    const auto pos = plain.size() - 4;          // where the section byte starts
+    bad[pos] = 9;
+    CHECK(!wire::decode_tx_v3(bad, d, err));
+}
 } // namespace
 
 int main() {
@@ -275,6 +304,7 @@ int main() {
     test_dandelion();
     test_cli();
     test_wire_budget();
+    test_txv3_witness();
     if (failures) {
         std::cerr << failures << " failure(s)\n";
         return 1;

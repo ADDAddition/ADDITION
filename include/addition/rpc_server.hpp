@@ -1,6 +1,7 @@
 #pragma once
 
 #include "addition/chain.hpp"
+#include "addition/channel.hpp"
 #include "addition/bridge.hpp"
 #include "addition/consensus_engine.hpp"
 #include "addition/contract_engine.hpp"
@@ -18,6 +19,8 @@
 #include "addition/wallet_store.hpp"
 
 #include <cstdint>
+#include <map>
+#include <memory>
 #include <mutex>
 #include <string>
 
@@ -73,6 +76,14 @@ private:
     std::uint32_t auto_mine_interval_sec_{60};
     std::string advertised_p2p_{};
     WalletStore wallets_;
+    // Payment channels between two wallets held by THIS node (loopback peers;
+    // no channel P2P transport yet). In-memory only: lost on restart.
+    struct LocalChannel {
+        std::string wallet_a, wallet_b;
+        std::unique_ptr<channel::Channel> a, b;
+        std::string status{"funding"};
+    };
+    std::map<std::string, LocalChannel> channels_;
     mutable std::mutex mu_;
 };
 

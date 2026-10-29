@@ -22,6 +22,13 @@ bool Mempool::looks_spendable(const Transaction& tx) const {
     if (tx.inputs.empty() || tx.outputs.empty()) {
         return false;
     }
+    if (tx.signer.empty() && tx.signer_pubkey.empty() && tx.signature.empty() && !tx.inputs.empty()) {
+        // Script-v1 spend: every input must carry a witness (verified by Chain).
+        for (const auto& in : tx.inputs) {
+            if (in.witness.empty()) return false;
+        }
+        return true;
+    }
     if (tx.signer.empty()) {  // empty pubkey => on-chain registry (chain validates)
         return false;
     }

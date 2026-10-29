@@ -67,6 +67,8 @@ public:
     // Test hook: exposes the block payload encoder (BLB2/BLB3) for unit tests.
     std::string encode_block_payload_for_test(const Block& block) const { return encode_block_payload(block); }
     std::string encode_block_payload_v2_for_test(const Block& block) const { return encode_block_payload_v2(block); }
+    std::string adapt_for_peer_for_test(const std::string& msg, int proto) const { return adapt_for_peer(msg, proto); }
+    std::string encode_tx_payload_for_test(const Transaction& tx) const { return encode_tx_payload(tx); }
     const std::string& self_id() const;
     const std::string& node_public_key() const;
     const std::string& node_private_key() const;
@@ -104,7 +106,8 @@ private:
     std::unordered_set<std::string> seen_block_hashes_;
     std::vector<std::string> outbound_;
     std::unordered_map<std::string, bool> handshake_ok_;
-    // Negotiated wire protocol per peer (2 = hex TXB2/BLB2, 3 = base64 TXV3/BLV3).
+    // Negotiated wire protocol per peer (2 = hex TXB2/BLB2, 3 = base64 TXV3/BLV3,
+    // 4 = v3 + TXV3 script witnesses).
     // Unknown peers are treated as v2 (always decodable by both).
     std::unordered_map<std::string, int> peer_proto_;
     int peer_proto(const std::string& peer) const;

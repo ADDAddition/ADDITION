@@ -154,6 +154,7 @@ private:
         std::uint64_t amount{0};
         bool spent{false};
         std::uint64_t spendable_height{0}; // unbonding freeze (0 = none)
+        std::uint64_t height{0};  // block height that created it (for older())
     };
 
     ChainConfig cfg_;
@@ -194,6 +195,7 @@ private:
     bool validate_slash(const SlashEvidence& ev, std::string& error) const;
     std::vector<StakeTicket> eligible_tickets_at(std::uint64_t voted_height) const;
     std::uint64_t context_height() const;
+    bool validate_script_inputs(const Transaction& tx, std::string& error) const;
     bool validate_transaction_signature(const Transaction& tx, std::string& error) const;
     bool validate_transaction_signature(const Transaction& tx, std::string& error, bool check_crypto) const;
     // signer_pubkey, or the registry entry (optionally overlaid by same-block registrations).
