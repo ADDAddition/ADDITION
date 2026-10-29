@@ -211,12 +211,9 @@ int main(int argc, char** argv) {
         return true;
     }();
 
-    const char* privacy_master_key_env = std::getenv("ADDITION_PRIVACY_MASTER_KEY");
-    const bool has_privacy_master_key = privacy_master_key_env != nullptr && std::string(privacy_master_key_env).size() >= 32;
-    if (mainnet_mode && !has_privacy_master_key) {
-        std::cerr << "fatal: ADDITION_PRIVACY_MASTER_KEY missing or too short (min 32 chars) for --network mainnet\n";
-        return 3;
-    }
+    // No node-held privacy master key: note metadata uses the keyless per-note
+    // cipher (see addition/privacy.hpp NoteCipher). The old env var is ignored.
+    const bool legacy_privacy_key_set = std::getenv("ADDITION_PRIVACY_MASTER_KEY") != nullptr;
 
     addition::Chain chain(node_cfg.chain);
     addition::Mempool mempool;
@@ -652,8 +649,9 @@ int main(int argc, char** argv) {
         std::cout << "testnet mode enabled (default)\n";
         break;
     }
-    if (!has_privacy_master_key) {
-        std::cout << "warning: ADDITION_PRIVACY_MASTER_KEY not set or too short (min 32); private note operations will fail\n";
+    if (legacy_privacy_key_set) {
+        std::cout << "warning: ADDITION_PRIVACY_MASTER_KEY is set but no longer used (no node-held privacy key); "
+                     "remove it from the environment\n";
     }
 
     auto last_sync = std::chrono::steady_clock::now();

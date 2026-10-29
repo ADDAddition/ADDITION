@@ -160,6 +160,9 @@ void apply_network_profile_chain(ChainConfig& chain, NetworkMode mode) {
     chain.confirmations_policy = profile.confirmations_policy;
     chain.economic_security = profile.economic_security;
     chain.retarget_window = profile.retarget_window;
+    chain.difficulty_fork_height = profile.difficulty_fork_height;
+    chain.lwma_window = profile.lwma_window;
+    chain.legacy_min_difficulty_target = profile.legacy_min_difficulty_target;
     chain.target_block_time_sec = profile.target_block_time_sec;
 }
 
@@ -354,6 +357,17 @@ bool apply_kv(NodeConfig& cfg, const std::string& table, const std::string& key,
             return false;
         }
         cfg.chain.retarget_window = static_cast<std::uint32_t>(v);
+        return true;
+    }
+    if (full == "chain.difficulty_fork_height" || full == "difficulty_fork_height") {
+        return parse_u64(value, cfg.chain.difficulty_fork_height);
+    }
+    if (full == "chain.lwma_window" || full == "lwma_window") {
+        std::uint64_t v = 0;
+        if (!parse_u64(value, v) || v < 2 || v > 1000) {
+            return false;
+        }
+        cfg.chain.lwma_window = static_cast<std::uint32_t>(v);
         return true;
     }
     if (full == "comment" || full == "chain.comment") {
@@ -593,14 +607,18 @@ ChainConfig mainnet_chain_config() {
     cfg.difficulty_window = 120U;
     cfg.pow_algorithm = PowAlgorithm::MemoryHard;
     cfg.initial_difficulty_target = kMainnetDifficultyTarget;
-    cfg.min_difficulty_target = kMainnetDifficultyTarget;
+    cfg.min_difficulty_target = kMainnetMinDifficultyTarget;
     cfg.max_difficulty_target = kMainnetMaxDifficultyTarget;
+    cfg.legacy_min_difficulty_target = kMainnetDifficultyTarget;
     cfg.retarget_window = 30U;
+    cfg.difficulty_fork_height = kMainnetDifficultyForkHeight;
+    cfg.lwma_window = kDefaultLwmaWindow;
     cfg.halving_interval = 210000U;
     cfg.require_pq_signatures = true;
     cfg.require_privacy_pool = true;
     cfg.allow_zero_reward_blocks = true;
-    cfg.min_fee = 0ULL;
+    // Nonzero relay/consensus floor (1 base unit) against free spam.
+    cfg.min_fee = kMainnetMinFee;
     cfg.pow_profile = "mainnet";
     cfg.confirmations_policy = 2;
     cfg.economic_security = "none";
@@ -704,9 +722,10 @@ bool validate_network_profile(const NodeConfig& cfg, std::string& error) {
                     "(not the ~4ms easy target)";
             return false;
         }
-        if (cfg.chain.min_difficulty_target != kMainnetDifficultyTarget ||
+        if (cfg.chain.min_difficulty_target != kMainnetMinDifficultyTarget ||
+            cfg.chain.max_difficulty_target != kMainnetMaxDifficultyTarget ||
             cfg.chain.initial_difficulty_target != kMainnetDifficultyTarget) {
-            error = "mainnet difficulty must stay at 0x000000FFFFFFFFFF";
+            error = "mainnet difficulty: initial/max must be 0x000000FFFFFFFFFF and min 0x0000000000FFFFFF";
             return false;
         }
         if (cfg.chain.pow_algorithm != PowAlgorithm::MemoryHard) {
@@ -1011,6 +1030,17 @@ bool load_genesis_json(const std::string& path, ChainConfig& chain, std::string&
                 return false;
             }
             chain.retarget_window = static_cast<std::uint32_t>(n);
+            return true;
+        }
+        if (k == "difficulty_fork_height") {
+            return parse_u64(v, chain.difficulty_fork_height);
+        }
+        if (k == "lwma_window") {
+            std::uint64_t n = 0;
+            if (!parse_u64(v, n) || n < 2 || n > 1000) {
+                return false;
+            }
+            chain.lwma_window = static_cast<std::uint32_t>(n);
             return true;
         }
         error = "unknown genesis key: " + k;

@@ -56,7 +56,7 @@ int main() {
         return 1;
     }
     if (mainnet_cfg.initial_difficulty_target != addition::kMainnetDifficultyTarget ||
-        mainnet_cfg.min_difficulty_target != addition::kMainnetDifficultyTarget ||
+        mainnet_cfg.min_difficulty_target != addition::kMainnetMinDifficultyTarget ||
         mainnet_cfg.max_difficulty_target != addition::kMainnetMaxDifficultyTarget) {
         std::cerr << "test failed: mainnet difficulty knobs\n";
         return 1;
@@ -72,7 +72,7 @@ int main() {
     }
     if (addition::kMainnetDifficultyTarget != 0x000000FFFFFFFFFFULL ||
         mainnet_cfg.initial_difficulty_target != 0x000000FFFFFFFFFFULL ||
-        mainnet_cfg.min_difficulty_target != 0x000000FFFFFFFFFFULL ||
+        mainnet_cfg.min_difficulty_target != 0x0000000000FFFFFFULL ||
         mainnet_cfg.max_difficulty_target != 0x000000FFFFFFFFFFULL) {
         std::cerr << "test failed: ADDITION_MAINNET_V1 difficulty_target must stay 0x000000FFFFFFFFFF\n";
         return 1;

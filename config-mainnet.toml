@@ -40,13 +40,21 @@ block_reward = 50
 max_supply = 50000000
 target_block_time_sec = 60
 halving_interval = 210000
+# Tail emission: once the halving schedule decays to 0 (~height 1.26M, ~20.4M
+# coins emitted), every block mints tail_emission_reward forever. The tail is
+# NOT bounded by max_supply (Monero-style); max_supply caps the halving phase.
 tail_emission_reward = 1
-min_fee = 0
+# Consensus minimum fee per tx (base units). Nonzero to price spam.
+min_fee = 1
 genesis_timestamp = 1770000000
 pow_algorithm = "memory_hard"
-# Same numeric floor as the existing testnet *hard* target. Cannot retarget to the
-# ~4ms easy target (0x0000FFFFFFFFFFFF). See docs/MAINNET_RUNBOOK.md.
+# LWMA per-block retarget (window 60). Easiest bound (max) stays the testnet
+# *hard* target so mainnet can never get easier than 0x000000FFFFFFFFFF; it can
+# get up to 2^16x harder (min). See docs/MAINNET_RUNBOOK.md.
 initial_difficulty_target = 0x000000FFFFFFFFFF
-min_difficulty_target = 0x000000FFFFFFFFFF
+min_difficulty_target = 0x0000000000FFFFFF
 max_difficulty_target = 0x000000FFFFFFFFFF
 retarget_window = 30
+lwma_window = 60
+# 0 = LWMA from genesis (needs a mainnet relaunch). For an in-place fork set tip+margin.
+difficulty_fork_height = 0

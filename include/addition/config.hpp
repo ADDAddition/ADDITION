@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "addition/consensus_rules.hpp"
+
 namespace addition {
 
 enum class NetworkMode {
@@ -43,6 +45,17 @@ inline constexpr std::uint64_t kRegtestMinDifficultyTarget = 0xFFFFFFFFFFFFFFFFU
 // ~4ms easy target. PoW is memory_hard (1 MiB x 16 rounds per attempt).
 inline constexpr std::uint64_t kMainnetDifficultyTarget = kTestnetHardDifficultyTarget;
 inline constexpr std::uint64_t kMainnetMaxDifficultyTarget = kTestnetHardDifficultyTarget;
+// Mainnet hardest allowed target (consensus safety bound for LWMA). 2^16x harder
+// than the floor; the easiest bound stays kMainnetMaxDifficultyTarget so mainnet
+// can never be loosened below the testnet hard target.
+inline constexpr std::uint64_t kMainnetMinDifficultyTarget = 0x0000000000FFFFFFULL;
+// Height at which the LWMA per-block retarget activates. 0 = from genesis
+// (requires a mainnet relaunch). For an in-place fork set to tip+margin.
+inline constexpr std::uint64_t kMainnetDifficultyForkHeight = 0ULL;
+// Sentinel: never activate LWMA (legacy window retarget forever).
+// Mainnet minimum tx fee (base units). Consensus: txs below are rejected in blocks.
+inline constexpr std::uint64_t kMainnetMinFee = 1ULL;
+inline constexpr std::uint64_t kDifficultyForkNever = 0xFFFFFFFFFFFFFFFFULL;
 
 // Testnet mine search deadline. Easy SHA3-512 should finish well inside this.
 inline constexpr std::uint64_t kTestnetMineDeadlineSec = 30;
@@ -70,6 +83,12 @@ struct ChainConfig {
     std::uint32_t confirmations_policy{2};
     std::string economic_security{"none"};
     std::uint32_t retarget_window{30U};
+    // LWMA per-block retarget (consensus). Blocks with height >= fork use LWMA.
+    std::uint64_t difficulty_fork_height{kDifficultyForkNever};
+    std::uint32_t lwma_window{60U};
+    // Hardest bound applied by the *legacy* rule before the fork (0 = min_difficulty_target).
+    // Lets mainnet replay its frozen pre-fork history after min was widened.
+    std::uint64_t legacy_min_difficulty_target{0ULL};
     std::uint32_t halving_interval{210000U};
     bool require_pq_signatures{true};
     bool require_privacy_pool{true};

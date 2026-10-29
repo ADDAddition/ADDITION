@@ -299,7 +299,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             << zk_circuit_v1_info_fields()
             << " research_goal_is_not_a_measurement=true";
         if (trusted) {
-            out << " privacy_master_key=" << (PrivacyPool::master_key_configured() ? "set" : "missing");
+            out << " privacy_master_key=none privacy_note_cipher=keyless_sha3_v1";
         }
         return out.str();
     }
