@@ -1,0 +1,17 @@
+[package]
+name = "addition-shielded-ffi"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[features]
+default = ["prove"]
+prove = ["risc0-zkvm/prove"]
+
+[dependencies]
+risc0-zkvm = { version = "3.0", default-features = false, features = ["std", "disable-dev-mode"] }
+shielded-methods = { path = "../methods" }
+shielded-core = { path = "../core" }
+bincode = "1.3"

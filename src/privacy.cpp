@@ -414,146 +414,20 @@ std::string PrivacyPool::mint_note_internal(const std::string& owner,
     return note_id;
 }
 
-std::string PrivacyPool::mint_zk(const std::string& owner,
-                                 std::uint64_t amount,
-                                 const std::string& commitment,
-                                 const std::string& nullifier,
-                                 const std::string& proof_hex,
-                                 const std::string& verification_key_hex,
-                                 std::string& error) {
-    if (owner.empty() || amount == 0) {
-        error = "invalid mint_zk params";
-        return {};
-    }
-    if (!is_hex_even(commitment) || !is_hex_even(nullifier)) {
-        error = "commitment/nullifier must be even-length hex";
-        return {};
-    }
-    if (used_nullifiers_.count(nullifier)) {
-        error = "nullifier already used";
-        return {};
-    }
-    if (spent_commitments_.count(commitment)) {
-        error = "commitment already spent";
-        return {};
-    }
-
-    const std::string public_input = "mint|" + owner + "|" + std::to_string(amount) + "|" + commitment + "|" +
-                                     nullifier;
-    if (!verify_proof(public_input, proof_hex, verification_key_hex, error)) {
-        return {};
-    }
-
-    const auto note_id = mk_note_id(owner, amount, commitment);
-    if (notes_.count(note_id)) {
-        error = "note already exists";
-        return {};
-    }
-
-    std::string sealed_amount;
-    if (!cipher_->seal_amount(amount, note_id, "zk", sealed_amount, error)) {
-        return {};
-    }
-
-    std::string owner_tag;
-    if (!cipher_->owner_tag(owner, note_id, owner_tag, error)) {
-        return {};
-    }
-
-    notes_[note_id] = PrivateNote{owner_tag,
-                                  sealed_amount,
-                                  "zk",
-                                  commitment,
-                                  nullifier,
-                                  false};
-    return note_id;
+// The former mint_zk/spend_zk accepted an ML-DSA signature from a server-held
+// master key as a "proof". That is not zero-knowledge and gave no privacy, so the
+// path is removed. Real privacy: shielded (addz) transactions, see shielded.hpp.
+std::string PrivacyPool::mint_zk(const std::string&, std::uint64_t, const std::string&, const std::string&,
+                                 const std::string&, const std::string&, std::string& error) {
+    error = "mint_zk removed (was not zero-knowledge); use shielded (addz) transactions";
+    return {};
 }
 
-bool PrivacyPool::spend_zk(const std::string& owner,
-                           const std::string& note_id,
-                           const std::string& recipient,
-                           std::uint64_t amount,
-                           const std::string& nullifier,
-                           const std::string& proof_hex,
-                           const std::string& verification_key_hex,
-                           std::string& new_note_id,
+bool PrivacyPool::spend_zk(const std::string&, const std::string&, const std::string&, std::uint64_t,
+                           const std::string&, const std::string&, const std::string&, std::string&,
                            std::string& error) {
-    if (owner.empty() || recipient.empty() || note_id.empty() || amount == 0) {
-        error = "invalid spend_zk params";
-        return false;
-    }
-
-    auto it = notes_.find(note_id);
-    if (it == notes_.end()) {
-        error = "note not found";
-        return false;
-    }
-    auto& note = it->second;
-    if (note.spent) {
-        error = "note already spent";
-        return false;
-    }
-    std::string expected_owner_tag;
-    if (!cipher_->owner_tag(owner, note_id, expected_owner_tag, error)) {
-        return false;
-    }
-    if (note.owner_tag != expected_owner_tag) {
-        error = "owner mismatch";
-        return false;
-    }
-    std::uint64_t note_amount = 0;
-    if (!cipher_->unseal_amount(note.amount_sealed, note_id, note.blinding, note_amount, error)) {
-        return false;
-    }
-    if (note_amount < amount) {
-        error = "insufficient note amount";
-        return false;
-    }
-    if (note.nullifier != nullifier) {
-        error = "nullifier mismatch";
-        return false;
-    }
-    if (used_nullifiers_.count(nullifier)) {
-        error = "nullifier already used";
-        return false;
-    }
-
-    const std::string public_input = "spend|" + owner + "|" + note_id + "|" + recipient + "|" +
-                                     std::to_string(amount) + "|" + nullifier;
-    if (!verify_proof(public_input, proof_hex, verification_key_hex, error)) {
-        return false;
-    }
-
-    note.spent = true;
-    used_nullifiers_.insert(nullifier);
-    spent_commitments_.insert(note.commitment);
-
-    std::string mint_error;
-    new_note_id = mint_note_internal(recipient, amount, mint_error);
-    if (!mint_error.empty()) {
-        note.spent = false;
-        used_nullifiers_.erase(nullifier);
-        spent_commitments_.erase(note.commitment);
-        error = mint_error;
-        return false;
-    }
-
-    const auto change = note_amount - amount;
-    if (change > 0) {
-        std::string change_note;
-        change_note = mint_note_internal(owner, change, mint_error);
-        if (!mint_error.empty() || change_note.empty()) {
-            note.spent = false;
-            used_nullifiers_.erase(nullifier);
-            spent_commitments_.erase(note.commitment);
-            notes_.erase(new_note_id);
-            new_note_id.clear();
-            error = "failed to mint change note";
-            return false;
-        }
-    }
-
-    return true;
+    error = "spend_zk removed (was not zero-knowledge); use shielded (addz) transactions";
+    return false;
 }
 
 bool PrivacyPool::verifier_configured() const {

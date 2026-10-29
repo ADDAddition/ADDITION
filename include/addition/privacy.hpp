@@ -51,6 +51,8 @@ public:
 // RPC calls (owner/amount arrive in clear). There is no master key to leak.
 std::shared_ptr<const NoteCipher> make_keyless_note_cipher();
 
+// DEPRECATED: transparent "opening" notes. Amounts/owners are visible to the node;
+// this is NOT a privacy feature. Use shielded (addz) transactions (shielded.hpp).
 class PrivacyPool {
 public:
     PrivacyPool();

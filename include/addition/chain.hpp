@@ -1,5 +1,7 @@
 #pragma once
 
+#include "addition/shielded.hpp"
+
 #include "addition/block.hpp"
 #include "addition/config.hpp"
 #include "addition/staking.hpp"
@@ -143,6 +145,8 @@ public:
         const auto it = pubkey_registry_.find(address);
         return (it != pubkey_registry_.end() && it->second == pubkey_hex) ? std::string() : pubkey_hex;
     }
+public:
+    const shielded::State& shielded_state() const { return shielded_; }
 
 private:
     struct UTXO {
@@ -166,6 +170,7 @@ private:
     std::map<std::string, StakeTicket> tickets_;
     std::uint64_t total_slashed_{0};
     std::uint64_t applying_height_{0}; // block height being applied (0 = mempool context)
+    shielded::State shielded_;
     std::function<void()> on_commit_;
     int suppress_commit_{0};
     mutable std::uint64_t last_batch_verify_ms_{0};
@@ -178,6 +183,11 @@ private:
                               std::uint64_t reward) const;
     bool mine_block(Block b, std::size_t threads, std::string& mined_hash, std::string& error,
                     std::atomic<bool>* stop);
+    bool validate_shielded_part(const Transaction& tx,
+                                shielded::Bundle& bundle,
+                                const std::unordered_set<std::string>& pending_nfs,
+                                bool check_proof,
+                                std::string& error) const;
     bool validate_block_header(const Block& candidate, std::string& error) const;
     bool validate_block_transactions(const Block& candidate, std::string& error) const;
     bool validate_block_staking(const Block& candidate, std::string& error) const;

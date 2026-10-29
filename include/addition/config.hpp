@@ -126,6 +126,9 @@ struct ChainConfig {
     std::uint32_t stake_reward_bps{3000U};         // stakers' share of subsidy+fees (30%)
     // Consensus: max canonical binary block weight (bytes). See block.hpp.
     std::uint64_t max_block_weight{2ULL * 1024ULL * 1024ULL};
+    // EXPERIMENTAL shielded pool (addz). Off by default on every network; must stay
+    // off on mainnet until an external cryptographic audit is complete.
+    bool shielded_enabled{false};
     std::vector<std::string> bootstrap_peers{"127.0.0.1:28545"};
 };
 

@@ -61,6 +61,9 @@ std::string tx_to_line(const Transaction& tx) {
     for (const auto& out : tx.outputs) {
         oss << "O|" << out.recipient << '|' << out.amount << '\n';
     }
+    if (!tx.shielded.empty()) {
+        oss << "S|" << tx.shielded << '\n';
+    }
     oss << "E\n";
     return oss.str();
 }
@@ -123,6 +126,8 @@ bool parse_tx_lines(std::istringstream& iss, Transaction& tx, std::string& error
             std::getline(ls, nonce);
             tx.fee = static_cast<std::uint64_t>(std::stoull(fee));
             tx.nonce = static_cast<std::uint64_t>(std::stoull(nonce));
+        } else if (tag == 'S') {
+            std::getline(ls, tx.shielded);
         } else {
             error = "unknown tx tag";
             return false;

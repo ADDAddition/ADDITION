@@ -24,8 +24,7 @@ struct Transaction {
     std::string signature;
     std::uint64_t fee{0};
     std::uint64_t nonce{0};
-    // Optional shielded bundle (hex, see shielded.hpp on feat/shielded). Empty =>
-    // legacy transparent tx. Same field/hash rule as feat/shielded for merge.
+    // Optional shielded bundle (hex, see shielded.hpp). Empty => legacy transparent tx.
     std::string shielded;
 };
 

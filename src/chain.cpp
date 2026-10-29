@@ -76,6 +76,7 @@ void Chain::reset() {
     tickets_.clear();
     total_slashed_ = 0;
     applying_height_ = 0;
+    shielded_ = shielded::State{};
 
     auto g = make_genesis();
     blocks_.push_back(g);
@@ -396,8 +397,48 @@ bool Chain::validate_transaction(const Transaction& tx, std::string& error) cons
     return validate_transaction(tx, error, true);
 }
 
+bool Chain::validate_shielded_part(const Transaction& tx,
+                                   shielded::Bundle& bundle,
+                                   const std::unordered_set<std::string>& pending_nfs,
+                                   bool check_proof,
+                                   std::string& error) const {
+    if (!cfg_.shielded_enabled) {
+        error = "shielded transactions not enabled on this network";
+        return false;
+    }
+    if (!shielded::from_tx_field(tx.shielded, bundle, error)) {
+        return false;
+    }
+    if (tx.inputs.empty()) {
+        if (!tx.signer.empty() || !tx.signature.empty() || !tx.signer_pubkey.empty()) {
+            error = "fully shielded tx must not carry a transparent signer";
+            return false;
+        }
+        if (bundle.vpub_in != 0) {
+            error = "vpub_in requires transparent inputs";
+            return false;
+        }
+        if (bundle.nullifiers.empty()) {
+            error = "fully shielded tx must spend at least one note";
+            return false;
+        }
+    }
+    if (!shielded_.check(bundle, pending_nfs, error)) {
+        return false;
+    }
+    if (check_proof && !shielded::verify_bundle_proof(tx, bundle, error)) {
+        return false;
+    }
+    return true;
+}
+
 bool Chain::validate_transaction(const Transaction& tx, std::string& error, bool check_signature) const {
-    if (tx.outputs.empty() && !(tx.inputs.empty() && applying_height_ != 0)) {
+    const bool is_shielded = !tx.shielded.empty();
+    shielded::Bundle bundle;
+    if (is_shielded && !validate_shielded_part(tx, bundle, {}, check_signature, error)) {
+        return false;
+    }
+    if (tx.outputs.empty() && !is_shielded && !(tx.inputs.empty() && applying_height_ != 0)) {
         error = "transaction has no outputs";
         return false;
     }
@@ -417,6 +458,19 @@ bool Chain::validate_transaction(const Transaction& tx, std::string& error, bool
             return false;
         }
         outputs_total += out.amount;
+    }
+
+    if (tx.inputs.empty() && is_shielded) {
+        if (cfg_.min_fee > 0 && tx.fee < cfg_.min_fee) {
+            error = "fee below network minimum";
+            return false;
+        }
+        if (static_cast<unsigned __int128>(bundle.vpub_out) !=
+            static_cast<unsigned __int128>(outputs_total) + tx.fee) {
+            error = "shielded value balance mismatch";
+            return false;
+        }
+        return true;
     }
 
     if (tx.inputs.empty()) {
@@ -510,6 +564,16 @@ bool Chain::validate_transaction(const Transaction& tx, std::string& error, bool
     if (outputs_total > (std::numeric_limits<std::uint64_t>::max() - tx.fee)) {
         error = "outputs+fee overflow";
         return false;
+    }
+
+    if (is_shielded) {
+        const auto lhs = static_cast<unsigned __int128>(inputs_total) + bundle.vpub_out;
+        const auto rhs = static_cast<unsigned __int128>(outputs_total) + tx.fee + bundle.vpub_in;
+        if (lhs != rhs) {
+            error = "shielded value balance mismatch";
+            return false;
+        }
+        return true;
     }
 
     if (inputs_total < outputs_total + tx.fee) {
@@ -662,11 +726,9 @@ bool Chain::validate_transaction_signature(const Transaction& tx, std::string& e
         error = "missing signature";
         return false;
     }
-    if (!tx.shielded.empty()) {
-        // Shielded bundles are validated by feat/shielded; never accept unverified ones here.
-        error = "shielded tx not supported by this build";
-        return false;
-    }
+    // Shielded part (if any) is verified by validate_shielded_part (gated by
+    // cfg_.shielded_enabled, fail-closed without the STARK backend); the PQ
+    // signature below covers it via hash_transaction's |sh= commitment.
 
     std::string pubkey;
     if (!resolve_signer_pubkey(tx, nullptr, pubkey, error)) {
@@ -800,6 +862,13 @@ bool Chain::apply_transaction(const Transaction& tx,
             pubkey_registry_.emplace(tx.signer, tx.signer_pubkey);
         }
     }
+    if (!tx.shielded.empty()) {
+        shielded::Bundle bundle;
+        if (!shielded::from_tx_field(tx.shielded, bundle, error)) {
+            return false;
+        }
+        shielded_.apply(bundle);
+    }
 
     seen_transactions_.insert(txid);
     return true;
@@ -872,6 +941,10 @@ bool Chain::validate_block_transactions(const Block& candidate, std::string& err
     }
 
     const auto& coinbase = candidate.transactions.front();
+    if (!coinbase.shielded.empty()) {
+        error = "coinbase must not carry a shielded bundle";
+        return false;
+    }
     if (!coinbase.inputs.empty()) {
         error = "coinbase must not have inputs";
         return false;
@@ -897,7 +970,7 @@ bool Chain::validate_block_transactions(const Block& candidate, std::string& err
     }
     std::uint64_t fees = 0;
     for (std::size_t i = 1; i < candidate.transactions.size(); ++i) {
-        if (candidate.transactions[i].inputs.empty()) {
+        if (candidate.transactions[i].inputs.empty() && candidate.transactions[i].shielded.empty()) {
             error = "non-coinbase tx must have inputs";
             return false;
         }
@@ -926,8 +999,45 @@ bool Chain::validate_block_transactions(const Block& candidate, std::string& err
 
     auto snapshot_utxo = utxo_set_;
     auto snapshot_index = address_index_;
+    // Shielded: stateful checks against pre-block state (anchors must be from
+    // earlier blocks), nullifier uniqueness across the whole block, then STARKs.
+    std::unordered_set<std::string> block_nfs;
+    std::unordered_set<std::string> block_cms;
+    std::vector<std::pair<const Transaction*, shielded::Bundle>> shielded_jobs;
+    std::vector<std::uint64_t> shielded_vpub_in(candidate.transactions.size(), 0);
+    std::vector<std::uint64_t> shielded_vpub_out(candidate.transactions.size(), 0);
+    for (std::size_t i = 1; i < candidate.transactions.size(); ++i) {
+        const auto& tx = candidate.transactions[i];
+        if (tx.shielded.empty()) {
+            continue;
+        }
+        shielded::Bundle bundle;
+        if (!validate_shielded_part(tx, bundle, block_nfs, false, error)) {
+            return false;
+        }
+        for (const auto& n : bundle.nullifiers) {
+            block_nfs.insert(shielded::hex32(n));
+        }
+        for (const auto& c : bundle.commitments) {
+            if (!block_cms.insert(shielded::hex32(c)).second) {
+                error = "shielded: duplicate commitment in block";
+                return false;
+            }
+        }
+        shielded_vpub_in[i] = bundle.vpub_in;
+        shielded_vpub_out[i] = bundle.vpub_out;
+        shielded_jobs.emplace_back(&tx, std::move(bundle));
+    }
+    for (const auto& job : shielded_jobs) {
+        if (!shielded::verify_bundle_proof(*job.first, job.second, error)) {
+            return false;
+        }
+    }
+
+    std::size_t tx_index = 0;
     for (const auto& tx : candidate.transactions) {
-        if (tx.outputs.empty() && !(&tx == &coinbase && coinbase_total == 0)) {
+        const std::size_t this_index = tx_index++;
+        if (tx.outputs.empty() && tx.shielded.empty() && !(&tx == &coinbase && coinbase_total == 0)) {
             error = "tx outputs empty";
             return false;
         }
@@ -974,7 +1084,14 @@ bool Chain::validate_block_transactions(const Block& candidate, std::string& err
             error = "block tx outputs+fee overflow";
             return false;
         }
-        if (!tx.inputs.empty() && inputs_total < outputs_total + tx.fee) {
+        if (!tx.shielded.empty()) {
+            const auto lhs = static_cast<unsigned __int128>(inputs_total) + shielded_vpub_out[this_index];
+            const auto rhs = static_cast<unsigned __int128>(outputs_total) + tx.fee + shielded_vpub_in[this_index];
+            if (lhs != rhs) {
+                error = "block shielded value mismatch";
+                return false;
+            }
+        } else if (!tx.inputs.empty() && inputs_total < outputs_total + tx.fee) {
             error = "block tx value mismatch";
             return false;
         }
@@ -997,12 +1114,11 @@ bool Chain::validate_block_transactions(const Block& candidate, std::string& err
     std::unordered_map<std::string, std::string> registry_overlay;  // same-block registrations
     for (std::size_t i = 1; i < candidate.transactions.size(); ++i) {
         const auto& tx = candidate.transactions[i];
+        if (tx.inputs.empty() && !tx.shielded.empty()) {
+            continue;  // authorized by the STARK (knowledge of nk), verified above
+        }
         if (tx.signer.empty() || tx.signature.rfind("pq=", 0) != 0) {
             error = "non-coinbase tx missing PQ signature";
-            return false;
-        }
-        if (!tx.shielded.empty()) {
-            error = "shielded tx not supported by this build";
             return false;
         }
         std::string pubkey;
@@ -1080,6 +1196,7 @@ bool Chain::add_block(const Block& block, std::string& error) {
         ~ApplyGuard() { ref = 0; }
     } guard{applying_height_};
     applying_height_ = block.header.height;
+    auto shielded_snapshot = shielded_;
 
     for (const auto& tx : block.transactions) {
         const auto txid = hash_transaction(tx);
@@ -1098,6 +1215,7 @@ bool Chain::add_block(const Block& block, std::string& error) {
             }
             cumulative_work_ = work_snapshot;
             difficulty_target_ = diff_snapshot;
+            shielded_ = std::move(shielded_snapshot);
             return false;
         }
     }
@@ -1178,6 +1296,7 @@ bool Chain::replace_with_chain(const std::vector<Block>& candidate,
     auto old_work = cumulative_work_;
     auto old_tickets = tickets_;
     auto old_slashed = total_slashed_;
+    auto old_shielded = shielded_;
 
     bool accepted = false;
     {
@@ -1200,6 +1319,7 @@ bool Chain::replace_with_chain(const std::vector<Block>& candidate,
                 cumulative_work_ = old_work;
                 tickets_ = old_tickets;
                 total_slashed_ = old_slashed;
+                shielded_ = old_shielded;
                 error = "invalid candidate at height " + std::to_string(i) + ": " + add_err;
                 --suppress_commit_;
                 return false;
@@ -1220,6 +1340,7 @@ bool Chain::replace_with_chain(const std::vector<Block>& candidate,
             cumulative_work_ = old_work;
             tickets_ = old_tickets;
             total_slashed_ = old_slashed;
+            shielded_ = old_shielded;
             error = "candidate work not higher";
             --suppress_commit_;
             return false;

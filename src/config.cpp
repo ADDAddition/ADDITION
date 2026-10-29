@@ -170,6 +170,11 @@ void apply_network_profile_chain(ChainConfig& chain, NetworkMode mode) {
 int apply_staking_key(ChainConfig& c, const std::string& k, const std::string& v) {
     std::uint64_t n = 0;
     auto num = [&](std::uint64_t lo, std::uint64_t hi) { return parse_u64(v, n) && n >= lo && n <= hi; };
+    if (k == "shielded_enabled") {
+        if (v == "1" || v == "true") { c.shielded_enabled = true; return 1; }
+        if (v == "0" || v == "false") { c.shielded_enabled = false; return 1; }
+        return 0;
+    }
     if (k == "staking_activation_height") { return parse_u64(v, c.staking_activation_height) ? 1 : 0; }
     if (k == "stake_min_amount") { if (!num(1, UINT64_MAX)) return 0; c.stake_min_amount = n; return 1; }
     if (k == "stake_maturity") { if (!num(1, 1000000)) return 0; c.stake_maturity = n; return 1; }
@@ -748,6 +753,10 @@ bool validate_network_profile(const NodeConfig& cfg, std::string& error) {
         if (cfg.chain.network_mode != "mainnet" || cfg.chain.network_id != kMainnetNetworkId) {
             error = "mainnet requires network_id=ADDITION_MAINNET_V1 and a mainnet genesis; "
                     "refusing to relabel a testnet chain";
+            return false;
+        }
+        if (cfg.chain.shielded_enabled) {
+            error = "shielded_enabled is EXPERIMENTAL (unaudited) and refused on mainnet";
             return false;
         }
         if (cfg.chain.genesis_timestamp == kTestnetGenesisTimestamp) {
