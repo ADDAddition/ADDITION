@@ -183,6 +183,15 @@ def main() -> int:
         if "error" in A("wallet_send miner %s 40 1" % addr):
             return fail("fund device")
         A("mine " + miner)
+        # Regression (mobile report): the device sends a tx first, so its pubkey is in the
+        # registry and the stake tx carries an empty signer_pubkey. The ticket must still
+        # get the full key, or every vote fails with "invalid vote signature".
+        pre = A("wallet_send device %s 2 1" % miner)
+        if "error" in pre:
+            return fail("device pre-send: " + pre)
+        A("mine " + miner)
+        if not field(A("get_nonce " + addr), "nonce") or field(A("get_nonce " + addr), "nonce") == "0":
+            return fail("pre-send not confirmed: " + A("get_nonce " + addr))
         n0 = field(A("get_nonce " + addr), "nonce")
         if n0 == "":
             return fail("get_nonce: " + A("get_nonce " + addr))

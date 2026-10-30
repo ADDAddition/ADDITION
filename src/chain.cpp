@@ -900,7 +900,12 @@ bool Chain::apply_transaction(const Transaction& tx,
             out.spendable_height = h + cfg_.stake_unbond_delay;
         }
         if (out.owner == kStakeAddress) {
-            tickets_[key] = StakeTicket{key, tx.signer, tx.signer_pubkey, out.amount, h};
+            // Store the full key: a signer already in the registry sends an empty
+            // signer_pubkey (pubkey_field_for), which left the ticket keyless and
+            // made every vote fail with "invalid vote signature".
+            std::string ticket_pk = tx.signer_pubkey;
+            if (ticket_pk.empty()) registered_pubkey(tx.signer, ticket_pk);
+            tickets_[key] = StakeTicket{key, tx.signer, ticket_pk, out.amount, h};
         }
         utxo_set_[key] = out;
         if (address_index_[out.owner] > (std::numeric_limits<std::uint64_t>::max() - out.amount)) {
@@ -1528,7 +1533,7 @@ bool Chain::verify_stake_vote(const StakeVote& v, std::string& error) const {
         error = "unknown ticket";
         return false;
     }
-    if (!vote_signature_ok(t->second, cfg_.network_id, v)) {
+    if (!vote_signature_ok(ticket_with_key(t->second), cfg_.network_id, v)) {
         error = "invalid vote signature";
         return false;
     }
@@ -1541,7 +1546,7 @@ bool Chain::verify_vote_signature_only(const StakeVote& v, std::string& error) c
         error = "unknown ticket";
         return false;
     }
-    if (!vote_signature_ok(t->second, cfg_.network_id, v)) {
+    if (!vote_signature_ok(ticket_with_key(t->second), cfg_.network_id, v)) {
         error = "invalid vote signature";
         return false;
     }
@@ -1584,7 +1589,7 @@ bool Chain::validate_slash(const SlashEvidence& ev, std::string& error) const {
         error = "slash: unknown or spent ticket";
         return false;
     }
-    if (!vote_signature_ok(t->second, cfg_.network_id, a) || !vote_signature_ok(t->second, cfg_.network_id, b)) {
+    if (!vote_signature_ok(ticket_with_key(t->second), cfg_.network_id, a) || !vote_signature_ok(ticket_with_key(t->second), cfg_.network_id, b)) {
         error = "slash: invalid vote signature";
         return false;
     }
@@ -1636,7 +1641,7 @@ bool Chain::validate_block_staking(const Block& candidate, std::string& error) c
             return false;
         }
         const auto t = tickets_.find(v.ticket_id);
-        if (t == tickets_.end() || !vote_signature_ok(t->second, cfg_.network_id, v)) {
+        if (t == tickets_.end() || !vote_signature_ok(ticket_with_key(t->second), cfg_.network_id, v)) {
             error = "invalid stake vote signature";
             return false;
         }

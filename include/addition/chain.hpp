@@ -151,6 +151,11 @@ public:
     bool registered_pubkey(const std::string& address, std::string& pubkey_hex) const;
     std::size_t registry_size() const { return pubkey_registry_.size(); }
     // Pubkey to put in a new tx: "" when this exact key is already registered.
+    // Tickets written before the keyless-ticket fix: fall back to the registry.
+    StakeTicket ticket_with_key(StakeTicket t) const {
+        if (t.owner_pubkey.empty()) { const auto it = pubkey_registry_.find(t.owner); if (it != pubkey_registry_.end()) t.owner_pubkey = it->second; }
+        return t;
+    }
     std::string pubkey_field_for(const std::string& address, const std::string& pubkey_hex) const {
         const auto it = pubkey_registry_.find(address);
         return (it != pubkey_registry_.end() && it->second == pubkey_hex) ? std::string() : pubkey_hex;
