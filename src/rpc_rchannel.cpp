@@ -308,6 +308,11 @@ bool RpcServer::handle_channel_message(const std::string& /*peer*/, const std::s
         rchan_opening_[f[1]] = std::move(rc);
         return true;
     }
+    if (op == "RKEY") {
+        if (!rchan_route_key(error)) return false;
+        reply = "CHANOK|" + bytes_to_hex(rchan_rk_pk_);
+        return true;
+    }
     if (op == "FUND") {
         if (f.size() != 6) { error = "bad FUND"; return false; }
         auto it = rchan_opening_.find(f[1]);
@@ -349,11 +354,6 @@ bool RpcServer::handle_channel_message(const std::string& /*peer*/, const std::s
     }
     if (rc.status != "open") { error = "channel not open"; return false; }
     auto& ch = *rc.ch;
-    if (op == "RKEY") {
-        if (!rchan_route_key(error)) return false;
-        reply = "CHANOK|" + bytes_to_hex(rchan_rk_pk_);
-        return true;
-    }
     if (op == "UPD") {
         channel::State next;
         if ((f.size() != 4 && f.size() != 6) || !channel::decode_state(f[2], next)) { error = "bad UPD"; return false; }

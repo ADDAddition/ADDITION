@@ -1839,8 +1839,10 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
 
     const auto hs = handshake_ok_.find(peer);
     if (hs == handshake_ok_.end() || !hs->second) {
+        // Not misbehaviour: after we restart, honest peers still hold a cached
+        // handshake and re-HELLO on this error. Scoring it banned them (seen on
+        // the Tor testnet). Unauthenticated traffic is still bounded by the rate limiter.
         error = "handshake required";
-        peers_.mark_peer_bad(peer);
         return false;
     }
 
