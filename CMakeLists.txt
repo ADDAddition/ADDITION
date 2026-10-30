@@ -113,6 +113,10 @@ if(ADDITION_BUILD_TESTS)
     target_link_libraries(test_net_tor PRIVATE addition_core)
     add_test(NAME test_net_tor COMMAND test_net_tor)
 
+    add_executable(test_peer_bans tests/test_peer_bans.cpp)
+    target_link_libraries(test_peer_bans PRIVATE addition_core)
+    add_test(NAME test_peer_bans COMMAND test_peer_bans)
+
     add_executable(test_speed_v3 tests/test_speed_v3.cpp)
     target_link_libraries(test_speed_v3 PRIVATE addition_core)
     add_test(NAME test_speed_v3 COMMAND test_speed_v3)

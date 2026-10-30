@@ -40,7 +40,13 @@ public:
     bool remove_peer(const std::string& endpoint);
     bool has_peer(const std::string& endpoint) const;
     void mark_peer_good(const std::string& endpoint);
-    void mark_peer_bad(const std::string& endpoint);
+    void mark_peer_bad(const std::string& endpoint);  // misbehaviour: can ban (time-limited)
+    // Transport failure (Tor circuit drop, timeout): score -1 and backoff, never a ban.
+    void mark_peer_unreachable(const std::string& endpoint);
+    // A peer that just completed an authenticated HELLO: clear backoff, and if it
+    // was banned only for unreachability, re-admit it.
+    void readmit_authenticated(const std::string& endpoint);
+    std::int64_t ban_expiry(const std::string& endpoint) const;  // 0 if not banned
     bool is_banned(const std::string& endpoint) const;
     std::vector<std::string> peers() const;
     std::size_t peer_count() const;
@@ -57,6 +63,7 @@ private:
     std::unordered_map<std::string, std::int64_t> backoff_;  // seed -> retry-after
     std::unordered_set<std::string> seeds_;
     std::unordered_set<std::string> candidates_;
+    std::unordered_set<std::string> soft_banned_;  // banned via unreachability only
     std::size_t max_peers_ = 125;
     std::size_t max_candidates_ = 1000;
     std::int64_t ban_seconds_ = 3600;

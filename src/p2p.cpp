@@ -205,8 +205,37 @@ void PeerNetwork::mark_peer_bad(const std::string& endpoint) {
         return;
     }
     banned_[endpoint] = now_locked() + ban_seconds_;
+    soft_banned_.erase(endpoint);
     peers_.erase(endpoint);
     score_.erase(endpoint);
+}
+
+void PeerNetwork::mark_peer_unreachable(const std::string& endpoint) {
+    std::lock_guard<std::mutex> lk(mu_);
+    if (peers_.find(endpoint) == peers_.end()) return;
+    auto& sc = score_[endpoint];
+    sc = std::max(kMinScore, sc - 1);
+    if (sc <= kBanScore) {
+        backoff_[endpoint] = now_locked() + 60;  // retry later; inbound is still accepted
+        sc = kBanScore + 1;
+    }
+}
+
+void PeerNetwork::readmit_authenticated(const std::string& endpoint) {
+    std::lock_guard<std::mutex> lk(mu_);
+    backoff_.erase(endpoint);
+    if (soft_banned_.erase(endpoint) != 0) banned_.erase(endpoint);
+    if (banned_locked(endpoint)) return;  // misbehaviour ban stands until expiry
+    banned_.erase(endpoint);
+    if (peers_.count(endpoint) == 0 && peers_.size() < max_peers_) peers_.insert(endpoint);
+    auto& sc = score_[endpoint];
+    if (sc < 0) sc = 0;
+}
+
+std::int64_t PeerNetwork::ban_expiry(const std::string& endpoint) const {
+    std::lock_guard<std::mutex> lk(mu_);
+    if (!banned_locked(endpoint)) return 0;
+    return banned_.at(endpoint);
 }
 
 bool PeerNetwork::is_banned(const std::string& endpoint) const {

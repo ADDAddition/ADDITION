@@ -430,6 +430,7 @@ bool RpcServer::rchan_drive(const std::string& id, std::string& error) {
     if (!channel::decode_state(rc.out_state, x)) { rc.out_phase.clear(); error = "corrupt outbox"; return false; }
     auto fail = [&](const std::string& e) {
         error = e;
+        rc.last_error = e;
         ++rc.attempts;
         rc.next_try = now_s() + std::min<std::int64_t>(60, 1LL << std::min(rc.attempts, 6u));
         std::string e2;
@@ -497,6 +498,7 @@ bool RpcServer::rchan_drive(const std::string& id, std::string& error) {
         rc.out_extra.clear();
         rc.out_action.clear();
         rc.attempts = 0;
+        rc.last_error.clear();
         return rchan_save(id, rc, error);
     }
     return true;
@@ -705,6 +707,11 @@ std::string RpcServer::handle_rchan_command(const std::string& cmd, std::istring
                 << " bal_a=" << st.bal_a << " bal_b=" << st.bal_b << " local=" << rc.ch->local_balance()
                 << " htlcs=" << st.htlcs.size() << " pending=" << (rc.ch->has_pending() ? 1 : 0)
                 << " outbox=" << (rc.out_phase.empty() ? "-" : rc.out_phase) << " attempts=" << rc.attempts;
+            if (!rc.last_error.empty()) {
+                std::string le = rc.last_error;
+                for (auto& c : le) if (c == '\n' || c == ' ') c = '_';
+                out << " last_error=" << le.substr(0, 160);
+            }
         }
         return out.str();
     }

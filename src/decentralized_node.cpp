@@ -795,7 +795,7 @@ std::size_t DecentralizedNode::flush_stem(std::string& last) {
             continue;
         }
         last = "stem relay failed to " + relay;
-        peers_.mark_peer_bad(relay);
+        peers_.mark_peer_unreachable(relay);
         // Relay unreachable: fall back to fluffing (embargo semantics).
         Transaction tx{};
         std::string derr;
@@ -879,7 +879,7 @@ bool DecentralizedNode::fetch_blocks_from_peer(const std::string& peer,
     std::string inv_resp;
     if (!send_p2p_request(peer, inv_req.str(), inv_resp)) {
         error = "REQINV transport failed";
-        peers_.mark_peer_bad(peer);
+        peers_.mark_peer_unreachable(peer);
         return false;
     }
     if (inv_resp.rfind("ok:INV|", 0) != 0) {
@@ -974,7 +974,7 @@ bool DecentralizedNode::fetch_blocks_from_peer(const std::string& peer,
         }
         if (got < reqs.size()) {
             error = "REQBLK transport failed at height " + std::to_string(wanted[got]);
-            peers_.mark_peer_bad(peer);
+            peers_.mark_peer_unreachable(peer);
             forget_handshake(peer);
             return ingested_any;
         }
@@ -985,7 +985,7 @@ bool DecentralizedNode::fetch_blocks_from_peer(const std::string& peer,
     if (!send_p2p_request(peer, id + " REQH|", remote_height_resp) ||
         remote_height_resp.rfind("ok:HAVEH|", 0) != 0) {
         error = "REQH failed during reorg";
-        peers_.mark_peer_bad(peer);
+        peers_.mark_peer_unreachable(peer);
         return false;
     }
     std::uint64_t remote_h = 0;
@@ -1007,7 +1007,7 @@ bool DecentralizedNode::fetch_blocks_from_peer(const std::string& peer,
         std::string block_resp;
         if (!send_p2p_request(peer, req.str(), block_resp)) {
             error = "REQBLK transport failed at height " + std::to_string(h);
-            peers_.mark_peer_bad(peer);
+            peers_.mark_peer_unreachable(peer);
             return false;
         }
 
@@ -1174,6 +1174,7 @@ bool DecentralizedNode::handshake_with_peer_uncached(const std::string& peer, st
             peer_pubkeys_[peer] = peer_pk;
             pinned_peer_pubkeys_.emplace(peer, peer_pk);
             outbound_hs_ok_[peer] = true;
+            peers_.readmit_authenticated(peer);
             peer_proto_[peer] = std::stoi(v);
             wire_id = attempt_id;
             return true;
@@ -1196,7 +1197,7 @@ bool DecentralizedNode::handshake_with_peer_uncached(const std::string& peer, st
             continue;
         }
 
-        if (hello_resp == "error: unknown peer") {
+        if (hello_resp == "error: unknown peer" || hello_resp.rfind("error: peer banned", 0) == 0) {
             error = "seed rejected peer id (persist banned self)";
             continue;
         }
@@ -1320,7 +1321,7 @@ bool DecentralizedNode::sync_once_impl(std::string& error) {
         if (!send_p2p_request(peer, wire_id + " REQWORK|", remote_work_resp)) {
             last_error = "REQWORK transport failed";
             if (std::getenv("ADDITION_SYNC_DEBUG") != nullptr) std::cerr << "sync reqwork transport fail" << std::endl;
-            peers_.mark_peer_bad(peer);
+            peers_.mark_peer_unreachable(peer);
             continue;
         }
 
@@ -1364,7 +1365,7 @@ bool DecentralizedNode::sync_once_impl(std::string& error) {
         std::string remote_height_resp;
         if (!send_p2p_request(peer, wire_id + " REQH|", remote_height_resp)) {
             last_error = "REQH transport failed";
-            peers_.mark_peer_bad(peer);
+            peers_.mark_peer_unreachable(peer);
             continue;
         }
 
@@ -1575,7 +1576,7 @@ bool DecentralizedNode::flush_outbound_gossip(std::size_t& sent, std::string& er
             }
             if (!send_p2p_request(peer, wire_id + " " + adapted, resp)) {
                 last = "gossip transport failed to " + peer;
-                peers_.mark_peer_bad(peer);
+                peers_.mark_peer_unreachable(peer);
                 forget_handshake(peer);
                 break;
             }
@@ -1679,13 +1680,17 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
     reply.clear();
     if (!peers_.has_peer(peer)) {
         if (!peers_.add_peer(peer)) {
-            error = "unknown peer";
+            if (const auto until = peers_.ban_expiry(peer); until != 0) {
+                error = "peer banned until " + std::to_string(until) + " (misbehaviour; time-limited)";
+            } else {
+                error = "peer table full";
+            }
             return false;
         }
     }
 
     if (peers_.is_banned(peer)) {
-        error = "peer banned";
+        error = "peer banned until " + std::to_string(peers_.ban_expiry(peer)) + " (misbehaviour; time-limited)";
         return false;
     }
 
@@ -1825,6 +1830,7 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         ack << "HELLO_ACK|" << negotiated << '|' << active_network_id(chain_) << '|' << now << '|' << nonce
             << '|' << node_public_key_ << '|' << ack_sig;
         reply = ack.str();
+        peers_.readmit_authenticated(peer);
         peers_.mark_peer_good(peer);
         handshake_ok_[peer] = true;
         peer_proto_[peer] = std::stoi(negotiated);

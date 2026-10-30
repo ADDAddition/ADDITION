@@ -100,6 +100,7 @@ private:
         // revoked, awaiting the peer's revocation).
         std::string out_phase, out_state, out_kind, out_extra, out_action;
         unsigned attempts{0};
+        std::string last_error;  // last outbox failure, surfaced in rchan_list (not persisted)
         std::int64_t next_try{0};
         // Receiver side: effect of the peer's pending update, applied once it is
         // revoked-in (e.g. forward an HTLC, settle upstream).
