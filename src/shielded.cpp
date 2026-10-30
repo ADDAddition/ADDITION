@@ -135,6 +135,71 @@ bool Address::decode(const std::string& s, Address& out, std::string& error) {
     return true;
 }
 Address SpendingKey::address() const { return Address{owner_tag(nk), kem_pk}; }
+namespace {
+void put_blob(Bytes& o, const Bytes& b) {
+    const auto n = static_cast<std::uint32_t>(b.size());
+    for (int i = 0; i < 4; ++i) o.push_back(static_cast<std::uint8_t>((n >> (8 * i)) & 0xFF));
+    o.insert(o.end(), b.begin(), b.end());
+}
+bool get_blob(const Bytes& in, std::size_t& p, Bytes& b) {
+    if (p + 4 > in.size()) return false;
+    std::uint32_t n = 0;
+    for (int i = 0; i < 4; ++i) n |= static_cast<std::uint32_t>(in[p + i]) << (8 * i);
+    p += 4;
+    if (n > in.size() - p) return false;
+    b.assign(in.begin() + static_cast<std::ptrdiff_t>(p), in.begin() + static_cast<std::ptrdiff_t>(p + n));
+    p += n;
+    return true;
+}
+H32 keystore_key(const std::string& secret) {
+    const Bytes s(secret.begin(), secret.end());
+    return sha256_dom("ADD/zkeystore/v1", {&s});
+}
+const Bytes kKeystoreAad{'A', 'D', 'D', 'Z', 'K', '1'};
+}  // namespace
+
+bool seal_spending_key(const SpendingKey& sk, const std::string& secret, Bytes& out, std::string& error) {
+    if (secret.empty()) { error = "empty keystore secret"; return false; }
+    Bytes plain;
+    put_blob(plain, Bytes(sk.nk.begin(), sk.nk.end()));
+    put_blob(plain, sk.kem_sk);
+    put_blob(plain, sk.kem_pk);
+    std::uint8_t nonce[12];
+    if (RAND_bytes(nonce, sizeof(nonce)) != 1) { error = "rng failure"; return false; }
+    Bytes ct;
+    const bool ok = aead(true, keystore_key(secret), nonce, kKeystoreAad, plain, ct);
+    std::fill(plain.begin(), plain.end(), 0);
+    if (!ok) { error = "seal failed"; return false; }
+    out = Bytes(kKeystoreAad.begin(), kKeystoreAad.end());
+    out.insert(out.end(), nonce, nonce + 12);
+    out.insert(out.end(), ct.begin(), ct.end());
+    return true;
+}
+
+bool open_spending_key(const Bytes& in, const std::string& secret, SpendingKey& out, std::string& error) {
+    if (in.size() < 6 + 12 + 16 || !std::equal(kKeystoreAad.begin(), kKeystoreAad.end(), in.begin())) {
+        error = "bad keystore format"; return false;
+    }
+    std::uint8_t nonce[12];
+    std::memcpy(nonce, in.data() + 6, 12);
+    const Bytes ct(in.begin() + 18, in.end());
+    Bytes plain;
+    if (!aead(false, keystore_key(secret), nonce, kKeystoreAad, ct, plain)) {
+        error = "keystore decrypt failed (wrong key/passphrase?)"; return false;
+    }
+    std::size_t p = 0;
+    Bytes nk;
+    SpendingKey sk;
+    const bool ok = get_blob(plain, p, nk) && nk.size() == sk.nk.size() && get_blob(plain, p, sk.kem_sk) &&
+                    get_blob(plain, p, sk.kem_pk) && p == plain.size();
+    if (ok) std::copy(nk.begin(), nk.end(), sk.nk.begin());
+    std::fill(plain.begin(), plain.end(), 0);
+    std::fill(nk.begin(), nk.end(), 0);
+    if (!ok) { error = "keystore payload corrupt"; return false; }
+    out = std::move(sk);
+    return true;
+}
+
 bool generate_spending_key(SpendingKey& out, std::string& error) {
     OQS_KEM* kem = OQS_KEM_new(kKem);
     if (!kem) { error = "ML-KEM-1024 unavailable in liboqs"; return false; }

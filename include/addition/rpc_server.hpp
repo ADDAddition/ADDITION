@@ -88,6 +88,7 @@ private:
     // Shielded (addz) spending keys per local wallet name. Testnet tooling:
     // in-memory only (lost on restart); notes are rescanned from the chain.
     std::map<std::string, shielded::SpendingKey> zkeys_;
+    bool ensure_zkey(const std::string& name, bool create, std::string& error);
     std::string shielded_scan(const std::string& wallet, std::vector<shielded::Note>* unspent, std::uint64_t* total);
     mutable std::mutex mu_;
 public:

@@ -2,6 +2,10 @@
 
 #include "addition/block.hpp"
 #include "addition/net_io.hpp"
+#include <cstdlib>
+#include <iterator>
+#include <filesystem>
+#include <fstream>
 #include "addition/btc_hygiene.hpp"
 #include "addition/config.hpp"
 #include "addition/crypto.hpp"
@@ -225,9 +229,58 @@ std::uint64_t RpcServer::unlocked_balance(const std::string& address) const {
     return confirmed; // locked stake is held by @stake, not in the owner's balance
 }
 
+namespace {
+std::string zkey_secret(const StoredWallet& sw) {
+    std::string secret = sw.private_key;
+    if (const char* pass = std::getenv("ADDITION_ZKEY_PASSPHRASE")) secret += std::string("|") + pass;
+    return secret;
+}
+}  // namespace
+
+bool RpcServer::ensure_zkey(const std::string& name, bool create, std::string& error) {
+    if (zkeys_.count(name)) return true;
+    StoredWallet sw{};
+    if (!wallets_.load(name, sw, error, true)) return false;
+    const std::string path = wallets_.dir() + "/" + name + ".zkey";
+    {
+        std::ifstream in(path, std::ios::binary);
+        if (in) {
+            const shielded::Bytes blob((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            shielded::SpendingKey sk;
+            if (!shielded::open_spending_key(blob, zkey_secret(sw), sk, error)) return false;
+            zkeys_[name] = std::move(sk);
+            return true;
+        }
+    }
+    if (!create) { error = "run z_address first"; return false; }
+    shielded::SpendingKey sk;
+    if (!shielded::generate_spending_key(sk, error)) return false;
+    if (wallets_.configured()) {
+        shielded::Bytes blob;
+        if (!shielded::seal_spending_key(sk, zkey_secret(sw), blob, error)) return false;
+        const std::string tmp = path + ".tmp";
+        {
+            std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
+            if (!out) { error = "cannot write " + tmp; return false; }
+            out.write(reinterpret_cast<const char*>(blob.data()), static_cast<std::streamsize>(blob.size()));
+            if (!out) { error = "write failed"; return false; }
+        }
+        std::error_code ec;
+        std::filesystem::permissions(tmp, std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
+                                     std::filesystem::perm_options::replace, ec);
+        std::filesystem::rename(tmp, path, ec);
+        if (ec) { error = "rename failed: " + ec.message(); return false; }
+    }
+    zkeys_[name] = std::move(sk);
+    return true;
+}
+
 std::string RpcServer::shielded_scan(const std::string& wallet, std::vector<shielded::Note>* unspent, std::uint64_t* total) {
+    {
+        std::string zerr;
+        if (!ensure_zkey(wallet, false, zerr)) return "no shielded key for wallet: " + zerr;
+    }
     const auto it = zkeys_.find(wallet);
-    if (it == zkeys_.end()) return "no shielded key for wallet (run z_address first)";
     std::uint64_t pos = 0, sum = 0;
     for (const auto& blk : chain_.blocks()) {
         for (const auto& tx : blk.transactions) {
@@ -877,11 +930,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         StoredWallet sw{};
         std::string error;
         if (name.empty() || !wallets_.load(name, sw, error, true)) return "error: usage z_address <wallet> " + error;
-        if (!zkeys_.count(name)) {
-            shielded::SpendingKey sk;
-            if (!shielded::generate_spending_key(sk, error)) return "error: " + error;
-            zkeys_[name] = std::move(sk);
-        }
+        if (!ensure_zkey(name, true, error)) return "error: " + error;
         return "ok zaddr=" + zkeys_[name].address().encode();
     }
 
@@ -914,7 +963,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         StoredWallet sw{};
         std::string error;
         if (name.empty() || amount == 0 || fee == 0 || !wallets_.load(name, sw, error, true)) return "error: bad usage " + error;
-        if (!zkeys_.count(name)) return "error: run z_address first";
+        if (!ensure_zkey(name, false, error)) return "error: " + error;
         const auto& sk = zkeys_[name];
         Transaction tx{};
         shielded::Bundle b;

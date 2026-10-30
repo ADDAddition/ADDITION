@@ -61,6 +61,9 @@ struct SpendingKey {
     Bytes kem_pk;
 };
 bool generate_spending_key(SpendingKey& out, std::string& error);
+// At-rest keystore: AES-256-GCM under SHA-256("ADD/zkeystore/v1" || secret).
+bool seal_spending_key(const SpendingKey& sk, const std::string& secret, Bytes& out, std::string& error);
+bool open_spending_key(const Bytes& in, const std::string& secret, SpendingKey& out, std::string& error);
 
 // ---- bundle ----------------------------------------------------------------
 struct EncryptedNote {
