@@ -959,6 +959,9 @@ bool DecentralizedNode::ingest_block(const Block& block, std::string& error) {
     }
 
     if (!chain_.add_block(block, error)) {
+        // Not connected (out of order, gap, transient): forget it so a later
+        // fetch can retry instead of being silently treated as "already seen".
+        seen_block_hashes_.erase(bh);
         return false;
     }
 
