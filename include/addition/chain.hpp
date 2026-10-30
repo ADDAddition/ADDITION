@@ -71,6 +71,12 @@ public:
     std::uint64_t balance_of(const std::string& address) const;
     std::uint64_t last_nonce(const std::string& address) const;
     std::uint64_t next_nonce(const std::string& address) const;
+    // Optional mempool view so wallets can chain several pending txs per
+    // sender: next_nonce() continues after the highest pending nonce and
+    // build_transaction() skips outpoints already reserved by pending txs.
+    // Consensus validation never uses these hooks.
+    void set_pending_view(std::function<std::uint64_t(const std::string&)> max_pending_nonce,
+                          std::function<bool(const std::string&)> outpoint_reserved);
     bool credit_balance(const std::string& address,
                         std::uint64_t amount,
                         const std::string& reason,
@@ -166,6 +172,8 @@ private:
     std::unordered_map<std::string, UTXO> utxo_set_;
     std::unordered_map<std::string, std::uint64_t> address_index_;
     std::unordered_map<std::string, std::uint64_t> signer_last_nonce_;
+    std::function<std::uint64_t(const std::string&)> pending_nonce_fn_;
+    std::function<bool(const std::string&)> pending_outpoint_fn_;
     std::unordered_set<std::string> seen_transactions_;
     std::unordered_map<std::string, std::string> pubkey_registry_;
     std::uint64_t difficulty_target_{0};

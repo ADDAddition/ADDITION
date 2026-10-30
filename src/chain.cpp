@@ -288,8 +288,19 @@ std::uint64_t Chain::last_nonce(const std::string& address) const {
     return it == signer_last_nonce_.end() ? 0ULL : it->second;
 }
 
+void Chain::set_pending_view(std::function<std::uint64_t(const std::string&)> max_pending_nonce,
+                             std::function<bool(const std::string&)> outpoint_reserved) {
+    pending_nonce_fn_ = std::move(max_pending_nonce);
+    pending_outpoint_fn_ = std::move(outpoint_reserved);
+}
+
 std::uint64_t Chain::next_nonce(const std::string& address) const {
-    return last_nonce(address) + 1ULL;
+    std::uint64_t n = last_nonce(address) + 1ULL;
+    if (pending_nonce_fn_) {
+        const auto p = pending_nonce_fn_(address);
+        if (p >= n) n = p + 1ULL;
+    }
+    return n;
 }
 
 bool Chain::credit_balance(const std::string& address,
@@ -359,6 +370,9 @@ bool Chain::build_transaction(const std::string& from,
     for (const auto& [key, utxo] : utxo_set_) {
         if (utxo.spent || utxo.owner != from || utxo.spendable_height > height() + 1) {
             continue;
+        }
+        if (pending_outpoint_fn_ && pending_outpoint_fn_(key)) {
+            continue;  // already spent by one of our pending mempool txs
         }
 
         const auto sep = key.rfind(':');

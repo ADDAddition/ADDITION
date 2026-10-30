@@ -16,6 +16,10 @@ public:
     std::vector<Transaction> snapshot() const;
     void replace(const std::vector<Transaction>& txs);
     std::size_t size() const;
+    // Highest pending nonce for an account signer (0 if none).
+    std::uint64_t max_pending_nonce(const std::string& signer) const;
+    // "txid:index" reserved by a pending tx.
+    bool outpoint_reserved(const std::string& key) const;
 
 private:
     std::string signer_nonce_key(const Transaction& tx) const;

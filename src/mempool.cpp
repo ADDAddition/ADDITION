@@ -2,6 +2,7 @@
 #include "addition/shielded.hpp"
 
 #include <algorithm>
+#include <unordered_map>
 
 namespace addition {
 namespace {
@@ -127,6 +128,23 @@ std::vector<Transaction> Mempool::fetch_for_block(std::size_t max_count) {
         return a.nonce < b.nonce;
     });
 
+    // Nonce chaining: several pending txs per signer are allowed, but within
+    // a block each signer's txs must apply in ascending nonce order. Keep the
+    // fee-ordered slots, and reassign each signer's txs to its slots by nonce.
+    {
+        std::unordered_map<std::string, std::vector<std::size_t>> slots;
+        for (std::size_t i = 0; i < pending_.size(); ++i) {
+            if (!pending_[i].signer.empty()) slots[pending_[i].signer].push_back(i);
+        }
+        for (auto& [signer, idx] : slots) {
+            if (idx.size() < 2) continue;
+            std::vector<Transaction> txs;
+            for (auto i : idx) txs.push_back(pending_[i]);
+            std::stable_sort(txs.begin(), txs.end(),
+                             [](const Transaction& a, const Transaction& b) { return a.nonce < b.nonce; });
+            for (std::size_t k = 0; k < idx.size(); ++k) pending_[idx[k]] = std::move(txs[k]);
+        }
+    }
     const auto n = (max_count < pending_.size()) ? max_count : pending_.size();
     std::vector<Transaction> out;
     out.reserve(n);
@@ -182,6 +200,20 @@ void Mempool::replace(const std::vector<Transaction>& txs) {
         index_inputs(tx);
         pending_.push_back(tx);
     }
+}
+
+std::uint64_t Mempool::max_pending_nonce(const std::string& signer) const {
+    std::lock_guard<std::mutex> lk(mu_);
+    std::uint64_t m = 0;
+    for (const auto& tx : pending_) {
+        if (tx.signer == signer && tx.nonce > m) m = tx.nonce;
+    }
+    return m;
+}
+
+bool Mempool::outpoint_reserved(const std::string& key) const {
+    std::lock_guard<std::mutex> lk(mu_);
+    return reserved_outpoints_.count(key) != 0;
 }
 
 std::size_t Mempool::size() const {

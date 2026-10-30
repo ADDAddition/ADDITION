@@ -218,6 +218,9 @@ int main(int argc, char** argv) {
 
     addition::Chain chain(node_cfg.chain);
     addition::Mempool mempool;
+    chain.set_pending_view(
+        [&mempool](const std::string& a) { return mempool.max_pending_nonce(a); },
+        [&mempool](const std::string& k) { return mempool.outpoint_reserved(k); });
     addition::Miner miner(chain, mempool);
     addition::StakingEngine staking;
     addition::TokenEngine tokens;
