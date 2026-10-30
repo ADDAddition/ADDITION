@@ -1,3 +1,4 @@
+#include "addition/net_transport.hpp"
 #include "addition/rpc_server.hpp"
 
 #include "addition/block.hpp"
@@ -1204,9 +1205,13 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         {
             std::string announce_err;
             node_.announce_tip(announce_err);
-            std::size_t sent = 0;
-            std::string gossip_err;
-            node_.flush_outbound_gossip(sent, gossip_err);
+            // Over Tor a flush can take minutes (circuit builds, dead peers);
+            // the background loop flushes every few seconds, so don't block RPC.
+            if (transport_policy().socks_proxy.empty()) {
+                std::size_t sent = 0;
+                std::string gossip_err;
+                node_.flush_outbound_gossip(sent, gossip_err);
+            }
         }
 
         std::ostringstream out;
