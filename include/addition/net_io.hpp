@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <mutex>
 #include <string>
 
 namespace addition {
@@ -38,5 +39,32 @@ bool socket_send_paced(std::uintptr_t sock, const char* data, std::size_t n);
 bool socket_recv_line(std::uintptr_t sock, std::string& line, std::size_t max_bytes);
 bool socket_recv_request(std::uintptr_t sock, std::string& req, std::size_t max_bytes);
 bool socket_recv_http_response(std::uintptr_t sock, std::string& raw, std::size_t max_bytes);
+// Line reader for persistent connections: bytes read past the '\n' stay in
+// `carry` for the next call instead of being dropped.
+bool socket_recv_line_buffered(std::uintptr_t sock, std::string& carry, std::string& line, std::size_t max_bytes);
+
+// Node-state lock released during slow network I/O. RPC, inbound P2P and the
+// background sync all hold the same mutex; a thread doing a Tor round trip
+// registers its lock here so send_p2p_request() can drop it while waiting.
+void set_thread_state_lock(std::unique_lock<std::mutex>* lock);
+std::unique_lock<std::mutex>* thread_state_lock();
+struct ThreadStateLockScope {
+    std::unique_lock<std::mutex>* prev;
+    explicit ThreadStateLockScope(std::unique_lock<std::mutex>* l) : prev(thread_state_lock()) { set_thread_state_lock(l); }
+    ~ThreadStateLockScope() { set_thread_state_lock(prev); }
+    ThreadStateLockScope(const ThreadStateLockScope&) = delete;
+    ThreadStateLockScope& operator=(const ThreadStateLockScope&) = delete;
+};
+// Unlocks the registered state lock (if held) for its lifetime.
+struct StateUnlockDuringIo {
+    std::unique_lock<std::mutex>* l;
+    bool released = false;
+    StateUnlockDuringIo() : l(thread_state_lock()) {
+        if (l != nullptr && l->owns_lock()) { l->unlock(); released = true; }
+    }
+    ~StateUnlockDuringIo() { if (released) l->lock(); }
+    StateUnlockDuringIo(const StateUnlockDuringIo&) = delete;
+    StateUnlockDuringIo& operator=(const StateUnlockDuringIo&) = delete;
+};
 
 } // namespace addition

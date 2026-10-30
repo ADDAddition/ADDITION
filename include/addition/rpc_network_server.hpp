@@ -21,6 +21,9 @@ public:
 
     bool start(std::string& error);
     void stop();
+    // Persistent P2P connections: after a plain-line reply, keep reading further
+    // lines on the same socket until the peer closes or idles for idle_ms.
+    void set_keepalive(int idle_ms) { keepalive_idle_ms_ = idle_ms; }
 
     struct Stats {
         std::size_t active{0};
@@ -40,6 +43,7 @@ private:
     Handler handler_;
 
     std::atomic<bool> running_{false};
+    int keepalive_idle_ms_{0};
     std::thread worker_;
     struct ClientThread {
         std::thread th;

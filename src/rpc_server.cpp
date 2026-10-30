@@ -1,6 +1,7 @@
 #include "addition/rpc_server.hpp"
 
 #include "addition/block.hpp"
+#include "addition/net_io.hpp"
 #include "addition/btc_hygiene.hpp"
 #include "addition/config.hpp"
 #include "addition/crypto.hpp"
@@ -254,6 +255,7 @@ std::string RpcServer::public_rpc_banner() const {
 
 std::string RpcServer::handle_command(const std::string& line, bool trusted) {
     std::unique_lock<std::mutex> lock(mu_);
+    ThreadStateLockScope io_unlock_scope(&lock);  // P2P I/O drops the lock while waiting
     std::istringstream iss(line);
     std::string cmd;
     iss >> cmd;

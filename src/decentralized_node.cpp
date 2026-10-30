@@ -17,6 +17,9 @@
 #include <iostream>
 #include <thread>
 #include <limits>
+#include <mutex>
+#include <unordered_map>
+#include <vector>
 #include <sstream>
 
 #ifdef _WIN32
@@ -115,75 +118,139 @@ constexpr int kOnionConnectTimeoutMs = 120000;
 constexpr int kOnionIoTimeoutMs = 180000;
 constexpr int kOnionHelloTransportRetries = 5;
 
-bool send_p2p_request(const std::string& endpoint, const std::string& request, std::string& response) {
+// Persistent outbound connections. A Tor circuit to an onion service costs
+// 5-60 s to build; reusing the socket turns every later request into one
+// round trip. Peers that close after each reply (older nodes) simply fail the
+// reuse attempt and fall back to a fresh connection.
+struct PooledConn {
+    SocketT sock;
+    std::string carry;
+    std::chrono::steady_clock::time_point last_used;
+};
+constexpr auto kPoolMaxIdle = std::chrono::seconds(60);   // < server keepalive (90 s)
+constexpr std::size_t kPoolPerEndpoint = 4;
+std::mutex g_pool_mu;
+std::unordered_map<std::string, std::vector<PooledConn>> g_pool;
+
+bool pool_take(const std::string& endpoint, PooledConn& out) {
+    std::lock_guard<std::mutex> lk(g_pool_mu);
+    auto it = g_pool.find(endpoint);
+    if (it == g_pool.end()) return false;
+    auto& v = it->second;
+    const auto now = std::chrono::steady_clock::now();
+    while (!v.empty()) {
+        PooledConn c = std::move(v.back());
+        v.pop_back();
+        if (now - c.last_used < kPoolMaxIdle) { out = std::move(c); return true; }
+        close_socket(c.sock);
+    }
+    return false;
+}
+
+void pool_put(const std::string& endpoint, PooledConn c) {
+    c.last_used = std::chrono::steady_clock::now();
+    std::lock_guard<std::mutex> lk(g_pool_mu);
+    auto& v = g_pool[endpoint];
+    if (v.size() >= kPoolPerEndpoint) { close_socket(c.sock); return; }
+    v.push_back(std::move(c));
+}
+
+bool open_p2p_conn(const std::string& endpoint, PooledConn& out) {
     std::string ip;
     std::uint16_t port = 0;
-    if (!parse_endpoint(endpoint, ip, port)) {
-        return false;
-    }
-
-#ifdef _WIN32
-    WSADATA wsa_data{};
-    if (WSAStartup(MAKEWORD(2, 2), &wsa_data) != 0) {
-        return false;
-    }
-#endif
-
+    if (!parse_endpoint(endpoint, ip, port)) return false;
     std::uintptr_t raw_sock = 0;
     std::string terr;
     // transport_connect honors the Tor/SOCKS policy: .onion via SOCKS5 (ATYP
     // domain, no local DNS), clearnet refused in onion_only mode.
     if (!transport_connect(ip, port, is_onion_v3_host(ip) ? kOnionConnectTimeoutMs : kConnectTimeoutMs, raw_sock, terr)) {
-#ifdef _WIN32
-        WSACleanup();
-#endif
         return false;
     }
     SocketT sock = static_cast<SocketT>(raw_sock);
     socket_apply_wan_opts(static_cast<std::uintptr_t>(sock));
-    {
-        const int io_ms = is_onion_v3_host(ip) ? kOnionIoTimeoutMs : kSocketTimeoutMs;
+    const int io_ms = is_onion_v3_host(ip) ? kOnionIoTimeoutMs : kSocketTimeoutMs;
 #ifdef _WIN32
-        DWORD timeout_ms = static_cast<DWORD>(io_ms);
-        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout_ms), sizeof(timeout_ms));
-        setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&timeout_ms), sizeof(timeout_ms));
+    DWORD timeout_ms = static_cast<DWORD>(io_ms);
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout_ms), sizeof(timeout_ms));
+    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&timeout_ms), sizeof(timeout_ms));
 #else
-        timeval tv{};
-        tv.tv_sec = io_ms / 1000;
-        tv.tv_usec = (io_ms % 1000) * 1000;
-        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-        setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+    timeval tv{};
+    tv.tv_sec = io_ms / 1000;
+    tv.tv_usec = (io_ms % 1000) * 1000;
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 #endif
-    }
+    out.sock = sock;
+    out.carry.clear();
+    return true;
+}
 
-    const std::string payload = request + "\n";
-    if (payload.size() > kMaxLineBytes) {
-        close_socket(sock);
-#ifdef _WIN32
-        WSACleanup();
-#endif
-        return false;
-    }
+// Write all requests, then read one reply line per request (pipelining).
+// Returns the number of replies read; the connection is pooled only if all came back.
+std::size_t exchange_on(const std::string& endpoint, PooledConn& c,
+                        const std::vector<std::string>& requests, std::vector<std::string>& responses) {
+    std::string payload;
+    for (const auto& r : requests) { payload += r; payload.push_back('\n'); }
     // Pace ~1 KiB writes. A residential first-burst of the ~15 KiB ML-DSA
-    // HELLO often dies even when the peer loop-reads. Still read a reply if
-    // the peer RSTs after a partial write.
-    const bool sent_ok =
-        socket_send_paced(static_cast<std::uintptr_t>(sock), payload.c_str(), payload.size());
-    const bool recv_ok =
-        socket_recv_line(static_cast<std::uintptr_t>(sock), response, kMaxLineBytes);
-    if (!recv_ok) {
-        close_socket(sock);
-#ifdef _WIN32
-        WSACleanup();
-#endif
-        return false;
+    // HELLO often dies even when the peer loop-reads.
+    const bool sent_ok = socket_send_paced(static_cast<std::uintptr_t>(c.sock), payload.c_str(), payload.size());
+    std::size_t got = 0;
+    for (std::size_t i = 0; i < requests.size(); ++i) {
+        std::string line;
+        if (!socket_recv_line_buffered(static_cast<std::uintptr_t>(c.sock), c.carry, line, kMaxLineBytes)) break;
+        responses.push_back(std::move(line));
+        ++got;
     }
-    (void)sent_ok;
+    if (sent_ok && got == requests.size() && c.carry.empty()) {
+        pool_put(endpoint, std::move(c));
+    } else {
+        close_socket(c.sock);
+    }
+    return got;
+}
 
-    close_socket(sock);
+std::size_t send_p2p_pipeline(const std::string& endpoint, const std::vector<std::string>& requests,
+                              std::vector<std::string>& responses) {
+    responses.clear();
+    for (const auto& r : requests) {
+        if (r.size() + 1 > kMaxLineBytes) return 0;
+    }
+    if (requests.empty()) return 0;
+#ifdef _WIN32
+    WSADATA wsa_data{};
+    if (WSAStartup(MAKEWORD(2, 2), &wsa_data) != 0) return 0;
+#endif
+    StateUnlockDuringIo unlocked;  // never hold node state across a Tor round trip
+    std::size_t got = 0;
+    PooledConn c;
+    if (pool_take(endpoint, c)) {
+        got = exchange_on(endpoint, c, requests, responses);
+        if (got == 0) responses.clear();  // stale pooled socket: retry fresh
+    }
+    if (got == 0) {
+        PooledConn fresh;
+        if (open_p2p_conn(endpoint, fresh)) {
+            // Old peers close after one reply; send the rest one per connection.
+            got = exchange_on(endpoint, fresh, {requests.front()}, responses);
+            if (got == 1 && requests.size() > 1) {
+                std::vector<std::string> rest(requests.begin() + 1, requests.end());
+                PooledConn again;
+                if (pool_take(endpoint, again) || open_p2p_conn(endpoint, again)) {
+                    got += exchange_on(endpoint, again, rest, responses);
+                }
+            }
+        }
+    }
 #ifdef _WIN32
     WSACleanup();
 #endif
+    return got;
+}
+
+bool send_p2p_request(const std::string& endpoint, const std::string& request, std::string& response) {
+    std::vector<std::string> out;
+    if (send_p2p_pipeline(endpoint, {request}, out) != 1) return false;
+    response = std::move(out.front());
     return true;
 }
 
@@ -433,6 +500,7 @@ std::vector<std::string> public_rpc_endpoints(const std::string& p2p_peer) {
 }
 
 bool send_http_rpc(const std::string& endpoint, const std::string& cmd, std::string& response) {
+    StateUnlockDuringIo unlocked;  // HTTP round trip: don't hold node state
     std::string ip;
     std::uint16_t port = 0;
     if (!parse_endpoint(endpoint, ip, port)) {
@@ -560,8 +628,9 @@ void DecentralizedNode::load_peer_pins(const std::vector<std::pair<std::string, 
 
 bool DecentralizedNode::relay_rotation_messages_to_peer(const std::string& peer, std::string& error) {
     auto& relayed = relayed_message_ids_by_peer_[peer];
+    const auto pending = outbound_;  // copy: the state lock is dropped during sends
 
-    for (const auto& msg : outbound_) {
+    for (const auto& msg : pending) {
         const bool is_rotation = (msg.rfind("IDROTATE|", 0) == 0);
         const bool is_vote = (msg.rfind("IDVOTE|", 0) == 0);
         if (!is_rotation && !is_vote) {
@@ -962,36 +1031,50 @@ bool DecentralizedNode::fetch_blocks_from_peer(const std::string& peer,
 
     if (!reorg_needed) {
         bool ingested_any = false;
+        // Pipeline every missing block on one persistent connection instead of
+        // one Tor round trip (and formerly one circuit) per block.
+        std::vector<std::uint64_t> wanted;
+        std::vector<std::string> reqs;
         for (const auto& [h, hash] : inventory) {
+            if (h <= chain_.height() || chain_.has_block_hash(hash)) {
+                continue;
+            }
+            wanted.push_back(h);
+            reqs.push_back(id + " REQBLK|" + std::to_string(h));
+        }
+        if (reqs.empty()) {
+            return true;
+        }
+        std::vector<std::string> resps;
+        const auto got = send_p2p_pipeline(peer, reqs, resps);
+        for (std::size_t i = 0; i < got; ++i) {
+            const auto h = wanted[i];
+            const auto& block_resp = resps[i];
             if (h <= chain_.height()) {
-                continue;
-            }
-            if (chain_.has_block_hash(hash)) {
-                continue;
-            }
-
-            std::ostringstream req;
-            req << id << " REQBLK|" << h;
-            std::string block_resp;
-            if (!send_p2p_request(peer, req.str(), block_resp)) {
-                error = "REQBLK transport failed at height " + std::to_string(h);
-                peers_.mark_peer_bad(peer);
-                return ingested_any;
+                continue;  // ingested by gossip while the state lock was released
             }
             if (block_resp.rfind("ok:BLKDATA|", 0) != 0) {
                 error = "REQBLK rejected at height " + std::to_string(h) + ": " + block_resp;
                 peers_.mark_peer_bad(peer);
                 return ingested_any;
             }
-
             std::string ingest_error;
             if (!ingest_block_payload(block_resp.substr(11), ingest_error)) {
+                if (chain_.height() >= h) {
+                    continue;  // raced with gossip; already have it
+                }
                 peers_.mark_peer_bad(peer);
                 error = ingest_error;
                 return ingested_any;
             }
             ingested_any = true;
             peers_.mark_peer_good(peer);
+        }
+        if (got < reqs.size()) {
+            error = "REQBLK transport failed at height " + std::to_string(wanted[got]);
+            peers_.mark_peer_bad(peer);
+            forget_handshake(peer);
+            return ingested_any;
         }
         return true;
     }
@@ -1069,7 +1152,34 @@ bool DecentralizedNode::fetch_blocks_from_peer(const std::string& peer,
 
 bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string& wire_id, std::string& error) {
     error.clear();
-    handshake_ok_[peer] = false;
+    // Reuse a recent signed handshake instead of a ~15 KiB ML-DSA HELLO per
+    // message. Invalidated on "handshake required" or any transport failure.
+    {
+        const auto it = hello_cache_.find(peer);
+        if (it != hello_cache_.end()) {
+            const auto hs = outbound_hs_ok_.find(peer);
+            if (hs != outbound_hs_ok_.end() && hs->second &&
+                now_seconds() < it->second.second + kHelloCacheSeconds) {
+                wire_id = it->second.first;
+                return true;
+            }
+            hello_cache_.erase(it);
+        }
+    }
+    const bool ok = handshake_with_peer_uncached(peer, wire_id, error);
+    if (ok) {
+        hello_cache_[peer] = {wire_id.empty() ? self_id_ : wire_id, now_seconds()};
+    }
+    return ok;
+}
+
+void DecentralizedNode::forget_handshake(const std::string& peer) {
+    hello_cache_.erase(peer);
+}
+
+bool DecentralizedNode::handshake_with_peer_uncached(const std::string& peer, std::string& wire_id, std::string& error) {
+    error.clear();
+    outbound_hs_ok_[peer] = false;
     wire_id.clear();
 
     int transport_fails = 0;
@@ -1109,6 +1219,7 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
                 }
                 if (onion) {
                     // Exponential backoff (2,4,8,16 s): lets Tor build a new circuit.
+                    StateUnlockDuringIo unlocked;
                     std::this_thread::sleep_for(std::chrono::seconds(1LL << transport_fails));
                 }
             }
@@ -1159,21 +1270,21 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
             }
             peer_pubkeys_[peer] = peer_pk;
             pinned_peer_pubkeys_.emplace(peer, peer_pk);
-            handshake_ok_[peer] = true;
+            outbound_hs_ok_[peer] = true;
             peer_proto_[peer] = std::stoi(v);
             wire_id = attempt_id;
             return true;
         }
 
         if (persist_leftover_reply(hello_resp)) {
-            handshake_ok_[peer] = true;
+            outbound_hs_ok_[peer] = true;
             std::string work;
             if (send_p2p_request(peer, attempt_id + " REQWORK|", work) && work.rfind("ok:HAVEWORK|", 0) == 0) {
                 wire_id = attempt_id;
                 return true;
             }
             error = "persist leftover reply without HAVEWORK: " + hello_resp;
-            handshake_ok_[peer] = false;
+            outbound_hs_ok_[peer] = false;
             continue;
         }
 
@@ -1275,7 +1386,17 @@ bool DecentralizedNode::ingest_from_public_rpc(const std::string& p2p_peer, std:
 }
 
 bool DecentralizedNode::sync_once(std::string& error) {
+    // The state lock is released during network I/O, so a second caller (RPC
+    // "sync" vs the background loop) could interleave; let only one run.
+    while (sync_busy_.exchange(true)) {
+        StateUnlockDuringIo unlocked;  // wait for the other sync to finish, then run ours
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    struct Clear { std::atomic<bool>& f; ~Clear() { f.store(false); } } clear{sync_busy_};
     const bool ok = sync_once_impl(error);
+    if (std::getenv("ADDITION_SYNC_DEBUG") != nullptr) {
+        std::cerr << "sync_once tid=" << std::this_thread::get_id() << " ok=" << ok << " height=" << chain_.height() << " err=" << error << std::endl;
+    }
     refresh_local_votes(); // vote on whatever tip we ended up on
     return ok;
 }
@@ -1317,7 +1438,9 @@ bool DecentralizedNode::sync_once_impl(std::string& error) {
         }
 
         std::string rpc_err;
+        if (std::getenv("ADDITION_SYNC_DEBUG") != nullptr) std::cerr << "sync try tid=" << std::this_thread::get_id() << " peer=" << peer << std::endl;
         if (ingest_from_public_rpc(peer, rpc_err)) {
+            if (std::getenv("ADDITION_SYNC_DEBUG") != nullptr) std::cerr << "sync via public rpc" << std::endl;
             any_handshake = true;
             if (chain_.height() > max_remote_h) {
                 max_remote_h = chain_.height();
@@ -1328,7 +1451,8 @@ bool DecentralizedNode::sync_once_impl(std::string& error) {
         std::string hs_err;
         std::string wire_id;
         if (!handshake_with_peer(peer, wire_id, hs_err)) {
-            handshake_ok_[peer] = false;
+            if (std::getenv("ADDITION_SYNC_DEBUG") != nullptr) std::cerr << "sync hs fail " << hs_err << " rpc=" << rpc_err << std::endl;
+            outbound_hs_ok_[peer] = false;
             last_error = (hs_err.empty() ? std::string("handshake failed") : hs_err) + "; " +
                          (rpc_err.empty() ? std::string("public-rpc ingest failed") : rpc_err);
             continue;
@@ -1350,6 +1474,7 @@ bool DecentralizedNode::sync_once_impl(std::string& error) {
         {
             std::string relay_err;
             if (!relay_rotation_messages_to_peer(peer, relay_err)) {
+                if (std::getenv("ADDITION_SYNC_DEBUG") != nullptr) std::cerr << "sync relay fail " << relay_err << std::endl;
                 last_error = relay_err.empty() ? "rotation relay failed" : relay_err;
                 peers_.mark_peer_bad(peer);
                 continue;
@@ -1359,16 +1484,31 @@ bool DecentralizedNode::sync_once_impl(std::string& error) {
         std::string remote_work_resp;
         if (!send_p2p_request(peer, wire_id + " REQWORK|", remote_work_resp)) {
             last_error = "REQWORK transport failed";
+            if (std::getenv("ADDITION_SYNC_DEBUG") != nullptr) std::cerr << "sync reqwork transport fail" << std::endl;
             peers_.mark_peer_bad(peer);
             continue;
         }
 
+        if (remote_work_resp.find("handshake required") != std::string::npos) {
+            // Cached HELLO went stale on the remote side: re-handshake once and retry.
+            forget_handshake(peer);
+            std::string hs2;
+            if (handshake_with_peer(peer, wire_id, hs2)) {
+                if (wire_id.empty()) {
+                    wire_id = self_id_;
+                }
+                remote_work_resp.clear();
+                send_p2p_request(peer, wire_id + " REQWORK|", remote_work_resp);
+            }
+        }
         if (remote_work_resp.rfind("ok:HAVEWORK|", 0) != 0) {
             last_error = "REQWORK rejected: " + remote_work_resp;
+            if (std::getenv("ADDITION_SYNC_DEBUG") != nullptr) std::cerr << "sync reqwork rejected " << remote_work_resp.substr(0,200) << std::endl;
             peers_.mark_peer_bad(peer);
             continue;
         }
 
+        if (std::getenv("ADDITION_SYNC_DEBUG") != nullptr) std::cerr << "sync reqwork resp=" << remote_work_resp.substr(0, 120) << std::endl;
         std::uint64_t remote_work = 0;
         try {
             remote_work = std::stoull(remote_work_resp.substr(12));
@@ -1378,6 +1518,9 @@ bool DecentralizedNode::sync_once_impl(std::string& error) {
             continue;
         }
 
+        if (std::getenv("ADDITION_SYNC_DEBUG") != nullptr) {
+            std::cerr << "sync peer=" << peer << " remote_work=" << remote_work << " local_work=" << chain_.cumulative_work() << std::endl;
+        }
         if (remote_work <= chain_.cumulative_work()) {
             peers_.mark_peer_good(peer);
             continue;
@@ -1541,7 +1684,11 @@ bool DecentralizedNode::flush_outbound_gossip(std::size_t& sent, std::string& er
             if (!send_p2p_request(peer, wire_id + " " + adapted, resp)) {
                 last = "gossip transport failed to " + peer;
                 peers_.mark_peer_bad(peer);
+                forget_handshake(peer);
                 break;
+            }
+            if (resp.find("handshake required") != std::string::npos) {
+                forget_handshake(peer);
             }
             if (resp.rfind("error:", 0) == 0) {
                 last = "gossip rejected by " + peer + ": " + resp;

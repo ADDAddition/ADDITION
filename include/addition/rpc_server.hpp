@@ -90,6 +90,10 @@ private:
     std::map<std::string, shielded::SpendingKey> zkeys_;
     std::string shielded_scan(const std::string& wallet, std::vector<shielded::Note>* unspent, std::uint64_t* total);
     mutable std::mutex mu_;
+public:
+    // Shared node-state lock (RPC, inbound P2P, background sync).
+    std::mutex& state_mutex() const { return mu_; }
+private:
 };
 
 } // namespace addition

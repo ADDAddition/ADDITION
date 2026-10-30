@@ -260,8 +260,11 @@ def main() -> int:
             return fail("node A height after mine: " + info_a)
 
         info_b = tcp_rpc("127.0.0.1", ports["b_write"], "getinfo")
-        if field(info_b, "height") != "0":
-            return fail("node B must start at height 0: " + info_b)
+        # B bootstraps from A, and background sync no longer blocks on RPC, so B
+        # may already have caught up; it must never be ahead of A.
+        hb0 = field(info_b, "height")
+        if not hb0.isdigit() or int(hb0) > int(height_a):
+            return fail("node B height must be <= A: " + info_b)
 
         add = tcp_rpc("127.0.0.1", ports["b_write"], "addpeer 127.0.0.1:%s" % ports["a_p2p"])
         if add not in {"ok", "error: invalid/duplicate peer"}:
@@ -271,7 +274,7 @@ def main() -> int:
             return fail("node B peers missing A: " + peers_b)
 
         sync = tcp_rpc("127.0.0.1", ports["b_write"], "sync", timeout=45.0)
-        if sync == "ok:height=0":
+        if sync == "ok:height=0" and int(height_a) > 0:
             return fail("sync returned ok:height=0 while A is at height %s" % height_a)
         if not sync.startswith("ok:height="):
             return fail("sync: " + sync)

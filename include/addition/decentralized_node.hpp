@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <atomic>
 #include <unordered_map>
 #include <deque>
 #include <string>
@@ -111,7 +112,12 @@ private:
     std::unordered_set<std::string> seen_txids_;
     std::unordered_set<std::string> seen_block_hashes_;
     std::vector<std::string> outbound_;
-    std::unordered_map<std::string, bool> handshake_ok_;
+    std::unordered_map<std::string, bool> handshake_ok_;      // inbound: keyed by claimed peer id
+    std::unordered_map<std::string, bool> outbound_hs_ok_;    // outbound: keyed by endpoint
+    // peer endpoint -> (wire id, unix time of last signed HELLO)
+    std::unordered_map<std::string, std::pair<std::string, std::uint64_t>> hello_cache_;
+    static constexpr std::uint64_t kHelloCacheSeconds = 600;
+    std::atomic<bool> sync_busy_{false};
     // Negotiated wire protocol per peer (2 = hex TXB2/BLB2, 3 = base64 TXV3/BLV3,
     // 4 = v3 + TXV3 script witnesses).
     // Unknown peers are treated as v2 (always decodable by both).
@@ -176,6 +182,8 @@ private:
     bool decode_tx_payload(const std::string& payload, Transaction& tx, std::string& error) const;
     std::string encode_block_payload(const Block& block) const;
     bool handshake_with_peer(const std::string& peer, std::string& wire_id, std::string& error);
+    bool handshake_with_peer_uncached(const std::string& peer, std::string& wire_id, std::string& error);
+    void forget_handshake(const std::string& peer);
     bool fetch_blocks_from_peer(const std::string& peer, const std::string& wire_id, std::string& error);
     bool ingest_from_public_rpc(const std::string& p2p_peer, std::string& error);
     bool learn_peers_from(const std::string& peer, const std::string& wire_id, std::string& error);

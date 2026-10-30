@@ -1,4 +1,7 @@
 #include "addition/rpc_network_server.hpp"
+#ifndef _WIN32
+#include <poll.h>
+#endif
 
 #include "addition/net_io.hpp"
 
@@ -332,6 +335,40 @@ void RpcNetworkServer::serve_client(std::uintptr_t client_raw) {
         }
     } slot_guard{large_slots_, large};
 
+#ifndef _WIN32
+    if (keepalive_idle_ms_ > 0) {
+        std::string carry;
+        std::string line;
+        bool first = true;
+        for (;;) {
+            if (!first) {
+                // Wait for the next pipelined/persistent request without pinning
+                // shutdown: poll in 1 s slices up to the idle limit.
+                int waited = 0;
+                bool ready = carry.find('\n') != std::string::npos;
+                while (!ready && running_.load() && waited < keepalive_idle_ms_) {
+                    pollfd pfd{};
+                    pfd.fd = client;
+                    pfd.events = POLLIN;
+                    const int pr = ::poll(&pfd, 1, 1000);
+                    if (pr < 0) break;
+                    if (pr > 0) { ready = true; break; }
+                    waited += 1000;
+                }
+                if (!ready) break;
+            }
+            first = false;
+            if (!socket_recv_line_buffered(static_cast<std::uintptr_t>(client), carry, line, limit)) break;
+            if (line.rfind("GET ", 0) == 0 || line.rfind("POST ", 0) == 0) break;  // not a P2P line
+            std::string resp = handler_(line);
+            if (resp.empty() || resp.back() != '\n') resp.push_back('\n');
+            if (resp.size() > kMaxLineBytes) resp = "error: response too large\n";
+            if (!socket_send_all(static_cast<std::uintptr_t>(client), resp.c_str(), resp.size())) break;
+        }
+        close_socket(client);
+        return;
+    }
+#endif
     std::string req;
     if (!socket_recv_request(static_cast<std::uintptr_t>(client), req, limit)) {
         close_socket(client);

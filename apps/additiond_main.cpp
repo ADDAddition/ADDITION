@@ -1,3 +1,4 @@
+#include "addition/net_io.hpp"
 #include "addition/auto_mine.hpp"
 #include "addition/chain.hpp"
 #include "addition/config.hpp"
@@ -320,9 +321,23 @@ int main(int argc, char** argv) {
         }
     });
 
+    // Inbound P2P, RPC and the background sync share one state lock (the RPC
+    // server's). Outbound Tor round trips release it (StateUnlockDuringIo), so a
+    // long catch-up no longer freezes RPC or the peers syncing from us.
+    std::atomic<addition::RpcServer*> state_owner{nullptr};
+    auto with_state_lock = [&](auto&& fn) {
+        addition::RpcServer* owner = state_owner.load();
+        if (owner == nullptr) {
+            return fn();
+        }
+        std::unique_lock<std::mutex> lk(owner->state_mutex());
+        addition::ThreadStateLockScope scope(&lk);
+        return fn();
+    };
     addition::RpcNetworkServer p2p_rpc(node_cfg.p2p_bind, node_cfg.p2p_port, [&](const std::string& cmd) {
-        return node.handle_p2p_line(cmd);
+        return with_state_lock([&] { return node.handle_p2p_line(cmd); });
     });
+    p2p_rpc.set_keepalive(90000);
 
     addition::RpcServer rpc(chain,
                             mempool,
@@ -342,6 +357,7 @@ int main(int argc, char** argv) {
                             allow_insecure_tx_commands,
                             strict_admin_mode,
                             (std::filesystem::path(node_cfg.data_dir) / "wallets").string());
+    state_owner.store(&rpc);
     const bool enable_lan_rpc = []() {
         if (const char* v = std::getenv("ADDITION_ENABLE_LAN_RPC")) {
             return std::string(v) == "1";
@@ -685,11 +701,14 @@ int main(int argc, char** argv) {
     for (std::string line; std::getline(std::cin, line);) {
         const auto now = std::chrono::steady_clock::now();
         if (now - last_sync >= std::chrono::seconds(5)) {
-            std::string sync_err;
-            node.sync_once(sync_err);
-            std::size_t sent = 0;
-            std::string gossip_err;
-            node.flush_outbound_gossip(sent, gossip_err);
+            with_state_lock([&] {
+                std::string sync_err;
+                node.sync_once(sync_err);
+                std::size_t sent = 0;
+                std::string gossip_err;
+                node.flush_outbound_gossip(sent, gossip_err);
+                return 0;
+            });
             last_sync = now;
         }
 
@@ -741,11 +760,14 @@ int main(int argc, char** argv) {
             std::this_thread::sleep_for(std::chrono::seconds(1));
             const auto now = std::chrono::steady_clock::now();
             if (now - last_sync >= std::chrono::seconds(5)) {
-                std::string sync_err;
-                node.sync_once(sync_err);
-                std::size_t sent = 0;
-                std::string gossip_err;
-                node.flush_outbound_gossip(sent, gossip_err);
+                with_state_lock([&] {
+                    std::string sync_err;
+                    node.sync_once(sync_err);
+                    std::size_t sent = 0;
+                    std::string gossip_err;
+                    node.flush_outbound_gossip(sent, gossip_err);
+                    return 0;
+                });
                 last_sync = now;
             }
         }
