@@ -1665,6 +1665,9 @@ std::string DecentralizedNode::handle_p2p_line(const std::string& line) {
     std::string err;
     std::string reply;
     if (!handle_inbound_message(peer, payload, reply, err)) {
+        // Operator diagnostics: message type + reason only (no payload content).
+        std::cerr << "p2p reject peer=" << peer << " type=" << payload.substr(0, payload.find('|'))
+                  << " err=" << err << " banned=" << (peers_.is_banned(peer) ? 1 : 0) << std::endl;
         return std::string("error: ") + err;
     }
     if (reply.empty()) {
@@ -1858,7 +1861,11 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         const auto ok = fluff_transaction(tx, error);
         if (ok) {
             peers_.mark_peer_good(peer);
-        } else {
+        } else if (error.find("signature") != std::string::npos) {
+            // Only provably bad txs are misbehaviour. State-dependent rejects
+            // (inputs already spent, duplicate, nonce/fee) are normal when an
+            // honest peer re-gossips a stale mempool after a restart; scoring
+            // them got honest peers banned for an hour.
             peers_.mark_peer_bad(peer);
         }
         return ok;
