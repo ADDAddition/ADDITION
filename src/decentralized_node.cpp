@@ -1245,6 +1245,7 @@ bool DecentralizedNode::handshake_with_peer_uncached(const std::string& peer, st
             continue;
         }
 
+        if (std::getenv("ADDITION_SYNC_DEBUG")) std::cerr << "hello resp peer=" << peer << " attempt=" << attempt << " resp=" << hello_resp.substr(0, 60) << std::endl;
         if (hello_resp.rfind("ok:HELLO_ACK|", 0) == 0) {
             const auto ack = hello_resp.substr(13);
             std::istringstream as(ack);
