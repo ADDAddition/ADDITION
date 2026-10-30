@@ -1455,6 +1455,9 @@ bool DecentralizedNode::sync_once_impl(std::string& error) {
         if (peers_.is_banned(peer) || (!advertised_p2p_.empty() && peer == advertised_p2p_)) {
             continue;  // never sync from / gossip to our own advertised endpoint
         }
+        if (!is_peer_endpoint(peer)) {
+            continue;  // node-id aliases (n-...) are not dialable; skip instead of burning a timeout
+        }
 
         std::string rpc_err;
         if (std::getenv("ADDITION_SYNC_DEBUG") != nullptr) std::cerr << "sync try tid=" << std::this_thread::get_id() << " peer=" << peer << std::endl;
@@ -1684,6 +1687,9 @@ bool DecentralizedNode::flush_outbound_gossip(std::size_t& sent, std::string& er
     for (const auto& peer : peers_.peers()) {
         if (peers_.is_banned(peer) || (!advertised_p2p_.empty() && peer == advertised_p2p_)) {
             continue;  // self (e.g. our own .onion learned via peer exchange): wasted Tor round trip
+        }
+        if (!is_peer_endpoint(peer)) {
+            continue;  // node-id alias, not dialable
         }
         std::string wire_id;
         std::string hs_err;
