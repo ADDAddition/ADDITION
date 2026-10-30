@@ -260,9 +260,39 @@ int main(int argc, char** argv) {
             }
         }
 
+        // Persistent node identity (mode 0600), so TOFU peer pins survive restarts.
+        // ADDITION_NODE_KEY_EPHEMERAL=1 keeps the old never-on-disk behavior.
+        const std::string key_path = (std::filesystem::path(node_cfg.data_dir) / "node_key.dat").string();
+        const bool ephemeral_only = std::getenv("ADDITION_NODE_KEY_EPHEMERAL") != nullptr;
+        if (node_keys.private_key.empty() && !ephemeral_only && std::filesystem::exists(key_path)) {
+            std::ifstream kin(key_path, std::ios::binary);
+            std::string kl;
+            std::string kpub;
+            std::string kpriv;
+            while (std::getline(kin, kl)) {
+                if (kl.rfind("PUB|", 0) == 0) kpub = kl.substr(4);
+                else if (kl.rfind("PRIV|", 0) == 0) kpriv = kl.substr(5);
+            }
+            if (!kpub.empty() && !kpriv.empty()) {
+                node_keys.public_key = kpub;
+                node_keys.private_key = kpriv;
+            }
+        }
         if (node_keys.public_key.empty() || node_keys.private_key.empty()) {
             node_keys = addition::generate_wallet_keys();
-            std::cout << "warning: generated ephemeral node private key; set ADDITION_NODE_PRIVKEY for restart persistence\n";
+            if (!ephemeral_only) {
+                std::filesystem::create_directories(node_cfg.data_dir);
+                const std::string tmp = key_path + ".tmp";
+                {
+                    std::ofstream kout(tmp, std::ios::binary | std::ios::trunc);
+                    std::filesystem::permissions(tmp, std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
+                                                 std::filesystem::perm_options::replace);
+                    kout << "PUB|" << node_keys.public_key << "\nPRIV|" << node_keys.private_key << '\n';
+                }
+                std::filesystem::rename(tmp, key_path);
+                std::cout << "generated persistent node key (" << key_path << ", mode 0600)\n";
+            }
+            if (ephemeral_only) std::cout << "warning: generated ephemeral node private key; set ADDITION_NODE_PRIVKEY for restart persistence\n";
             std::filesystem::create_directories(node_cfg.data_dir);
             std::ofstream out(id_path, std::ios::binary | std::ios::trunc);
             out << "PUB|" << node_keys.public_key << '\n';
@@ -483,7 +513,7 @@ int main(int argc, char** argv) {
 
     std::string local_error;
     if (!local_rpc.start(local_error)) {
-        std::cout << "warning: local RPC failed to start: " << local_error << '\n';
+        std::cout << "fatal: local RPC failed to start: " << local_error << '\n'; return 1;
     } else {
         std::cout << "local RPC listening on 127.0.0.1:" << node_cfg.local_rpc_port << '\n';
         if (local_rpc_auth_required) {
@@ -510,7 +540,7 @@ int main(int argc, char** argv) {
     std::string p2p_error;
     if (enable_p2p_rpc) {
         if (!p2p_rpc.start(p2p_error)) {
-            std::cout << "warning: P2P RPC failed to start: " << p2p_error << '\n';
+            std::cout << "fatal: P2P RPC failed to start: " << p2p_error << '\n'; return 1;
         } else {
             std::cout << "P2P RPC listening on 0.0.0.0:" << node_cfg.p2p_port << '\n';
         }

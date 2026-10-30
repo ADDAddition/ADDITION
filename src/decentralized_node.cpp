@@ -1048,6 +1048,7 @@ bool DecentralizedNode::fetch_blocks_from_peer(const std::string& peer,
         }
     }
 
+    if (std::getenv("ADDITION_SYNC_DEBUG")) std::cerr << "fetch inv_items=" << inventory.size() << " reorg=" << reorg_needed << " resp=" << inv_resp.substr(0, 60) << std::endl;
     if (!reorg_needed) {
         bool ingested_any = false;
         // Pipeline every missing block on one persistent connection instead of
@@ -1066,6 +1067,7 @@ bool DecentralizedNode::fetch_blocks_from_peer(const std::string& peer,
         }
         std::vector<std::string> resps;
         const auto got = send_p2p_pipeline(peer, reqs, resps);
+        if (std::getenv("ADDITION_SYNC_DEBUG")) std::cerr << "fetch inv=" << inventory.size() << " reqs=" << reqs.size() << " got=" << got << " first=" << (resps.empty() ? std::string() : resps[0].substr(0, 40)) << std::endl;
         for (std::size_t i = 0; i < got; ++i) {
             const auto h = wanted[i];
             const auto& block_resp = resps[i];
@@ -1082,6 +1084,7 @@ bool DecentralizedNode::fetch_blocks_from_peer(const std::string& peer,
                 if (chain_.height() >= h) {
                     continue;  // raced with gossip; already have it
                 }
+                if (std::getenv("ADDITION_SYNC_DEBUG")) std::cerr << "fetch ingest fail h=" << h << " " << ingest_error << std::endl;
                 peers_.mark_peer_bad(peer);
                 error = ingest_error;
                 return ingested_any;
