@@ -896,7 +896,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         {
             std::size_t sent = 0;
             std::string gossip_err;
-            node_.flush_outbound_gossip(sent, gossip_err);
+            if (transport_policy().socks_proxy.empty()) node_.flush_outbound_gossip(sent, gossip_err);  // Tor: background loop flushes
         }
         const auto id = lc.a->info().funding_txid.substr(0, 16);
         lc.status = "open";
@@ -1012,7 +1012,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         {
             std::size_t sent = 0;
             std::string gossip_err;
-            node_.flush_outbound_gossip(sent, gossip_err);
+            if (transport_policy().socks_proxy.empty()) node_.flush_outbound_gossip(sent, gossip_err);  // Tor: background loop flushes
         }
         std::ostringstream out;
         out << "ok:gossiped hash=" << hash_transaction(tx) << " nullifiers=" << b.nullifiers.size()
@@ -1082,7 +1082,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             }
             std::size_t sent = 0;
             std::string gerr;
-            node_.flush_outbound_gossip(sent, gerr);
+            if (transport_policy().socks_proxy.empty()) node_.flush_outbound_gossip(sent, gerr);  // Tor: background loop flushes
             return "ok ticket=" + id + " conflicting_votes_signed=2 accepted=" + std::to_string(accepted) +
                    " pending_slashes=" + std::to_string(node_.pending_slash_count());
         }
@@ -1111,7 +1111,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         {
             std::size_t sent = 0;
             std::string gossip_err;
-            node_.flush_outbound_gossip(sent, gossip_err);
+            if (transport_policy().socks_proxy.empty()) node_.flush_outbound_gossip(sent, gossip_err);  // Tor: background loop flushes
         }
         lc.status = mode.empty() ? "closing_coop" : "closing_" + mode;
         return "ok close_txid=" + hash_transaction(tx);
@@ -1166,7 +1166,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         {
             std::size_t sent = 0;
             std::string gossip_err;
-            node_.flush_outbound_gossip(sent, gossip_err);
+            if (transport_policy().socks_proxy.empty()) node_.flush_outbound_gossip(sent, gossip_err);  // Tor: background loop flushes
         }
         std::ostringstream out;
         out << "ok:gossiped"
@@ -1210,7 +1210,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             if (transport_policy().socks_proxy.empty()) {
                 std::size_t sent = 0;
                 std::string gossip_err;
-                node_.flush_outbound_gossip(sent, gossip_err);
+                if (transport_policy().socks_proxy.empty()) node_.flush_outbound_gossip(sent, gossip_err);  // Tor: background loop flushes
             }
         }
 
@@ -1687,7 +1687,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         {
             std::size_t sent = 0;
             std::string gossip_err;
-            node_.flush_outbound_gossip(sent, gossip_err);
+            if (transport_policy().socks_proxy.empty()) node_.flush_outbound_gossip(sent, gossip_err);  // Tor: background loop flushes
         }
         const auto txid = hash_transaction(tx);
         std::ostringstream out;
@@ -1783,7 +1783,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             const auto cast = node_.refresh_local_votes();
             std::size_t sent = 0;
             std::string gossip_err;
-            node_.flush_outbound_gossip(sent, gossip_err);
+            if (transport_policy().socks_proxy.empty()) node_.flush_outbound_gossip(sent, gossip_err);  // Tor: background loop flushes
             return "ok:auto_vote=on address=" + stored.address + " votes_cast=" + std::to_string(cast);
         }
         node_.clear_auto_vote_key(stored.address);
