@@ -1,7 +1,7 @@
 # Mainnet onion seeds
 
 Mainnet (`ADDITION_MAINNET_V1`) no longer has a clearnet default seed:
-`34.27.30.115:28546` was removed as the default, and so was HTTP read/ingest.
+`<seed>.onion:28546` was removed as the default, and so was HTTP read/ingest.
 
 `include/addition/config.hpp` → `kMainnetOnionSeeds[]` lists the seed onions.
 **They are placeholders for now** (`placeholdermainnetseed…onion:28546`). They are

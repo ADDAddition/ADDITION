@@ -23,7 +23,7 @@ Contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com)
 | Console | Issue one TEXT RPC line to local node | any safe TEXT command |
 
 Height / peers / `last_tps` / `next_reward` come from live `getinfo` only —
-never invented. Public read (`/api/rpc` → `34.27.30.115:38546`) is status-only;
+never invented. Public read (`/api/rpc` → `127.0.0.1:38546`) is status-only;
 `wallet_send` stays off the public port.
 
 ## Banners (desktop About only)
@@ -43,7 +43,7 @@ MP4 paths and no committed video binaries.
 - Default local write: `127.0.0.1:8546` (loopback only; also `::1` / `localhost`)
 - Refuse non-loopback send (including `0.0.0.0` and public seed IPs)
 - Do not bind write RPC to `0.0.0.0:8545`
-- Public read remains `34.27.30.115:38546` / site `/api/rpc`
+- Public read remains `127.0.0.1:38546` / site `/api/rpc`
 
 ## Prerequisites
 

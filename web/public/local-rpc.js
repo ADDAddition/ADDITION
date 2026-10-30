@@ -1,5 +1,5 @@
 (function (global) {
-  const PUBLIC_SEED_RPC = "http://34.27.30.115:38546/rpc";
+  const PUBLIC_SEED_RPC = "http://127.0.0.1:38546/rpc";
 
   function parseFields(line) {
     if (global.AdditionSite && typeof global.AdditionSite.parseFields === "function") {

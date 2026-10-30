@@ -26,9 +26,8 @@ If write RPC is down or returns `error:`, the app shows **RPC offline** / the no
 | Path | Allowed commands | Default |
 |---|---|---|
 | Write (wallet) | `createwallet`, `wallet_*`, `getbalance`, `fee_info`, `getinfo` | `127.0.0.1:8545` TEXT RPC |
-| Public read | `getinfo`, `getblock`, `getblockraw` only | optional `https://rpc.additionblockchain.com/rpc` |
 
-Write RPC accepts loopback (`127.0.0.1`, `localhost`, `::1`) or a LAN host you set. It refuses public operator hosts (`rpc.additionblockchain.com`, `34.27.30.115`, and other non-LAN addresses). Do not bind write RPC on a public interface. Do not treat public read as a send/createwallet backend.
+Write RPC accepts loopback (`127.0.0.1`, `localhost`, `::1`) or a LAN host you set. It refuses public operator hosts (`<your-node>`, `<your-node>`, and other non-LAN addresses). Do not bind write RPC on a public interface. Do not treat public read as a send/createwallet backend.
 
 On the iOS Simulator, `127.0.0.1:8545` is the Mac that already runs `additiond --network testnet`. On a phone, open the Home gear and point write RPC at your own loopback or LAN node (and token, if you set `ADDITION_RPC_TOKEN`).
 

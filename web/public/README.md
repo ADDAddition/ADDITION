@@ -9,8 +9,8 @@ Primary nav (desktop + mobile bottom tabs): **Explore · Wallet · Get started �
 - `/` is the product homepage (what ADDITION is) plus explorer search / latest blocks / latest txs, with a compare teaser. Dedicated views: `/block/`, `/tx/`, `/address/`. Pretty URLs are folders with `index.html`.
 - `/compare/` (alias `/benchmark/` → `/compare/`) is a live-only table: ADDITION vs Bitcoin, Ethereum, Solana, Monero on shipped axes. No ADDITION TPS race, no invented height/price, no ZK-privacy claim.
 - `/wallet/` is a Trust-like wallet (Home / Receive / Send / Activity nav). Prefers public mainnet write on seed `38546` via `/api/rpc` (createwallet / mine / wallet_send / sign / tx_build per CoS). Falls back to `/local-rpc` → loopback (`8546` mainnet / `8545` testnet) when public RPC is offline.
-- `/join/` covers public mainnet first (seed `34.27.30.115:28546`, RPC `38546` read+write) and research testnet second.
-- `/status/` is public mainnet `getinfo` via `/api/rpc` (Worker `PUBLIC_RPC_HTTP` → `http://34.27.30.115:38546/rpc`). Height from live getinfo only. Live strip shows `network`, `network_id`, `height`, `peers`, `privacy_claim`, supply fields.
+- `/join/` covers public mainnet first (seed `<seed>.onion:28546`, RPC `38546` read+write) and research testnet second.
+- `/status/` is public mainnet `getinfo` via `/api/rpc` (Worker `PUBLIC_RPC_HTTP` → `http://127.0.0.1:38546/rpc`). Height from live getinfo only. Live strip shows `network`, `network_id`, `height`, `peers`, `privacy_claim`, supply fields.
 - `/privacy/` states the live claim `opening_not_zk` (SHA3-512 opening). No public mint/spend mockup forms — operators use `/local/` next to a node.
 - `/api/info` (and `/api/`) returns JSON from live `getinfo` + `monetary_info` (includes `privacy_claim`). `price_usd` is always null — no invented ticker. `/api/capabilities` probes launch RPCs and copies `network_id` from live `getinfo` (fail closed if RPC offline).
 - `/embed/` is an iframe widget (themes `modern|compact|bare`) fed by `/api/info`. Says price unavailable when the node has no price RPC. Shows `network_id` only when `/api/info` returns it.

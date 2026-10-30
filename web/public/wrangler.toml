@@ -11,7 +11,7 @@ zone_name = "additionblockchain.com"
 pattern = "www.additionblockchain.com/*"
 zone_name = "additionblockchain.com"
 [[routes]]
-pattern = "rpc.additionblockchain.com/*"
+pattern = "<your-node>/*"
 zone_name = "additionblockchain.com"
 
 [assets]
@@ -20,8 +20,6 @@ binding = "ASSETS"
 # Let the worker see /rpc?cmd= even after a trailing-slash redirect to /rpc/.
 run_worker_first = ["/rpc*", "/api*", "/jsonrpc*", "/local-rpc*"]
 
-# Do not put PUBLIC_RPC_HTTP in [vars]. A committed empty value wipes the live
-# Worker binding on every CI deploy. Set it with:
-#   npx wrangler secret put PUBLIC_RPC_HTTP
-# Expected public product value: http://34.27.30.115:38546/rpc
-# Missing secret → worker returns "RPC offline". Do not commit tunnel URLs.
+# Optional upstream for /api/rpc: an operator may set PUBLIC_RPC_URL (or legacy
+# PUBLIC_RPC_HTTP) as a Worker secret. CI never sets it and the site does not
+# depend on it: unset -> "RPC offline" and the pages use the visitor's own node.

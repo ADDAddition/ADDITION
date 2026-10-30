@@ -100,21 +100,21 @@ kRounds      = 16</pre>
 <hr>
 <h2 id="7-networks-and-ports">7. Networks and ports</h2>
 <p>Public product profile:</p>
-<table><tr><th></th><th>Public mainnet</th></tr><tr><td>Flag</td><td><code>additiond --mainnet</code></td></tr><tr><td><code>network_id</code></td><td><code>ADDITION_MAINNET_V1</code></td></tr><tr><td>Genesis</td><td><code>genesis-mainnet.json</code> (<code>timestamp</code> 1770000000)</td></tr><tr><td>Default data dir</td><td><code>data-mainnet</code></td></tr><tr><td>Home-node write RPC</td><td><strong><code>127.0.0.1:8546</code></strong></td></tr><tr><td>Public HTTP</td><td><strong><code>38546</code></strong> (seed <code>34.27.30.115:38546</code>)</td></tr><tr><td>P2P</td><td><strong><code>28546</code></strong> (seed <code>34.27.30.115:28546</code>)</td></tr><tr><td>Consensus</td><td><code>memory_hard</code></td></tr></table>
+<table><tr><th></th><th>Public mainnet</th></tr><tr><td>Flag</td><td><code>additiond --mainnet</code></td></tr><tr><td><code>network_id</code></td><td><code>ADDITION_MAINNET_V1</code></td></tr><tr><td>Genesis</td><td><code>genesis-mainnet.json</code> (<code>timestamp</code> 1770000000)</td></tr><tr><td>Default data dir</td><td><code>data-mainnet</code></td></tr><tr><td>Home-node write RPC</td><td><strong><code>127.0.0.1:8546</code></strong></td></tr><tr><td>Public HTTP</td><td><strong><code>38546</code></strong> (seed <code>127.0.0.1:38546</code>)</td></tr><tr><td>P2P</td><td><strong><code>28546</code></strong> (seed <code>&lt;seed&gt;.onion:28546</code>)</td></tr><tr><td>Consensus</td><td><code>memory_hard</code></td></tr></table>
 <p><strong>Hard rules:</strong></p>
-<ul><li>Home write RPC binds <strong><code>127.0.0.1:8546</code></strong> — never public bind / never <code>0.0.0.0</code></li><li>Never publish <code>8545</code> / <code>8546</code></li><li>Mixing another network’s <code>blocks.dat</code> into a mainnet <code>--data-dir</code> is refused</li><li>Seed operators set <code>ADDITION_ADVERTISED_P2P=34.27.30.115:28546</code> so public <code>getinfo</code> / <code>peers</code> advertise that IPv4 endpoint and do not list <code>self</code></li></ul>
+<ul><li>Home write RPC binds <strong><code>127.0.0.1:8546</code></strong> — never public bind / never <code>0.0.0.0</code></li><li>Never publish <code>8545</code> / <code>8546</code></li><li>Mixing another network’s <code>blocks.dat</code> into a mainnet <code>--data-dir</code> is refused</li><li>Seed operators set <code>ADDITION_ADVERTISED_P2P=&lt;seed&gt;.onion:28546</code> so public <code>getinfo</code> / <code>peers</code> advertise that IPv4 endpoint and do not list <code>self</code></li></ul>
 <p>A separate testnet profile (<code>ADDITION_TESTNET_V1</code>, ports <code>28545</code> / <code>38545</code>) exists in the same binary for operators; it is <strong>not</strong> the public product on this site. See <code>/join/#testnet</code>.</p>
 <hr>
 <h2 id="8-public-rpc">8. Public RPC</h2>
-<p><strong>Seed:</strong> <code>34.27.30.115:38546</code>  </p>
+<p><strong>Seed:</strong> <code>127.0.0.1:38546</code>  </p>
 <p><strong>Site proxy:</strong> <code>/api/rpc</code> (Cloudflare Worker → <code>PUBLIC_RPC_HTTP</code>)</p>
 <p>Read path (stock allowlist in <code>rpc_access.cpp</code> <code>is_public_read_command</code>): <code>getinfo</code>, <code>monetary_info</code>, <code>crypto_selftest</code>, <code>tx_status</code>, <code>peers</code>, <code>getblock</code>, <code>getblockhash</code>, <code>getblockraw</code>.</p>
 <p><strong>Write allowlist (CoS / public product, documented in <code>MAINNET_RUNBOOK.md</code>):</strong> on seed <code>38546</code>, the following answer for join/wallet flows:</p>
 <ul><li><code>createwallet</code></li><li><code>mine</code></li><li><code>wallet_send</code></li><li>sign (<code>wallet_sign</code> / <code>sign_message</code>)</li><li><code>tx_build</code> / <code>sendtx_signed*</code></li></ul>
 <p>Home operators still keep trusted write on <strong><code>127.0.0.1:8546</code></strong>. The site wallet prefers <code>/api/rpc</code> → public <code>38546</code>, with a loopback fallback to <code>/local-rpc</code> when public RPC is offline.</p>
 <p>Example:</p>
-<pre>curl -s &#x27;http://34.27.30.115:38546/rpc?cmd=getinfo&#x27;
-curl -s &#x27;http://34.27.30.115:38546/jsonrpc?method=getinfo&#x27;</pre>
+<pre>curl -s &#x27;http://127.0.0.1:38546/rpc?cmd=getinfo&#x27;
+curl -s &#x27;http://127.0.0.1:38546/jsonrpc?method=getinfo&#x27;</pre>
 <hr>
 <h2 id="9-wallet-and-transactions">9. Wallet and transactions</h2>
 <h3 id="9-1-wallet-and-spends-public-product-path">9.1 Wallet and spends (public product path)</h3>
@@ -132,7 +132,7 @@ curl -s &#x27;http://34.27.30.115:38546/jsonrpc?method=getinfo&#x27;</pre>
 <ul><li>Not FIPS 140-3 validated module</li><li>Not immune to every future cryptanalytic break</li><li>Not a Solana-scale (or any invented) TPS claim on live mainnet</li><li>Live <code>getinfo</code> may report <code>economic_security=none</code> — that field is copied from the node, not upgraded in marketing copy</li></ul>
 <hr>
 <h2 id="11-live-network-fields">11. Live network fields</h2>
-<p><strong>Live public <code>getinfo</code></strong> (fetched from seed <code>34.27.30.115:38546</code> via <code>/api/rpc</code> — height may be <code>0</code>; peers change; never a canned marketing number). Prefer <a href="/status/"><code>/status/</code></a> for the full panel.</p>
+<p><strong>Live public <code>getinfo</code></strong> (fetched from seed <code>127.0.0.1:38546</code> via <code>/api/rpc</code> — height may be <code>0</code>; peers change; never a canned marketing number). Prefer <a href="/status/"><code>/status/</code></a> for the full panel.</p>
 <pre id="live-getinfo-snapshot" class="raw">Loading live getinfo…</pre>
 <p id="live-getinfo-note" class="note"></p>
 <table><tr><th>Field / topic</th><th>Live truth</th></tr><tr><td><code>network_id</code></td><td>From live <code>getinfo</code> only</td></tr><tr><td>Height</td><td>From live <code>getinfo</code> only — <strong>may be <code>0</code></strong></td></tr><tr><td><code>pq_mode</code> / algs</td><td><code>strict</code> / <code>ml-dsa-87</code> + SHA3-512 (confirm via live fields)</td></tr><tr><td><code>privacy_claim</code></td><td>From live <code>getinfo</code> (opening is <code>opening_not_zk</code>)</td></tr><tr><td><code>consensus_path</code></td><td><code>memory_hard_pow</code> on mainnet</td></tr><tr><td><code>throughput_claim</code></td><td><code>none</code></td></tr><tr><td><code>peers=…</code></td><td>Live query only — not a permanent marketing number</td></tr></table>
@@ -146,7 +146,7 @@ export ADDITION_ENABLE_P2P_RPC=1
   --data-dir $HOME/addition-mainnet \
   --local-rpc-port 8546 \
   --p2p-port 28547 \
-  --bootstrap 34.27.30.115:28546
+  --bootstrap &lt;seed&gt;.onion:28546
 # sync, then getinfo; mine on 127.0.0.1:8546 or public 38546 write allowlist</pre>
 <p>Never publish port <code>8546</code>. Auto-mine stays off on mainnet.</p>
 <hr>
@@ -154,7 +154,7 @@ export ADDITION_ENABLE_P2P_RPC=1
 <p><strong>Email:</strong> <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
 <p>MIT-licensed software. This whitepaper is engineering documentation, not an audit certificate, not investment advice, and not a token-sale prospectus.</p>
 <hr>
-<p>*Sources: <code>include/addition/config.hpp</code>, <code>src/crypto.cpp</code>, <code>src/chain.cpp</code>, <code>src/privacy.cpp</code>, <code>src/auto_mine.cpp</code>, <code>src/rpc_access.cpp</code>, <code>src/rpc_server.cpp</code>, <code>genesis-mainnet.json</code>, <code>config-mainnet.toml</code>, <code>docs/MAINNET_RUNBOOK.md</code>, <code>docs/ARCHITECTURE.md</code>, <code>docs/WALLET.md</code>, and live RPCs on <code>34.27.30.115:38546</code>.*</p>
+<p>*Sources: <code>include/addition/config.hpp</code>, <code>src/crypto.cpp</code>, <code>src/chain.cpp</code>, <code>src/privacy.cpp</code>, <code>src/auto_mine.cpp</code>, <code>src/rpc_access.cpp</code>, <code>src/rpc_server.cpp</code>, <code>genesis-mainnet.json</code>, <code>config-mainnet.toml</code>, <code>docs/MAINNET_RUNBOOK.md</code>, <code>docs/ARCHITECTURE.md</code>, <code>docs/WALLET.md</code>, and live RPCs on <code>127.0.0.1:38546</code>.*</p>
     <p class="note">Source file in the repository: <a href="https://github.com/ADDAddition/ADDITION/blob/main/docs/whitepaper.md">docs/whitepaper.md</a></p>
   </main>
   <footer id="site-footer"></footer>

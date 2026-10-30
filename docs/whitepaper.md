@@ -245,7 +245,7 @@ Public product profile:
 | Genesis | `genesis-mainnet.json` (`timestamp` 1770000000) |
 | Default data dir | `data-mainnet` |
 | Home-node write RPC | **`127.0.0.1:8546`** |
-| Public HTTP | **`38546`** (seed `34.27.30.115:38546`) |
+| Public HTTP | **`38546`** (seed `127.0.0.1:38546`) |
 | P2P | **`28546`** (seed `<seed>.onion:28546`) |
 | Consensus | `memory_hard` |
 
@@ -262,7 +262,7 @@ A separate testnet profile (`ADDITION_TESTNET_V1`, ports `28545` / `38545`) exis
 
 ## 8. Public RPC
 
-**Seed:** `34.27.30.115:38546`  
+**Seed:** `127.0.0.1:38546`  
 **Site proxy:** `/api/rpc` (Cloudflare Worker → `PUBLIC_RPC_HTTP`)
 
 Read path (stock allowlist in `rpc_access.cpp` `is_public_read_command`): `getinfo`, `monetary_info`, `crypto_selftest`, `tx_status`, `peers`, `getblock`, `getblockhash`, `getblockraw`.
@@ -280,8 +280,8 @@ Home operators still keep trusted write on **`127.0.0.1:8546`**. The site wallet
 Example:
 
 ```bash
-curl -s 'http://34.27.30.115:38546/rpc?cmd=getinfo'
-curl -s 'http://34.27.30.115:38546/jsonrpc?method=getinfo'
+curl -s 'http://127.0.0.1:38546/rpc?cmd=getinfo'
+curl -s 'http://127.0.0.1:38546/jsonrpc?method=getinfo'
 ```
 
 ---
@@ -329,7 +329,7 @@ An observer with node access or the master key can open commitments. This is **n
 
 ## 11. Live network fields
 
-**Live public `getinfo`** (fetched from seed `34.27.30.115:38546` via `/api/rpc` — height may be `0`; peers change; never a canned marketing number). Prefer [`/status/`](/status/) for the full panel.
+**Live public `getinfo`** (fetched from seed `127.0.0.1:38546` via `/api/rpc` — height may be `0`; peers change; never a canned marketing number). Prefer [`/status/`](/status/) for the full panel.
 
 @@LIVE_GETINFO_SNAPSHOT@@
 
@@ -376,4 +376,4 @@ MIT-licensed software. This whitepaper is engineering documentation, not an audi
 
 ---
 
-*Sources: `include/addition/config.hpp`, `src/crypto.cpp`, `src/chain.cpp`, `src/privacy.cpp`, `src/auto_mine.cpp`, `src/rpc_access.cpp`, `src/rpc_server.cpp`, `genesis-mainnet.json`, `config-mainnet.toml`, `docs/MAINNET_RUNBOOK.md`, `docs/ARCHITECTURE.md`, `docs/WALLET.md`, and live RPCs on `34.27.30.115:38546`.*
+*Sources: `include/addition/config.hpp`, `src/crypto.cpp`, `src/chain.cpp`, `src/privacy.cpp`, `src/auto_mine.cpp`, `src/rpc_access.cpp`, `src/rpc_server.cpp`, `genesis-mainnet.json`, `config-mainnet.toml`, `docs/MAINNET_RUNBOOK.md`, `docs/ARCHITECTURE.md`, `docs/WALLET.md`, and live RPCs on `127.0.0.1:38546`.*
