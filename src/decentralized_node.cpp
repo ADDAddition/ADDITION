@@ -16,6 +16,9 @@
 #include <chrono>
 #include <iostream>
 #include <thread>
+#ifndef _WIN32
+#include <poll.h>
+#endif
 #include <limits>
 #include <mutex>
 #include <unordered_map>
@@ -115,7 +118,7 @@ bool parse_endpoint(const std::string& endpoint, std::string& ip, std::uint16_t&
 // Tor: fresh onion circuits (HS descriptor fetch + rendezvous) routinely take
 // 30-90 s, and a ~15 KiB ML-DSA-87 HELLO is paced over a slow circuit.
 constexpr int kOnionConnectTimeoutMs = 120000;
-constexpr int kOnionIoTimeoutMs = 180000;
+constexpr int kOnionIoTimeoutMs = 60000;  // per reply line; a dead circuit must not stall sync for minutes
 constexpr int kOnionHelloTransportRetries = 5;
 
 // Persistent outbound connections. A Tor circuit to an onion service costs
@@ -141,7 +144,23 @@ bool pool_take(const std::string& endpoint, PooledConn& out) {
     while (!v.empty()) {
         PooledConn c = std::move(v.back());
         v.pop_back();
-        if (now - c.last_used < kPoolMaxIdle) { out = std::move(c); return true; }
+        bool alive = now - c.last_used < kPoolMaxIdle;
+#ifndef _WIN32
+        if (alive) {
+            // Peer closed or sent unsolicited bytes while idle: don't reuse.
+            pollfd pfd{static_cast<int>(c.sock), POLLIN, 0};
+            if (::poll(&pfd, 1, 0) != 0) alive = false;
+        }
+#endif
+        if (alive) {
+#ifndef _WIN32
+            // Reused (possibly half-dead Tor circuit): fail fast, caller retries fresh.
+            timeval tv{20, 0};
+            setsockopt(c.sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+#endif
+            out = std::move(c);
+            return true;
+        }
         close_socket(c.sock);
     }
     return false;
