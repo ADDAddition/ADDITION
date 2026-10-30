@@ -474,130 +474,6 @@ std::string http_response_body(const std::string& raw) {
     return raw;
 }
 
-std::uint16_t configured_public_http_port() {
-    if (const char* raw = std::getenv("ADDITION_PUBLIC_HTTP_PORT")) {
-        try {
-            const auto parsed = std::stoul(raw);
-            if (parsed > 0 && parsed <= 65535) {
-                return static_cast<std::uint16_t>(parsed);
-            }
-        } catch (const std::exception&) {
-        }
-    }
-    return 80;
-}
-
-void push_unique_endpoint(std::vector<std::string>& out, const std::string& ip, std::uint16_t port) {
-    const std::string ep = ip + ":" + std::to_string(port);
-    if (std::find(out.begin(), out.end(), ep) == out.end()) {
-        out.push_back(ep);
-    }
-}
-
-std::vector<std::string> public_rpc_endpoints(const std::string& p2p_peer) {
-    std::string ip;
-    std::uint16_t port = 0;
-    std::vector<std::string> out;
-    if (!parse_endpoint(p2p_peer, ip, port)) {
-        return out;
-    }
-    // Prefer the canonical public-read port for this P2P port (28546→38546,
-    // 28545→38545). :80 serves the public testnet only — never use it for
-    // mainnet IBD (would ingest ADDITION_TESTNET_V1 into MAINNET_V1).
-    if (port <= 55535) {
-        push_unique_endpoint(out, ip, static_cast<std::uint16_t>(port + 10000U));
-    }
-    const bool mainnet_p2p = (port == 28546);
-    if (mainnet_p2p) {
-        push_unique_endpoint(out, ip, 38546);
-    } else {
-        push_unique_endpoint(out, ip, configured_public_http_port());
-        push_unique_endpoint(out, ip, 38545);
-        push_unique_endpoint(out, ip, 38546);
-    }
-    return out;
-}
-
-bool send_http_rpc(const std::string& endpoint, const std::string& cmd, std::string& response) {
-    StateUnlockDuringIo unlocked;  // HTTP round trip: don't hold node state
-    std::string ip;
-    std::uint16_t port = 0;
-    if (!parse_endpoint(endpoint, ip, port)) {
-        return false;
-    }
-#ifdef _WIN32
-    WSADATA wsa_data{};
-    if (WSAStartup(MAKEWORD(2, 2), &wsa_data) != 0) {
-        return false;
-    }
-#endif
-    std::uintptr_t raw_sock = 0;
-    std::string terr;
-    if (!transport_connect(ip, port, is_onion_v3_host(ip) ? kOnionConnectTimeoutMs : kConnectTimeoutMs, raw_sock, terr)) {
-#ifdef _WIN32
-        WSACleanup();
-#endif
-        return false;
-    }
-    SocketT sock = static_cast<SocketT>(raw_sock);
-    socket_apply_wan_opts(static_cast<std::uintptr_t>(sock));
-#ifdef _WIN32
-    DWORD timeout_ms = static_cast<DWORD>(kSocketTimeoutMs);
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout_ms), sizeof(timeout_ms));
-    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&timeout_ms), sizeof(timeout_ms));
-#else
-    timeval tv{};
-    tv.tv_sec = kSocketTimeoutMs / 1000;
-    tv.tv_usec = (kSocketTimeoutMs % 1000) * 1000;
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-#endif
-    std::ostringstream req;
-    req << "GET /rpc?cmd=" << url_encode_cmd(cmd) << " HTTP/1.0\r\n"
-        << "Host: " << ip << "\r\n"
-        << "Connection: close\r\n\r\n";
-    const auto raw = req.str();
-    if (!socket_send_paced(static_cast<std::uintptr_t>(sock), raw.c_str(), raw.size())) {
-        close_socket(sock);
-#ifdef _WIN32
-        WSACleanup();
-#endif
-        return false;
-    }
-    std::string http;
-    if (!socket_recv_http_response(static_cast<std::uintptr_t>(sock), http, kMaxLineBytes) ||
-        http.empty()) {
-        close_socket(sock);
-#ifdef _WIN32
-        WSACleanup();
-#endif
-        return false;
-    }
-    close_socket(sock);
-#ifdef _WIN32
-    WSACleanup();
-#endif
-    response = http_response_body(http);
-    while (!response.empty() && (response.back() == '\n' || response.back() == '\r')) {
-        response.pop_back();
-    }
-    return !response.empty();
-}
-
-bool send_public_rpc(const std::string& endpoint, const std::string& cmd, std::string& response) {
-    std::string ip;
-    std::uint16_t port = 0;
-    if (parse_endpoint(endpoint, ip, port) &&
-        (port == 80 || port == configured_public_http_port())) {
-        return send_http_rpc(endpoint, cmd, response);
-    }
-    if (send_p2p_request(endpoint, cmd, response) && !response.empty() &&
-        response.rfind("error: usage <peer>", 0) != 0) {
-        return true;
-    }
-    return send_http_rpc(endpoint, cmd, response);
-}
-
 } // namespace
 
 DecentralizedNode::DecentralizedNode(std::string self_id,
@@ -1345,72 +1221,6 @@ bool DecentralizedNode::handshake_with_peer_uncached(const std::string& peer, st
     return false;
 }
 
-bool DecentralizedNode::ingest_from_public_rpc(const std::string& p2p_peer, std::string& error) {
-    error.clear();
-    const auto endpoints = public_rpc_endpoints(p2p_peer);
-    if (endpoints.empty()) {
-        error = "no public-rpc endpoint for " + p2p_peer;
-        return false;
-    }
-
-    std::string last;
-    for (const auto& ep : endpoints) {
-        std::string info;
-        if (!send_public_rpc(ep, "getinfo", info)) {
-            last = "public-rpc getinfo transport failed at " + ep;
-            continue;
-        }
-        if (info.rfind("error:", 0) == 0) {
-            last = "public-rpc getinfo: " + info;
-            continue;
-        }
-        std::string remote_id;
-        if (!parse_info_token(info, "network_id", remote_id) || remote_id != active_network_id(chain_)) {
-            last = "public-rpc network_id mismatch at " + ep + " (want " + active_network_id(chain_) +
-                   ", got " + (remote_id.empty() ? std::string("<missing>") : remote_id) + ")";
-            continue;
-        }
-        std::uint64_t remote_h = 0;
-        if (!parse_info_u64(info, "height", remote_h)) {
-            last = "public-rpc getinfo missing height at " + ep;
-            continue;
-        }
-        if (remote_h <= chain_.height()) {
-            return true;
-        }
-
-        for (std::uint64_t h = chain_.height() + 1; h <= remote_h; ++h) {
-            std::string raw;
-            const std::string cmd = "getblockraw " + std::to_string(h);
-            if (!send_public_rpc(ep, cmd, raw)) {
-                error = "public-rpc getblockraw transport failed at height " + std::to_string(h);
-                return false;
-            }
-            std::string payload = raw;
-            if (payload.rfind("ok:BLKDATA|", 0) == 0) {
-                payload = payload.substr(11);
-            } else if (payload.rfind("error:", 0) == 0) {
-                error = "public-rpc getblockraw " + std::to_string(h) + ": " + raw;
-                return false;
-            }
-            std::string ingest_err;
-            if (!ingest_block_payload(payload, ingest_err)) {
-                error = "public-rpc ingest height " + std::to_string(h) + ": " + ingest_err;
-                return false;
-            }
-        }
-        if (chain_.height() < remote_h) {
-            error = "public-rpc ingest stalled at height " + std::to_string(chain_.height()) +
-                    " peer_height=" + std::to_string(remote_h);
-            return false;
-        }
-        return true;
-    }
-
-    error = last.empty() ? ("public-rpc ingest failed for " + p2p_peer) : last;
-    return false;
-}
-
 bool DecentralizedNode::sync_once(std::string& error) {
     // The state lock is released during network I/O, so a second caller (RPC
     // "sync" vs the background loop) could interleave; let only one run.
@@ -1466,24 +1276,15 @@ bool DecentralizedNode::sync_once_impl(std::string& error) {
             continue;  // node-id aliases (n-...) are not dialable; skip instead of burning a timeout
         }
 
-        std::string rpc_err;
+        std::string rpc_err;  // no public-RPC fallback: sync is P2P only
         if (std::getenv("ADDITION_SYNC_DEBUG") != nullptr) std::cerr << "sync try tid=" << std::this_thread::get_id() << " peer=" << peer << std::endl;
-        if (ingest_from_public_rpc(peer, rpc_err)) {
-            if (std::getenv("ADDITION_SYNC_DEBUG") != nullptr) std::cerr << "sync via public rpc" << std::endl;
-            any_handshake = true;
-            if (chain_.height() > max_remote_h) {
-                max_remote_h = chain_.height();
-            }
-            continue;
-        }
-
         std::string hs_err;
         std::string wire_id;
         if (!handshake_with_peer(peer, wire_id, hs_err)) {
             if (std::getenv("ADDITION_SYNC_DEBUG") != nullptr) std::cerr << "sync hs fail " << hs_err << " rpc=" << rpc_err << std::endl;
             outbound_hs_ok_[peer] = false;
             last_error = (hs_err.empty() ? std::string("handshake failed") : hs_err) + "; " +
-                         (rpc_err.empty() ? std::string("public-rpc ingest failed") : rpc_err);
+                         std::string("p2p only");
             continue;
         }
         if (wire_id.empty()) {

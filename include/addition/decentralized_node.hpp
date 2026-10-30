@@ -185,7 +185,6 @@ private:
     bool handshake_with_peer_uncached(const std::string& peer, std::string& wire_id, std::string& error);
     void forget_handshake(const std::string& peer);
     bool fetch_blocks_from_peer(const std::string& peer, const std::string& wire_id, std::string& error);
-    bool ingest_from_public_rpc(const std::string& p2p_peer, std::string& error);
     bool learn_peers_from(const std::string& peer, const std::string& wire_id, std::string& error);
     std::string encode_tx_gossip(const Transaction& tx) const;
     std::string encode_block_announce(const Block& block) const;
