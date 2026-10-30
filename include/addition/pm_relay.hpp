@@ -63,6 +63,8 @@ public:
                         std::string& error);
     bool find_package(const std::string& index, std::string& pkg_hex, std::string& error);
 
+    // Client-held keys: raw envelopes for a mailbox (wire lines, oldest expiry first).
+    std::vector<std::string> fetch_mailbox(const std::string& mailbox, std::size_t max);
     // Inbound wire body (after "PMSG|"). duplicate=true when already known.
     bool accept_wire(const std::string& peer, const std::string& body, bool& duplicate,
                      std::string& error);

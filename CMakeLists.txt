@@ -339,5 +339,13 @@ if(ADDITION_BUILD_TESTS)
         set_tests_properties(test_regtest_staking_three_node PROPERTIES
             ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
             TIMEOUT 300)
+        add_test(
+            NAME test_regtest_client_signing
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_regtest_client_signing.py
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        )
+        set_tests_properties(test_regtest_client_signing PROPERTIES
+            ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
+            TIMEOUT 180)
     endif()
 endif()

@@ -415,6 +415,18 @@ std::vector<std::string> PmRelay::undelivered_for(const std::string& peer, std::
     return out;
 }
 
+std::vector<std::string> PmRelay::fetch_mailbox(const std::string& mailbox, std::size_t max) {
+    std::lock_guard<std::mutex> g(mu_);
+    purge_locked(now_sec());
+    std::vector<std::pair<std::uint64_t, std::string>> v;
+    for (const auto& [id, e] : envs_)
+        if (e.mailbox == mailbox) v.emplace_back(e.expire_at, e.wire());
+    std::sort(v.begin(), v.end());
+    std::vector<std::string> out;
+    for (auto& x : v) { if (out.size() >= max) break; out.push_back(std::move(x.second)); }
+    return out;
+}
+
 bool PmRelay::has_undelivered(const std::string& peer) {
     return !undelivered_for(peer, 1).empty();
 }

@@ -19,6 +19,7 @@
 
 #include <exception>
 #include <algorithm>
+#include <ctime>
 #include <sstream>
 #include <vector>
 #include <chrono>
@@ -1499,7 +1500,7 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
 
         tx.signer = from;
         tx.signer_pubkey = chain_.pubkey_field_for(from, pubkey);
-        tx.signature = std::string("pq=") + sig_hex;
+        tx.signature = sig_hex.rfind("pq=", 0) == 0 ? sig_hex : std::string("pq=") + sig_hex;
 
         if (!chain_.validate_transaction(tx, error)) {
             return "error: " + error;
@@ -1641,6 +1642,102 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
 
     // ---- on-chain staking (tickets). Keys come from the local wallet store
     // and are used in-process only; no private key crosses RPC. ----
+    // ---- External / client-side signing (mobile keeps ML-DSA-87 keys on device) ----
+    // get_nonce <address>
+    // stake_build <address> <pubkey_hex> <amount> [fee]         -> sign_hash nonce fee
+    // unstake_build <address> <pubkey_hex> <ticket_id> [fee]    -> sign_hash nonce fee
+    // stake_submit <address> <pubkey_hex> <amount> <fee> <nonce> <sig_hex>
+    // unstake_submit <address> <pubkey_hex> <ticket_id> <fee> <nonce> <sig_hex>
+    // vote_build <ticket_id> [approve 1|0]                       -> message_hex to sign
+    // vote_submit <ticket_id> <voted_height> <voted_hash> <approve> <sig_hex>
+    // The client signs sign_hash (tx) / the vote message bytes with ML-DSA-87 and
+    // sends the raw signature hex (no "pq=" prefix). The node never sees the key.
+    if (cmd == "get_nonce") {
+        std::string addr;
+        iss >> addr;
+        if (addr.empty()) return "error: usage get_nonce <address>";
+        return "nonce=" + std::to_string(chain_.next_nonce(addr)) + " address=" + addr + " height=" + std::to_string(chain_.height());
+    }
+    if (cmd == "stake_build" || cmd == "unstake_build" || cmd == "stake_submit" || cmd == "unstake_submit") {
+        const bool submit = cmd.find("_submit") != std::string::npos;
+        const bool lock = cmd.rfind("stake_", 0) == 0;
+        std::string addr, pubkey, arg, sig_hex;
+        std::uint64_t fee = 0, nonce = 0;
+        iss >> addr >> pubkey >> arg >> fee;
+        if (submit) iss >> nonce >> sig_hex;
+        if (addr.empty() || pubkey.empty() || arg.empty() || (submit && (fee == 0 || sig_hex.empty())))
+            return "error: usage " + cmd + " <address> <pubkey_hex> <" + (lock ? "amount" : "ticket_id") + "> " +
+                   (submit ? "<fee> <nonce> <sig_hex>" : "[fee]");
+        if (derive_address_from_pubkey(pubkey) != addr) return "error: address/pubkey mismatch";
+        const auto required_fee = std::max<std::uint64_t>(chain_.config().min_fee,
+            std::max(recommended_min_fee(mempool_.size(), chain_.total_fees_last_block()), ai_optimizer_.recommended_fee_floor()));
+        if (fee == 0) fee = required_fee;
+        if (fee < required_fee) return "error: fee too low, required>=" + std::to_string(required_fee);
+        if (!submit) nonce = chain_.next_nonce(addr);
+        Transaction tx{};
+        std::string error;
+        if (lock) {
+            std::uint64_t amount = 0;
+            try { amount = std::stoull(arg); } catch (...) { return "error: invalid amount"; }
+            if (!chain_.build_stake_lock(addr, amount, fee, nonce, tx, error)) return "error: " + error;
+        } else {
+            const auto t = chain_.ticket(arg);
+            if (!t) return "error: unknown ticket";
+            if (t->owner != addr) return "error: ticket not owned by address";
+            if (!chain_.build_stake_unlock(arg, fee, nonce, tx, error)) return "error: " + error;
+        }
+        tx.signer = addr;
+        tx.signer_pubkey = chain_.pubkey_field_for(addr, pubkey);
+        tx.signature.clear();
+        const auto sign_hash = hash_transaction(tx);
+        if (!submit)
+            return "sign_hash=" + sign_hash + " nonce=" + std::to_string(nonce) + " fee=" + std::to_string(fee);
+        tx.signature = sig_hex.rfind("pq=", 0) == 0 ? sig_hex : std::string("pq=") + sig_hex;
+        if (!chain_.validate_transaction(tx, error)) return "error: " + error;
+        if (!node_.submit_transaction(tx, error)) return "error: " + error;
+        const auto txid = hash_transaction(tx);
+        std::ostringstream out;
+        if (lock) {
+            std::uint32_t idx = 0;
+            for (std::uint32_t k = 0; k < tx.outputs.size(); ++k)
+                if (tx.outputs[k].recipient == kStakeAddress) { idx = k; break; }
+            out << "ok:stake_lock hash=" << txid << " ticket=" << txid << ':' << idx;
+        } else {
+            out << "ok:stake_unlock hash=" << txid << " ticket=" << arg;
+        }
+        out << " fee=" << fee << " nonce=" << nonce;
+        return out.str();
+    }
+    if (cmd == "vote_build") {
+        std::string ticket;
+        int approve = 1;
+        iss >> ticket >> approve;
+        if (ticket.empty()) return "error: usage vote_build <ticket_id> [approve 1|0]";
+        const auto tip = chain_.block_at(chain_.height());
+        if (!tip) return "error: no tip";
+        const auto sel = chain_.selected_tickets_for_next_block();
+        const bool selected = std::find(sel.begin(), sel.end(), ticket) != sel.end();
+        const auto tip_hash = hash_block_header(tip->header);
+        const auto msg = chain_.stake_vote_message_for(chain_.height(), tip_hash, ticket, approve != 0);
+        return "voted_height=" + std::to_string(chain_.height()) + " voted_hash=" + tip_hash + " approve=" +
+               std::to_string(approve != 0 ? 1 : 0) + " selected=" + (selected ? "1" : "0") +
+               " message_hex=" + bytes_to_hex(std::vector<std::uint8_t>(msg.begin(), msg.end()));
+    }
+    if (cmd == "vote_submit") {
+        StakeVote v{};
+        int approve = 1;
+        std::string sig_hex;
+        iss >> v.ticket_id >> v.voted_height >> v.voted_hash >> approve >> sig_hex;
+        if (v.ticket_id.empty() || v.voted_hash.empty() || sig_hex.empty())
+            return "error: usage vote_submit <ticket_id> <voted_height> <voted_hash> <approve 1|0> <sig_hex>";
+        v.approve = approve != 0;
+        v.signature = sig_hex.rfind("pq=", 0) == 0 ? sig_hex : "pq=" + sig_hex;
+        std::string error;
+        if (!chain_.verify_vote_signature_only(v, error)) return "error: " + error;
+        if (!node_.submit_stake_vote(v, error)) return "error: " + error;
+        return "ok:vote ticket=" + v.ticket_id + " height=" + std::to_string(v.voted_height);
+    }
+
     if (cmd == "stake" || cmd == "unstake") {
         std::string name;
         std::string arg;
@@ -3022,6 +3119,57 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
             return "error: " + error;
         }
         return out;
+    }
+
+    // ---- AMLS1 / PMSG with client-held keys (node = relay + store only) ----
+    // msg_kp_submit <pkg_hex>        publish a client-signed (ML-DSA-87) listed key package
+    // msg_kp_get <handle|index>      raw package hex (client verifies it itself)
+    // msg_env_post <wire>            post a client-built "PMSG|v1|..." envelope (or body)
+    // msg_env_fetch <mailbox> [max]  stored envelopes for a mailbox (client decrypts)
+    // msg_env_delete <msg_id> <token_hex>
+    if (cmd == "msg_kp_submit" || cmd == "msg_kp_get" || cmd == "msg_env_post" || cmd == "msg_env_fetch" ||
+        cmd == "msg_env_delete") {
+        auto* relay = node_.pm_relay();
+        if (relay == nullptr) return "error: pm relay disabled";
+        std::string a, b, error;
+        iss >> a >> b;
+        if (a.empty()) return "error: usage " + cmd + " <arg>";
+        if (cmd == "msg_kp_submit") {
+            pqmsg::KeyPackage kp;
+            if (!pqmsg::KeyPackage::from_hex(a, kp, error) || !kp.verify(static_cast<std::uint64_t>(std::time(nullptr)), error))
+                return "error: " + error;
+            if (!relay->publish_package(a, error)) return "error: " + error;
+            return "ok verified=ml-dsa-87 fingerprint=" + pqmsg::fingerprint(kp.identity_pub) + " index=" + kp.index +
+                   " expires=" + std::to_string(kp.expires) + " package=" + kp.hash();
+        }
+        if (cmd == "msg_kp_get") {
+            std::string hex;
+            const bool is_index = a.size() == 32 && std::all_of(a.begin(), a.end(), [](char c) { return std::isxdigit(static_cast<unsigned char>(c)) != 0; });
+            if (!relay->find_package(is_index ? a : pqmsg::handle_index(a), hex, error)) return "error: " + error;
+            return "package=" + hex;
+        }
+        if (cmd == "msg_env_post") {
+            const std::string body = a.rfind("PMSG|", 0) == 0 ? a.substr(5) : a;
+            bool dup = false;
+            if (!relay->accept_wire("rpc-client", body, dup, error)) return "error: " + error;
+            const auto f = body.find('|');
+            const auto g = f == std::string::npos ? f : body.find('|', f + 1);
+            return std::string(dup ? "ok duplicate" : "ok stored") +
+                   " msg_id=" + (g == std::string::npos ? std::string("?") : body.substr(f + 1, g - f - 1));
+        }
+        if (cmd == "msg_env_fetch") {
+            std::size_t max = 64;
+            if (!b.empty()) { try { max = std::min<std::size_t>(256, std::stoull(b)); } catch (...) {} }
+            const auto lines = relay->fetch_mailbox(a, max);
+            std::ostringstream out;
+            out << "envelopes=" << lines.size();
+            for (const auto& l : lines) out << "\n" << l;
+            return out.str();
+        }
+        bool known = false;
+        if (b.empty()) return "error: usage msg_env_delete <msg_id> <token_hex>";
+        if (!relay->accept_delete("rpc-client", a + "|" + b, known, error)) return "error: " + error;
+        return known ? "ok deleted" : "ok tombstoned";
     }
 
     if (cmd == "msg_kp_publish" || cmd == "msg_kp_lookup" || cmd == "msg_session_start" ||
