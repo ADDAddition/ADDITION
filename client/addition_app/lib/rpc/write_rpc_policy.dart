@@ -59,16 +59,13 @@ class WriteRpcPolicy {
     '34.27.30.115',
   };
 
-  static const knownPublicReadUrls = {
-    'https://rpc.additionblockchain.com/rpc',
-    'https://additionblockchain.com/api/rpc',
-    'http://34.27.30.115/rpc',
-    'http://34.27.30.115:38545/rpc',
-    'http://34.27.30.115:38546/rpc',
-  };
+  /// No hosted/public read endpoints: the app never depends on an
+  /// operator server. Status reads go to a user-run node only
+  /// (loopback, or the user's own Tor .onion via a local SOCKS proxy).
+  static const knownPublicReadUrls = <String>{};
 
-  static const defaultPublicReadUrl =
-      'https://additionblockchain.com/api/rpc';
+  /// Default: the user's own node on this device / LAN tunnel.
+  static const defaultPublicReadUrl = 'http://127.0.0.1:38545/rpc';
 
   static String hostFromEndpoint(String endpoint) {
     final text = endpoint.trim();
@@ -127,13 +124,13 @@ class WriteRpcPolicy {
 
   static bool isKnownPublicReadEndpoint(String endpoint) {
     final trimmed = endpoint.trim().replaceAll(RegExp(r'/+$'), '');
-    if (knownPublicReadUrls.contains(trimmed) ||
-        knownPublicReadUrls.contains(endpoint.trim())) {
-      return true;
-    }
+    if (trimmed.isEmpty) return false;
     try {
       final host = hostFromEndpoint(endpoint);
-      return host == 'rpc.additionblockchain.com' || host == '34.27.30.115';
+      if (isRefusedPublicWriteHost(host)) return false;
+      // User-run node only: loopback or a v3 onion (56 base32 chars).
+      return isLoopbackHost(host) ||
+          RegExp(r'^[a-z2-7]{56}\.onion$').hasMatch(host);
     } catch (_) {
       return false;
     }

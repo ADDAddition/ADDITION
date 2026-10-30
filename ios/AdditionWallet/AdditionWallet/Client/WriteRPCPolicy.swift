@@ -54,11 +54,9 @@ enum WriteRPCPolicy {
         "34.27.30.115",
     ]
 
-    static let knownPublicReadURLs: Set<String> = [
-        "https://rpc.additionblockchain.com/rpc",
-        "http://34.27.30.115/rpc",
-        "http://34.27.30.115:38545/rpc",
-    ]
+    /// No hosted/public read endpoints. Reads go to a user-run node only
+    /// (loopback or the user's own v3 .onion over a local Tor SOCKS proxy).
+    static let knownPublicReadURLs: Set<String> = []
 
     static func host(from endpoint: String) throws -> String {
         let text = endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -107,13 +105,13 @@ enum WriteRPCPolicy {
 
     static func isKnownPublicReadEndpoint(_ endpoint: String) -> Bool {
         let trimmed = endpoint.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        if knownPublicReadURLs.contains(trimmed) || knownPublicReadURLs.contains(endpoint.trimmingCharacters(in: .whitespacesAndNewlines)) {
-            return true
-        }
+        if trimmed.isEmpty { return false }
         guard let host = try? host(from: endpoint) else {
             return false
         }
-        return host == "rpc.additionblockchain.com" || host == "34.27.30.115"
+        if isRefusedPublicWrite(host) { return false }
+        if isLoopback(host) { return true }
+        return host.range(of: "^[a-z2-7]{56}\\.onion$", options: .regularExpression) != nil
     }
 
     static func assertCommand(_ command: String, write: Bool) throws -> String {
