@@ -5,6 +5,7 @@
 #include "addition/dandelion.hpp"
 #include "addition/mempool.hpp"
 #include "addition/p2p.hpp"
+#include "addition/pm_relay.hpp"
 
 #include <cstdint>
 #include <functional>
@@ -39,6 +40,10 @@ public:
     bool announce_tip(std::string& error);
     // Push queued TX|/BLK| (and rotation) gossip to connected peers over P2P.
     bool flush_outbound_gossip(std::size_t& sent, std::string& error);
+    void set_pm_relay(PmRelay* relay) { pm_relay_ = relay; }
+    PmRelay* pm_relay() const { return pm_relay_; }
+    // Store-and-forward: push queued PMSG/PMDEL lines each peer has not received.
+    std::size_t relay_private_messages();
 
     std::vector<std::string> pull_outbound_messages();
     bool handle_inbound_message(const std::string& peer, const std::string& message, std::string& error);
@@ -106,6 +111,7 @@ private:
     std::string node_private_key_;
     Chain& chain_;
     Mempool& mempool_;
+    PmRelay* pm_relay_ = nullptr;
     PeerNetwork& peers_;
     ConsensusEngine& consensus_;
 

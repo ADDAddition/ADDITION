@@ -1461,9 +1461,36 @@ bool DecentralizedNode::is_push_gossip_message(const std::string& message) const
            message.rfind("SVOTE|", 0) == 0;
 }
 
+std::size_t DecentralizedNode::relay_private_messages() {
+    if (pm_relay_ == nullptr) return 0;
+    std::size_t sent = 0;
+    for (const auto& peer : peers_.peers()) {
+        if (io_aborted()) break;
+        if (peers_.is_banned(peer) || (!advertised_p2p_.empty() && peer == advertised_p2p_)) continue;
+        if (!is_peer_endpoint(peer)) continue;
+        auto lines = pm_relay_->undelivered_for(peer, PmRelay::kPushPerPeerRound);
+        if (lines.empty()) continue;
+        std::string wire_id;
+        std::string hs_err;
+        if (!handshake_with_peer(peer, wire_id, hs_err)) continue;  // kept; retried next round
+        if (wire_id.empty()) wire_id = self_id_;
+        for (const auto& line : lines) {
+            std::string resp;
+            if (send_p2p_request(peer, wire_id + " " + line, resp) && resp.find("PMOK|") != std::string::npos) {
+                pm_relay_->mark_delivered(peer, line);
+                ++sent;
+            } else if (resp.find("rate limit") != std::string::npos || io_aborted()) {
+                break;
+            }
+        }
+    }
+    return sent;
+}
+
 bool DecentralizedNode::flush_outbound_gossip(std::size_t& sent, std::string& error) {
     error.clear();
     sent = 0;
+    sent += relay_private_messages();
     {
         std::string stem_last;
         sent += flush_stem(stem_last);
@@ -1643,7 +1670,9 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         (message.rfind("ADVERTISE|", 0) == 0) ||
         (message.rfind("IDROTATE|", 0) == 0) ||
         (message.rfind("IDVOTE|", 0) == 0) ||
-        (message.rfind("SVOTE|", 0) == 0);
+        (message.rfind("SVOTE|", 0) == 0) ||
+        (message.rfind("PMSG|", 0) == 0) ||
+        (message.rfind("PMDEL|", 0) == 0);
     if (!allow_peer_message(peer, expensive, error)) {
         peers_.mark_peer_bad(peer);
         return false;
@@ -1796,6 +1825,23 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
             peers_.mark_peer_bad(peer);
         }
         return ok;
+    }
+
+    if (message.rfind("PMSG|", 0) == 0 || message.rfind("PMDEL|", 0) == 0) {
+        if (pm_relay_ == nullptr) {
+            error = "pm relay disabled";
+            return false;
+        }
+        bool dup = false;
+        const bool del = message.rfind("PMDEL|", 0) == 0;
+        const auto ok = del ? pm_relay_->accept_delete(peer, message.substr(6), dup, error)
+                            : pm_relay_->accept_wire(peer, message.substr(5), dup, error);
+        if (ok) {
+            peers_.mark_peer_good(peer);
+            reply = dup ? "PMOK|dup" : "PMOK|stored";
+            error.clear();
+        }
+        return ok;  // rejected envelopes are not misbehaviour-scored beyond the rate limiter
     }
 
     if (message.rfind("SVOTE|", 0) == 0) {

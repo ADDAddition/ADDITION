@@ -3015,6 +3015,44 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         return out;
     }
 
+    if (cmd == "msg_key" || cmd == "msg_send" || cmd == "msg_inbox" || cmd == "msg_read" ||
+        cmd == "msg_delete" || cmd == "msg_relay_status") {
+        // E2E relay (ML-KEM-1024 + AES-256-GCM). Loopback only: not in the remote allowlist.
+        auto* relay = node_.pm_relay();
+        if (relay == nullptr) return "error: pm relay disabled";
+        std::string error;
+        if (cmd == "msg_relay_status") return relay->status();
+        if (cmd == "msg_key") {
+            std::string wallet, pk, mailbox;
+            iss >> wallet;
+            if (!relay->ensure_key(wallet, pk, mailbox, error)) return "error: " + error;
+            return "mailbox=" + mailbox + " pubkey=" + pk;
+        }
+        if (cmd == "msg_send") {
+            std::string pk, ttl_s, text;
+            iss >> pk >> ttl_s;
+            std::getline(iss, text);
+            if (!text.empty() && text.front() == ' ') text.erase(text.begin());
+            std::uint64_t ttl = 0;
+            try { ttl = std::stoull(ttl_s); } catch (...) { return "error: usage msg_send <recipient_pubkey_hex> <ttl_sec> <text>"; }
+            std::string id;
+            if (!relay->send(pk, text, ttl, id, error)) return "error: " + error;
+            return "queued msg_id=" + id;
+        }
+        std::string wallet, id, out;
+        iss >> wallet >> id;
+        if (cmd == "msg_inbox") {
+            if (!relay->inbox(wallet, out, error)) return "error: " + error;
+            return out;
+        }
+        if (cmd == "msg_read") {
+            if (!relay->read(wallet, id, out, error)) return "error: " + error;
+            return out;
+        }
+        if (!relay->remove(wallet, id, error)) return "error: " + error;
+        return "deleted msg_id=" + id + " (tombstone relayed)";
+    }
+
     if (cmd == "pm_status") {
         std::string msg_id;
         iss >> msg_id;

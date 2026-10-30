@@ -316,6 +316,8 @@ int main(int argc, char** argv) {
                                      mempool,
                                      peers,
                                      consensus);
+    addition::PmRelay pm_relay((std::filesystem::path(node_cfg.data_dir) / "pm_keys").string());
+    node.set_pm_relay(&pm_relay);
     addition::StateStore store(node_cfg.data_dir);
 
     {
