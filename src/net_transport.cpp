@@ -2,7 +2,9 @@
 
 #include "addition/net_io.hpp"
 
+#include <atomic>
 #include <cctype>
+#include <deque>
 #include <cstring>
 #include <mutex>
 #include <vector>
@@ -26,6 +28,9 @@ namespace {
 
 std::mutex g_mu;
 TransportPolicy g_policy;
+std::atomic<bool> g_io_abort{false};
+std::mutex g_io_mu;
+std::deque<std::uintptr_t> g_io_socks;  // recent outbound sockets (bounded)
 
 #ifdef _WIN32
 using SockT = SOCKET;
@@ -122,6 +127,29 @@ TransportPolicy transport_policy() {
     return g_policy;
 }
 
+namespace {
+void track_io_socket(std::uintptr_t s) {
+    std::lock_guard<std::mutex> lk(g_io_mu);
+    g_io_socks.push_back(s);
+    while (g_io_socks.size() > 512) g_io_socks.pop_front();
+}
+} // namespace
+
+void abort_all_io() {
+    g_io_abort.store(true);
+    std::lock_guard<std::mutex> lk(g_io_mu);
+    for (auto s : g_io_socks) {
+#ifdef _WIN32
+        shutdown(static_cast<SOCKET>(s), SD_BOTH);
+#else
+        ::shutdown(static_cast<int>(s), SHUT_RDWR);
+#endif
+    }
+    g_io_socks.clear();
+}
+
+bool io_aborted() { return g_io_abort.load(); }
+
 RouteKind route_for(const std::string& host, const TransportPolicy& p) {
     const bool onion = is_onion_v3_host(host);
     if (onion) {
@@ -207,6 +235,10 @@ bool transport_connect(const std::string& host,
     const auto pol = transport_policy();
     const auto kind = route_for(host, pol);
     SockT s = kBad;
+    if (g_io_abort.load()) {
+        error = "shutting down";
+        return false;
+    }
     if (kind == RouteKind::Refused) {
         error = is_onion_v3_host(host) ? "onion peer needs a SOCKS proxy" : "clearnet refused (onion_only)";
         return false;
@@ -216,6 +248,7 @@ bool transport_connect(const std::string& host,
             error = "connect failed";
             return false;
         }
+        track_io_socket(static_cast<std::uintptr_t>(s));
         out_sock = static_cast<std::uintptr_t>(s);
         return true;
     }
@@ -229,6 +262,7 @@ bool transport_connect(const std::string& host,
         error = "socks proxy unreachable";
         return false;
     }
+    track_io_socket(static_cast<std::uintptr_t>(s));
     // Onion circuits can take a while; caller sets the overall IO timeouts.
 #ifdef _WIN32
     DWORD tmo = 60000;

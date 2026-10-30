@@ -267,6 +267,7 @@ std::size_t send_p2p_pipeline(const std::string& endpoint, const std::vector<std
 }
 
 bool send_p2p_request(const std::string& endpoint, const std::string& request, std::string& response) {
+    if (io_aborted()) return false;
     std::vector<std::string> out;
     if (send_p2p_pipeline(endpoint, {request}, out) != 1) return false;
     response = std::move(out.front());
@@ -1086,7 +1087,7 @@ bool DecentralizedNode::handshake_with_peer_uncached(const std::string& peer, st
     int transport_fails = 0;
     std::string hello_version = kProtoVersion;
     bool downgraded = false;
-    for (int attempt = 0; attempt < 8; ++attempt) {
+    for (int attempt = 0; attempt < 8 && !io_aborted(); ++attempt) {
         const auto hello_ts = now_seconds();
         const std::string hello_nonce = "s" + std::to_string(attempt) + "-" + std::to_string(hello_ts % 1000000ULL);
         const std::string hello_body = hello_version + "|" + active_network_id(chain_) + "|" +
@@ -1269,6 +1270,10 @@ bool DecentralizedNode::sync_once_impl(std::string& error) {
     std::string last_error;
 
     for (const auto& peer : peers) {
+        if (io_aborted()) {
+            error = "shutting down";
+            return false;
+        }
         if (peers_.is_banned(peer) || (!advertised_p2p_.empty() && peer == advertised_p2p_)) {
             continue;  // never sync from / gossip to our own advertised endpoint
         }
@@ -1389,7 +1394,7 @@ bool DecentralizedNode::sync_once_impl(std::string& error) {
         }
 
         int idle_rounds = 0;
-        while (chain_.height() < remote_h) {
+        while (chain_.height() < remote_h && !io_aborted()) {
             const auto before = chain_.height();
             std::string fetch_err;
             if (!fetch_blocks_from_peer(peer, wire_id, fetch_err)) {

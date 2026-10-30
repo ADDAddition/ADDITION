@@ -39,4 +39,10 @@ bool transport_connect(const std::string& host,
                        std::uintptr_t& out_sock,
                        std::string& error);
 
+// Shutdown support: abort_all_io() marks the process as stopping and
+// shutdown()s every outbound socket opened by transport_connect, so a blocked
+// connect/SOCKS/recv returns at once. New connects are refused afterwards.
+void abort_all_io();
+bool io_aborted();
+
 } // namespace addition

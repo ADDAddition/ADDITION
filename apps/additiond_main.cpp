@@ -702,6 +702,16 @@ int main(int argc, char** argv) {
     std::signal(SIGINT, handle_stop_signal);
     std::signal(SIGTERM, handle_stop_signal);
 
+    // SIGTERM/SIGINT only set a flag; this watcher turns it into an immediate
+    // abort of outbound network I/O so an in-progress (Tor) sync unwinds in
+    // seconds and the normal save-and-exit path below runs.
+    std::thread stop_watcher([] {
+        while (!g_stay_alive_stop) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        }
+        addition::abort_all_io();
+    });
+
     std::thread auto_mine_thread;
     if (node_cfg.enable_auto_mine) {
         const std::string reward =
@@ -804,6 +814,10 @@ int main(int argc, char** argv) {
     }
 
     g_stay_alive_stop = true;
+    std::cout << "shutdown: stopping (network I/O aborted)" << std::endl;
+    if (stop_watcher.joinable()) {
+        stop_watcher.join();
+    }
     if (auto_mine_thread.joinable()) {
         auto_mine_thread.join();
     }
