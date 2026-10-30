@@ -54,6 +54,12 @@ public:
     // Valid, selected, unique votes for the block the miner builds next.
     std::vector<StakeVote> usable_stake_votes() const;
     std::size_t vote_pool_size() const { return vote_pool_.size(); }
+    // Automatic equivocation detection. Every validly signed vote seen (gossip
+    // or in a block) is remembered per ticket|height; a second, conflicting
+    // vote becomes SlashEvidence that the miner includes (ticket is burned).
+    bool observe_vote_for_equivocation(const StakeVote& vote);
+    std::vector<SlashEvidence> usable_slash_evidence() const;
+    std::size_t pending_slash_count() const { return pending_slashes_.size(); }
     // Local auto-voter. Keys live only in this process (loaded from the local
     // wallet store); they are never sent over RPC or P2P.
     void set_auto_vote_key(const std::string& address, const std::string& public_key,
@@ -121,6 +127,9 @@ private:
     std::unordered_set<std::string> seen_rotation_ids_;
     std::unordered_set<std::string> seen_vote_signatures_;
     std::vector<StakeVote> vote_pool_;
+    std::unordered_map<std::string, StakeVote> vote_watch_;   // ticket|height -> first vote
+    std::vector<SlashEvidence> pending_slashes_;
+    std::unordered_set<std::string> slash_reported_;          // ticket ids with evidence
     std::unordered_set<std::string> seen_stake_votes_; // ticket|height|hash|approve
     struct AutoVoteKey {
         std::string public_key;

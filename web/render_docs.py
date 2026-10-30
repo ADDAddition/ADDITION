@@ -255,6 +255,9 @@ def write_doc(
     *,
     with_toc: bool = False,
 ) -> None:
+    if not (ROOT / rel_md).exists():
+        print(f"skip (missing source): {rel_md}")
+        return
     md = (ROOT / rel_md).read_text(encoding="utf-8")
     dest.parent.mkdir(parents=True, exist_ok=True)
     body = md_to_html(md, with_anchors=with_toc, skip_md_toc=with_toc)

@@ -134,11 +134,14 @@ bool Miner::mine_next_block(const std::string& reward_address,
     // Staking votes are collected first so their bytes are reserved before txs.
     const bool with_votes = vote_source_ && chain_.staking_active_at(chain_.height() + 1);
     std::vector<StakeVote> votes;
+    std::vector<SlashEvidence> slashes;
     std::size_t vote_reserve = 0;
     if (with_votes) {
         votes = vote_source_();
+        if (slash_source_) slashes = slash_source_();
         Block probe{};
         probe.votes = votes;
+        probe.slashes = slashes;
         vote_reserve = stake_extension_weight(probe);
     }
 
@@ -174,7 +177,7 @@ bool Miner::mine_next_block(const std::string& reward_address,
     const auto tx_count = valid.size();
     bool mined = false;
     if (with_votes) {
-        mined = chain_.mine_and_add_block_with_votes(reward_address, valid, votes, {}, threads,
+        mined = chain_.mine_and_add_block_with_votes(reward_address, valid, votes, slashes, threads,
                                                      mined_hash, error, &stop_);
     } else {
         mined = chain_.mine_and_add_block(reward_address, valid, threads, mined_hash, error, &stop_);

@@ -46,8 +46,9 @@ subsidy_floor = 1
 # Emission lands on exactly 50M at height 27,272,727 (~17.3y); ~99% by ~17.0y.
 # No tail emission: after the cap, miners and stakers are paid by fees only.
 tail_emission_reward = 0
-# Hybrid PoW/PoS (Decred-style). Activation is a launch decision (see report).
-# staking_activation_height = 0
+# Hybrid PoW/PoS (Decred-style). Activates when cumulative supply reaches
+# 37,500,000 (3/4 of the cap): height 14,772,727 (~9.36 years). Consensus-pinned.
+staking_activation_height = 14772727
 stake_min_amount = 1000
 stake_maturity = 768  # ~4.3 h at 20 s
 stake_unbond_delay = 4320  # ~1 day at 20 s

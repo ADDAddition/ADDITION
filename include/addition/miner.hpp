@@ -47,6 +47,8 @@ public:
     // Optional source of stake votes on the current tip (e.g. the node's
     // relayed vote pool). When set, blocks are mined through the vote path.
     void set_vote_source(std::function<std::vector<StakeVote>()> source) { vote_source_ = std::move(source); }
+    // Optional source of equivocation evidence (burns the ticket when mined).
+    void set_slash_source(std::function<std::vector<SlashEvidence>()> source) { slash_source_ = std::move(source); }
     void request_stop();
     // Max BLKDATA wire bytes for a mined block (default: kMaxRelayBlockWireBytes).
     void set_relay_budget_bytes(std::size_t bytes);
@@ -64,6 +66,7 @@ private:
     Mempool& mempool_;
     std::atomic<bool> stop_{false};
     std::function<std::vector<StakeVote>()> vote_source_;
+    std::function<std::vector<SlashEvidence>()> slash_source_;
     double last_tps_{0.0};
     std::uint64_t last_mine_ms_{0};
     std::size_t last_mined_txs_{0};

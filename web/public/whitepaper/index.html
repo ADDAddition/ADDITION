@@ -2,22 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ADDITION technical whitepaper</title>
   <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta property="og:image" content="https://additionblockchain.com/og.png"><meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="/common.css">
   <style>
-.wp-toc { margin: 1rem 0 1.5rem; padding: 0.85rem 1rem; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); color: var(--ink); }
-.wp-toc strong { display: block; margin-bottom: 0.5rem; color: var(--ink); }
+.wp-toc { margin: 1rem 0 1.5rem; padding: 0.85rem 1rem; border: 1px solid var(--line); border-radius: 12px; background: rgba(47, 95, 138, 0.06); }
+.wp-toc strong { display: block; margin-bottom: 0.5rem; }
 .wp-toc ol { margin: 0; padding-left: 1.2rem; }
-.wp-toc li { margin: 0.25rem 0; color: var(--ink); }
-.prose h2[id], .prose h3[id] { scroll-margin-top: 5rem; color: var(--ink); }
-.prose h2[id]:target, .prose h3[id]:target { outline: 2px solid rgba(78, 200, 224, 0.45); outline-offset: 4px; border-radius: 4px; }
+.wp-toc li { margin: 0.25rem 0; }
+.prose h2[id], .prose h3[id] { scroll-margin-top: 5rem; }
+.prose h2[id]:target, .prose h3[id]:target { outline: 2px solid rgba(47, 95, 138, 0.35); outline-offset: 4px; border-radius: 4px; }
 </style>
 
 </head>
@@ -84,17 +81,19 @@
 kRounds      = 16</pre>
 <p>Mainnet difficulty floor (initial = min = max): <strong><code>0x000000FFFFFFFFFF</code></strong>. Smaller target = harder. Check: <code>head64(hash) &lt;= target</code>.</p>
 <h3 id="5-2-timing-and-retarget">5.2 Timing and retarget</h3>
-<table><tr><th>Parameter</th><th>Value (code / genesis)</th></tr><tr><td><code>target_block_time_sec</code></td><td><strong>60</strong></td></tr><tr><td><code>retarget_window</code></td><td><strong>30</strong></td></tr><tr><td>Retarget compare window</td><td><code>30 × 60s</code> of timestamps (<code>chain.cpp</code>)</td></tr><tr><td>Early blocks</td><td>target × <code>9/10</code> (harder)</td></tr><tr><td>Late blocks</td><td>target scaled up, clamped to <code>[min, max]</code></td></tr><tr><td>Mainnet mine deadline</td><td><code>mine_deadline_sec=0</code> (search until found)</td></tr></table>
+<table><tr><th>Parameter</th><th>Value (code / genesis)</th></tr><tr><td><code>target_block_time_sec</code></td><td><strong>20</strong></td></tr><tr><td>LWMA difficulty window</td><td><strong>180</strong> blocks (~1 hour)</td></tr><tr><td>Future-timestamp bound</td><td><strong>300 s</strong> (15 blocks × 20 s)</td></tr><tr><td>Early blocks</td><td>target × <code>9/10</code> (harder)</td></tr><tr><td>Late blocks</td><td>target scaled up, clamped to <code>[min, max]</code></td></tr><tr><td>Mainnet mine deadline</td><td><code>mine_deadline_sec=0</code> (search until found)</td></tr></table>
 <p>Because mainnet clamps min and max to the same hard floor, retarget cannot climb to an easy testnet-style target.</p>
 <h3 id="5-3-auto-mine">5.3 Auto-mine</h3>
 <p><code>auto_mine</code> is <strong>refused on mainnet</strong> (<code>src/auto_mine.cpp</code>). Live <code>getinfo</code> reports <code>auto_mine=off</code>. Config <code>enable_auto_mine = false</code> in <code>config-mainnet.toml</code> does not override that refusal.</p>
-<h3 id="5-4-coinbase">5.4 Coinbase</h3>
-<p>Block template builds a single coinbase output to the <strong>finding miner’s</strong> reward address (<code>chain.cpp</code> <code>make_block_template</code>). There is <strong>no</strong> 70/25/5 miner/staker/treasury split. Coinbase is 100% to the finding miner.</p>
+<h3 id="5-4-coinbase-and-hybrid-pow-pos">5.4 Coinbase and hybrid PoW/PoS</h3>
+<p>Consensus implements hybrid PoW/PoS (tickets on chain). On mainnet, staking activates at <strong>height 14,772,727</strong>, the first block at which cumulative emission reaches <strong>37,500,000 ADD (3/4 of the 50M cap)</strong>: 22,727,272 from the 4/block era (heights 1–5,681,818), +11,363,638 from the 2/block era (to height 11,363,637, total 34,090,910), then 3,409,090 blocks at 1/block. At 20 s blocks that is about <strong>9.36 years</strong> after genesis. Before that height the coinbase is 100% to the finding miner; from it on, 30% of each block&#x27;s reward plus fees goes to the approving stakers.</p>
+<p>When active (regtest/testnet configs can enable it):</p>
+<ul><li><strong>Tickets:</strong> a stake-lock tx sends ≥ <code>stake_min_amount</code> (default <strong>1000</strong>) to <code>@stake</code>; it becomes a ticket after <code>stake_maturity</code> blocks (mainnet <strong>768</strong> ≈ 4.3 h).</li><li><strong>Selection:</strong> for block *h*, <strong>5</strong> tickets are chosen deterministically from the hash of block *h−1*. Each signs an ML-DSA-87 vote on *h−1*; votes relay over P2P (<code>SVOTE</code>) and miners include them (block payload <code>BLB3</code>).</li><li><strong>Quorum:</strong> a block needs <strong>3</strong> approving votes once at least <code>stake_min_live_tickets</code> tickets are live.</li><li><strong>Reward split:</strong> <strong>30%</strong> of the block subsidy+fees is split equally among the approving voters in the coinbase; the miner gets the rest.</li><li><strong>Slashing:</strong> two conflicting votes from one ticket at the same height (equivocation) are evidence; including it burns the ticket. Missed votes are not penalized.</li><li><strong>Unbonding:</strong> a stake-unlock tx returns funds, frozen for <code>stake_unbond_delay</code> blocks (mainnet <strong>4320</strong> ≈ 1 day).</li><li><strong>Keys stay local:</strong> the wallet signs <code>stake</code>/<code>unstake</code>/votes locally; RPC never accepts a raw private key.</li></ul>
 <hr>
 <h2 id="6-economics">6. Economics</h2>
 <p>From <code>genesis-mainnet.json</code>, <code>config-mainnet.toml</code>, and <code>mainnet_chain_config()</code>:</p>
-<table><tr><th>Parameter</th><th>Value</th></tr><tr><td><code>max_supply</code></td><td><strong>50,000,000</strong> whole units</td></tr><tr><td><code>block_reward</code></td><td><strong>50</strong></td></tr><tr><td><code>halving_interval</code></td><td><strong>210,000</strong> blocks</td></tr><tr><td><code>tail_emission_reward</code></td><td>1 (after deep halvings / policy in chain)</td></tr><tr><td><code>min_fee</code> (spec / genesis)</td><td><strong>0</strong></td></tr><tr><td>Precision</td><td>Whole integers only — no 8-decimal satoshi subunit</td></tr></table>
-<p><strong>Coinbase:</strong> 100% of the block reward (plus collected fees, subject to validation) goes to the finding miner’s address. No token sale, no pre-mine claim in genesis beyond the empty height-0 chain, no ICO language.</p>
+<table><tr><th>Parameter</th><th>Value</th></tr><tr><td><code>max_supply</code></td><td><strong>50,000,000</strong> whole units</td></tr><tr><td><code>block_reward</code></td><td><strong>4</strong> (20 s blocks)</td></tr><tr><td><code>halving_interval</code></td><td><strong>5,681,819</strong> blocks (~3.6 years)</td></tr><tr><td><code>subsidy_floor</code></td><td><strong>1</strong> per block until the cap, then <strong>0</strong> (no tail emission)</td></tr><tr><td>Schedule</td><td>4/block (heights 1–5,681,819), 2/block (to 11,363,638), then 1/block until exactly 50,000,000 at height <strong>27,272,727</strong> (~17.3 years); 99% by height ~26.77M (~17.0 years)</td></tr><tr><td><code>min_fee</code> (spec / genesis)</td><td><strong>0</strong></td></tr><tr><td>Precision</td><td>Whole integers only — no 8-decimal satoshi subunit</td></tr></table>
+<p><strong>Coinbase:</strong> while staking is dormant, 100% of the block reward (plus collected fees, subject to validation) goes to the finding miner’s address. Supply is hard-capped at 50,000,000; no subsidy is minted past it. No token sale, no pre-mine claim in genesis beyond the empty height-0 chain, no ICO language.</p>
 <p><strong>Fees:</strong> Spec / genesis / <code>mainnet_chain_config()</code> floor is <code>min_fee=0</code>. Congestion heuristics may raise <code>recommended_min_fee</code> / <code>dynamic_min_fee</code> from mempool size and last-block fees. Copy live fields from the node; do not invent a fee market narrative.</p>
 <p><strong>Live <code>monetary_info</code></strong> — fetched on this page (fail closed → <code>RPC offline</code>):</p>
 <pre id="live-monetary-snapshot" class="raw">Loading live monetary_info…</pre>

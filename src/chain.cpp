@@ -1521,6 +1521,19 @@ bool Chain::verify_stake_vote(const StakeVote& v, std::string& error) const {
     return true;
 }
 
+bool Chain::verify_vote_signature_only(const StakeVote& v, std::string& error) const {
+    const auto t = tickets_.find(v.ticket_id);
+    if (t == tickets_.end()) {
+        error = "unknown ticket";
+        return false;
+    }
+    if (!vote_signature_ok(t->second, cfg_.network_id, v)) {
+        error = "invalid vote signature";
+        return false;
+    }
+    return true;
+}
+
 std::vector<StakeVote> Chain::usable_votes_for_next_block(const std::vector<StakeVote>& pool) const {
     std::vector<StakeVote> out;
     std::unordered_set<std::string> used;

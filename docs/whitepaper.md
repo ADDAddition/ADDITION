@@ -196,7 +196,7 @@ Because mainnet clamps min and max to the same hard floor, retarget cannot climb
 
 ### 5.4 Coinbase and hybrid PoW/PoS
 
-Consensus code implements hybrid PoW/PoS (tickets on chain), but **on mainnet it is dormant**: `staking_activation_height` is unset (never), so today the coinbase is 100% to the finding miner. Activation needs a chosen height and a coordinated release.
+Consensus implements hybrid PoW/PoS (tickets on chain). On mainnet, staking activates at **height 14,772,727**, the first block at which cumulative emission reaches **37,500,000 ADD (3/4 of the 50M cap)**: 22,727,272 from the 4/block era (heights 1–5,681,818), +11,363,638 from the 2/block era (to height 11,363,637, total 34,090,910), then 3,409,090 blocks at 1/block. At 20 s blocks that is about **9.36 years** after genesis. Before that height the coinbase is 100% to the finding miner; from it on, 30% of each block's reward plus fees goes to the approving stakers.
 
 When active (regtest/testnet configs can enable it):
 

@@ -4,6 +4,7 @@
 #include "addition/chain.hpp"
 #include "addition/config.hpp"
 #include "addition/crypto.hpp"
+#include "addition/mempool.hpp"
 #include "addition/shielded.hpp"
 #include "addition/wallet_keys.hpp"
 
@@ -172,6 +173,15 @@ int main() {
         std::cout << "metric z2z(1in,2out): prove_s=" << prove_s << " verify_ms=" << ms
                   << " proof_bytes=" << b2.proof.size() << " bundle_bytes=" << sh::serialize(b2).size()
                   << " tx_hex_chars=" << t2.shielded.size() << "\n";
+    }
+    {   // mempool accepts + relays fully shielded txs; nullifier double-spend blocked
+        addition::Mempool mp;
+        CHECK(mp.submit(t2), "mempool accepts fully shielded tx");
+        CHECK(!mp.submit(t2), "mempool rejects duplicate shielded tx");
+        auto t2b = t2; t2b.fee = 2;
+        CHECK(!mp.submit(t2b), "mempool rejects nullifier conflict");
+        CHECK(mp.fetch_for_block(10).size() == 1, "shielded tx fetched for block");
+        CHECK(mp.submit(t2b), "nullifier released after fetch");
     }
     // wrong spender key cannot build a spend of alice's note
     {

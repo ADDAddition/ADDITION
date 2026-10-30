@@ -1,4 +1,5 @@
 #include "addition/mempool.hpp"
+#include "addition/shielded.hpp"
 
 #include <algorithm>
 
@@ -7,6 +8,18 @@ namespace {
 
 std::string outpoint_key(const TxInput& in) {
     return in.previous_txid + ":" + std::to_string(in.output_index);
+}
+
+// Fully shielded tx (no transparent inputs): its double-spend keys are the
+// bundle nullifiers. Returns false if the bundle does not parse.
+bool shielded_nullifier_keys(const Transaction& tx, std::vector<std::string>& out) {
+    out.clear();
+    if (tx.shielded.empty()) return true;
+    shielded::Bundle b;
+    std::string err;
+    if (!shielded::from_tx_field(tx.shielded, b, err)) return false;
+    for (const auto& nf : b.nullifiers) out.push_back("nf:" + shielded::hex32(nf));
+    return true;
 }
 
 } // namespace
@@ -19,6 +32,14 @@ std::string Mempool::signer_nonce_key(const Transaction& tx) const {
 }
 
 bool Mempool::looks_spendable(const Transaction& tx) const {
+    if (tx.inputs.empty() && !tx.shielded.empty()) {
+        // Fully shielded (z->z or z->t): no transparent inputs or signer. The
+        // STARK proof and nullifiers are verified by Chain; here we only require
+        // a parseable bundle that spends at least one nullifier.
+        if (!tx.signer.empty() || !tx.signature.empty()) return false;
+        std::vector<std::string> nfs;
+        return shielded_nullifier_keys(tx, nfs) && !nfs.empty();
+    }
     if (tx.inputs.empty() || tx.outputs.empty()) {
         return false;
     }
@@ -42,11 +63,19 @@ void Mempool::index_inputs(const Transaction& tx) {
     for (const auto& in : tx.inputs) {
         reserved_outpoints_.insert(outpoint_key(in));
     }
+    std::vector<std::string> nfs;
+    if (shielded_nullifier_keys(tx, nfs)) {
+        for (const auto& k : nfs) reserved_outpoints_.insert(k);
+    }
 }
 
 void Mempool::unindex_inputs(const Transaction& tx) {
     for (const auto& in : tx.inputs) {
         reserved_outpoints_.erase(outpoint_key(in));
+    }
+    std::vector<std::string> nfs;
+    if (shielded_nullifier_keys(tx, nfs)) {
+        for (const auto& k : nfs) reserved_outpoints_.erase(k);
     }
 }
 
@@ -64,8 +93,15 @@ bool Mempool::submit(const Transaction& tx) {
         txids_.erase(txid);
         return false;
     }
-    for (const auto& in : tx.inputs) {
-        if (reserved_outpoints_.count(outpoint_key(in)) != 0) {
+    std::vector<std::string> keys;
+    for (const auto& in : tx.inputs) keys.push_back(outpoint_key(in));
+    {
+        std::vector<std::string> nfs;
+        shielded_nullifier_keys(tx, nfs);
+        keys.insert(keys.end(), nfs.begin(), nfs.end());
+    }
+    for (const auto& key : keys) {
+        if (reserved_outpoints_.count(key) != 0) {
             txids_.erase(txid);
             if (!sn.empty()) {
                 signer_nonces_.erase(sn);

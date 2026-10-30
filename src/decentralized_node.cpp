@@ -14,6 +14,8 @@
 #include <exception>
 #include <cctype>
 #include <chrono>
+#include <iostream>
+#include <thread>
 #include <limits>
 #include <sstream>
 
@@ -107,6 +109,12 @@ bool parse_endpoint(const std::string& endpoint, std::string& ip, std::uint16_t&
     return true;
 }
 
+// Tor: fresh onion circuits (HS descriptor fetch + rendezvous) routinely take
+// 30-90 s, and a ~15 KiB ML-DSA-87 HELLO is paced over a slow circuit.
+constexpr int kOnionConnectTimeoutMs = 120000;
+constexpr int kOnionIoTimeoutMs = 180000;
+constexpr int kOnionHelloTransportRetries = 5;
+
 bool send_p2p_request(const std::string& endpoint, const std::string& request, std::string& response) {
     std::string ip;
     std::uint16_t port = 0;
@@ -125,7 +133,7 @@ bool send_p2p_request(const std::string& endpoint, const std::string& request, s
     std::string terr;
     // transport_connect honors the Tor/SOCKS policy: .onion via SOCKS5 (ATYP
     // domain, no local DNS), clearnet refused in onion_only mode.
-    if (!transport_connect(ip, port, is_onion_v3_host(ip) ? 60000 : kConnectTimeoutMs, raw_sock, terr)) {
+    if (!transport_connect(ip, port, is_onion_v3_host(ip) ? kOnionConnectTimeoutMs : kConnectTimeoutMs, raw_sock, terr)) {
 #ifdef _WIN32
         WSACleanup();
 #endif
@@ -134,7 +142,7 @@ bool send_p2p_request(const std::string& endpoint, const std::string& request, s
     SocketT sock = static_cast<SocketT>(raw_sock);
     socket_apply_wan_opts(static_cast<std::uintptr_t>(sock));
     {
-        const int io_ms = is_onion_v3_host(ip) ? 90000 : kSocketTimeoutMs;
+        const int io_ms = is_onion_v3_host(ip) ? kOnionIoTimeoutMs : kSocketTimeoutMs;
 #ifdef _WIN32
         DWORD timeout_ms = static_cast<DWORD>(io_ms);
         setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout_ms), sizeof(timeout_ms));
@@ -438,7 +446,7 @@ bool send_http_rpc(const std::string& endpoint, const std::string& cmd, std::str
 #endif
     std::uintptr_t raw_sock = 0;
     std::string terr;
-    if (!transport_connect(ip, port, is_onion_v3_host(ip) ? 60000 : kConnectTimeoutMs, raw_sock, terr)) {
+    if (!transport_connect(ip, port, is_onion_v3_host(ip) ? kOnionConnectTimeoutMs : kConnectTimeoutMs, raw_sock, terr)) {
 #ifdef _WIN32
         WSACleanup();
 #endif
@@ -858,6 +866,9 @@ bool DecentralizedNode::ingest_block(const Block& block, std::string& error) {
     if (!seen_block_hashes_.insert(bh).second) {
         return true;
     }
+    for (const auto& v : block.votes) {
+        observe_vote_for_equivocation(v);  // a vote in a competing block counts too
+    }
 
     if (!chain_.add_block(block, error)) {
         return false;
@@ -1088,8 +1099,18 @@ bool DecentralizedNode::handshake_with_peer(const std::string& peer, std::string
             error = "HELLO transport failed to " + peer +
                     " (paced WAN write/read of ML-DSA HELLO failed)";
             ++transport_fails;
-            if (transport_fails >= 2) {
-                return false;
+            {
+                std::string hip;
+                std::uint16_t hport = 0;
+                const bool onion = parse_endpoint(peer, hip, hport) && is_onion_v3_host(hip);
+                const int max_fails = onion ? kOnionHelloTransportRetries : 2;
+                if (transport_fails >= max_fails) {
+                    return false;
+                }
+                if (onion) {
+                    // Exponential backoff (2,4,8,16 s): lets Tor build a new circuit.
+                    std::this_thread::sleep_for(std::chrono::seconds(1LL << transport_fails));
+                }
             }
             continue;
         }
@@ -2527,10 +2548,61 @@ void DecentralizedNode::prune_vote_pool() {
     }
     vote_pool_.swap(kept);
     if (seen_stake_votes_.size() > 100000) seen_stake_votes_.clear();
+    std::vector<SlashEvidence> live;
+    for (auto& ev : pending_slashes_) {
+        if (chain_.ticket(ev.a.ticket_id)) live.push_back(std::move(ev));
+    }
+    pending_slashes_.swap(live);
+}
+
+bool DecentralizedNode::observe_vote_for_equivocation(const StakeVote& v) {
+    std::string err;
+    if (!chain_.verify_vote_signature_only(v, err)) {
+        return false;
+    }
+    const auto key = v.ticket_id + "|" + std::to_string(v.voted_height);
+    const auto it = vote_watch_.find(key);
+    if (it == vote_watch_.end()) {
+        if (vote_watch_.size() > 200000) vote_watch_.clear();
+        vote_watch_.emplace(key, v);
+        return false;
+    }
+    const auto& first = it->second;
+    if (first.voted_hash == v.voted_hash && first.approve == v.approve) {
+        return false;
+    }
+    if (slash_reported_.count(v.ticket_id) != 0) {
+        return true;
+    }
+    SlashEvidence ev{first, v};
+    if (!chain_.slash_evidence_valid(ev, err)) {
+        return false;
+    }
+    slash_reported_.insert(v.ticket_id);
+    pending_slashes_.push_back(ev);
+    // Relay the conflicting vote so every peer can build the same evidence.
+    outbound_.push_back("SVOTE|" + encode_stake_vote(v));
+    outbound_.push_back("SVOTE|" + encode_stake_vote(first));
+    std::cerr << "[staking] equivocation detected: ticket " << v.ticket_id.substr(0, 16)
+              << "... height " << v.voted_height << " (slash evidence queued)\n";
+    return true;
+}
+
+std::vector<SlashEvidence> DecentralizedNode::usable_slash_evidence() const {
+    std::vector<SlashEvidence> out;
+    for (const auto& ev : pending_slashes_) {
+        std::string err;
+        if (chain_.slash_evidence_valid(ev, err)) out.push_back(ev);
+    }
+    return out;
 }
 
 bool DecentralizedNode::submit_stake_vote(const StakeVote& v, std::string& error) {
     prune_vote_pool();
+    if (observe_vote_for_equivocation(v)) {
+        error = "duplicate stake vote (equivocation recorded)";
+        return false;
+    }
     const auto tip = chain_.height();
     if (v.voted_height != tip) {
         error = "stale stake vote";

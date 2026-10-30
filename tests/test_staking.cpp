@@ -218,11 +218,22 @@ int main() {
     {
         const auto victim = chain.selected_tickets_for_next_block()[0];
         const auto* vk = owner_keys(chain, victim, k);
-        SlashEvidence ev{make_vote(chain, victim, *vk, true), make_vote(chain, victim, *vk, false)};
+        // Automatic detection: the node sees both conflicting votes via gossip,
+        // builds the evidence itself, and the miner includes it.
+        std::string verr;
+        check(node.submit_stake_vote(make_vote(chain, victim, *vk, true), verr) || verr.find("duplicate") != std::string::npos,
+              "first vote accepted " + verr);
+        check(!node.submit_stake_vote(make_vote(chain, victim, *vk, false), verr), "conflicting vote rejected");
+        check(node.pending_slash_count() == 1, "equivocation auto-detected");
+        check(node.usable_slash_evidence().size() == 1, "auto slash evidence valid");
         std::vector<StakeVote> vs;
         for (const auto& id : chain.selected_tickets_for_next_block()) vs.push_back(make_vote(chain, id, *owner_keys(chain, id, k)));
         const auto before = chain.total_staked();
-        check(chain.mine_and_add_block_with_votes(k[0].address, {}, vs, {ev}, 1, h, err), "mine slash " + err);
+        Miner auto_miner(chain, mempool);
+        auto_miner.set_vote_source([&]() { return vs; });
+        auto_miner.set_slash_source([&]() { return node.usable_slash_evidence(); });
+        check(auto_miner.mine_next_block(k[0].address, 100, 1, h, err), "miner includes auto slash " + err);
+        check(chain.tip().slashes.size() == 1, "mined block carries slash evidence");
         check(!chain.ticket(victim).has_value(), "slashed ticket removed");
         check(chain.total_slashed() == 20 && chain.total_staked() == before - 20, "slash burns 20");
     }

@@ -657,7 +657,7 @@ ChainConfig mainnet_chain_config() {
     cfg.subsidy_floor = kMainnetSubsidyFloor;
     cfg.stake_maturity = kMainnetStakeMaturity;
     cfg.stake_unbond_delay = kMainnetStakeUnbondDelay;
-    cfg.staking_activation_height = kStakingNever;
+    cfg.staking_activation_height = kMainnetStakingActivationHeight;
     cfg.require_pq_signatures = true;
     cfg.require_privacy_pool = true;
     cfg.allow_zero_reward_blocks = true;
@@ -791,6 +791,10 @@ bool validate_network_profile(const NodeConfig& cfg, std::string& error) {
         if (cfg.chain.stake_vote_quorum == 0 || cfg.chain.stake_vote_quorum > cfg.chain.stake_votes_per_block ||
             cfg.chain.stake_reward_bps > 10000) {
             error = "mainnet staking parameters invalid";
+            return false;
+        }
+        if (cfg.chain.staking_activation_height != kMainnetStakingActivationHeight) {
+            error = "mainnet staking_activation_height must be 14772727 (37.5M cumulative supply)";
             return false;
         }
         if (cfg.chain.pow_algorithm != PowAlgorithm::MemoryHard) {

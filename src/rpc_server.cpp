@@ -207,6 +207,7 @@ RpcServer::RpcServer(Chain& chain,
         node_.refresh_local_votes();
         return node_.usable_stake_votes();
     });
+    miner_.set_slash_source([this]() { return node_.usable_slash_evidence(); });
 }
 
 void RpcServer::set_auto_mine_status(bool enabled, std::uint32_t interval_sec) {

@@ -76,6 +76,11 @@ inline constexpr std::uint64_t kMainnetStakeUnbondDelay = 4320ULL;
 // Hybrid PoW/PoS defaults (see staking.hpp). Mainnet activation is a
 // launch decision; Never until vote gossip ships in the P2P layer.
 inline constexpr std::uint64_t kStakingNever = UINT64_MAX;
+// Mainnet staking activation: first height at which cumulative emission reaches
+// 37,500,000 (3/4 of the 50M cap). Genesis mints 0; 4/block for heights
+// 1..5,681,818 (22,727,272), 2/block for 5,681,819..11,363,637 (34,090,910 total),
+// then 1/block: 37.5M at height 14,772,727 (~9.36 years at 20 s).
+inline constexpr std::uint64_t kMainnetStakingActivationHeight = 14'772'727ULL;
 inline constexpr std::uint64_t kDifficultyForkNever = 0xFFFFFFFFFFFFFFFFULL;
 
 // Testnet mine search deadline. Easy SHA3-512 should finish well inside this.

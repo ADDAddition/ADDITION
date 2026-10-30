@@ -102,6 +102,10 @@ public:
     bool verify_stake_vote(const StakeVote& vote, std::string& error) const;
     // Filter a vote pool down to valid, selected, unique votes on the current tip.
     std::vector<StakeVote> usable_votes_for_next_block(const std::vector<StakeVote>& pool) const;
+    // Equivocation detection: signature-only check of a vote against its live
+    // ticket (any height/hash), and validity of slash evidence vs current state.
+    bool verify_vote_signature_only(const StakeVote& v, std::string& error) const;
+    bool slash_evidence_valid(const SlashEvidence& ev, std::string& error) const { return validate_slash(ev, error); }
     // Unsigned stake lock (output to @stake + change) / unlock (spend ticket).
     bool build_stake_lock(const std::string& from,
                           std::uint64_t amount,
