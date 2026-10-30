@@ -136,7 +136,7 @@ public:
 
     // On-chain public-key registry: address -> pubkey hex, recorded the first
     // time a confirmed tx carries the full key. Later txs from that address may
-    // leave signer_pubkey empty (saves 2592 B ML-DSA-87 / 1793 B Falcon-1024).
+    // leave signer_pubkey empty (saves 2592 B ML-DSA-87).
     // Deterministic: rebuilt by replay; snapshotted/restored like the UTXO set.
     bool registered_pubkey(const std::string& address, std::string& pubkey_hex) const;
     std::size_t registry_size() const { return pubkey_registry_.size(); }

@@ -11,18 +11,13 @@
 
 ## Options to raise throughput (ordered by safety)
 1. Done: miner byte budget, signature cache (positive results only, keyed SHA3-512(pk|msg|sig)).
-2. TXB3 raw encoding (pubkey/sig as bytes, not hex) and BLKDATA without the outer hex: ~4x
-   smaller. Wire-protocol change -> needs version negotiation. ~32 tx/block.
-3. Raise kMaxLineBytes (e.g. 4 MiB => ~140 txs/block x4 with TXB3 => ~550). Two-phase rollout:
-   first ship receivers accepting large lines, later raise the miner budget. **Prerequisite:**
-   RpcNetworkServer spawns an unbounded thread per connection; add a connection cap and
-   per-peer memory budget first or 4 MiB lines become a memory DoS.
-4. Consensus max block bytes/tx count: currently none in Chain::validate_block. Should be added
-   (hard-fork-ish rule; a decision for Jeremy).
-5. Signature "aggregation": ML-DSA has no native aggregation. Realistic levers: pubkey registry
-   (tx references a registered key id: saves 2592 B/tx, ~35%), Falcon-512 (~666 B sig, ~897 B pk;
-   algorithm change, harder constant-time signing), STARK/SNARK proof of N ML-DSA verifies
-   (research grade, prover cost large). None implemented.
+2. Done (Phase 2): binary wire v3 (`TXV3`/`BLV3`, raw bytes, base64 framing, proto 3/4
+   negotiation). Witnesses ride in the TXV3 witness section.
+3. Done (Phase 2): 4 MiB max line with connection caps and large-message slots.
+4. Done (Phase 2): consensus `max_block_weight` (2 MiB) checked in `add_block`.
+5. Signature "aggregation": ML-DSA has no native aggregation. The pubkey registry is done
+   (saves 2592 B/tx, ~35%). ML-DSA-87 is the only signature scheme; no alternative
+   lattice scheme will be added. STARK proof of N ML-DSA verifies remains research-grade.
 
 ## Sharding evaluation (honest)
 include/addition/shard_manager.hpp is an unreferenced header stub: no cross-shard messaging,
@@ -49,7 +44,7 @@ first (~100-500x headroom) and consider a rollup/DA layer later. No sharding cod
   table; Dandelion may stem back to the sender), no handshake gating of inbound messages,
   the node core is not thread-safe (all pre-existing).
 
-## Phase 2 — speed (wire v3, weight, registry, Falcon)
+## Phase 2 — speed (wire v3, weight, registry)
 
 Approved by Jeremy ("C'est sur je veux optimiser toute").
 
@@ -58,13 +53,12 @@ Approved by Jeremy ("C'est sur je veux optimiser toute").
   `"3"`; `"2"` still accepted. Handshake ACK returns the negotiated version
   (signed); client retries once with v2 on mismatch. v3 payloads are transcoded
   to hex v2 for v2 peers. `BLV3` carries an extension-section count (0 here),
-  reserved for fix/core's staking votes/slashes. (fix/core WIP already uses the
-  magic `BLB3` for its hex staked blocks, hence the V3 names.)
+  now carrying staking votes/slashes.
 - **Consensus weight** = TXV3 bytes (+framing). `max_block_weight` = 2 MiB
   (config, 64 KiB..3 MiB-64 KiB), checked first in `add_block`.
 - **Pubkey registry**: first key-carrying spend registers signer->pubkey; later
   txs may omit the ~2.6 KB key. Snapshotted/restored on reorg, rebuilt on replay.
-- **Falcon-1024** (`fn-dsa-1024-v1`, liboqs constant-time impl, versioned address).
+- **Signature scheme**: ML-DSA-87 only (FIPS 204). Falcon/FN-DSA was removed and is rejected.
 - **Caps**: 4 MiB max line, 256 KiB default; 128 inbound / 8 per IP (64 loopback
   for Tor); 16 large-message slots; ~92 MiB worst-case buffering.
 - **Shielded** field: carried/hashed/weighted, consensus-rejected (fail closed).
@@ -74,10 +68,10 @@ Approved by Jeremy ("C'est sur je veux optimiser toute").
 
 | scheme / key | tx weight | txs/block | tx/s | peer cold add_block |
 |---|---|---|---|---|
-| ML-DSA-87 + pubkey | 7505 | 278 | 13.9 | 108 ms |
-| ML-DSA-87 registry | 4913 | 426 | 21.3 | 65 ms |
-| Falcon-1024 + pubkey | 3350 | 624 | 31.2 | 338 ms |
-| Falcon-1024 registry | 1557 | 1344 | 67.2 | 109 ms |
+| ML-DSA-87 + pubkey | 7505 | 278 | 13.9 | 157 ms |
+| ML-DSA-87 registry | 4913 | 426 | 21.3 | 64 ms |
+
+Re-measured 2026-10-29 after Falcon removal: unchanged, ~21 tx/s with the registry.
 
 Full blocks are ~2.79 MB on the wire (< 3 MiB relay, < 4 MiB line).
 Previous hex v2: ~0.4 tx/s.

@@ -1,4 +1,4 @@
-// Throughput bench (phase 2): per scheme (ML-DSA-87, Falcon-1024), with and
+// Throughput bench (phase 2): ML-DSA-87 (sole signature scheme), with and
 // without the pubkey registry, fill one real block from the mempool via the
 // miner under the consensus weight cap, and report included txs, weight, wire
 // bytes, verify rate and implied tx/s at the configured block time.
@@ -101,7 +101,5 @@ int main(int argc, char** argv) {
     int rc = 0;
     rc |= run("ml-dsa-87", false, n, block_sec);
     rc |= run("ml-dsa-87", true, n, block_sec);
-    rc |= run("fn-dsa-1024-v1", false, n, block_sec);
-    rc |= run("fn-dsa-1024-v1", true, n, block_sec);
     return rc;
 }

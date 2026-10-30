@@ -33,8 +33,6 @@ const char* oqs_name_for(SigScheme scheme) {
     case SigScheme::SlhDsaShake256s:
         // liboqs 0.12.0 exposes FIPS 205 SLH-DSA-SHAKE-256s as this SPHINCS+ name.
         return OQS_SIG_alg_sphincs_shake_256s_simple;
-    case SigScheme::Falcon1024:
-        return OQS_SIG_alg_falcon_1024;
     case SigScheme::Unknown:
         return "";
     }
@@ -42,7 +40,6 @@ const char* oqs_name_for(SigScheme scheme) {
     switch (missing) {
     case SigScheme::MlDsa87:
     case SigScheme::SlhDsaShake256s:
-    case SigScheme::Falcon1024:
     case SigScheme::Unknown:
         break;
     }
@@ -90,7 +87,6 @@ bool scheme_supports_ctx_sign(SigScheme scheme) {
         cached = &slh_cached;
         ok = &slh_ok;
         break;
-    case SigScheme::Falcon1024:
     case SigScheme::Unknown:
         return false;
     }
@@ -99,7 +95,6 @@ bool scheme_supports_ctx_sign(SigScheme scheme) {
         switch (missing) {
         case SigScheme::MlDsa87:
         case SigScheme::SlhDsaShake256s:
-        case SigScheme::Falcon1024:
         case SigScheme::Unknown:
             break;
         }
@@ -175,12 +170,6 @@ SigScheme infer_sig_scheme_from_key_bytes(std::size_t nbytes, bool secret) {
     if (get_scheme_sizes(SigScheme::SlhDsaShake256s, slh)) {
         if (nbytes == (secret ? slh.secret_key : slh.public_key)) {
             return SigScheme::SlhDsaShake256s;
-        }
-    }
-    PqKeySizes fn{};
-    if (get_scheme_sizes(SigScheme::Falcon1024, fn)) {
-        if (nbytes == (secret ? fn.secret_key : fn.public_key)) {
-            return SigScheme::Falcon1024;
         }
     }
     return SigScheme::Unknown;
@@ -263,66 +252,6 @@ bool slh_verify_with_ctx(const std::vector<std::uint8_t>& public_key,
         return false;
     }
     return true;
-}
-
-// Falcon-1024 has no FIPS-style context string in liboqs 0.12, so we domain-
-// separate by prefixing the message. Keeps Falcon sigs from ever being valid
-// over a raw ML-DSA message (and vice versa: different keys/addresses anyway).
-constexpr const char kFalconDomain[] = "ADDITION|fn-dsa-1024-v1|";
-
-OQS_SIG* tls_falcon_1024() {
-    struct Holder {
-        OQS_SIG* sig{nullptr};
-        Holder() { sig = OQS_SIG_new(OQS_SIG_alg_falcon_1024); }
-        ~Holder() { if (sig != nullptr) { OQS_SIG_free(sig); } }
-    };
-    thread_local Holder h;
-    return h.sig;
-}
-
-bool falcon_sign_domain(const std::vector<std::uint8_t>& secret_key,
-                        const std::string& message,
-                        std::vector<std::uint8_t>& signature,
-                        std::string& error) {
-    OQS_SIG* sig = tls_falcon_1024();
-    if (sig == nullptr) {
-        error = "OQS_SIG_new failed for falcon-1024";
-        return false;
-    }
-    if (secret_key.size() != sig->length_secret_key) {
-        error = "secret key size mismatch";
-        return false;
-    }
-    const std::string m = std::string(kFalconDomain) + message;
-    signature.assign(sig->length_signature, 0);
-    size_t len = 0;
-    if (OQS_SIG_sign(sig, signature.data(), &len, reinterpret_cast<const std::uint8_t*>(m.data()), m.size(),
-                     secret_key.data()) != OQS_SUCCESS) {
-        signature.clear();
-        error = "OQS_SIG_sign failed (falcon-1024)";
-        return false;
-    }
-    signature.resize(len);
-    return true;
-}
-
-bool falcon_verify_domain(const std::vector<std::uint8_t>& public_key,
-                          const std::string& message,
-                          const std::vector<std::uint8_t>& signature,
-                          std::string& error) {
-    OQS_SIG* sig = tls_falcon_1024();
-    if (sig == nullptr) {
-        error = "OQS_SIG_new failed for falcon-1024";
-        return false;
-    }
-    if (public_key.size() != sig->length_public_key || signature.empty() ||
-        signature.size() > sig->length_signature) {
-        error = "falcon size mismatch";
-        return false;
-    }
-    const std::string m = std::string(kFalconDomain) + message;
-    return OQS_SIG_verify(sig, reinterpret_cast<const std::uint8_t*>(m.data()), m.size(), signature.data(),
-                          signature.size(), public_key.data()) == OQS_SUCCESS;
 }
 
 bool is_hex_char(char c) {
@@ -451,8 +380,6 @@ const char* sig_scheme_id(SigScheme scheme) {
         return kMlDsa87SchemeId;
     case SigScheme::SlhDsaShake256s:
         return kSlhDsaShake256sSchemeId;
-    case SigScheme::Falcon1024:
-        return kFalcon1024SchemeId;
     case SigScheme::Unknown:
         return "unknown";
     }
@@ -460,7 +387,6 @@ const char* sig_scheme_id(SigScheme scheme) {
     switch (missing) {
     case SigScheme::MlDsa87:
     case SigScheme::SlhDsaShake256s:
-    case SigScheme::Falcon1024:
     case SigScheme::Unknown:
         break;
     }
@@ -481,10 +407,6 @@ bool parse_sig_scheme(const std::string& name, SigScheme& out) {
         out = SigScheme::SlhDsaShake256s;
         return true;
     }
-    if (name == "fn-dsa-1024-v1" || name == "fn-dsa-1024" || name == "falcon-1024" || name == "Falcon-1024") {
-        out = SigScheme::Falcon1024;
-        return true;
-    }
     out = SigScheme::Unknown;
     return false;
 }
@@ -502,10 +424,6 @@ bool sig_scheme_allowed_strict(SigScheme scheme) {
         // Fail closed unless this liboqs build can sign+verify with a non-empty context.
         // Do not enable slh-dsa-shake-256s and do not fall back to ctx-less sign.
         return sig_scheme_available(scheme) && scheme_supports_ctx_sign(scheme);
-    case SigScheme::Falcon1024:
-        // Constant-time liboqs implementation only (PQClean-derived, no
-        // variable-time floating-point path). Fail closed if absent.
-        return sig_scheme_available(scheme);
     case SigScheme::Unknown:
         return false;
     }
@@ -513,7 +431,6 @@ bool sig_scheme_allowed_strict(SigScheme scheme) {
     switch (missing) {
     case SigScheme::MlDsa87:
     case SigScheme::SlhDsaShake256s:
-    case SigScheme::Falcon1024:
     case SigScheme::Unknown:
         break;
     }
@@ -530,12 +447,6 @@ std::string allowed_sig_algs_list() {
             out += ',';
         }
         out += kSlhDsaShake256sSchemeId;
-    }
-    if (sig_scheme_allowed_strict(SigScheme::Falcon1024)) {
-        if (!out.empty()) {
-            out += ',';
-        }
-        out += kFalcon1024SchemeId;
     }
     if (out.empty()) {
         out = "none";
@@ -662,9 +573,6 @@ std::string sign_message_hybrid(const std::string& private_key,
         case SigScheme::SlhDsaShake256s:
             signed_ok = slh_sign_with_ctx(sk, message, pq_sig, err);
             break;
-        case SigScheme::Falcon1024:
-            signed_ok = falcon_sign_domain(sk, message, pq_sig, err);
-            break;
         case SigScheme::Unknown:
             err = "unknown scheme rejected in strict mode";
             break;
@@ -674,7 +582,6 @@ std::string sign_message_hybrid(const std::string& private_key,
             switch (missing) {
             case SigScheme::MlDsa87:
             case SigScheme::SlhDsaShake256s:
-            case SigScheme::Falcon1024:
             case SigScheme::Unknown:
                 break;
             }
@@ -831,8 +738,6 @@ bool verify_message_signature_hybrid_uncached(const std::string& public_key,
         return pq_verify_message(pk_bytes, message, sig_bytes, err);
     case SigScheme::SlhDsaShake256s:
         return slh_verify_with_ctx(pk_bytes, message, sig_bytes, err);
-    case SigScheme::Falcon1024:
-        return falcon_verify_domain(pk_bytes, message, sig_bytes, err);
     case SigScheme::Unknown:
         return false;
     }
@@ -840,7 +745,6 @@ bool verify_message_signature_hybrid_uncached(const std::string& public_key,
     switch (missing) {
     case SigScheme::MlDsa87:
     case SigScheme::SlhDsaShake256s:
-    case SigScheme::Falcon1024:
     case SigScheme::Unknown:
         break;
     }

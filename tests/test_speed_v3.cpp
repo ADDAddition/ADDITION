@@ -1,4 +1,4 @@
-// Phase-2 speed work: wire v3, block weight, pubkey registry, Falcon-1024,
+// Phase-2 speed work: wire v3, block weight, pubkey registry (ML-DSA-87 only),
 // shielded fit, inbound connection caps. Test keys are generated in memory and
 // never printed or persisted.
 #include "addition/block.hpp"
@@ -66,8 +66,8 @@ Transaction signed_tx(const WalletKeys& k, bool with_pub, std::uint64_t nonce) {
     return tx;
 }
 
-void test_wire_and_weight(const WalletKeys& mldsa, const WalletKeys& falcon) {
-    for (const auto* k : {&mldsa, &falcon}) {
+void test_wire_and_weight(const WalletKeys& mldsa, const WalletKeys& mldsa2) {
+    for (const auto* k : {&mldsa, &mldsa2}) {
         for (bool pub : {true, false}) {
             const auto tx = signed_tx(*k, pub, 7);
             const auto bin = wire::encode_tx_v3(tx);
@@ -88,7 +88,7 @@ void test_wire_and_weight(const WalletKeys& mldsa, const WalletKeys& falcon) {
     b.header.previous_hash = std::string(128, 'a');
     b.header.merkle_root = std::string(128, 'b');
     b.transactions.push_back(signed_tx(mldsa, true, 1));
-    b.transactions.push_back(signed_tx(falcon, false, 2));
+    b.transactions.push_back(signed_tx(mldsa2, false, 2));
     const auto bb = wire::encode_block_v3(b);
     Block bk;
     std::string err;
@@ -98,22 +98,6 @@ void test_wire_and_weight(const WalletKeys& mldsa, const WalletKeys& falcon) {
     // Truncated / hostile counts rejected without allocation blowup.
     std::string hostile = "TXV3";
     CHECK(!wire::decode_tx_v3(hostile + std::string(4, '\xff'), bk.transactions[0], err));
-}
-
-void test_falcon(const WalletKeys& f) {
-    CHECK(f.algorithm.find("fn-dsa-1024") != std::string::npos || f.algorithm.find("alcon") != std::string::npos);
-    CHECK(infer_sig_scheme_from_pubkey_hex(f.public_key) == SigScheme::Falcon1024);
-    CHECK(f.public_key.size() == 1793 * 2);
-    const std::string msg = "hello";
-    const auto sig = sign_message_hybrid(f.private_key, msg);
-    CHECK(verify_message_signature_hybrid(f.public_key, msg, sig));
-    CHECK(!verify_message_signature_hybrid(f.public_key, "hellp", sig));
-    std::string err;
-    CHECK(address_binds_pubkey(f.address, SigScheme::Falcon1024, f.public_key, err));
-    // Versioned address: same key under another scheme id must not bind.
-    CHECK(!address_binds_pubkey(f.address, SigScheme::MlDsa87, f.public_key, err));
-    SigScheme s{};
-    CHECK(parse_sig_scheme("fn-dsa-1024-v1", s) && s == SigScheme::Falcon1024);
 }
 
 void test_registry_and_reorg(const WalletKeys& k) {
@@ -253,12 +237,13 @@ void test_connection_caps() {
 
 int main() {
     const auto mldsa = generate_wallet_keys("ml-dsa-87");
-    const auto falcon = generate_wallet_keys("fn-dsa-1024-v1");
+    const auto mldsa2 = generate_wallet_keys("ml-dsa-87");
+    SigScheme rej{};
+    if (parse_sig_scheme("fn-dsa-1024-v1", rej) || parse_sig_scheme("falcon-1024", rej)) { std::cerr << "FAIL falcon still parses\n"; ++failures; }
     test_tagged_roundtrip();
-    test_falcon(falcon);
-    test_wire_and_weight(mldsa, falcon);
+    test_wire_and_weight(mldsa, mldsa2);
     test_registry_and_reorg(mldsa);
-    test_registry_and_reorg(falcon);
+    test_registry_and_reorg(mldsa2);
     test_block_weight_rule(mldsa);
     test_shielded_fit(mldsa);
     test_connection_caps();

@@ -57,5 +57,5 @@ State is in-memory only and lost on restart.
 * Messaging is in-process and lock-step. There is no concurrent update, no reconnection logic, and no persistence.
 * Fee policy and size limits for large witnesses are not tuned. The mempool accepts signer-less txs only when every input has a witness.
 * The preimage check on settle is done in the helper, not enforced by a protocol layer.
-* Falcon is not implemented (ML-DSA-87 only).
+* Signatures are ML-DSA-87 only.
 * The TXV3 witness section + proto-4 negotiation landed in release/v1 integration; needs external review.

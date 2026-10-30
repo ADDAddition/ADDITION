@@ -108,7 +108,7 @@ Build requires **liboqs** and **OpenSSL**. Missing liboqs fails the build.
 
 - Thread-local `OQS_SIG` and parallel batch verify in `crypto.cpp`
 - Opt-in **SLH-DSA** (`slh-dsa-shake-256s`) only if this liboqs build can `OQS_SIG_sign_with_ctx_str` with a non-empty context; otherwise rejected in strict mode
-- Unknown schemes (including Falcon/FN-DSA) are rejected
+- Any other scheme name is rejected
 
 Strict mode means the node only accepts the allowlisted PQ schemes it can verify. Lattice assumptions can age; operators should track NIST / cryptanalysis guidance over time. PQ here is a **grade and posture**, not a forever warranty.
 
