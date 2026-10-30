@@ -777,7 +777,9 @@ int test_public_rpc_ingest() {
         pub_worker.join();
         return fail("public-rpc addpeer");
     }
-    if (!node_b.node.sync_once(err)) {
+    // Fix 5: no HTTP/public-RPC fallback any more. P2P is broken in this
+    // fixture, so sync must NOT reach A's height through the HTTP endpoint.
+    if (node_b.node.sync_once(err) && node_b.chain.height() == node_a.chain.height()) {
         running = false;
         poke_port(p2p_port);
         poke_port(pub_port);
@@ -785,7 +787,7 @@ int test_public_rpc_ingest() {
         close(pub_fd);
         p2p_worker.join();
         pub_worker.join();
-        return fail("public-rpc sync_once: " + err);
+        return fail("public-rpc fallback still active");
     }
     running = false;
     poke_port(p2p_port);
@@ -795,8 +797,8 @@ int test_public_rpc_ingest() {
     p2p_worker.join();
     pub_worker.join();
 
-    if (node_b.chain.height() != node_a.chain.height()) {
-        return fail("public-rpc height " + std::to_string(node_b.chain.height()) +
+    if (node_b.chain.height() == node_a.chain.height()) {
+        return fail("public-rpc fallback still active: height " + std::to_string(node_b.chain.height()) +
                     " != " + std::to_string(node_a.chain.height()));
     }
     return 0;
@@ -930,10 +932,8 @@ int test_http_port80_ingest() {
     if (!added) {
         return fail("http80 addpeer");
     }
-    if (!synced) {
-        return fail("http80 sync_once: " + err);
-    }
-    if (node_b.chain.height() != node_a.chain.height() || node_b.chain.height() == 0) {
+    (void)synced;  // Fix 5: HTTP :80 ingest removed; B must not catch up via HTTP.
+    if (node_b.chain.height() == node_a.chain.height()) {
         return fail("http80 height " + std::to_string(node_b.chain.height()) +
                     " != " + std::to_string(node_a.chain.height()));
     }
@@ -1151,7 +1151,8 @@ int test_mainnet_http_ingest_skips_testnet() {
         pub_worker.join();
         return fail("mainnet http addpeer");
     }
-    if (!node_b.node.sync_once(err)) {
+    // Fix 5: HTTP ingest removed; sync must not succeed through HTTP.
+    if (node_b.node.sync_once(err) && node_b.chain.height() == node_a.chain.height()) {
         running = false;
         poke_port(p2p_port);
         poke_port(pub_port);
@@ -1159,7 +1160,7 @@ int test_mainnet_http_ingest_skips_testnet() {
         close(pub_fd);
         p2p_worker.join();
         pub_worker.join();
-        return fail("mainnet http sync_once: " + err);
+        return fail("mainnet http fallback still active");
     }
     running = false;
     poke_port(p2p_port);
@@ -1169,7 +1170,7 @@ int test_mainnet_http_ingest_skips_testnet() {
     p2p_worker.join();
     pub_worker.join();
 
-    if (node_b.chain.height() != node_a.chain.height() || node_b.chain.height() == 0) {
+    if (node_b.chain.height() == node_a.chain.height()) {
         return fail("mainnet http height " + std::to_string(node_b.chain.height()) +
                     " != " + std::to_string(node_a.chain.height()));
     }
