@@ -69,6 +69,7 @@ add_library(addition_core
     src/pouw_compute.cpp
     src/private_messaging.cpp
     src/pm_relay.cpp
+    src/pq_session.cpp
     src/rpc_rchannel.cpp
     src/ai_optimizer.cpp
     src/wallet.cpp
@@ -197,6 +198,9 @@ if(ADDITION_BUILD_TESTS)
     add_executable(test_pm_relay tests/test_pm_relay.cpp)
     target_link_libraries(test_pm_relay PRIVATE addition_core)
     add_test(NAME test_pm_relay COMMAND test_pm_relay)
+    add_executable(test_pq_session tests/test_pq_session.cpp)
+    target_link_libraries(test_pq_session PRIVATE addition_core)
+    add_test(NAME test_pq_session COMMAND test_pq_session)
     set_tests_properties(test_runtime PROPERTIES TIMEOUT 90)
 
     add_executable(test_amm tests/test_amm.cpp)

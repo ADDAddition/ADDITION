@@ -33,9 +33,12 @@ public:
     static constexpr std::size_t kMaxStoreBytes = 32u * 1024u * 1024u;
     static constexpr std::size_t kPeerRatePerMin = 60;
     static constexpr std::size_t kPushPerPeerRound = 32;
+    static constexpr std::size_t kMaxFrame = 32768;     // AMLS1 session frames
+    static constexpr std::size_t kMaxPackages = 2048;   // key-package directory
 
     explicit PmRelay(std::string key_dir = {});
     void set_key_dir(std::string dir);
+    std::string key_dir() { std::lock_guard<std::mutex> g(mu_); return key_dir_; }
 
     // Message key for a local wallet name (created on first use, 0600 file).
     bool ensure_key(const std::string& wallet, std::string& pubkey_hex, std::string& mailbox,
@@ -44,6 +47,21 @@ public:
     // Encrypt to recipient_pk_hex and queue for relay. Returns msg_id.
     bool send(const std::string& recipient_pk_hex, const std::string& plaintext,
               std::uint64_t ttl_sec, std::string& msg_id, std::string& error);
+
+    // Same envelope for binary session frames (pq_session), up to kMaxFrame.
+    bool send_frame(const std::string& recipient_pk_hex, const std::string& frame,
+                    std::uint64_t ttl_sec, std::string& msg_id, std::string& error);
+    // All decryptable envelopes for wallet: (msg_id, plaintext).
+    bool read_all(const std::string& wallet, std::vector<std::pair<std::string, std::string>>& out,
+                  std::string& error);
+
+    // Opt-in key-package directory (signed ML-DSA-87 packages, replicated to
+    // every node via "KPKG|v1|<hex>", so lookups are local). First identity to
+    // claim an index keeps it until its package expires.
+    bool publish_package(const std::string& pkg_hex, std::string& error);
+    bool accept_package(const std::string& peer, const std::string& body, bool& duplicate,
+                        std::string& error);
+    bool find_package(const std::string& index, std::string& pkg_hex, std::string& error);
 
     // Inbound wire body (after "PMSG|"). duplicate=true when already known.
     bool accept_wire(const std::string& peer, const std::string& body, bool& duplicate,
@@ -78,6 +96,11 @@ private:
     bool decrypt_locked(const Env& e, const Keys& k, std::string& plain, std::string& token_hex,
                         std::string& error) const;
     bool store_locked(Env e, bool& duplicate, std::string& error);
+    bool send_impl(const std::string& recipient_pk_hex, const std::string& plaintext, std::size_t max,
+                   std::uint64_t ttl_sec, std::string& msg_id, std::string& error);
+    bool put_package_locked(const std::string& pkg_hex, bool& duplicate, std::string& error);
+    struct Pkg { std::string hex, line_id, identity; std::uint64_t created = 0, expires = 0; };
+    std::map<std::string, Pkg> pkgs_;  // index -> package
     bool rate_ok_locked(const std::string& peer);
     void purge_locked(std::uint64_t now);
 

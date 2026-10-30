@@ -1700,6 +1700,7 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         (message.rfind("SVOTE|", 0) == 0) ||
         (message.rfind("PMSG|", 0) == 0) ||
         (message.rfind("PMDEL|", 0) == 0) ||
+        (message.rfind("KPKG|", 0) == 0) ||
         (message.rfind("CHAN|", 0) == 0);
     if (!allow_peer_message(peer, expensive, error)) {
         peers_.mark_peer_bad(peer);
@@ -1862,6 +1863,20 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         }
         const bool ok = chan_handler_(peer, message.substr(5), reply, error);
         if (ok) peers_.mark_peer_good(peer);
+        return ok;
+    }
+
+    if (message.rfind("KPKG|", 0) == 0) {
+        if (pm_relay_ == nullptr) {
+            error = "pm relay disabled";
+            return false;
+        }
+        bool dup = false;
+        const bool ok = pm_relay_->accept_package(peer, message.substr(5), dup, error);
+        if (ok) {
+            reply = dup ? "PMOK|dup" : "PMOK|stored";
+            error.clear();
+        }
         return ok;
     }
 

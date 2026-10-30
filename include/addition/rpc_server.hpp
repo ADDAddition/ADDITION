@@ -13,6 +13,7 @@
 #include "addition/pouw_compute.hpp"
 #include "addition/pouw_storage.hpp"
 #include "addition/private_messaging.hpp"
+#include "addition/pq_session.hpp"
 #include "addition/privacy.hpp"
 #include "addition/shielded.hpp"
 #include "addition/staking.hpp"
@@ -116,6 +117,7 @@ private:
     std::map<std::string, std::string> rchan_links_;     // "out_chan:htlc" -> "in_chan:htlc" (forwarded)
     std::map<std::string, std::string> rchan_payments_;  // payment_hash -> status (origin side)
     std::vector<std::string> rchan_actions_;             // queued proposals, run by rchan_tick
+    std::unique_ptr<pqmsg::Messenger> messenger_;          // AMLS1 sessions (lazy)
     std::string rchan_fault_;                            // test-only fault injection (non-mainnet)
     void rchan_save_meta();
     bool rchan_propose(const std::string& id, const channel::State& next, const std::string& kind,

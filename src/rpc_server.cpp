@@ -3024,6 +3024,60 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         return out;
     }
 
+    if (cmd == "msg_kp_publish" || cmd == "msg_kp_lookup" || cmd == "msg_session_start" ||
+        cmd == "msg_session_send" || cmd == "msg_session_recv" || cmd == "msg_sessions") {
+        // AMLS1 PQ sessions (ML-DSA-87 key packages, ML-KEM-1024 handshake + KEM double
+        // ratchet) inside the PMSG envelope. Loopback only, like msg_*.
+        auto* relay = node_.pm_relay();
+        if (relay == nullptr) return "error: pm relay disabled";
+        if (!messenger_) messenger_ = std::make_unique<pqmsg::Messenger>(relay->key_dir(), relay);
+        std::string error, out;
+        if (cmd == "msg_kp_publish") {
+            std::string wallet, handle = "-", days_s = "30";
+            iss >> wallet >> handle >> days_s;
+            std::uint64_t days = 30;
+            try { days = std::stoull(days_s); } catch (...) {}
+            std::string contact, fp;
+            if (!messenger_->publish(wallet, handle, days, contact, fp, error)) return "error: " + error;
+            return "fingerprint=" + fp + " listed=" + std::string(handle == "-" ? "no" : "yes") +
+                   " index=" + (handle == "-" ? std::string("-") : pqmsg::handle_index(handle)) +
+                   " contact=" + contact;
+        }
+        if (cmd == "msg_kp_lookup") {
+            std::string x;
+            iss >> x;
+            pqmsg::KeyPackage kp;
+            if (!messenger_->lookup(x, kp, error)) return "error: " + error;
+            return "verified=ml-dsa-87 fingerprint=" + pqmsg::fingerprint(kp.identity_pub) +
+                   " expires=" + std::to_string(kp.expires) + " package=" + kp.hash();
+        }
+        if (cmd == "msg_session_start" || cmd == "msg_session_send") {
+            std::string wallet, target, ttl_s, text;
+            iss >> wallet >> target >> ttl_s;
+            std::getline(iss, text);
+            if (!text.empty() && text.front() == ' ') text.erase(text.begin());
+            std::uint64_t ttl = 0;
+            try { ttl = std::stoull(ttl_s); } catch (...) { ttl = 0; }
+            if (wallet.empty() || target.empty() || ttl == 0 || text.empty() || text.size() > 4096)
+                return "error: usage " + cmd + " <wallet> <handle|addc1:...|session_id> <ttl_sec> <text>";
+            if (cmd == "msg_session_start") {
+                std::string sid;
+                if (!messenger_->start(wallet, target, text, ttl, sid, error)) return "error: " + error;
+                return "session=" + sid + " queued";
+            }
+            if (!messenger_->send(wallet, target, text, ttl, error)) return "error: " + error;
+            return "session=" + target + " queued";
+        }
+        std::string wallet;
+        iss >> wallet;
+        if (cmd == "msg_session_recv") {
+            if (!messenger_->receive(wallet, out, error)) return "error: " + error;
+            return out;
+        }
+        if (!messenger_->sessions(wallet, out, error)) return "error: " + error;
+        return out;
+    }
+
     if (cmd == "msg_key" || cmd == "msg_send" || cmd == "msg_inbox" || cmd == "msg_read" ||
         cmd == "msg_delete" || cmd == "msg_relay_status") {
         // E2E relay (ML-KEM-1024 + AES-256-GCM). Loopback only: not in the remote allowlist.

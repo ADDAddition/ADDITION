@@ -1,6 +1,7 @@
 #include "addition/pm_relay.hpp"
 
 #include "addition/crypto.hpp"
+#include "addition/pq_session.hpp"
 
 #include <oqs/oqs.h>
 #include <openssl/evp.h>
@@ -164,7 +165,17 @@ bool PmRelay::ensure_key(const std::string& wallet, std::string& pubkey_hex, std
 
 bool PmRelay::send(const std::string& recipient_pk_hex, const std::string& plaintext,
                    std::uint64_t ttl_sec, std::string& msg_id, std::string& error) {
-    if (plaintext.empty() || plaintext.size() > kMaxPlaintext) { error = "message must be 1..4096 bytes"; return false; }
+    return send_impl(recipient_pk_hex, plaintext, kMaxPlaintext, ttl_sec, msg_id, error);
+}
+
+bool PmRelay::send_frame(const std::string& recipient_pk_hex, const std::string& frame,
+                         std::uint64_t ttl_sec, std::string& msg_id, std::string& error) {
+    return send_impl(recipient_pk_hex, frame, kMaxFrame, ttl_sec, msg_id, error);
+}
+
+bool PmRelay::send_impl(const std::string& recipient_pk_hex, const std::string& plaintext, std::size_t max,
+                        std::uint64_t ttl_sec, std::string& msg_id, std::string& error) {
+    if (plaintext.empty() || plaintext.size() > max) { error = "message must be 1.." + std::to_string(max) + " bytes"; return false; }
     ttl_sec = std::clamp<std::uint64_t>(ttl_sec, kMinTtl, kMaxTtl);
     std::vector<std::uint8_t> pk;
     if (!hex_to_bytes(recipient_pk_hex, pk, error)) { error = "invalid recipient key"; return false; }
@@ -209,6 +220,9 @@ bool PmRelay::send(const std::string& recipient_pk_hex, const std::string& plain
 }
 
 void PmRelay::purge_locked(std::uint64_t now) {
+    for (auto it = pkgs_.begin(); it != pkgs_.end();) {
+        if (it->second.expires <= now) it = pkgs_.erase(it); else ++it;
+    }
     for (auto it = envs_.begin(); it != envs_.end();) {
         if (it->second.expire_at <= now) {
             bytes_ -= it->second.ct.size() + it->second.kem_ct.size();
@@ -268,7 +282,7 @@ bool PmRelay::accept_wire(const std::string& peer, const std::string& body, bool
     try { e.expire_at = std::stoull(f[3]); } catch (...) { error = "bad pm envelope"; return false; }
     if (!is_hex(e.id, 32, 32) || !is_hex(e.mailbox, 32, 32) || !is_hex(e.del_hash, 64, 64) ||
         !is_hex(e.kem_ct, 3136, 3136) || !is_hex(e.iv, 24, 24) ||
-        !is_hex(e.ct, 2 * (256 + 16), 2 * (4352 + 16)) || ((e.ct.size() / 2 - 16) % 256) != 0) {
+        !is_hex(e.ct, 2 * (256 + 16), 2 * (((kMaxFrame + 2 + 255) / 256) * 256 + 16)) || ((e.ct.size() / 2 - 16) % 256) != 0) {
         error = "bad pm envelope";
         return false;
     }
@@ -394,6 +408,10 @@ std::vector<std::string> PmRelay::undelivered_for(const std::string& peer, std::
         if (out.size() >= max) break;
         if (!done.count("m:" + id)) out.push_back(e.wire());
     }
+    for (const auto& [idx, p] : pkgs_) {
+        if (out.size() >= max) break;
+        if (!done.count(p.line_id)) out.push_back("KPKG|v1|" + p.hex);
+    }
     return out;
 }
 
@@ -405,9 +423,74 @@ void PmRelay::mark_delivered(const std::string& peer, const std::string& line) {
     std::string id;
     if (line.rfind("PMSG|v1|", 0) == 0) id = "m:" + line.substr(8, 32);
     else if (line.rfind("PMDEL|", 0) == 0) id = "d:" + line.substr(6, 32);
+    else if (line.rfind("KPKG|v1|", 0) == 0) id = "k:" + to_hex(sha3_512_bytes(line.substr(8))).substr(0, 32);
     if (id.empty()) return;
     std::lock_guard<std::mutex> g(mu_);
     delivered_[peer].insert(id);
+}
+
+bool PmRelay::put_package_locked(const std::string& pkg_hex, bool& duplicate, std::string& error) {
+    duplicate = false;
+    pqmsg::KeyPackage kp;
+    if (!pqmsg::KeyPackage::from_hex(pkg_hex, kp, error) || !kp.verify(now_sec(), error)) return false;
+    if (kp.index == "-") { error = "unlisted key package"; return false; }
+    const auto ident = pqmsg::fingerprint(kp.identity_pub);
+    auto it = pkgs_.find(kp.index);
+    if (it != pkgs_.end() && it->second.expires > now_sec()) {
+        if (it->second.identity != ident) { error = "index owned by another identity"; return false; }
+        if (kp.created <= it->second.created) { duplicate = true; return true; }
+    } else if (it == pkgs_.end() && pkgs_.size() >= kMaxPackages) {
+        error = "key-package directory full";
+        return false;
+    }
+    Pkg p;
+    p.hex = pkg_hex;
+    p.line_id = "k:" + to_hex(sha3_512_bytes(pkg_hex)).substr(0, 32);
+    p.identity = ident;
+    p.created = kp.created;
+    p.expires = kp.expires;
+    pkgs_[kp.index] = std::move(p);
+    return true;
+}
+
+bool PmRelay::publish_package(const std::string& pkg_hex, std::string& error) {
+    std::lock_guard<std::mutex> g(mu_);
+    bool dup = false;
+    return put_package_locked(pkg_hex, dup, error);
+}
+
+bool PmRelay::accept_package(const std::string& peer, const std::string& body, bool& duplicate,
+                             std::string& error) {
+    if (body.rfind("v1|", 0) != 0 || body.size() > 64000) { error = "bad key package line"; return false; }
+    const auto hex = body.substr(3);
+    std::lock_guard<std::mutex> g(mu_);
+    if (!rate_ok_locked(peer)) { error = "pm rate limit"; return false; }
+    const bool ok = put_package_locked(hex, duplicate, error);
+    if (ok) delivered_[peer].insert("k:" + to_hex(sha3_512_bytes(hex)).substr(0, 32));
+    return ok;
+}
+
+bool PmRelay::find_package(const std::string& index, std::string& pkg_hex, std::string& error) {
+    std::lock_guard<std::mutex> g(mu_);
+    auto it = pkgs_.find(index);
+    if (it == pkgs_.end() || it->second.expires <= now_sec()) { error = "no key package for that handle"; return false; }
+    pkg_hex = it->second.hex;
+    return true;
+}
+
+bool PmRelay::read_all(const std::string& wallet, std::vector<std::pair<std::string, std::string>>& out,
+                       std::string& error) {
+    std::lock_guard<std::mutex> g(mu_);
+    Keys k;
+    if (!load_key_locked(wallet, k, false, error)) return false;
+    purge_locked(now_sec());
+    for (const auto& [id, e] : envs_) {
+        if (e.mailbox != k.mailbox) continue;
+        std::string plain, tok, err;
+        if (decrypt_locked(e, k, plain, tok, err)) out.emplace_back(id, std::move(plain));
+    }
+    OPENSSL_cleanse(k.sk.data(), k.sk.size());
+    return true;
 }
 
 std::size_t PmRelay::purge_expired() {
@@ -421,7 +504,7 @@ std::string PmRelay::status() {
     std::lock_guard<std::mutex> g(mu_);
     purge_locked(now_sec());
     return "pm_relay stored=" + std::to_string(envs_.size()) + " bytes=" + std::to_string(bytes_) +
-           " tombstones=" + std::to_string(tombstones_.size()) + " max_messages=" +
+           " tombstones=" + std::to_string(tombstones_.size()) + " key_packages=" + std::to_string(pkgs_.size()) + " max_messages=" +
            std::to_string(kMaxMessages) + " kem=ML-KEM-1024 aead=AES-256-GCM";
 }
 
