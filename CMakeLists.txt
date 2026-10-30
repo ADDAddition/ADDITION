@@ -71,6 +71,7 @@ add_library(addition_core
     src/pm_relay.cpp
     src/pq_session.cpp
     src/rpc_rchannel.cpp
+    src/htlc_onion.cpp
     src/ai_optimizer.cpp
     src/wallet.cpp
     src/auto_mine.cpp
@@ -116,6 +117,9 @@ if(ADDITION_BUILD_TESTS)
     add_executable(test_peer_bans tests/test_peer_bans.cpp)
     target_link_libraries(test_peer_bans PRIVATE addition_core)
     add_test(NAME test_peer_bans COMMAND test_peer_bans)
+    add_executable(test_htlc_onion tests/test_htlc_onion.cpp)
+    target_link_libraries(test_htlc_onion PRIVATE addition_core)
+    add_test(NAME test_htlc_onion COMMAND test_htlc_onion)
 
     add_executable(test_speed_v3 tests/test_speed_v3.cpp)
     target_link_libraries(test_speed_v3 PRIVATE addition_core)

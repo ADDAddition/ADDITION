@@ -1,5 +1,6 @@
 #pragma once
 
+#include <set>
 #include "addition/chain.hpp"
 #include "addition/channel.hpp"
 #include "addition/bridge.hpp"
@@ -26,6 +27,7 @@
 #include <memory>
 #include <mutex>
 #include <sstream>
+#include <set>
 #include <string>
 
 namespace addition {
@@ -135,6 +137,10 @@ public:
     // Background step (called by the daemon loop, under the state lock): runs
     // queued HTLC forwards/settles and resumes interrupted updates.
     void rchan_tick();
+    // Onion routing key (ML-KEM-1024, <data>/rchannels/route_kem.*, 0600).
+    std::vector<std::uint8_t> rchan_rk_pk_, rchan_rk_sk_;
+    std::set<std::string> rchan_onion_seen_;  // replay tags of peeled onions
+    bool rchan_route_key(std::string& error);
 private:
     // Shielded (addz) spending keys per local wallet name. Testnet tooling:
     // in-memory only (lost on restart); notes are rescanned from the chain.

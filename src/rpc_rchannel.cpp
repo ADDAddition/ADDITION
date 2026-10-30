@@ -10,8 +10,10 @@
 // The receiver classifies every update (channel::classify_peer_update): plain
 // payments may not lower its balance; the proposer may add an HTLC it funds;
 // only the HTLC receiver may remove it (settle needs the preimage).
-// Multi-hop: the ADD extra carries the remaining channel route (source-routed,
-// cleartext to each hop). Forwarding/settling runs from rchan_tick, never from
+// Multi-hop: the ADD extra is "O<hex>", a fixed-size Sphinx-style onion
+// (htlc_onion.hpp, ML-KEM-1024 per hop) built by the payer; each hop peels its
+// layer and learns only the next channel, amount and expiry. Cleartext routes
+// are refused. RKEY|- returns this node's onion route key (first-hop lookup). Forwarding/settling runs from rchan_tick, never from
 // inside an inbound handler (avoids cross-node lock waits).
 // REV-round failure: the proposer persists its outbox (phase upd/rev) and
 // rchan_tick resumes it with backoff; UPD and REV are idempotent on the
@@ -21,6 +23,7 @@
 #include "addition/rpc_server.hpp"
 
 #include "addition/crypto.hpp"
+#include "addition/htlc_onion.hpp"
 #include "addition/script.hpp"
 
 #include <chrono>
@@ -46,7 +49,7 @@ bool safe_id(const std::string& id) {
 }
 
 bool safe_token(const std::string& t) {
-    if (t.empty() || t.size() > 4096) return false;
+    if (t.empty() || t.size() > (t[0] == 'O' ? 2 * onion::kPacket + 1 : 4096)) return false;
     for (char c : t)
         if (!(std::isalnum(static_cast<unsigned char>(c)) || c == ',' || c == '+' || c == '-' || c == '_' || c == '.'))
             return false;
@@ -60,6 +63,32 @@ std::int64_t now_s() {
 std::uint64_t& side_bal(channel::State& s, bool a) { return a ? s.bal_a : s.bal_b; }
 
 }  // namespace
+
+bool RpcServer::rchan_route_key(std::string& error) {
+    if (!rchan_rk_sk_.empty()) return true;
+    std::error_code ec;
+    const auto dir = std::filesystem::path(rchan_dir());
+    std::filesystem::create_directories(dir, ec);
+    const auto kf = dir / "route_kem.key";
+    {
+        std::ifstream in(kf);
+        std::string pk, sk;
+        if (in >> pk >> sk && hex_to_bytes(pk, rchan_rk_pk_, error) && hex_to_bytes(sk, rchan_rk_sk_, error) &&
+            rchan_rk_pk_.size() == onion::kKemPk && rchan_rk_sk_.size() == onion::kKemSk)
+            return true;
+    }
+    if (!onion::keygen(rchan_rk_pk_, rchan_rk_sk_)) { rchan_rk_sk_.clear(); error = "route key keygen failed"; return false; }
+    const auto tmp = kf.string() + ".tmp";
+    {
+        std::ofstream out(tmp, std::ios::trunc);
+        ::chmod(tmp.c_str(), 0600);
+        out << bytes_to_hex(rchan_rk_pk_) << "\n" << bytes_to_hex(rchan_rk_sk_) << "\n";
+        if (!out) { error = "cannot write route key"; return false; }
+    }
+    std::filesystem::rename(tmp, kf, ec);
+    if (ec) { error = "cannot write route key"; return false; }
+    return true;
+}
 
 std::string RpcServer::rchan_dir() const {
     const std::filesystem::path w(wallets_.dir());
@@ -198,35 +227,41 @@ void RpcServer::rchan_apply_effect(const std::string& id, RemoteChannel& rc) {
         const channel::Htlc* h = nullptr;
         for (auto& x : rc.ch->state().htlcs) if (x.id == hid) h = &x;
         if (!h) return;
-        const auto ex = split_bar(eff[2], ',');  // route,fee,delta
-        if (ex.size() != 3 || ex[0] == "-") {
+        const std::string fail = "FAIL " + id + " " + std::to_string(hid);
+        auto settle_invoice = [&](std::uint64_t want_amt) {
             auto inv = rchan_invoices_.find(h->payment_hash);
-            bool ok = false;
             if (inv != rchan_invoices_.end()) {
                 const auto iv = split_bar(inv->second, ' ');  // wallet amount preimage status
                 std::uint64_t amt = 0;
                 try { amt = std::stoull(iv.at(1)); } catch (...) {}
-                if (iv.size() >= 3 && iv[0] == rc.wallet && h->amount >= amt) {
+                if (iv.size() >= 3 && iv[0] == rc.wallet && h->amount >= amt && h->amount >= want_amt) {
                     rchan_actions_.push_back("SETTLE " + id + " " + std::to_string(hid) + " " + iv[2]);
                     inv->second = iv[0] + " " + iv[1] + " " + iv[2] + " paid";
-                    ok = true;
+                    return;
                 }
             }
-            if (!ok) rchan_actions_.push_back("FAIL " + id + " " + std::to_string(hid));
-        } else {
-            const auto route = split_bar(ex[0], '+');
-            std::uint64_t fee = 0, delta = 0;
-            try { fee = std::stoull(ex[1]); delta = std::stoull(ex[2]); } catch (...) {}
-            std::string rest;
-            for (std::size_t i = 1; i < route.size(); ++i) rest += (i > 1 ? "+" : "") + route[i];
-            if (rest.empty()) rest = "-";
-            if (route.empty() || !rchannels_.count(route[0]) || h->amount <= fee || delta == 0 || h->expiry <= delta) {
-                rchan_actions_.push_back("FAIL " + id + " " + std::to_string(hid));
+            rchan_actions_.push_back(fail);
+        };
+        if (!eff[2].empty() && eff[2][0] == 'O') {
+            std::string err;
+            onion::Bytes pkt;
+            onion::Peeled pl;
+            if (!rchan_route_key(err) || !hex_to_bytes(eff[2].substr(1), pkt, err) ||
+                !onion::peel(rchan_rk_sk_, pkt, h->payment_hash, pl, err) || !rchan_onion_seen_.insert(pl.replay_tag).second) {
+                rchan_actions_.push_back(fail);
+            } else if (pl.final) {
+                if (h->expiry < pl.expiry) rchan_actions_.push_back(fail);
+                else settle_invoice(pl.amount);
+            } else if (!rchannels_.count(pl.next_chan) || pl.amount == 0 || h->amount < pl.amount || h->expiry <= pl.expiry) {
+                rchan_actions_.push_back(fail);
             } else {
-                rchan_actions_.push_back("FWD " + route[0] + " " + key + " " + std::to_string(h->amount - fee) + " " +
-                                         h->payment_hash + " " + std::to_string(h->expiry - delta) + " " + rest + "," +
-                                         ex[1] + "," + ex[2]);
+                rchan_actions_.push_back("FWD " + pl.next_chan + " " + key + " " + std::to_string(pl.amount) + " " +
+                                         h->payment_hash + " " + std::to_string(pl.expiry) + " O" + bytes_to_hex(pl.next_packet));
             }
+        } else {
+            const auto ex = split_bar(eff[2], ',');  // -,fee,delta (direct payment only)
+            if (ex.empty() || ex[0] == "-") settle_invoice(0);
+            else rchan_actions_.push_back(fail);  // cleartext routes refused (route privacy)
         }
     } else if (kind == "SETTLE" || kind == "FAIL") {
         auto l = rchan_links_.find(key);
@@ -314,6 +349,11 @@ bool RpcServer::handle_channel_message(const std::string& /*peer*/, const std::s
     }
     if (rc.status != "open") { error = "channel not open"; return false; }
     auto& ch = *rc.ch;
+    if (op == "RKEY") {
+        if (!rchan_route_key(error)) return false;
+        reply = "CHANOK|" + bytes_to_hex(rchan_rk_pk_);
+        return true;
+    }
     if (op == "UPD") {
         channel::State next;
         if ((f.size() != 4 && f.size() != 6) || !channel::decode_state(f[2], next)) { error = "bad UPD"; return false; }
@@ -675,7 +715,8 @@ std::string RpcServer::handle_rchan_command(const std::string& cmd, std::istring
         const auto ph = script::hash_preimage_hex(pre);
         rchan_invoices_[ph] = w + " " + std::to_string(amount) + " " + pre + " open";
         rchan_save_meta();
-        return "ok payment_hash=" + ph + " amount=" + std::to_string(amount);
+        if (!rchan_route_key(error)) return "error: " + error;
+        return "ok payment_hash=" + ph + " amount=" + std::to_string(amount) + " route_key=" + bytes_to_hex(rchan_rk_pk_);
     }
     if (cmd == "rchan_payment") {
         std::string ph;
@@ -759,16 +800,41 @@ std::string RpcServer::handle_rchan_command(const std::string& cmd, std::istring
     }
     if (rc.status != "open") return "error: channel not open";
     if (cmd == "rchan_htlc_pay") {
-        // rchan_htlc_pay <first_chan> <amount> <payment_hash> [route c2+c3|-] [fee_per_hop] [delta]
+        // rchan_htlc_pay <first_chan> <amount> <payment_hash> [route c2+c3|-] [fee_per_hop] [delta] [keys]
+        // keys (multi-hop): comma list of onion route keys for forwarders after
+        // the first hop, then the payee's key (rchan_invoice route_key=). The
+        // first hop's key is fetched from the channel peer (CHAN|RKEY).
         std::uint64_t amount = 0, fee = 0, delta = 6;
-        std::string ph, route = "-";
-        iss >> amount >> ph >> route >> fee >> delta;
+        std::string ph, route = "-", keys;
+        iss >> amount >> ph >> route >> fee >> delta >> keys;
         if (route.empty()) route = "-";
         if (amount == 0 || ph.size() != 128 || !safe_token(route) || delta == 0)
-            return "error: usage rchan_htlc_pay <chan> <amount> <payment_hash> [route c2+c3|-] [fee] [delta]";
-        const std::size_t hops = route == "-" ? 1 : 1 + split_bar(route, '+').size();
+            return "error: usage rchan_htlc_pay <chan> <amount> <payment_hash> [route c2+c3|-] [fee] [delta] [keys k2,..,payee]";
+        const auto rt = route == "-" ? std::vector<std::string>{} : split_bar(route, '+');
+        const std::size_t hops = 1 + rt.size();
         const std::uint64_t amt = amount + fee * (hops - 1);
         const std::uint64_t exp = chain_.height() + 20 + delta * hops;
+        std::string extra = "-," + std::to_string(fee) + "," + std::to_string(delta);
+        if (!rt.empty()) {
+            if (hops > onion::kMaxHops) return "error: route too long (max " + std::to_string(onion::kMaxHops) + " hops)";
+            const auto ks = keys.empty() ? std::vector<std::string>{} : split_bar(keys, ',');
+            if (ks.size() != rt.size()) return "error: need " + std::to_string(rt.size()) + " route key(s): forwarders after the first hop, then the payee";
+            std::string resp;
+            if (!node_.request_peer(rc.peer, "CHAN|RKEY|-", resp, error) || resp.rfind("CHANOK|", 0) != 0)
+                return "error: first hop route key: " + (error.empty() ? resp : error);
+            std::vector<onion::Hop> hv(hops);
+            if (!hex_to_bytes(resp.substr(7), hv[0].pubkey, error)) return "error: first hop route key";
+            for (std::size_t i = 0; i < ks.size(); ++i)
+                if (!hex_to_bytes(ks[i], hv[i + 1].pubkey, error)) return "error: bad route key " + std::to_string(i + 1);
+            for (std::size_t k = 0; k < hops; ++k) {
+                hv[k].next_chan = k < rt.size() ? rt[k] : "";
+                hv[k].amount = amount + fee * (k < rt.size() ? rt.size() - 1 - k : 0);
+                hv[k].expiry = exp - delta * (k + 1);
+            }
+            onion::Bytes pkt;
+            if (!onion::build(hv, ph, pkt, error)) return "error: " + error;
+            extra = "O" + bytes_to_hex(pkt);
+        }
         channel::State next = ch.state();
         ++next.n;
         auto& mine = side_bal(next, ch.is_a());
@@ -779,7 +845,7 @@ std::string RpcServer::handle_rchan_command(const std::string& cmd, std::istring
         next.htlcs.push_back(channel::Htlc{hid, ch.is_a(), amt, ph, exp});
         rchan_payments_[ph] = "pending";
         rchan_save_meta();
-        if (!rchan_propose(id, next, "ADD", route + "," + std::to_string(fee) + "," + std::to_string(delta), "", error)) {
+        if (!rchan_propose(id, next, "ADD", extra, "", error)) {
             if (rc.out_phase.empty()) { rchan_payments_[ph] = "failed"; rchan_save_meta(); return "error: " + error; }
             return "ok in_flight=" + rc.out_phase + " htlc=" + std::to_string(hid) + " (resumed by rchan_tick): " + error;
         }
