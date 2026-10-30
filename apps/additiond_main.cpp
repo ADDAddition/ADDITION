@@ -590,8 +590,7 @@ int main(int argc, char** argv) {
     std::cout << '\n';
     if (!node_cfg.advertised_p2p.empty()) {
         std::cout << "advertised_p2p=" << node_cfg.advertised_p2p
-                  << " (public getinfo/peers; not self). Public TCP 28545 can timeout/filter; "
-                  << "HTTP :80 sync is the reliable join path.\n";
+                  << " (public getinfo/peers; not self). Block sync is P2P only (TCP or Tor).\n";
     }
 
     const bool auto_mine_requested = node_cfg.enable_auto_mine;

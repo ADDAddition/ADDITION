@@ -165,8 +165,8 @@ struct NodeConfig {
 
 // Operator's current public P2P (IPv4 only). Not a peer-count claim.
 // Seed operators set ADDITION_ADVERTISED_P2P to this so public getinfo/peers
-// do not list `self`. Public TCP 28545 can timeout or be filtered; HTTP :80
-// sync is the reliable join path for testnet.
+// do not list `self`. Block sync is P2P only
+// (no HTTP/public-RPC ingest).
 inline constexpr const char* kOperatorPublicP2p = "34.27.30.115:28545";
 // Public mainnet P2P seed (ADDITION_MAINNET_V1). Distinct from the testnet seed.
 // Home miners: --mainnet --bootstrap 34.27.30.115:28546. Write RPC stays loopback.

@@ -12,8 +12,7 @@ genesis_file = "genesis.json"
 # Local two-node runs still pass --bootstrap 127.0.0.1:28545.
 # Seed operator: set ADDITION_ADVERTISED_P2P=34.27.30.115:28545 (or
 # advertised_p2p below) so public getinfo/peers do not list self.
-# Public TCP 28545 can timeout or be filtered; HTTP :80 sync is the
-# reliable join path. Do not claim public 28545 always works.
+# Block sync is P2P only (HTTP ingest removed). Public 28545 may be filtered.
 bootstrap_peers = [
   "34.27.30.115:28545"
 ]
