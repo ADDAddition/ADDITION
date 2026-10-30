@@ -755,6 +755,7 @@ int main(int argc, char** argv) {
                 std::size_t sent = 0;
                 std::string gossip_err;
                 node.flush_outbound_gossip(sent, gossip_err);
+                rpc.rchan_tick();
                 return 0;
             });
             last_sync = now;
@@ -814,6 +815,7 @@ int main(int argc, char** argv) {
                     std::size_t sent = 0;
                     std::string gossip_err;
                     node.flush_outbound_gossip(sent, gossip_err);
+                    rpc.rchan_tick();  // HTLC forwards/settles + interrupted-update recovery
                     return 0;
                 });
                 last_sync = now;

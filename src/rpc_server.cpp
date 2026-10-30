@@ -1120,7 +1120,9 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         return "ok close_txid=" + hash_transaction(tx);
     }
 
-    if (cmd == "rchan_open" || cmd == "rchan_pay" || cmd == "rchan_close" || cmd == "rchan_list") {
+    if (cmd == "rchan_open" || cmd == "rchan_pay" || cmd == "rchan_close" || cmd == "rchan_list" ||
+        cmd == "rchan_invoice" || cmd == "rchan_htlc_pay" || cmd == "rchan_payment" || cmd == "rchan_recover" ||
+        cmd == "rchan_tick" || cmd == "rchan_fault") {
         return handle_rchan_command(cmd, iss);
     }
 

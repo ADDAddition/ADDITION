@@ -98,6 +98,25 @@ public:
     bool has_pending() const { return pending_.has_value(); }
     const std::string& remote_pubkey() const { return remote_pub_; }
 
+    // ---- Cross-node recovery helpers (REV-round failure) ----
+    // True after we revoked our previous state but have not yet received the
+    // peer's revocation (its next revocation hash): no new update may start.
+    bool awaiting_remote_revoke() const { return !remote_hashes_.count(cur_.n + 1); }
+    const std::optional<State>& pending_state() const { return pending_; }
+    // Re-derive the revocation we sent when advancing to cur_ (idempotent resend).
+    Revoke last_revoke() const;
+    bool has_remote_secret(std::uint64_t n, const std::string& secret) const {
+        const auto it = remote_secrets_.find(n);
+        return it != remote_secrets_.end() && it->second == secret;
+    }
+    // Discard a pending (never-revoked) state. The peer still holds our
+    // signature on it, so it is remembered: once state number n is revoked
+    // (revocation is per number, not per content) penalty_for() also matches it.
+    void drop_pending();
+    // Remember a state we signed for the peer that will never become current.
+    void note_signed_abandoned(const State& s) { abandoned_.emplace(s.n, s); }
+    std::size_t abandoned_count() const { return abandoned_.size(); }
+
     // Persistence (cross-node channels). Contains the revocation seed and remote
     // revocation secrets but never the wallet private key; store with mode 0600.
     std::string serialize() const;
@@ -121,7 +140,22 @@ private:
     std::map<std::uint64_t, std::string> remote_hashes_;   // n -> remote holder's rev hash
     std::map<std::uint64_t, std::string> remote_secrets_;  // revealed (revoked) remote secrets
     std::map<std::uint64_t, State> history_;               // states (for penalty reconstruction)
+    std::multimap<std::uint64_t, State> abandoned_;        // signed-for-peer states that were rolled back
 };
+
+// Classification of an update proposed by the remote peer (cross-node). The
+// receiver accepts only: a plain payment that does not lower its balance; a
+// new HTLC offered by the proposer; removal of an HTLC the receiver offered,
+// either back to the receiver (fail) or to the proposer against the preimage
+// (settle). Anything else is rejected.
+enum class PeerUpdate { Reject, Pay, AddHtlc, SettleHtlc, FailHtlc };
+struct PeerUpdateClass {
+    PeerUpdate kind{PeerUpdate::Reject};
+    Htlc htlc{};
+    std::string err;
+};
+PeerUpdateClass classify_peer_update(const Channel& local, const State& next, const std::string& preimage,
+                                     std::uint64_t height);
 
 // High-level helpers driving both endpoints in-process.
 bool open_channel(Chain& chain, const WalletKeys& a, const WalletKeys& b, std::uint64_t capacity, std::uint64_t push_to_b,

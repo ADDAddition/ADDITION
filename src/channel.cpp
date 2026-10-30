@@ -69,6 +69,8 @@ void Channel::set_funding(const std::string& txid, std::uint32_t vout) {
 bool Channel::validate_next(const State& next, std::string& err) const {
     if (pending_) { err = "update already in flight"; return false; }
     if (next.n != cur_.n + 1) { err = "bad state number"; return false; }
+    // Never sign a peer commitment without its revocation hash (would be unpunishable).
+    if (!remote_hashes_.count(next.n)) { err = "awaiting remote revocation"; return false; }
     if (next.bal_a < info_.fee) { err = "funder cannot pay commitment fee"; return false; }
     if (next.htlcs.size() > 16) { err = "too many htlcs"; return false; }
     if (next.bal_a + next.bal_b + htlc_sum(next) != info_.capacity) { err = "state does not conserve capacity"; return false; }
@@ -110,6 +112,17 @@ Revoke Channel::revoke_and_advance() {
     pending_.reset();
     remote_sig_pending_.reset();
     return r;
+}
+
+Revoke Channel::last_revoke() const {
+    const std::uint64_t n = cur_.n == 0 ? 0 : cur_.n - 1;
+    return Revoke{n, rev_secret(n), rev_hash(n + 2)};
+}
+
+void Channel::drop_pending() {
+    if (pending_) abandoned_.emplace(pending_->n, *pending_);
+    pending_.reset();
+    remote_sig_pending_.reset();
 }
 
 bool Channel::receive_revoke(const Revoke& r, std::string& err) {
@@ -182,14 +195,23 @@ Transaction Channel::sweep(const Transaction& parent, std::uint32_t vout, const 
 std::optional<Transaction> Channel::penalty_for(const Transaction& b) const {
     const std::uint64_t n = b.nonce;
     const auto sec = remote_secrets_.find(n);
-    const auto hs = history_.find(n);
-    if (sec == remote_secrets_.end() || hs == history_.end()) return std::nullopt;
+    if (sec == remote_secrets_.end() || !remote_hashes_.count(n)) return std::nullopt;
     const auto rh = remote_hashes_.at(n);
-    if (hash_transaction(commitment_tx(info_, !is_a_, hs->second, rh)) != hash_transaction(b)) return std::nullopt;
+    // Revocation is per state number: match the agreed state or any rolled-back
+    // state with the same number that we had signed for the peer.
+    std::vector<const State*> cands;
+    if (auto h = history_.find(n); h != history_.end()) cands.push_back(&h->second);
+    for (auto [a, e] = abandoned_.equal_range(n); a != e; ++a) cands.push_back(&a->second);
+    const auto bh = hash_transaction(b);
+    const State* match = nullptr;
+    for (auto* c : cands)
+        if (hash_transaction(commitment_tx(info_, !is_a_, *c, rh)) == bh) { match = c; break; }
+    if (!match) return std::nullopt;
+    const State& st = *match;
     const auto remote = remote_address();
     std::vector<std::pair<std::uint32_t, std::string>> outs;
     if (auto o = find_output(b, to_local_script(remote, local_.address, rh, info_.to_self_delay))) outs.push_back(*o);
-    for (auto& h : hs->second.htlcs) {
+    for (auto& h : st.htlcs) {
         const auto& off = h.offered_by_a ? info_.addr_a : info_.addr_b;
         const auto& rcv = h.offered_by_a ? info_.addr_b : info_.addr_a;
         const auto hs_script = htlc_script(local_.address, off, rcv, rh, h.payment_hash, h.expiry);
@@ -318,6 +340,7 @@ std::string Channel::serialize() const {
     for (const auto& [n, h] : remote_hashes_) o << "rhash " << n << " " << h << "\n";
     for (const auto& [n, h] : remote_secrets_) o << "rsecret " << n << " " << h << "\n";
     for (const auto& [n, st] : history_) o << "hist " << n << " " << encode_state(st) << "\n";
+    for (const auto& [n, st] : abandoned_) o << "aband " << n << " " << encode_state(st) << "\n";
     return o.str();
 }
 
@@ -333,6 +356,7 @@ std::unique_ptr<Channel> Channel::deserialize(const std::string& data, WalletKey
     std::optional<std::string> sig_pending;
     std::map<std::uint64_t, std::string> rh, rs;
     std::map<std::uint64_t, State> hist;
+    std::multimap<std::uint64_t, State> aband;
     try {
         while (std::getline(in, line)) {
             std::istringstream ls(line);
@@ -354,6 +378,7 @@ std::unique_ptr<Channel> Channel::deserialize(const std::string& data, WalletKey
             else if (k == "rhash") { std::uint64_t n; std::string h; ls >> n >> h; rh[n] = h; }
             else if (k == "rsecret") { std::uint64_t n; std::string h; ls >> n >> h; rs[n] = h; }
             else if (k == "hist") { std::uint64_t n; std::string t; ls >> n >> t; State s; if (!decode_state(t, s)) throw 1; hist[n] = s; }
+            else if (k == "aband") { std::uint64_t n; std::string t; ls >> n >> t; State s; if (!decode_state(t, s)) throw 1; aband.emplace(n, s); }
         }
     } catch (...) {
         err = "corrupt channel file";
@@ -375,6 +400,7 @@ std::unique_ptr<Channel> Channel::deserialize(const std::string& data, WalletKey
     c->remote_hashes_ = rh;
     c->remote_secrets_ = rs;
     c->history_ = hist;
+    c->abandoned_ = aband;
     return c;
 }
 
@@ -501,6 +527,58 @@ bool route_payment(const std::vector<Hop>& route, std::uint64_t amount, const st
         }
     }
     return true;
+}
+
+PeerUpdateClass classify_peer_update(const Channel& local, const State& next, const std::string& preimage,
+                                     std::uint64_t height) {
+    PeerUpdateClass r;
+    const State& cur = local.state();
+    const bool me_a = local.is_a();
+    auto mine = [&](const State& s) { return me_a ? s.bal_a : s.bal_b; };
+    auto theirs = [&](const State& s) { return me_a ? s.bal_b : s.bal_a; };
+    std::map<std::uint64_t, const Htlc*> c, n;
+    for (auto& h : cur.htlcs) c[h.id] = &h;
+    for (auto& h : next.htlcs) n[h.id] = &h;
+    std::vector<const Htlc*> added, removed;
+    for (auto& [id, h] : n) {
+        auto it = c.find(id);
+        if (it == c.end()) { added.push_back(h); continue; }
+        const Htlc& o = *it->second;
+        if (o.offered_by_a != h->offered_by_a || o.amount != h->amount || o.payment_hash != h->payment_hash ||
+            o.expiry != h->expiry) { r.err = "existing htlc modified"; return r; }
+    }
+    for (auto& [id, h] : c) if (!n.count(id)) removed.push_back(h);
+    if (added.empty() && removed.empty()) {
+        if (next.next_htlc_id != cur.next_htlc_id || mine(next) < mine(cur)) { r.err = "update would lower local balance"; return r; }
+        r.kind = PeerUpdate::Pay;
+        return r;
+    }
+    if (added.size() == 1 && removed.empty()) {
+        const Htlc& h = *added[0];
+        if (h.offered_by_a == me_a) { r.err = "peer cannot add an htlc offered by us"; return r; }
+        if (h.id != cur.next_htlc_id || next.next_htlc_id != cur.next_htlc_id + 1) { r.err = "bad htlc id"; return r; }
+        if (mine(next) != mine(cur) || theirs(next) + h.amount != theirs(cur)) { r.err = "htlc add must be funded by the proposer"; return r; }
+        if (h.expiry <= height + 1) { r.err = "htlc expiry too close"; return r; }
+        r.kind = PeerUpdate::AddHtlc;
+        r.htlc = h;
+        return r;
+    }
+    if (removed.size() == 1 && added.empty()) {
+        const Htlc& h = *removed[0];
+        if (next.next_htlc_id != cur.next_htlc_id) { r.err = "bad htlc id"; return r; }
+        if (h.offered_by_a != me_a) { r.err = "peer cannot remove an htlc it offered (timeout is on-chain only)"; return r; }
+        r.htlc = h;
+        if (mine(next) == mine(cur) + h.amount && theirs(next) == theirs(cur)) { r.kind = PeerUpdate::FailHtlc; return r; }
+        if (theirs(next) == theirs(cur) + h.amount && mine(next) == mine(cur)) {
+            if (script::hash_preimage_hex(preimage) != h.payment_hash) { r.err = "bad preimage"; return r; }
+            r.kind = PeerUpdate::SettleHtlc;
+            return r;
+        }
+        r.err = "htlc removal does not balance";
+        return r;
+    }
+    r.err = "only one htlc change per update";
+    return r;
 }
 
 }  // namespace addition::channel

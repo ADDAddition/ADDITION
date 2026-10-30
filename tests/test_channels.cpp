@@ -258,6 +258,90 @@ static void test_consensus_guards() {
     CHECK(!env.chain.mine_and_add_block("m", {t}, 1, h, e), "block with invalid script rejected");
 }
 
+
+// Cross-node update rules (receiver-side classification) and REV-round recovery.
+static void test_cross_node_rules_and_recovery() {
+    Env env;
+    std::unique_ptr<ch::Channel> A, B;
+    CHECK(open(env, env.a, env.b, 10000, A, B), "open");
+    std::string e;
+    const auto h = env.chain.height();
+    // Plain payment A->B: B accepts, A (as receiver of such a proposal) rejects.
+    ch::State p = A->state(); ++p.n; p.bal_a -= 100; p.bal_b += 100;
+    CHECK(ch::classify_peer_update(*B, p, "", h).kind == ch::PeerUpdate::Pay, "B accepts incoming pay");
+    CHECK(ch::classify_peer_update(*A, p, "", h).kind == ch::PeerUpdate::Reject, "A rejects outgoing pay proposed by B");
+    // HTLC add offered (and funded) by A.
+    std::string pre;
+    random_hex(32, pre, e);
+    const auto ph = script::hash_preimage_hex(pre);
+    ch::State add = A->state(); ++add.n; add.bal_a -= 500;
+    add.htlcs.push_back(ch::Htlc{add.next_htlc_id++, true, 500, ph, h + 40});
+    CHECK(ch::classify_peer_update(*B, add, "", h).kind == ch::PeerUpdate::AddHtlc, "B accepts htlc offered by A");
+    CHECK(ch::classify_peer_update(*A, add, "", h).kind == ch::PeerUpdate::Reject, "A rejects htlc 'offered by A' from B");
+    ch::State close_exp = add; close_exp.htlcs[0].expiry = h + 1;
+    CHECK(ch::classify_peer_update(*B, close_exp, "", h).kind == ch::PeerUpdate::Reject, "expiry too close rejected");
+    ch::State unfunded = add; unfunded.bal_a += 500; unfunded.bal_b -= 500;
+    CHECK(ch::classify_peer_update(*B, unfunded, "", h).kind == ch::PeerUpdate::Reject, "htlc funded by receiver rejected");
+    CHECK(ch::update(*A, *B, add, e), "apply add: " + e);
+    // Removal proposed by B (the HTLC receiver).
+    ch::State settle = A->state(); ++settle.n; settle.bal_b += 500; settle.htlcs.clear();
+    ch::State fail = A->state(); ++fail.n; fail.bal_a += 500; fail.htlcs.clear();
+    CHECK(ch::classify_peer_update(*A, settle, pre, h).kind == ch::PeerUpdate::SettleHtlc, "A accepts settle with preimage");
+    CHECK(ch::classify_peer_update(*A, settle, std::string(64, 'f'), h).kind == ch::PeerUpdate::Reject, "settle without preimage rejected");
+    CHECK(ch::classify_peer_update(*A, fail, "", h).kind == ch::PeerUpdate::FailHtlc, "A accepts fail (refund)");
+    CHECK(ch::classify_peer_update(*B, fail, "", h).kind == ch::PeerUpdate::Reject, "offerer may not remove its own htlc off-chain");
+    CHECK(ch::update(*B, *A, settle, e), "apply settle: " + e);
+
+    // REV reply lost: A revoked, B advanced; A must not start a new update and
+    // can re-send its REV (B answers idempotently).
+    ch::State x = A->state(); ++x.n; x.bal_a -= 10; x.bal_b += 10;
+    CHECK(B->receive_commit_sig(x, A->sign_remote_commitment(x), e), "B sig: " + e);
+    CHECK(A->receive_commit_sig(x, B->sign_remote_commitment(x), e), "A sig: " + e);
+    const auto revA = A->revoke_and_advance();
+    CHECK(B->receive_revoke(revA, e), "B gets REV");
+    const auto revB = B->revoke_and_advance();  // reply lost in transit
+    CHECK(A->awaiting_remote_revoke(), "A awaits remote revocation");
+    ch::State y = A->state(); ++y.n; y.bal_a -= 1; y.bal_b += 1;
+    CHECK(!A->validate_next(y, e) && e == "awaiting remote revocation", "no update while awaiting revocation");
+    const auto again = A->last_revoke();
+    CHECK(again.revoked_n == revA.revoked_n && again.secret == revA.secret && again.next_hash == revA.next_hash, "REV re-derivable");
+    CHECK(!B->has_pending() && B->has_remote_secret(again.revoked_n, again.secret), "B recognises duplicate REV");
+    const auto replay = B->last_revoke();
+    CHECK(replay.secret == revB.secret && replay.next_hash == revB.next_hash, "B re-sends same revocation");
+    CHECK(A->receive_revoke(replay, e), "A recovers: " + e);
+    CHECK(!A->awaiting_remote_revoke(), "A no longer awaiting");
+    CHECK(ch::pay(*A, *B, 5, e), "channel usable after recovery: " + e);
+
+    // Rollback of a never-revoked pending state keeps penalty safety: the holder
+    // of the stale signed state is punishable once that number is revoked.
+    ch::State stale = A->state(); ++stale.n; stale.bal_a += 0; stale.bal_b -= 0;
+    stale.bal_a -= 3000; stale.bal_b += 3000;  // favourable to B
+    CHECK(B->receive_commit_sig(stale, A->sign_remote_commitment(stale), e), "B holds A's sig on stale: " + e);
+    auto copy = ch::Channel::deserialize(B->serialize(), env.b, e);  // what a cheating B could keep
+    CHECK(copy != nullptr, "copy");
+    std::optional<Transaction> stale_tx;
+    if (copy) {
+        // advance the copy without revealing anything to A to get B's fully signed stale commitment
+        copy->revoke_and_advance();
+        stale_tx = copy->signed_local_commitment();
+    }
+    B->drop_pending();                    // rollback on B (ABORT)
+    A->note_signed_abandoned(stale);      // A remembers what it signed
+    CHECK(!B->has_pending() && B->abandoned_count() == 1, "B rolled back");
+    CHECK(ch::pay(*A, *B, 7, e), "new state with same number: " + e);
+    CHECK(stale_tx && !A->penalty_for(*stale_tx).has_value(), "not yet revoked");
+    CHECK(ch::pay(*A, *B, 7, e), "next update revokes that number: " + e);
+    if (stale_tx) {
+        CHECK(accepted(env.chain, *stale_tx, e), "stale commitment confirms: " + e);
+        auto j = A->penalty_for(*stale_tx);
+        CHECK(j.has_value(), "penalty for rolled-back state");
+        if (j) CHECK(accepted(env.chain, *j, e), "penalty mined: " + e);
+    }
+    // persistence keeps abandoned states
+    auto re = ch::Channel::deserialize(A->serialize(), env.a, e);
+    CHECK(re && re->abandoned_count() == 1, "abandoned persisted");
+}
+
 int main() {
     test_script_unit();
     test_coop_and_throughput();
@@ -266,6 +350,7 @@ int main() {
     test_timeout_refund_and_success();
     test_multihop();
     test_consensus_guards();
+    test_cross_node_rules_and_recovery();
     if (failures) { std::cerr << failures << " failure(s)\n"; return 1; }
     std::cout << "test_channels: all passed\n";
     return 0;

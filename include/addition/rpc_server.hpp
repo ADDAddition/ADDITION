@@ -21,6 +21,7 @@
 
 #include <cstdint>
 #include <map>
+#include <vector>
 #include <memory>
 #include <mutex>
 #include <sstream>
@@ -93,6 +94,16 @@ private:
         std::string wallet, peer, status{"open"};
         std::unique_ptr<channel::Channel> ch;
         bool busy{false};
+        // Update this node proposed and has not finished (persisted, resumed by
+        // rchan_tick): phase "upd" (UPD sent, not yet revoked) or "rev" (we
+        // revoked, awaiting the peer's revocation).
+        std::string out_phase, out_state, out_kind, out_extra, out_action;
+        unsigned attempts{0};
+        std::int64_t next_try{0};
+        // Receiver side: effect of the peer's pending update, applied once it is
+        // revoked-in (e.g. forward an HTLC, settle upstream).
+        std::string in_effect;
+        std::int64_t pending_since{0};
     };
     std::map<std::string, RemoteChannel> rchannels_;
     std::map<std::string, RemoteChannel> rchan_opening_;  // responder side before FUND
@@ -100,11 +111,27 @@ private:
     std::string rchan_dir() const;
     void rchan_load();
     bool rchan_save(const std::string& id, const RemoteChannel& rc, std::string& error);
+    // Multi-hop HTLC bookkeeping (persisted in <data>/rchannels/meta, 0600).
+    std::map<std::string, std::string> rchan_invoices_;  // payment_hash -> "wallet amount preimage status"
+    std::map<std::string, std::string> rchan_links_;     // "out_chan:htlc" -> "in_chan:htlc" (forwarded)
+    std::map<std::string, std::string> rchan_payments_;  // payment_hash -> status (origin side)
+    std::vector<std::string> rchan_actions_;             // queued proposals, run by rchan_tick
+    std::string rchan_fault_;                            // test-only fault injection (non-mainnet)
+    void rchan_save_meta();
+    bool rchan_propose(const std::string& id, const channel::State& next, const std::string& kind,
+                       const std::string& extra, const std::string& action, std::string& error);
+    bool rchan_drive(const std::string& id, std::string& error);
+    void rchan_abandon_out(RemoteChannel& rc, const std::string& why);
+    void rchan_apply_effect(const std::string& id, RemoteChannel& rc);
+    bool rchan_run_action(const std::string& action, bool& keep);
     bool load_wallet_keys(const std::string& name, WalletKeys& keys, std::string& error);
     std::string handle_rchan_command(const std::string& cmd, std::istringstream& iss);
 public:
     bool handle_channel_message(const std::string& peer, const std::string& body, std::string& reply,
                                 std::string& error);
+    // Background step (called by the daemon loop, under the state lock): runs
+    // queued HTLC forwards/settles and resumes interrupted updates.
+    void rchan_tick();
 private:
     // Shielded (addz) spending keys per local wallet name. Testnet tooling:
     // in-memory only (lost on restart); notes are rescanned from the chain.
