@@ -168,9 +168,21 @@ struct NodeConfig {
 // do not list `self`. Block sync is P2P only
 // (no HTTP/public-RPC ingest).
 inline constexpr const char* kOperatorPublicP2p = "34.27.30.115:28545";
-// Public mainnet P2P seed (ADDITION_MAINNET_V1). Distinct from the testnet seed.
-// Home miners: --mainnet --bootstrap 34.27.30.115:28546. Write RPC stays loopback.
+// Legacy clearnet mainnet seed. NOT a default any more (kept only so configs
+// that still list it can be recognised); mainnet defaults to onion seeds.
 inline constexpr const char* kOperatorPublicMainnetP2p = "34.27.30.115:28546";
+// Mainnet bootstrap seeds are Tor v3 onions (docs/ONION_SEEDS.md).
+// PLACEHOLDERS until the real mainnet seed onions are generated: entries
+// starting with "placeholder" are well-formed but never dialed. With only
+// placeholders, --mainnet has no default seed and the operator must pass
+// --bootstrap <onion>:28546 (plus --tor-proxy).
+inline constexpr const char* kMainnetOnionSeeds[] = {
+    "placeholdermainnetseedaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.onion:28546",
+    "placeholdermainnetseedbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.onion:28546",
+};
+bool is_placeholder_seed(const std::string& endpoint);
+// Real (non-placeholder) mainnet onion seeds; empty while all are placeholders.
+std::vector<std::string> mainnet_default_seeds();
 
 bool is_ipv4_endpoint(const std::string& endpoint);
 bool is_loopback_host(const std::string& host);

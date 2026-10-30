@@ -666,8 +666,20 @@ ChainConfig mainnet_chain_config() {
     cfg.pow_profile = "mainnet";
     cfg.confirmations_policy = 2;
     cfg.economic_security = "none";
-    cfg.bootstrap_peers = {kOperatorPublicMainnetP2p};
+    cfg.bootstrap_peers = mainnet_default_seeds();
     return cfg;
+}
+
+bool is_placeholder_seed(const std::string& endpoint) {
+    return endpoint.rfind("placeholder", 0) == 0;
+}
+
+std::vector<std::string> mainnet_default_seeds() {
+    std::vector<std::string> out;
+    for (const char* s : kMainnetOnionSeeds) {
+        if (!is_placeholder_seed(s)) out.emplace_back(s);
+    }
+    return out;
 }
 
 ChainConfig fast_chain_config() {
@@ -1600,7 +1612,7 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
     if (cfg.bootstrap_peers.empty()) {
         switch (mode) {
         case NetworkMode::Mainnet:
-            cfg.bootstrap_peers = {kOperatorPublicMainnetP2p};
+            cfg.bootstrap_peers = mainnet_default_seeds();
             break;
         case NetworkMode::Fast:
             cfg.bootstrap_peers = {"127.0.0.1:28547"};
@@ -1651,7 +1663,8 @@ std::string daemon_help_text() {
            "  getinfo reports confirmations_policy and economic_security=none.\n"
            "\n"
            "--mainnet (same as --network mainnet) starts ADDITION_MAINNET_V1 from genesis-mainnet.json.\n"
-           "  Default bootstrap is the public mainnet seed 34.27.30.115:28546 (not the testnet seed).\n"
+           "  Default bootstrap: Tor onion seeds (docs/ONION_SEEDS.md; placeholders until published,\n"
+           "  so pass --tor-proxy 127.0.0.1:9050 --bootstrap <seed>.onion:28546). No clearnet default.\n"
            "  Override with --bootstrap IP:PORT. Write RPC stays 127.0.0.1:8546. Auto-mine refused.\n"
            "  PoW memory_hard at 0x000000FFFFFFFFFF — do not loosen.\n"
            "\n"
@@ -1676,7 +1689,7 @@ std::string daemon_help_text() {
            "  clearnet connections and binds P2P/public RPC to 127.0.0.1 (expose via HiddenServicePort).\n"
            "  --dandelion enables Dandelion++ stem/fluff tx relay. --p2p-bind ADDR sets the P2P listen addr.\n"
            "  Testnet public P2P (current): 34.27.30.115:28545 — P2P HELLO+REQBLK only.\n"
-           "  Mainnet public P2P (current): 34.27.30.115:28546 — P2P HELLO+REQBLK only.\n"
+           "  Mainnet seeds: onion only (see docs/ONION_SEEDS.md) — P2P HELLO+REQBLK only.\n"
            "  Seed operators set ADDITION_ADVERTISED_P2P to the matching seed so public getinfo/peers\n"
            "  do not list self. Write RPC stays 127.0.0.1.\n"
            "Auto-mine (testnet only, off by default, never on public RPC):\n"

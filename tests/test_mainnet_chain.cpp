@@ -176,9 +176,16 @@ int main() {
                 return 1;
             }
         }
-        if (ncfg.bootstrap_peers.empty() ||
-            ncfg.bootstrap_peers[0] != addition::kOperatorPublicMainnetP2p) {
-            std::cerr << "test failed: --mainnet default bootstrap must be the mainnet seed\n";
+        for (const auto& peer : ncfg.bootstrap_peers) {
+            if (peer == addition::kOperatorPublicMainnetP2p || addition::is_placeholder_seed(peer) ||
+                peer.find(".onion:") == std::string::npos) {
+                std::cerr << "test failed: --mainnet default bootstrap must be real onion seeds only: "
+                          << peer << "\n";
+                return 1;
+            }
+        }
+        if (addition::mainnet_default_seeds() != ncfg.bootstrap_peers) {
+            std::cerr << "test failed: --mainnet default bootstrap != mainnet_default_seeds()\n";
             return 1;
         }
     }

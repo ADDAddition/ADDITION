@@ -8,7 +8,7 @@ Run `additiond --mainnet` (same as `--network mainnet`) like `bitcoind`: anyone 
 
 | Public seed | Role |
 |-------------|------|
-| `34.27.30.115:28546` | P2P bootstrap |
+| `<seed>.onion:28546` | P2P bootstrap |
 | `34.27.30.115:38546` | HTTP public RPC (`/rpc?cmd=getinfo`; write allowlist open per CoS) |
 
 That is a separate chain from the research testnet (`28545` / `38545`). Not a label flip.
@@ -29,7 +29,7 @@ export ADDITION_ENABLE_P2P_RPC=1
   --data-dir $HOME/addition-mainnet \
   --local-rpc-port 8546 \
   --p2p-port 28547 \
-  --bootstrap 34.27.30.115:28546
+  --bootstrap <seed>.onion:28546
 # then: sync   (HTTP :38546 getblockraw and/or P2P HELLO+REQBLK)
 # then: mine on 127.0.0.1:8546 only
 ```
@@ -46,7 +46,7 @@ curl -s 'http://34.27.30.115:38546/rpc?cmd=getinfo'
 
 Expect `network=mainnet` and `network_id=ADDITION_MAINNET_V1`. Height may still be `0`; copy only what `getinfo` prints. Auto-mine stays off on mainnet. Do not invent peer counts or TPS.
 
-`config-mainnet.toml` lists bootstrap peer `34.27.30.115:28546`. Seed operators set `ADDITION_ADVERTISED_P2P=34.27.30.115:28546` so public `getinfo` / `peers` advertise that IPv4 endpoint and never list `self`.
+`config-mainnet.toml` lists bootstrap peer `<seed>.onion:28546`. Seed operators set `ADDITION_ADVERTISED_P2P=<seed>.onion:28546` so public `getinfo` / `peers` advertise that IPv4 endpoint and never list `self`.
 
 ## What `--mainnet` changes
 
@@ -128,7 +128,7 @@ sudo chown -R addition:addition /var/lib/addition/mainnet
 # /etc/addition/mainnet.env  (mode 0640, owner root:addition)
 # ADDITION_RPC_TOKEN=<optional write-RPC token>
 # ADDITION_ENABLE_P2P_RPC=1
-# ADDITION_ADVERTISED_P2P=34.27.30.115:28546   # public seed operator
+# ADDITION_ADVERTISED_P2P=<seed>.onion:28546   # public seed operator
 sudo install -m 0644 deploy/systemd/additiond-mainnet.service /etc/systemd/system/additiond-mainnet.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now additiond-mainnet.service
@@ -157,7 +157,7 @@ curl -s 'http://34.27.30.115:38546/rpc?cmd=getinfo'
 
 P2P listen is off unless `ADDITION_ENABLE_P2P_RPC=1`. HELLO carries `ADDITION_MAINNET_V1`, so a testnet peer is rejected.
 
-Public bootstrap is **34.27.30.115:28546**. Do not use the research testnet seed `34.27.30.115:28545`. If TCP 28546 is filtered on your path, use HTTP `:38546` for `getinfo` / ingest checks (`getblockraw`), then retry P2P (`HELLO`+`REQBLK`).
+Public bootstrap is **<seed>.onion:28546**. Do not use the research testnet seed `34.27.30.115:28545`. If TCP 28546 is filtered on your path, use HTTP `:38546` for `getinfo` / ingest checks (`getblockraw`), then retry P2P (`HELLO`+`REQBLK`).
 
 Do not loosen `memory_hard` / `0x000000FFFFFFFFFF`. Do not auto-mine. Do not bind write RPC to `0.0.0.0`.
 

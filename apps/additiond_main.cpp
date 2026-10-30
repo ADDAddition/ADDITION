@@ -577,7 +577,7 @@ int main(int argc, char** argv) {
         std::cout << "genesis=" << node_cfg.genesis_path << '\n';
     }
     if (mainnet_mode) {
-        std::cout << "bootstrap_peers (IPv4 only; not the public testnet seed):";
+        std::cout << "bootstrap_peers (mainnet: onion seeds; see docs/ONION_SEEDS.md):";
     } else if (regtest_mode) {
         std::cout << "bootstrap_peers (IPv4 only; local --regtest, not the public testnet seed):";
     } else {
@@ -588,6 +588,10 @@ int main(int argc, char** argv) {
         std::cout << ' ' << peer;
     }
     std::cout << '\n';
+    if (mainnet_mode && node_cfg.bootstrap_peers.empty()) {
+        std::cout << "WARNING: no mainnet seed configured (onion seeds are placeholders). "
+                     "Use --tor-proxy 127.0.0.1:9050 --bootstrap <seed>.onion:28546 or a node you run.\n";
+    }
     if (!node_cfg.advertised_p2p.empty()) {
         std::cout << "advertised_p2p=" << node_cfg.advertised_p2p
                   << " (public getinfo/peers; not self). Block sync is P2P only (TCP or Tor).\n";

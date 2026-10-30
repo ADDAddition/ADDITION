@@ -13,7 +13,7 @@ Public contact: [contact@additionblockchain.com](mailto:contact@additionblockcha
 | `network_id` | `ADDITION_MAINNET_V1` | `ADDITION_TESTNET_V1` |
 | Home-node write RPC | `127.0.0.1:8546` | `127.0.0.1:8545` |
 | Public RPC | `34.27.30.115:38546` | `34.27.30.115:38545` |
-| P2P bootstrap | `34.27.30.115:28546` | `34.27.30.115:28545` |
+| P2P bootstrap | `<seed>.onion:28546` | `34.27.30.115:28545` |
 
 Public seed **38546** write allowlist is open (CoS): `createwallet`, `mine`,
 `wallet_send`, `wallet_sign` / `sign_message`, `tx_build` / `sendtx_signed*`.

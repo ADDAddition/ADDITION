@@ -246,7 +246,7 @@ Public product profile:
 | Default data dir | `data-mainnet` |
 | Home-node write RPC | **`127.0.0.1:8546`** |
 | Public HTTP | **`38546`** (seed `34.27.30.115:38546`) |
-| P2P | **`28546`** (seed `34.27.30.115:28546`) |
+| P2P | **`28546`** (seed `<seed>.onion:28546`) |
 | Consensus | `memory_hard` |
 
 **Hard rules:**
@@ -254,7 +254,7 @@ Public product profile:
 - Home write RPC binds **`127.0.0.1:8546`** — never public bind / never `0.0.0.0`
 - Never publish `8545` / `8546`
 - Mixing another network’s `blocks.dat` into a mainnet `--data-dir` is refused
-- Seed operators set `ADDITION_ADVERTISED_P2P=34.27.30.115:28546` so public `getinfo` / `peers` advertise that IPv4 endpoint and do not list `self`
+- Seed operators set `ADDITION_ADVERTISED_P2P=<seed>.onion:28546` so public `getinfo` / `peers` advertise that IPv4 endpoint and do not list `self`
 
 A separate testnet profile (`ADDITION_TESTNET_V1`, ports `28545` / `38545`) exists in the same binary for operators; it is **not** the public product on this site. See `/join/#testnet`.
 
@@ -360,7 +360,7 @@ export ADDITION_ENABLE_P2P_RPC=1
   --data-dir $HOME/addition-mainnet \
   --local-rpc-port 8546 \
   --p2p-port 28547 \
-  --bootstrap 34.27.30.115:28546
+  --bootstrap <seed>.onion:28546
 # sync, then getinfo; mine on 127.0.0.1:8546 or public 38546 write allowlist
 ```
 

@@ -46,7 +46,7 @@
 | Flag | `additiond --network testnet` | `additiond --mainnet` |
 | `network_id` | `ADDITION_TESTNET_V1` | `ADDITION_MAINNET_V1` |
 | Genesis | [`genesis.json`](genesis.json) | [`genesis-mainnet.json`](genesis-mainnet.json) |
-| Bootstrap | `34.27.30.115:28545` | `34.27.30.115:28546` |
+| Bootstrap | `34.27.30.115:28545` | `<seed>.onion:28546` |
 | Public RPC | `34.27.30.115:38545` | `34.27.30.115:38546` / site `/api/rpc` |
 | Role | Research chain (separate) | Public product — explorer, join, wallet PWA |
 
@@ -103,7 +103,7 @@ Build `additiond` on Linux from this repository on `main`, then:
 ```bash
 export ADDITION_PRIVACY_MASTER_KEY='replace-with-32-or-more-chars____'
 export ADDITION_ENABLE_P2P_RPC=1
-additiond --mainnet --data-dir $HOME/addition-mainnet --local-rpc-port 8546 --p2p-port 28547 --bootstrap 34.27.30.115:28546
+additiond --mainnet --data-dir $HOME/addition-mainnet --local-rpc-port 8546 --p2p-port 28547 --bootstrap <seed>.onion:28546
 ```
 
 Type `sync` on the daemon stdin, or send it to write RPC on `127.0.0.1:8546`. Height should move. Write RPC stays loopback.
