@@ -52,6 +52,8 @@ std::string htlc_script(const std::string& revoker, const std::string& offerer, 
 Transaction commitment_tx(const Info& info, bool holder_a, const State& s, const std::string& holder_rev_hash);
 
 struct CommitSig { std::uint64_t n; std::string sig; };
+std::string encode_state(const State& s);
+bool decode_state(const std::string& text, State& s);
 struct Revoke { std::uint64_t revoked_n; std::string secret; std::string next_hash; };
 
 class Channel {
@@ -93,6 +95,13 @@ public:
     std::string rev_secret(std::uint64_t n) const;
     std::string rev_hash(std::uint64_t n) const;
     std::size_t stored_remote_secrets() const { return remote_secrets_.size(); }
+    bool has_pending() const { return pending_.has_value(); }
+    const std::string& remote_pubkey() const { return remote_pub_; }
+
+    // Persistence (cross-node channels). Contains the revocation seed and remote
+    // revocation secrets but never the wallet private key; store with mode 0600.
+    std::string serialize() const;
+    static std::unique_ptr<Channel> deserialize(const std::string& data, WalletKeys local, std::string& err);
 
 private:
     std::optional<std::pair<std::uint32_t, std::string>> find_output(const Transaction& t, const std::string& script) const;

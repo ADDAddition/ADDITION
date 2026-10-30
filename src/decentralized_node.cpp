@@ -1461,6 +1461,33 @@ bool DecentralizedNode::is_push_gossip_message(const std::string& message) const
            message.rfind("SVOTE|", 0) == 0;
 }
 
+bool DecentralizedNode::request_peer(const std::string& endpoint, const std::string& message,
+                                     std::string& response, std::string& error) {
+    response.clear();
+    if (!is_peer_endpoint(endpoint)) {
+        error = "invalid peer endpoint";
+        return false;
+    }
+    if (!peers_.has_peer(endpoint)) peers_.add_peer(endpoint);
+    std::string wire_id;
+    if (!handshake_with_peer(endpoint, wire_id, error)) {
+        if (error.empty()) error = "handshake failed";
+        return false;
+    }
+    if (wire_id.empty()) wire_id = self_id_;
+    std::string resp;
+    if (!send_p2p_request(endpoint, wire_id + " " + message, resp)) {
+        error = "peer unreachable";
+        return false;
+    }
+    if (resp.rfind("ok:", 0) == 0) {
+        response = resp.substr(3);
+        return true;
+    }
+    error = resp.empty() ? "empty peer response" : resp;
+    return false;
+}
+
 std::size_t DecentralizedNode::relay_private_messages() {
     if (pm_relay_ == nullptr) return 0;
     std::size_t sent = 0;
@@ -1672,7 +1699,8 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         (message.rfind("IDVOTE|", 0) == 0) ||
         (message.rfind("SVOTE|", 0) == 0) ||
         (message.rfind("PMSG|", 0) == 0) ||
-        (message.rfind("PMDEL|", 0) == 0);
+        (message.rfind("PMDEL|", 0) == 0) ||
+        (message.rfind("CHAN|", 0) == 0);
     if (!allow_peer_message(peer, expensive, error)) {
         peers_.mark_peer_bad(peer);
         return false;
@@ -1824,6 +1852,16 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         } else {
             peers_.mark_peer_bad(peer);
         }
+        return ok;
+    }
+
+    if (message.rfind("CHAN|", 0) == 0) {
+        if (!chan_handler_) {
+            error = "channels disabled";
+            return false;
+        }
+        const bool ok = chan_handler_(peer, message.substr(5), reply, error);
+        if (ok) peers_.mark_peer_good(peer);
         return ok;
     }
 

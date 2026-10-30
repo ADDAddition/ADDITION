@@ -5,6 +5,7 @@
 #include "addition/script.hpp"
 
 #include <algorithm>
+#include <sstream>
 
 namespace addition::channel {
 
@@ -261,6 +262,120 @@ std::optional<Transaction> Channel::sweep_htlc_success(const Transaction& c, boo
     std::vector<std::string> pre;
     if (!preimage.empty()) pre.push_back(preimage);
     return sweep(c, o->first, s, pre, (4ull << 40) + (n << 8) + id);
+}
+
+// ---------------- persistence ----------------
+
+std::string encode_state(const State& s) {
+    std::ostringstream o;
+    o << s.n << ":" << s.bal_a << ":" << s.bal_b << ":" << s.next_htlc_id << ":";
+    for (std::size_t i = 0; i < s.htlcs.size(); ++i) {
+        const auto& h = s.htlcs[i];
+        if (i) o << ";";
+        o << h.id << "," << (h.offered_by_a ? 1 : 0) << "," << h.amount << "," << h.payment_hash << "," << h.expiry;
+    }
+    return o.str();
+}
+
+bool decode_state(const std::string& t, State& s) {
+    s = State{};
+    std::vector<std::string> f;
+    std::string cur;
+    std::istringstream is(t);
+    while (std::getline(is, cur, ':')) f.push_back(cur);
+    if (f.size() == 4) f.emplace_back();
+    if (f.size() != 5) return false;
+    try {
+        s.n = std::stoull(f[0]);
+        s.bal_a = std::stoull(f[1]);
+        s.bal_b = std::stoull(f[2]);
+        s.next_htlc_id = std::stoull(f[3]);
+        std::istringstream hs(f[4]);
+        std::string one;
+        while (std::getline(hs, one, ';')) {
+            std::istringstream fs(one);
+            std::string id, off, amt, ph, exp;
+            if (!std::getline(fs, id, ',') || !std::getline(fs, off, ',') || !std::getline(fs, amt, ',') ||
+                !std::getline(fs, ph, ',') || !std::getline(fs, exp, ','))
+                return false;
+            s.htlcs.push_back(Htlc{std::stoull(id), off == "1", std::stoull(amt), ph, std::stoull(exp)});
+        }
+    } catch (...) {
+        return false;
+    }
+    return true;
+}
+
+std::string Channel::serialize() const {
+    std::ostringstream o;
+    o << "v 1\nis_a " << (is_a_ ? 1 : 0) << "\naddr_a " << info_.addr_a << "\naddr_b " << info_.addr_b
+      << "\ncapacity " << info_.capacity << "\nfunding " << (info_.funding_txid.empty() ? "-" : info_.funding_txid)
+      << " " << info_.funding_vout << "\ndelay " << info_.to_self_delay << "\nfee " << info_.fee
+      << "\nremote_pub " << remote_pub_ << "\nseed " << seed_ << "\ncur " << encode_state(cur_)
+      << "\nremote_sig_cur " << (remote_sig_cur_.empty() ? "-" : remote_sig_cur_) << "\n";
+    if (pending_) o << "pending " << encode_state(*pending_) << "\n";
+    if (remote_sig_pending_) o << "remote_sig_pending " << *remote_sig_pending_ << "\n";
+    for (const auto& [n, h] : remote_hashes_) o << "rhash " << n << " " << h << "\n";
+    for (const auto& [n, h] : remote_secrets_) o << "rsecret " << n << " " << h << "\n";
+    for (const auto& [n, st] : history_) o << "hist " << n << " " << encode_state(st) << "\n";
+    return o.str();
+}
+
+std::unique_ptr<Channel> Channel::deserialize(const std::string& data, WalletKeys local, std::string& err) {
+    std::istringstream in(data);
+    std::string line;
+    Info info;
+    bool is_a = false;
+    std::string remote_pub, seed;
+    State cur;
+    std::optional<State> pending;
+    std::string sig_cur;
+    std::optional<std::string> sig_pending;
+    std::map<std::uint64_t, std::string> rh, rs;
+    std::map<std::uint64_t, State> hist;
+    try {
+        while (std::getline(in, line)) {
+            std::istringstream ls(line);
+            std::string k;
+            ls >> k;
+            if (k == "is_a") { int v; ls >> v; is_a = v == 1; }
+            else if (k == "addr_a") ls >> info.addr_a;
+            else if (k == "addr_b") ls >> info.addr_b;
+            else if (k == "capacity") ls >> info.capacity;
+            else if (k == "funding") { ls >> info.funding_txid >> info.funding_vout; if (info.funding_txid == "-") info.funding_txid.clear(); }
+            else if (k == "delay") ls >> info.to_self_delay;
+            else if (k == "fee") ls >> info.fee;
+            else if (k == "remote_pub") ls >> remote_pub;
+            else if (k == "seed") ls >> seed;
+            else if (k == "cur") { std::string t; ls >> t; if (!decode_state(t, cur)) throw 1; }
+            else if (k == "pending") { std::string t; ls >> t; State s; if (!decode_state(t, s)) throw 1; pending = s; }
+            else if (k == "remote_sig_cur") { ls >> sig_cur; if (sig_cur == "-") sig_cur.clear(); }
+            else if (k == "remote_sig_pending") { std::string t; ls >> t; sig_pending = t; }
+            else if (k == "rhash") { std::uint64_t n; std::string h; ls >> n >> h; rh[n] = h; }
+            else if (k == "rsecret") { std::uint64_t n; std::string h; ls >> n >> h; rs[n] = h; }
+            else if (k == "hist") { std::uint64_t n; std::string t; ls >> n >> t; State s; if (!decode_state(t, s)) throw 1; hist[n] = s; }
+        }
+    } catch (...) {
+        err = "corrupt channel file";
+        return nullptr;
+    }
+    if (remote_pub.empty() || seed.empty() || info.addr_a.empty() || info.addr_b.empty()) {
+        err = "corrupt channel file";
+        return nullptr;
+    }
+    if (local.address != (is_a ? info.addr_a : info.addr_b)) {
+        err = "channel file does not belong to this wallet";
+        return nullptr;
+    }
+    auto c = std::make_unique<Channel>(std::move(local), remote_pub, is_a, info, seed);
+    c->cur_ = cur;
+    c->pending_ = pending;
+    c->remote_sig_cur_ = sig_cur;
+    c->remote_sig_pending_ = sig_pending;
+    c->remote_hashes_ = rh;
+    c->remote_secrets_ = rs;
+    c->history_ = hist;
+    return c;
 }
 
 // ---------------- in-process drivers ----------------

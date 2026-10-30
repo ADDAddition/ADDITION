@@ -214,6 +214,9 @@ RpcServer::RpcServer(Chain& chain,
         return node_.usable_stake_votes();
     });
     miner_.set_slash_source([this]() { return node_.usable_slash_evidence(); });
+    // Inbound CHAN| runs under the shared node-state lock (== mu_), so no extra locking here.
+    node_.set_channel_handler([this](const std::string& peer, const std::string& body, std::string& reply,
+                                     std::string& error) { return handle_channel_message(peer, body, reply, error); });
 }
 
 void RpcServer::set_auto_mine_status(bool enabled, std::uint32_t interval_sec) {
@@ -1115,6 +1118,10 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         }
         lc.status = mode.empty() ? "closing_coop" : "closing_" + mode;
         return "ok close_txid=" + hash_transaction(tx);
+    }
+
+    if (cmd == "rchan_open" || cmd == "rchan_pay" || cmd == "rchan_close" || cmd == "rchan_list") {
+        return handle_rchan_command(cmd, iss);
     }
 
     if (cmd == "channel_list") {

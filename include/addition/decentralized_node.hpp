@@ -44,6 +44,13 @@ public:
     PmRelay* pm_relay() const { return pm_relay_; }
     // Store-and-forward: push queued PMSG/PMDEL lines each peer has not received.
     std::size_t relay_private_messages();
+    // Cross-node payment channels: inbound "CHAN|" bodies go to this handler
+    // (called under the node-state lock), outbound requests via request_peer.
+    using ChannelHandler = std::function<bool(const std::string& peer, const std::string& body,
+                                              std::string& reply, std::string& error)>;
+    void set_channel_handler(ChannelHandler h) { chan_handler_ = std::move(h); }
+    bool request_peer(const std::string& endpoint, const std::string& message, std::string& response,
+                      std::string& error);
 
     std::vector<std::string> pull_outbound_messages();
     bool handle_inbound_message(const std::string& peer, const std::string& message, std::string& error);
@@ -112,6 +119,7 @@ private:
     Chain& chain_;
     Mempool& mempool_;
     PmRelay* pm_relay_ = nullptr;
+    ChannelHandler chan_handler_;
     PeerNetwork& peers_;
     ConsensusEngine& consensus_;
 

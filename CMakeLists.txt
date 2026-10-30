@@ -69,6 +69,7 @@ add_library(addition_core
     src/pouw_compute.cpp
     src/private_messaging.cpp
     src/pm_relay.cpp
+    src/rpc_rchannel.cpp
     src/ai_optimizer.cpp
     src/wallet.cpp
     src/auto_mine.cpp

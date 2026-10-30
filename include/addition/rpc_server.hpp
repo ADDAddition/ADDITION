@@ -23,6 +23,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <sstream>
 #include <string>
 
 namespace addition {
@@ -85,6 +86,26 @@ private:
         std::string status{"funding"};
     };
     std::map<std::string, LocalChannel> channels_;
+    // Cross-node channels: this node holds one side; the other side is a wallet
+    // on another node reached over P2P (CHAN| messages). Persisted under
+    // <data>/rchannels (0600) and reloaded on first use after restart.
+    struct RemoteChannel {
+        std::string wallet, peer, status{"open"};
+        std::unique_ptr<channel::Channel> ch;
+        bool busy{false};
+    };
+    std::map<std::string, RemoteChannel> rchannels_;
+    std::map<std::string, RemoteChannel> rchan_opening_;  // responder side before FUND
+    bool rchan_loaded_{false};
+    std::string rchan_dir() const;
+    void rchan_load();
+    bool rchan_save(const std::string& id, const RemoteChannel& rc, std::string& error);
+    bool load_wallet_keys(const std::string& name, WalletKeys& keys, std::string& error);
+    std::string handle_rchan_command(const std::string& cmd, std::istringstream& iss);
+public:
+    bool handle_channel_message(const std::string& peer, const std::string& body, std::string& reply,
+                                std::string& error);
+private:
     // Shielded (addz) spending keys per local wallet name. Testnet tooling:
     // in-memory only (lost on restart); notes are rescanned from the chain.
     std::map<std::string, shielded::SpendingKey> zkeys_;
