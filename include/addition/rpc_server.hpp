@@ -14,6 +14,7 @@
 #include "addition/pouw_storage.hpp"
 #include "addition/private_messaging.hpp"
 #include "addition/privacy.hpp"
+#include "addition/shielded.hpp"
 #include "addition/staking.hpp"
 #include "addition/token_engine.hpp"
 #include "addition/wallet_store.hpp"
@@ -84,6 +85,10 @@ private:
         std::string status{"funding"};
     };
     std::map<std::string, LocalChannel> channels_;
+    // Shielded (addz) spending keys per local wallet name. Testnet tooling:
+    // in-memory only (lost on restart); notes are rescanned from the chain.
+    std::map<std::string, shielded::SpendingKey> zkeys_;
+    std::string shielded_scan(const std::string& wallet, std::vector<shielded::Note>* unspent, std::uint64_t* total);
     mutable std::mutex mu_;
 };
 

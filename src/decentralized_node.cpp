@@ -1312,8 +1312,8 @@ bool DecentralizedNode::sync_once_impl(std::string& error) {
     std::string last_error;
 
     for (const auto& peer : peers) {
-        if (peers_.is_banned(peer)) {
-            continue;
+        if (peers_.is_banned(peer) || (!advertised_p2p_.empty() && peer == advertised_p2p_)) {
+            continue;  // never sync from / gossip to our own advertised endpoint
         }
 
         std::string rpc_err;
@@ -1520,8 +1520,8 @@ bool DecentralizedNode::flush_outbound_gossip(std::size_t& sent, std::string& er
     bool any_ok = false;
     std::string last;
     for (const auto& peer : peers_.peers()) {
-        if (peers_.is_banned(peer)) {
-            continue;
+        if (peers_.is_banned(peer) || (!advertised_p2p_.empty() && peer == advertised_p2p_)) {
+            continue;  // self (e.g. our own .onion learned via peer exchange): wasted Tor round trip
         }
         std::string wire_id;
         std::string hs_err;
@@ -1957,6 +1957,10 @@ bool DecentralizedNode::handle_inbound_message(const std::string& peer,
         if (!is_external_advertised_peer(addr)) {
             error = "bad advertise address";
             return false;
+        }
+        if (addr == advertised_p2p_) {
+            reply = "ADVERTISE_OK";
+            return true;  // ignore our own endpoint echoed back
         }
         peers_.add_candidate(addr);
         reply = "ADVERTISE_OK";

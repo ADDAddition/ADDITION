@@ -224,6 +224,30 @@ std::uint64_t RpcServer::unlocked_balance(const std::string& address) const {
     return confirmed; // locked stake is held by @stake, not in the owner's balance
 }
 
+std::string RpcServer::shielded_scan(const std::string& wallet, std::vector<shielded::Note>* unspent, std::uint64_t* total) {
+    const auto it = zkeys_.find(wallet);
+    if (it == zkeys_.end()) return "no shielded key for wallet (run z_address first)";
+    std::uint64_t pos = 0, sum = 0;
+    for (const auto& blk : chain_.blocks()) {
+        for (const auto& tx : blk.transactions) {
+            if (tx.shielded.empty()) continue;
+            shielded::Bundle b;
+            std::string e;
+            if (!shielded::from_tx_field(tx.shielded, b, e)) continue;
+            for (std::uint32_t j = 0; j < b.commitments.size(); ++j, ++pos) {
+                auto n = shielded::try_decrypt(it->second, tx, b, j);
+                if (!n) continue;
+                n->position = pos;
+                if (chain_.shielded_state().nullifier_spent(shielded::nullifier(it->second.nk, n->rho))) continue;
+                sum += n->value;
+                if (unspent) unspent->push_back(*n);
+            }
+        }
+    }
+    if (total) *total = sum;
+    return "";
+}
+
 std::string RpcServer::public_rpc_banner() const {
     return public_rpc_banner_text(chain_.config().network_mode);
 }
@@ -843,6 +867,174 @@ std::string RpcServer::handle_command(const std::string& line, bool trusted) {
         if (!ok) return "error: " + error;
         return "ok state=" + std::to_string(lc.a->state().n) + " bal_a=" + std::to_string(lc.a->state().bal_a) +
                " bal_b=" + std::to_string(lc.a->state().bal_b);
+    }
+
+    if (cmd == "z_address") {
+        std::string name;
+        iss >> name;
+        StoredWallet sw{};
+        std::string error;
+        if (name.empty() || !wallets_.load(name, sw, error, true)) return "error: usage z_address <wallet> " + error;
+        if (!zkeys_.count(name)) {
+            shielded::SpendingKey sk;
+            if (!shielded::generate_spending_key(sk, error)) return "error: " + error;
+            zkeys_[name] = std::move(sk);
+        }
+        return "ok zaddr=" + zkeys_[name].address().encode();
+    }
+
+    if (cmd == "z_balance") {
+        std::string name;
+        iss >> name;
+        std::vector<shielded::Note> notes;
+        std::uint64_t total = 0;
+        const auto e = shielded_scan(name, &notes, &total);
+        if (!e.empty()) return "error: " + e;
+        std::ostringstream out;
+        out << "ok shielded_balance=" << total << " notes=" << notes.size();
+        for (const auto& n : notes) out << "\nnote value=" << n.value << " memo=" << n.memo.c_str();
+        return out.str();
+    }
+
+    if (cmd == "z_shield" || cmd == "z_send" || cmd == "z_unshield") {
+        // z_shield <wallet> <amount> <fee> [zaddr]          transparent -> pool
+        // z_send <wallet> <zaddr> <amount> <fee> <memo...>   pool -> pool (no transparent signer)
+        // z_unshield <wallet> <taddr> <amount> <fee>         pool -> transparent
+        if (!chain_.config().shielded_enabled) return "error: shielded pool not enabled on this network";
+        if (!shielded::proof_system_available()) return "error: STARK prover not built";
+        std::string name, to;
+        std::uint64_t amount = 0, fee = 0;
+        iss >> name;
+        if (cmd == "z_shield") iss >> amount >> fee >> to; else iss >> to >> amount >> fee;
+        std::string memo;
+        std::getline(iss, memo);
+        while (!memo.empty() && memo.front() == ' ') memo.erase(memo.begin());
+        StoredWallet sw{};
+        std::string error;
+        if (name.empty() || amount == 0 || fee == 0 || !wallets_.load(name, sw, error, true)) return "error: bad usage " + error;
+        if (!zkeys_.count(name)) return "error: run z_address first";
+        const auto& sk = zkeys_[name];
+        Transaction tx{};
+        shielded::Bundle b;
+        double prove_s = 0;
+        if (cmd == "z_shield") {
+            shielded::Address dest = sk.address();
+            if (!to.empty() && !shielded::Address::decode(to, dest, error)) return "error: " + error;
+            if (unlocked_balance(sw.address) < amount + fee) return "error: insufficient unlocked balance";
+            if (!chain_.build_transaction(sw.address, sw.address, amount, fee, chain_.next_nonce(sw.address), tx, error)) return "error: " + error;
+            tx.outputs.erase(tx.outputs.begin());
+            tx.signer = sw.address;
+            tx.signer_pubkey = chain_.pubkey_field_for(sw.address, sw.public_key);
+            if (!shielded::build_bundle(tx, nullptr, {}, chain_.shielded_state().tree(), {{dest, amount, memo}}, amount, 0, b, error, &prove_s))
+                return "error: " + error;
+            tx.shielded = shielded::to_tx_field(b);
+            tx.signature.clear();
+            tx.signature = sign_message_hybrid(sw.private_key, hash_transaction(tx));
+        } else {
+            std::vector<shielded::Note> notes;
+            std::uint64_t total = 0;
+            const auto e = shielded_scan(name, &notes, &total);
+            if (!e.empty()) return "error: " + e;
+            std::sort(notes.begin(), notes.end(), [](const auto& x, const auto& y) { return x.value > y.value; });
+            std::vector<shielded::Note> use;
+            std::uint64_t in = 0;
+            for (const auto& n : notes) { if (in >= amount + fee || use.size() == shielded::kMaxIn) break; use.push_back(n); in += n.value; }
+            if (in < amount + fee) return "error: insufficient shielded balance";
+            tx.fee = fee;
+            std::vector<shielded::OutputSpec> outs;
+            std::uint64_t vpub_out = fee;
+            if (cmd == "z_send") {
+                shielded::Address dest;
+                if (!shielded::Address::decode(to, dest, error)) return "error: " + error;
+                outs.push_back({dest, amount, memo});
+            } else {
+                tx.outputs.push_back({to, amount});
+                vpub_out += amount;
+            }
+            if (in > amount + fee) outs.push_back({sk.address(), in - amount - fee, ""});
+            if (!shielded::build_bundle(tx, &sk, use, chain_.shielded_state().tree(), outs, 0, vpub_out, b, error, &prove_s))
+                return "error: " + error;
+            tx.shielded = shielded::to_tx_field(b);
+        }
+        if (!node_.submit_transaction(tx, error)) return "error: submit " + error;
+        {
+            std::size_t sent = 0;
+            std::string gossip_err;
+            node_.flush_outbound_gossip(sent, gossip_err);
+        }
+        std::ostringstream out;
+        out << "ok:gossiped hash=" << hash_transaction(tx) << " nullifiers=" << b.nullifiers.size()
+            << " commitments=" << b.commitments.size() << " prove_s=" << prove_s
+            << " transparent_signer=" << (tx.signer.empty() ? "none" : "yes");
+        return out.str();
+    }
+
+    if (cmd == "channel_route") {
+        // channel_route <from_wallet> <amount> <ch1,ch2,...> [fee_per_hop]: multi-hop HTLC payment.
+        std::string from, route;
+        std::uint64_t amount = 0, fee_hop = 0;
+        iss >> from >> amount >> route >> fee_hop;
+        if (from.empty() || amount == 0 || route.empty()) return "error: usage channel_route <from_wallet> <amount> <ch1,ch2,...> [fee_per_hop]";
+        std::vector<channel::Hop> hops;
+        std::string cur = from, path = from;
+        std::stringstream rs(route);
+        std::string id;
+        while (std::getline(rs, id, ',')) {
+            const auto it = channels_.find(id);
+            if (it == channels_.end() || it->second.status != "open") return "error: channel not open: " + id;
+            auto& lc = it->second;
+            if (cur == lc.wallet_a) { hops.push_back({lc.a.get(), lc.b.get()}); cur = lc.wallet_b; }
+            else if (cur == lc.wallet_b) { hops.push_back({lc.b.get(), lc.a.get()}); cur = lc.wallet_a; }
+            else return "error: route breaks at " + id;
+            path += "->" + cur;
+        }
+        std::string preimage;
+        {
+            shielded::SpendingKey tmp; std::string e;
+            if (!shielded::generate_spending_key(tmp, e)) return "error: rng";
+            preimage = shielded::hex32(tmp.nk);
+        }
+        const auto h = chain_.height();
+        std::string error;
+        if (!channel::route_payment(hops, amount, preimage, h + 40 + 6 * hops.size(), 6, fee_hop, error)) return "error: " + error;
+        return "ok route=" + path + " hops=" + std::to_string(hops.size()) + " amount=" + std::to_string(amount) +
+               " fee_per_hop=" + std::to_string(fee_hop);
+    }
+
+    if (cmd == "stake_equivocate_regtest") {
+        // REGTEST ONLY fault injection: sign two conflicting votes for one of
+        // <wallet>'s selected tickets and gossip both, to exercise automatic
+        // equivocation detection + slash on a local network.
+        if (chain_.config().network_id != "ADDITION_REGTEST_V1") return "error: regtest only";
+        std::string name;
+        iss >> name;
+        StoredWallet sw{};
+        std::string error;
+        if (name.empty() || !wallets_.load(name, sw, error, true)) return "error: usage stake_equivocate_regtest <wallet> " + error;
+        const auto tip = chain_.block_at(chain_.height());
+        if (!tip) return "error: no tip";
+        const auto tip_hash = hash_block_header(tip->header);
+        for (const auto& id : chain_.selected_tickets_for_next_block()) {
+            const auto t = chain_.ticket(id);
+            if (!t || t->owner != sw.address) continue;
+            int accepted = 0;
+            for (bool approve : {true, false}) {
+                StakeVote v{};
+                v.ticket_id = id;
+                v.voted_height = chain_.height();
+                v.voted_hash = tip_hash;
+                v.approve = approve;
+                v.signature = sign_message_hybrid(sw.private_key, chain_.stake_vote_message_for(v.voted_height, v.voted_hash, id, approve));
+                std::string e;
+                if (node_.submit_stake_vote(v, e)) ++accepted;
+            }
+            std::size_t sent = 0;
+            std::string gerr;
+            node_.flush_outbound_gossip(sent, gerr);
+            return "ok ticket=" + id + " conflicting_votes_signed=2 accepted=" + std::to_string(accepted) +
+                   " pending_slashes=" + std::to_string(node_.pending_slash_count());
+        }
+        return "error: wallet has no selected ticket for next block";
     }
 
     if (cmd == "channel_close") {
