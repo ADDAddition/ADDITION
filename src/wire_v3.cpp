@@ -279,7 +279,8 @@ bool decode_tx_v3(const std::string& bin, Transaction& tx, std::string& error) {
         }
     }
     if (!check_tail(bin, off, error, "tx v3")) return false;
-    if (tx.outputs.empty()) {
+    // pool->pool z_send carries no transparent outputs
+    if (tx.outputs.empty() && tx.shielded.empty()) {
         error = "tx payload has no outputs";
         return false;
     }

@@ -2476,7 +2476,8 @@ bool DecentralizedNode::decode_tx_payload(const std::string& payload,
         return false;
     }
 
-    if (tx.outputs.empty()) {
+    // pool->pool z_send carries no transparent outputs
+    if (tx.outputs.empty() && tx.shielded.empty()) {
         error = "tx payload has no outputs";
         return false;
     }
