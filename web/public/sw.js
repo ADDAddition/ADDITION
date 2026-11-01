@@ -1,5 +1,5 @@
 /* ADDITION PWA — cache shell assets only. Never cache RPC or wallet responses. */
-const CACHE = "addition-shell-v2-mainnet";
+const CACHE = "addition-shell-v3-premainnet";
 const SHELL = [
   "/",
   "/common.css",

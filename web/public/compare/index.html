@@ -3,167 +3,61 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Compare — ADDITION vs Bitcoin, Ethereum, Solana, Monero</title>
-  <meta name="description" content="Live ADDITION_MAINNET_V1 facts next to well-known public characterizations of Bitcoin, Ethereum, Solana, and Monero. No invented TPS, height, or price.">
-  <meta name="theme-color" content="#0b1220">
+  <title>ADDITION: specs and comparison</title>
+  <meta name="description" content="ADDITION's design compared with Bitcoin, Ethereum, Solana and Monero. Design parameters only: no price and no throughput claims.">
+  <meta name="theme-color" content="#070b14">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/favicon.ico">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:title" content="ADDITION: specs and comparison">
+  <meta property="og:description" content="ADDITION's design compared with Bitcoin, Ethereum, Solana and Monero. Design parameters only: no price and no throughput claims.">
   <meta property="og:image" content="https://additionblockchain.com/og.png">
-  <meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="/common.css">
 </head>
 <body>
   <header id="site-header"></header>
-  <div id="live-strip" class="status-strip pending" aria-live="polite">
-    <div class="status-strip-inner">
-      <span id="strip-flag" class="status-flag">…</span>
-      <dl id="strip-cells" class="status-cells"></dl>
-    </div>
-  </div>
-  <main>
-    <section class="product-hero" style="padding-top:1rem;padding-bottom:0.25rem">
-      <p class="eyebrow"><span class="net-badge">MAINNET</span> Live product</p>
-      <h1>ADDITION vs four chains</h1>
-      <p class="lede">
-        Only what <code>ADDITION_MAINNET_V1</code> ships today — next to short,
-        well-known public characterizations of Bitcoin, Ethereum, Solana, and Monero.
-        Height and peers come from live <code>getinfo</code> (may be <code>0</code>).
-        No ADDITION TPS, USD price, or ZK-privacy claim on this page.
-      </p>
+  <main class="page">
+    <section class="hero2">
+      <p class="eyebrow">● Design comparison</p>
+      <h1>Specs &amp; comparison</h1>
+      <p class="lede">ADDITION's column describes the code as it stands (pre-mainnet). The other columns give the usual public description of each chain. Neither price nor TPS is compared.</p>
     </section>
-
-    <section class="panel compare-panel">
-      <h2>Live comparison</h2>
-      <p class="note">
-        ADDITION column = shipped mainnet. Other columns = typical public characterizations
-        (not ADDITION measurements).
-      </p>
-      <div class="table-wrap">
-        <table class="compare-table">
-          <thead>
-            <tr>
-              <th scope="col">Axis</th>
-              <th scope="col" class="col-addition">ADDITION</th>
-              <th scope="col">Bitcoin</th>
-              <th scope="col">Ethereum</th>
-              <th scope="col">Solana</th>
-              <th scope="col">Monero</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <th scope="row">Consensus</th>
-              <td class="col-addition">UTXO L1 · <code>memory_hard</code> PoW · <code>ADDITION_MAINNET_V1</code></td>
-              <td>UTXO · Nakamoto PoW</td>
-              <td>Account · Proof of Stake</td>
-              <td>Account · PoH + Tower BFT (PoS)</td>
-              <td>UTXO-like · RandomX PoW</td>
-            </tr>
-            <tr>
-              <th scope="row">PoW / energy style</th>
-              <td class="col-addition">Memory-hard scratch over SHA3-512 (target floor in genesis / runbook)</td>
-              <td>SHA-256d · ASIC-oriented</td>
-              <td>N/A (PoS; no PoW mining)</td>
-              <td>N/A (PoS validators)</td>
-              <td>RandomX · CPU-oriented</td>
-            </tr>
-            <tr>
-              <th scope="row">Signatures</th>
-              <td class="col-addition"><code>ML-DSA-87</code> via liboqs · <code>pq_mode=strict</code> · SHA3-512 digests — NIST PQ suite as shipped; not a forever-unbreakable claim</td>
-              <td>ECDSA / Schnorr (secp256k1)</td>
-              <td>ECDSA (secp256k1)</td>
-              <td>Ed25519</td>
-              <td>Ed25519-family / CLSAG stack</td>
-            </tr>
-            <tr>
-              <th scope="row">Privacy (live)</th>
-              <td class="col-addition"><code>privacy_claim=opening_not_zk</code> — SHA3-512 commitment + nullifier opening; the node sees the trapdoor</td>
-              <td>Transparent ledger</td>
-              <td>Transparent ledger</td>
-              <td>Transparent ledger</td>
-              <td>Ring signatures + confidential amounts (RingCT) as public Monero design</td>
-            </tr>
-            <tr>
-              <th scope="row">Finality model</th>
-              <td class="col-addition">Probabilistic PoW (longest / heaviest valid chain)</td>
-              <td>Probabilistic PoW</td>
-              <td>Economic finality under PoS epochs</td>
-              <td>Slot confirmation under PoH / Tower</td>
-              <td>Probabilistic PoW</td>
-            </tr>
-            <tr>
-              <th scope="row">Fee model</th>
-              <td class="col-addition">Genesis / spec <code>min_fee=0</code>; live <code>dynamic_min_fee</code> / fee fields from <code>getinfo</code> when the node answers</td>
-              <td>Fee market / auction</td>
-              <td>EIP-1559 base + tip</td>
-              <td>Priority fees / prioritization</td>
-              <td>Dynamic fees (typical public Monero design)</td>
-            </tr>
-            <tr>
-              <th scope="row">Open mining / join</th>
-              <td class="col-addition">Open: bootstrap <code>&lt;seed&gt;.onion:28546</code>, sync, mine <code>memory_hard</code>; public RPC <code>38546</code> / site <code>/api/rpc</code></td>
-              <td>Open mining + public nodes</td>
-              <td>Validator staking (not open PoW mining)</td>
-              <td>Validator set / stake (not open PoW mining)</td>
-              <td>Open mining + public nodes</td>
-            </tr>
-            <tr>
-              <th scope="row">Height / peers</th>
-              <td class="col-addition">Only live <code>getinfo</code> (strip on this page) — height may be <code>0</code>; no canned stats</td>
-              <td>Public explorers / nodes</td>
-              <td>Public explorers / nodes</td>
-              <td>Public explorers / nodes</td>
-              <td>Public explorers / nodes</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="panel">
-      <h2>What ADDITION ships today</h2>
-      <ul class="compare-ships">
-        <li><strong>Post-quantum spends</strong> — ML-DSA-87 + SHA3-512 on mainnet (<code>pq_mode=strict</code>)</li>
-        <li><strong>Open PoW join</strong> — anyone can bootstrap, sync, and mine <code>memory_hard</code></li>
-        <li><strong>Live network reads</strong> — explorer / status / strip use public <code>getinfo</code> only</li>
-        <li><strong>Opening privacy</strong> — current live claim is <code>opening_not_zk</code> (not zero-knowledge)</li>
-      </ul>
-      <p class="note">
-        Rows that are not live on ADDITION mainnet (throughput races, ZK privacy, separate fast profiles)
-        are omitted here on purpose.
-      </p>
-      <div class="cta-row">
-        <a class="btn btn-primary" href="/join/">Join mainnet</a>
-        <a class="btn btn-secondary" href="/status/">Live status</a>
-        <a class="btn btn-ghost" href="/wallet/">Wallet</a>
-      </div>
-    </section>
-
-    <section class="panel">
-      <h2>Sources / notes</h2>
-      <ul class="note" style="margin:0;padding-left:1.2rem">
-        <li>ADDITION cells: code, genesis, public seed ports, and live <code>getinfo</code> / <code>privacy_claim</code> only.</li>
-        <li>BTC / ETH / SOL / XMR cells: short typical public characterizations of those networks — not measurements taken by ADDITION.</li>
-        <li>No invented ADDITION height, peer count, TPS, or USD ticker on this page.</li>
-        <li>Deeper engineering write-up: <a href="/whitepaper/">whitepaper</a> · join steps: <a href="/join/">/join/</a> · RPC: <a href="/rpc/">/rpc/</a>.</li>
-      </ul>
+    <section class="section"><h2>ADDITION parameters</h2><div class="card2"><table class="spec-table">
+  <tr><th>Signatures</th><td>ML-DSA-87 (NIST FIPS 204) only, via liboqs. No ECDSA, no Falcon. <code>pq_mode=strict</code>.</td></tr>
+  <tr><th>Hashing</th><td>SHA3-512</td></tr>
+  <tr><th>Supply</th><td>50,000,000 ADD hard cap, genesis mints 0, no tail emission</td></tr>
+  <tr><th>Block time</th><td>20 s target, LWMA retarget (180-block window)</td></tr>
+  <tr><th>Block reward</th><td>4 ADD (heights 1 to 5,681,818), 2 ADD (to 11,363,637), then 1 ADD until the cap at height 27,272,727 (about 17.3 years). After that, fees only.</td></tr>
+  <tr><th>Proof of work</th><td>Memory-hard PoW over SHA3-512</td></tr>
+  <tr><th>Staking</th><td>Ticket staking activates at height <strong>14,772,727</strong> (when 37.5M ADD have been emitted, about 9.4 years). From then on 30% of each reward goes to voting stakers. Equivocation is slashed.</td></tr>
+  <tr><th>Private payments</th><td>Shielded pool with STARK proofs, nullifiers and encrypted memos</td></tr>
+  <tr><th>Layer 2</th><td>Payment channels with HTLC multi-hop routing and timelocks</td></tr>
+  <tr><th>Messaging</th><td>AMLS1 end-to-end messaging: ML-DSA-87 identities, ML-KEM-1024 handshake; the node only relays</td></tr>
+  <tr><th>Network</th><td>P2P over Tor v3 onion services with a post-quantum handshake. Mainnet seeds are onion-only, no DNS seeds.</td></tr>
+</table>
+<p class="note">Values come from <code>include/addition/config.hpp</code> in the source code. Throughput is not advertised.</p></div></section>
+    <section class="section">
+      <h2>Side by side</h2>
+      <div class="table-wrap"><table class="blocks-table compare-table">
+        <thead><tr><th>Axis</th><th>ADDITION</th><th>Bitcoin</th><th>Ethereum</th><th>Solana</th><th>Monero</th></tr></thead>
+        <tbody>
+          <tr><th>Status</th><td>Pre-mainnet (testnet)</td><td>Live</td><td>Live</td><td>Live</td><td>Live</td></tr>
+          <tr><th>Signatures</th><td>ML-DSA-87 (post-quantum)</td><td>ECDSA / Schnorr</td><td>ECDSA</td><td>Ed25519</td><td>Ed25519 / CLSAG</td></tr>
+          <tr><th>Consensus</th><td>Memory-hard PoW, then hybrid staking</td><td>PoW (SHA-256d)</td><td>PoS</td><td>PoS + PoH</td><td>PoW (RandomX)</td></tr>
+          <tr><th>Supply</th><td>50M hard cap</td><td>21M hard cap</td><td>No fixed cap</td><td>Inflationary</td><td>Tail emission</td></tr>
+          <tr><th>Block time</th><td>20 s</td><td>~10 min</td><td>12 s</td><td>~0.4 s slots</td><td>~2 min</td></tr>
+          <tr><th>Privacy</th><td>Optional STARK shielded pool</td><td>Transparent</td><td>Transparent</td><td>Transparent</td><td>Private by default</td></tr>
+          <tr><th>Network</th><td>Tor onion P2P</td><td>Clearnet (Tor optional)</td><td>Clearnet</td><td>Clearnet</td><td>Clearnet (Tor/I2P optional)</td></tr>
+        </tbody>
+      </table></div>
     </section>
   </main>
   <footer id="site-footer"></footer>
   <script src="/common.js"></script>
   <script src="/chrome.js"></script>
-  <script>
-    (function () {
-      const S = window.AdditionSite;
-      S.rpcCommand("getinfo").then(function (info) {
-        S.renderLiveStrip(info);
-      });
-    }());
-  </script>
 </body>
 </html>

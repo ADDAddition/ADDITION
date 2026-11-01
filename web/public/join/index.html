@@ -3,141 +3,65 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Get started — ADDITION</title>
-  <meta name="description" content="Join ADDITION_MAINNET_V1. Public seed P2P &lt;seed&gt;.onion:28546, RPC 38546 (read + write). Bitcoin-like self-custody.">
-  <meta name="theme-color" content="#0b1220">
+  <title>Run an ADDITION node</title>
+  <meta name="description" content="Build additiond from source and run a node on the ADDITION research testnet over Tor. Mainnet has not launched.">
+  <meta name="theme-color" content="#070b14">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/favicon.ico">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:title" content="Run an ADDITION node">
+  <meta property="og:description" content="Build additiond from source and run a node on the ADDITION research testnet over Tor. Mainnet has not launched.">
   <meta property="og:image" content="https://additionblockchain.com/og.png">
-  <meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="Get started" data-sub="home node">
+<body>
   <header id="site-header"></header>
-  <div id="live-strip" class="status-strip pending" aria-live="polite">
-    <div class="status-strip-inner">
-      <span id="strip-flag" class="status-flag">…</span>
-      <dl id="strip-cells" class="status-cells"></dl>
-    </div>
-  </div>
-  <main class="prose">
-    <section class="product-hero" style="padding-top:1rem">
-      <p class="eyebrow"><span class="net-badge">MAINNET</span> Home node</p>
-      <h1>Get started</h1>
-      <p class="lede">
-        Run <code>additiond --mainnet</code> on your machine — the same model as Bitcoin.
-        Network <code>ADDITION_MAINNET_V1</code>, P2P bootstrap <code>&lt;seed&gt;.onion:28546</code>,
-        public RPC <code>http://127.0.0.1:38546</code> (read + write allowlist open).
-        Research testnet remains available as a separate chain.
-      </p>
-      <div class="cta-row">
-        <a class="btn btn-primary" href="#mainnet">Mainnet node</a>
-        <a class="btn btn-secondary" href="#testnet">Research testnet</a>
-        <a class="btn btn-ghost" href="/wallet/">Open wallet</a>
+  <main class="page">
+    <section class="hero2">
+      <p class="eyebrow">● Testnet</p>
+      <h1>Run a node</h1>
+      <p class="lede">Build <code>additiond</code> from source and join the research testnet. Your node holds your keys; its write RPC stays on 127.0.0.1.</p>
+    </section>
+    <div class="callout"><strong>Pre-mainnet.</strong> ADDITION mainnet has <em>not</em> launched. The code is public and tested on local and research testnets; there is no live mainnet, no listed coin and no sale.</div>
+    <section class="section">
+      <h2>Steps</h2>
+      <ol class="steps">
+        <li><h3>Install the dependencies</h3><p>A C++20 compiler, CMake, Ninja, OpenSSL and liboqs 0.12 (for ML-DSA-87). The shielded pool also needs a Rust toolchain.</p>
+<pre class="code">sudo apt install build-essential cmake ninja-build libssl-dev tor
+# liboqs 0.12.0
+git clone --depth 1 -b 0.12.0 https://github.com/open-quantum-safe/liboqs
+cmake -S liboqs -B liboqs/build -G Ninja -DCMAKE_INSTALL_PREFIX=$HOME/oqs -DOQS_BUILD_ONLY_LIB=ON
+ninja -C liboqs/build install</pre></li>
+        <li><h3>Build ADDITION</h3>
+<pre class="code">git clone https://github.com/ADDAddition/ADDITION
+cd ADDITION
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$HOME/oqs
+ninja -C build additiond
+ctest --test-dir build    # optional: run the test suite</pre></li>
+        <li><h3>Start Tor and the node</h3><p>Peers connect through Tor v3 onion services. Use the testnet bootstrap peers listed in the repository runbook.</p>
+<pre class="code">sudo systemctl start tor
+./build/additiond --network testnet --onion-only --tor-proxy 127.0.0.1:9050 \
+  --bootstrap &lt;peer&gt;.onion:PORT</pre></li>
+        <li><h3>Create a wallet and mine</h3><p>Commands go to your node's local RPC (one line in, one line out).</p>
+<pre class="code">printf 'createwallet alice\n' | nc 127.0.0.1 8545
+printf 'getinfo\n'            | nc 127.0.0.1 8545</pre></li>
+      </ol>
+    </section>
+    <section class="section">
+      <h2>Mainnet</h2>
+      <p class="sub">The <code>--mainnet</code> profile exists in the code but there is no live mainnet. Its seeds will be Tor onion addresses loaded from <code>seeds-mainnet.txt</code>; that list is empty until real seed nodes are published. See <a href="/docs/runbook/">the runbook</a>.</p>
+      <div class="grid grid-2">
+        <div class="card2"><h3>Ports</h3><p>P2P 28545 (testnet) / 28546 (mainnet). Write RPC on 127.0.0.1 only (8545 / 8546), never expose it. Optional read-only public RPC 38545 / 38546.</p></div>
+        <div class="card2"><h3>Safety</h3><p>Never share your <code>data/wallets/*.wal</code> files, node identity or <code>.env</code>. Nobody from the project will ask for them.</p></div>
       </div>
-    </section>
-
-    <div class="banner">
-      Binary from <a href="https://github.com/ADDAddition/ADDITION">this repo</a> on <code>main</code>.
-      Public RPC is <code>/rpc?cmd=getinfo</code> on seed <code>38546</code> (site <code>/api/rpc</code>).
-      Write allowlist on that port includes <code>createwallet</code>, <code>mine</code>, <code>wallet_send</code>, sign, <code>tx_build</code> (CoS).
-      Home-node write stays on <code>127.0.0.1:8546</code> — never publish <code>8545</code> / <code>8546</code>.
-      Height from live <code>getinfo</code> may be <code>0</code>.
-    </div>
-
-    <section class="panel" id="mainnet">
-      <h2>Public mainnet</h2>
-      <p>
-        Public product: <code>network_id=ADDITION_MAINNET_V1</code>.
-        Anyone can run a home node, sync from the public seed, mine, and use wallet RPCs —
-        the same model as <code>bitcoind</code> against a known bootstrap peer.
-      </p>
-      <p>
-        Public seed: <strong>&lt;seed&gt;.onion:28546</strong> (P2P) and
-        <strong>127.0.0.1:38546</strong> (HTTP).
-        Site <code>/api/rpc</code> proxies that path.
-        Separate chain from research testnet (<code>28545</code> / <code>38545</code>).
-      </p>
-      <p>Full runbook: <a href="https://github.com/ADDAddition/ADDITION/blob/main/docs/MAINNET_RUNBOOK.md">docs/MAINNET_RUNBOOK.md</a>.</p>
-
-      <h3>Mainnet ports</h3>
-      <table>
-        <tr><th>Port</th><th>Role</th></tr>
-        <tr><td>38546</td><td>Public HTTP on the seed (<code>/rpc?cmd=…</code>). Site <code>/api/rpc</code>. Write allowlist open (createwallet / mine / wallet_send / sign / tx_build).</td></tr>
-        <tr><td>28546</td><td>Public P2P bootstrap on the seed</td></tr>
-        <tr><td>8546</td><td>Home-node write RPC on <code>127.0.0.1</code> only — never publish. Wallet falls back here via <code>/local-rpc</code> if public RPC is offline.</td></tr>
-      </table>
-
-      <h3>Start a mainnet node</h3>
-      <p>Set <code>ADDITION_PRIVACY_MASTER_KEY</code> (32+ characters), build <code>additiond</code> from <code>main</code>, then:</p>
-      <pre>export ADDITION_PRIVACY_MASTER_KEY='replace-with-32-or-more-chars____'
-export ADDITION_ENABLE_P2P_RPC=1
-additiond --mainnet --data-dir $HOME/addition-mainnet --local-rpc-port 8546 --p2p-port 28547 --bootstrap &lt;seed&gt;.onion:28546</pre>
-      <p>Type <code>sync</code> on the daemon stdin (or send it to write RPC on <code>127.0.0.1:8546</code> or public <code>38546</code>), then <code>getinfo</code>. Mine with <code>memory_hard</code> on either path when you want to produce blocks.</p>
-      <p>Never <code>--bootstrap &lt;seed&gt;.onion:28545</code> for mainnet (that is the research testnet seed). Never publish port <code>8546</code>. Auto-mine is refused on mainnet.</p>
-
-      <h3>Mainnet public RPC</h3>
-      <pre>curl -s 'http://127.0.0.1:38546/rpc?cmd=getinfo'
-curl -s 'https://additionblockchain.com/api/rpc?cmd=getinfo'</pre>
-      <p>Expect <code>network=mainnet</code> and <code>network_id=ADDITION_MAINNET_V1</code>. Height may still be <code>0</code>; copy only fields the node prints. Do not invent peer counts or TPS.</p>
-      <p>On the seed, <code>createwallet</code> / <code>mine</code> / <code>wallet_send</code> / sign / <code>tx_build</code> answer on <code>38546</code> (CoS write allowlist). The site wallet prefers that public path via <code>/api/rpc</code>, with a loopback fallback to <code>/local-rpc</code> if offline.</p>
-      <p>Seed operator: <code>ADDITION_ADVERTISED_P2P=&lt;seed&gt;.onion:28546</code> so public <code>getinfo</code> / <code>peers</code> list that IPv4 endpoint and do not list <code>self</code>.</p>
-    </section>
-
-    <section class="panel" id="testnet">
-      <h2>Research testnet</h2>
-      <p>Separate research chain (<code>ADDITION_TESTNET_V1</code>). Not the public product on this site.</p>
-      <table>
-        <tr><th>Port</th><th>Role</th></tr>
-        <tr><td>38545</td><td>Public read RPC for the research chain</td></tr>
-        <tr><td>28545</td><td>P2P bootstrap for the research chain</td></tr>
-        <tr><td>8545</td><td>Write RPC on <code>127.0.0.1</code> only. Never publish.</td></tr>
-      </table>
-
-      <h3>Start a testnet node</h3>
-      <p>Build <code>additiond</code> from <code>main</code>, then:</p>
-      <pre>additiond --network testnet --data-dir $HOME/addition-testnet --local-rpc-port 8545 --p2p-port 28547 --bootstrap &lt;seed&gt;.onion:28545</pre>
-      <p>Type <code>sync</code> on the daemon stdin (or send it to write RPC on <code>127.0.0.1</code>). Height should move.</p>
-      <p><code>addpeer</code> after <code>--bootstrap</code> is <code>invalid/duplicate</code> (the seed is already listed).</p>
-
-      <h3>Public read (testnet)</h3>
-      <pre>curl 'http://127.0.0.1:38545/rpc?cmd=getinfo'</pre>
-      <p>Those curls succeed only when the operator seed answers. If they timeout, run your own <code>--network testnet</code> node.</p>
-      <p>Seed operator: <code>ADDITION_ADVERTISED_P2P=&lt;seed&gt;.onion:28545</code>.</p>
-    </section>
-
-    <section class="panel">
-      <h2>Wallet</h2>
-      <p>
-        The <a href="/wallet/">Wallet</a> page prefers public mainnet write on
-        <code>38546</code> via <code>/api/rpc</code>.
-        If that path is offline, run <code>ADDITION_NETWORK=mainnet python3 web/serve.py</code>
-        next to a home node so <code>/local-rpc</code> reaches <code>127.0.0.1:8546</code>.
-      </p>
-      <div class="tool-grid">
-        <a href="/wallet/"><strong>Wallet</strong><span>Receive, send, activity — public 38546 or home node</span></a>
-        <a href="/download/"><strong>Download</strong><span>Desktop helper, loopback RPC only</span></a>
-        <a href="/local/"><strong>Local tools</strong><span>Operator forms (tokens, swap, privacy)</span></a>
-        <a href="/status/"><strong>Status</strong><span>Public mainnet getinfo</span></a>
-      </div>
-      <p class="note">Privacy is ML-DSA / SHA3 opening (<code>opening_not_zk</code>), not a ZK circuit. Coinbase is 50 ADD, 100% to the finding miner. Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
     </section>
   </main>
   <footer id="site-footer"></footer>
   <script src="/common.js"></script>
   <script src="/chrome.js"></script>
-  <script>
-    (function () {
-      const S = window.AdditionSite;
-      S.rpcCommand("getinfo").then(function (info) {
-        S.renderLiveStrip(info);
-      });
-    }());
-  </script>
 </body>
 </html>

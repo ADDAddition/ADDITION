@@ -1,25 +1,23 @@
 # ADDITION wallet
 
-Public product: **ADDITION_MAINNET_V1**. Anyone can sync, mine, and use wallet
-RPCs against the public seed, or run a home node with loopback write.
+**Pre-mainnet.** The mainnet profile `ADDITION_MAINNET_V1` is implemented but has not
+launched. Wallet commands run only on your own node over loopback.
 
 Public contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com)
 
 ## Networks
 
-| | Public mainnet | Research testnet (secondary) |
+| | Mainnet profile (not launched) | Research testnet |
 |---|---|---|
 | Flag | `additiond --mainnet` | `additiond --network testnet` |
 | `network_id` | `ADDITION_MAINNET_V1` | `ADDITION_TESTNET_V1` |
 | Home-node write RPC | `127.0.0.1:8546` | `127.0.0.1:8545` |
-| Public RPC | `127.0.0.1:38546` | `127.0.0.1:38545` |
+| Public RPC (read-only) | `38546` | `38545` |
 | P2P bootstrap | `<seed>.onion:28546` | `<seed>.onion:28545` |
 
-Public seed **38546** write allowlist is open (CoS): `createwallet`, `mine`,
-`wallet_send`, `wallet_sign` / `sign_message`, `tx_build` / `sendtx_signed*`.
-Site `/wallet/` prefers `/api/rpc` → that public path; falls back to
-`/local-rpc` → loopback when public RPC is offline. Height from live `getinfo`
-may still be `0` — do not invent TPS or a USD ticker.
+The public RPC is read-only (`getinfo`, `monetary_info`, `crypto_selftest`,
+`tx_status`, `peers`, `getblock`, `getblockhash`, `getblockraw`). Site `/wallet/`
+talks only to `/local-rpc` → your loopback node. Do not invent TPS or a USD ticker.
 
 Never bind home-node write RPC to `0.0.0.0`. Never publish `8545` / `8546`.
 
@@ -73,7 +71,7 @@ mode `0600`) and is used only in-process to sign `sign_hash`.
 
 ### Prerequisites
 
-* A reachable TEXT RPC: home node `127.0.0.1:8546` (mainnet) / `8545` (testnet), or public `127.0.0.1:38546` when write is open
+* A reachable TEXT RPC: home node `127.0.0.1:8546` (mainnet) / `8545` (testnet)
 * Python 3.10+
 * `liboqs` on the library path (the same library used to build `additiond`)
 
@@ -139,10 +137,9 @@ The client refuses to emit `sendtx`, `sendtx_hash`, or `sign_message`.
 ```
 
 Windows: `powershell -File scripts\build_wallet.ps1`. Details in
-[`packaging/README.md`](../packaging/README.md). The public `/download/` page
-links those files as mainnet helpers (default write `127.0.0.1:8546`). The
-desktop helper refuses non-loopback RPC hosts. The in-browser `/wallet/` page
-prefers public `38546` write via `/api/rpc` when available.
+[`packaging/README.md`](../packaging/README.md). No prebuilt helper is
+published on the site yet. The desktop helper refuses non-loopback RPC hosts. The
+in-browser `/wallet/` page talks only to your loopback node via `/local-rpc`.
 
 ### Tests without a running daemon
 

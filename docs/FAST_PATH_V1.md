@@ -21,7 +21,7 @@ Brand: **ADDITION** only.
 | Parallel execution workers / state apply | **Scaffold** — not shipped |
 | Replica verify / network commit | **Scaffold** — not shipped |
 | Measured throughput RPC / published TPS | **Forbidden** until measured (`throughput_claim=none`) |
-| Live public product | remains **memory_hard** mainnet |
+| Mainnet profile | remains **memory_hard** PoW (mainnet not launched) |
 
 `fast_path_slice=pipeline_stages_typed_v1` names this fill. It does **not** set
 `fast_path_shipped=true` and does **not** allow boot.
@@ -47,7 +47,7 @@ A **separate network id** so the fast path cannot be confused with mainnet PoW:
    distinct genesis timestamp / data dir / ports from mainnet and testnet.
 2. **Consensus sketch** — leader schedules, pipelined block propagation, and
    parallel transaction execution. PoW is not the latency path; mainnet keeps
-   memory-hard PoW for the public product.
+   memory-hard PoW for the mainnet profile.
 3. **Crypto unchanged** — ML-DSA-87 / SHA3-512, `pq_mode=strict`. Privacy
    labels stay accurate (`opening_not_zk` live; `zk_pending` stub).
 4. **This fill PR** — typed pipeline stages + fail-closed message validation

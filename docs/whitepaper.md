@@ -1,26 +1,26 @@
 # ADDITION Technical Whitepaper
 
 **Brand:** ADDITION (never “SmartChain”)  
-**Network (public product):** `ADDITION_MAINNET_V1` / `addition-mainnet`  
+**Network status:** pre-mainnet. The mainnet profile (`ADDITION_MAINNET_V1`) is implemented but **has not launched**. Public nodes run the research testnet.  
 **Canonical source:** [github.com/ADDAddition/ADDITION](https://github.com/ADDAddition/ADDITION)  
 **Contact:** [contact@additionblockchain.com](mailto:contact@additionblockchain.com)  
-**Status:** Engineering description of the C++20 node, configs, and live public RPC. Values that can change (height, peers, fees) come only from live `getinfo` / related RPCs.
+**Status:** Engineering description of the C++20 node and its configs. Values that can change (height, peers, fees) come only from live `getinfo` / related RPCs.
 
 This document supersedes the short sketch in `docs/WHITE_PAPER.md`.
 
 ---
 
-## What ships on mainnet
+## Mainnet profile (implemented, not launched)
 
-| Topic | Live public product |
+| Topic | Mainnet profile in the code |
 | --- | --- |
 | Network | `ADDITION_MAINNET_V1`, `memory_hard` PoW |
 | Height / peers / fees | Copy live `getinfo` only (height may be `0`) |
 | Privacy | `privacy_claim=opening_not_zk` (SHA3-512 opening; node sees trapdoor) |
 | PQ crypto | **ML-DSA-87** + **SHA3-512**, `pq_mode=strict` — not a forever-unbreakable claim |
-| Throughput claim | `throughput_claim=none` on the live product (no invented TPS) |
+| Throughput claim | `throughput_claim=none` (no invented TPS) |
 
-- Public product **`ADDITION_MAINNET_V1`**: UTXO L1, P2P seed, public RPC, wallet spend path with **ML-DSA-87** / **SHA3-512** / `pq_mode=strict`
+- Mainnet profile **`ADDITION_MAINNET_V1`**: UTXO L1, Tor onion P2P seeds (none published yet), read-only public RPC, wallet spend path with **ML-DSA-87** / **SHA3-512** / `pq_mode=strict`
 - Mainnet PoW **`memory_hard`** at target floor **`0x000000FFFFFFFFFF`**
 - Privacy opening path: `privacy_mint_open` / `privacy_spend_open` labeled **`opening_not_zk`**
 - Height and monetary fields from **live `getinfo` / `monetary_info` only**
@@ -47,7 +47,7 @@ This document supersedes the short sketch in `docs/WHITE_PAPER.md`.
 
 ## 1. Abstract and motivation
 
-ADDITION is a Bitcoin-like Layer 1: a single C++20 daemon (`additiond`), a UTXO ledger, peer-to-peer gossip, and text/HTTP RPC. The public product network is **ADDITION_MAINNET_V1** — a decentralized public mainnet that anyone can join by bootstrapping the published seed, syncing, mining, and using wallet RPCs (same operational model as running `bitcoind` against a known bootstrap peer).
+ADDITION is a Bitcoin-like Layer 1: a single C++20 daemon (`additiond`), a UTXO ledger, peer-to-peer gossip, and text/HTTP RPC. The mainnet profile **ADDITION_MAINNET_V1** is designed so anyone can join by bootstrapping from published onion seeds, syncing, mining, and using wallet RPCs on their own node (the same model as running `bitcoind`). Mainnet has not launched yet and no seeds are published.
 
 The design priority is **post-quantum signatures at the protocol layer**. Spend transactions require **ML-DSA-87** (FIPS 204) via liboqs in `pq_mode=strict`. Hashing and PoW use **SHA3-512** (OpenSSL), with mainnet PoW wrapped in a memory-hard scratch (`memory_hard`).
 
@@ -236,17 +236,17 @@ From `genesis-mainnet.json`, `config-mainnet.toml`, and `mainnet_chain_config()`
 
 ## 7. Networks and ports
 
-Public product profile:
+Mainnet profile:
 
-| | Public mainnet |
+| | Mainnet profile (not launched) |
 | --- | --- |
 | Flag | `additiond --mainnet` |
 | `network_id` | `ADDITION_MAINNET_V1` |
 | Genesis | `genesis-mainnet.json` (`timestamp` 1770000000) |
 | Default data dir | `data-mainnet` |
 | Home-node write RPC | **`127.0.0.1:8546`** |
-| Public HTTP | **`38546`** (seed `127.0.0.1:38546`) |
-| P2P | **`28546`** (seed `<seed>.onion:28546`) |
+| Public HTTP (read-only) | **`38546`** |
+| P2P | **`28546`** (seeds `<seed>.onion:28546` from `seeds-mainnet.txt`) |
 | Consensus | `memory_hard` |
 
 **Hard rules:**
@@ -256,39 +256,29 @@ Public product profile:
 - Mixing another network’s `blocks.dat` into a mainnet `--data-dir` is refused
 - Seed operators set `ADDITION_ADVERTISED_P2P=<seed>.onion:28546` so public `getinfo` / `peers` advertise that IPv4 endpoint and do not list `self`
 
-A separate testnet profile (`ADDITION_TESTNET_V1`, ports `28545` / `38545`) exists in the same binary for operators; it is **not** the public product on this site. See `/join/#testnet`.
+A separate testnet profile (`ADDITION_TESTNET_V1`, ports `28545` / `38545`) exists in the same binary for operators; it is what public nodes run today. See `/join/`.
 
 ---
 
 ## 8. Public RPC
 
-**Seed:** `127.0.0.1:38546`  
 **Site proxy:** `/api/rpc` (Cloudflare Worker → `PUBLIC_RPC_HTTP`)
 
 Read path (stock allowlist in `rpc_access.cpp` `is_public_read_command`): `getinfo`, `monetary_info`, `crypto_selftest`, `tx_status`, `peers`, `getblock`, `getblockhash`, `getblockraw`.
 
-**Write allowlist (CoS / public product, documented in `MAINNET_RUNBOOK.md`):** on seed `38546`, the following answer for join/wallet flows:
-
-- `createwallet`
-- `mine`
-- `wallet_send`
-- sign (`wallet_sign` / `sign_message`)
-- `tx_build` / `sendtx_signed*`
-
-Home operators still keep trusted write on **`127.0.0.1:8546`**. The site wallet prefers `/api/rpc` → public `38546`, with a loopback fallback to `/local-rpc` when public RPC is offline.
+Every other command (wallet, mining, send, signing) is refused on the public port and only answers on loopback (`127.0.0.1:8546` mainnet profile / `8545` testnet) on your own node. The site wallet talks only to `/local-rpc` on loopback.
 
 Example:
 
 ```bash
-curl -s 'http://127.0.0.1:38546/rpc?cmd=getinfo'
-curl -s 'http://127.0.0.1:38546/jsonrpc?method=getinfo'
+curl -s 'http://127.0.0.1:38545/rpc?cmd=getinfo'   # testnet node with --public-rpc
 ```
 
 ---
 
 ## 9. Wallet and transactions
 
-### 9.1 Wallet and spends (public product path)
+### 9.1 Wallet and spends (on your own node)
 
 - `createwallet [name] [scheme]` — default ML-DSA-87; keys in `data/wallets/<name>.wal` (`priv_printed=0`)
 - `wallet_send <name> <to> <amount> [fee]` — node signs from the `.wal`; no privkey on the wire
@@ -296,9 +286,9 @@ curl -s 'http://127.0.0.1:38546/jsonrpc?method=getinfo'
 - Legacy `sendtx` with privkey on the line stays disabled unless `ADDITION_ALLOW_INSECURE_TX_COMMANDS=1` (leave unset)
 - Standalone CLI: `web/addition_wallet.py` (keys on caller disk)
 
-Site UI: `/wallet/` — product surface for mainnet.
+Site UI: `/wallet/`. It talks only to your own node over loopback (`/local-rpc`).
 
-### 9.2 What is not a public product on this site
+### 9.2 What is out of scope
 
 Loopback-only token / KV / swap / bridge operators tools may exist next to a home node. They are **not** a public DEX, Uniswap fork, mainnet token sale, or live cross-chain bridge. Do not invent liquidity, TVL, listing prices, or foreign-chain custody.
 
@@ -312,7 +302,7 @@ Loopback-only token / KV / swap / bridge operators tools may exist next to a hom
 2. **SHA3-512** remains a secure hash for commitments and PoW digests under current public cryptanalysis.
 3. **Majority of hashrate** under memory-hard PoW (same economic assumption family as Bitcoin PoW — not proven by this paper).
 4. Operators protect `ADDITION_PRIVACY_MASTER_KEY`, wallet `.wal` files, and never expose home write RPC beyond loopback.
-5. Public seed write allowlist is an operational trust surface: anyone who can reach those RPCs can create wallets / mine / send as allowed — treat keys and node storage accordingly.
+5. The public RPC is read-only (`is_public_read_command`). Anyone who can reach a node's loopback write RPC controls its wallets, so it must never be exposed.
 
 ### Threat model — what privacy is NOT
 
@@ -329,7 +319,7 @@ An observer with node access or the master key can open commitments. This is **n
 
 ## 11. Live network fields
 
-**Live public `getinfo`** (fetched from seed `127.0.0.1:38546` via `/api/rpc` — height may be `0`; peers change; never a canned marketing number). Prefer [`/status/`](/status/) for the full panel.
+**Live public `getinfo`** (fetched via `/api/rpc` from the site's read-only node; check `network_id` in the answer; height and peers change, no canned numbers). Prefer [`/status/`](/status/) for the full panel.
 
 @@LIVE_GETINFO_SNAPSHOT@@
 
@@ -339,7 +329,7 @@ An observer with node access or the master key can open commitments. This is **n
 | Height | From live `getinfo` only — **may be `0`** |
 | `pq_mode` / algs | `strict` / `ml-dsa-87` + SHA3-512 (confirm via live fields) |
 | `privacy_claim` | From live `getinfo` (opening is `opening_not_zk`) |
-| `consensus_path` | `memory_hard_pow` on mainnet |
+| `consensus_path` | `memory_hard_pow` on the mainnet profile |
 | `throughput_claim` | `none` |
 | `peers=…` | Live query only — not a permanent marketing number |
 
@@ -347,7 +337,9 @@ No USD ticker (`price_usd` stays null on the site API).
 
 ---
 
-## 12. How to join
+## 12. How to join (after launch)
+
+Mainnet has not launched and `seeds-mainnet.txt` is still empty, so these steps are the planned procedure. Today, use the testnet on [/join/](https://additionblockchain.com/join/).
 
 1. Read **[/join/](https://additionblockchain.com/join/)** on the site
 2. Follow **[`docs/MAINNET_RUNBOOK.md`](MAINNET_RUNBOOK.md)** in this repository
@@ -361,7 +353,7 @@ export ADDITION_ENABLE_P2P_RPC=1
   --local-rpc-port 8546 \
   --p2p-port 28547 \
   --bootstrap <seed>.onion:28546
-# sync, then getinfo; mine on 127.0.0.1:8546 or public 38546 write allowlist
+# sync, then getinfo; mine on your own 127.0.0.1:8546
 ```
 
 Never publish port `8546`. Auto-mine stays off on mainnet.
@@ -376,4 +368,4 @@ MIT-licensed software. This whitepaper is engineering documentation, not an audi
 
 ---
 
-*Sources: `include/addition/config.hpp`, `src/crypto.cpp`, `src/chain.cpp`, `src/privacy.cpp`, `src/auto_mine.cpp`, `src/rpc_access.cpp`, `src/rpc_server.cpp`, `genesis-mainnet.json`, `config-mainnet.toml`, `docs/MAINNET_RUNBOOK.md`, `docs/ARCHITECTURE.md`, `docs/WALLET.md`, and live RPCs on `127.0.0.1:38546`.*
+*Sources: `include/addition/config.hpp`, `src/crypto.cpp`, `src/chain.cpp`, `src/privacy.cpp`, `src/auto_mine.cpp`, `src/rpc_access.cpp`, `src/rpc_server.cpp`, `genesis-mainnet.json`, `config-mainnet.toml`, `docs/MAINNET_RUNBOOK.md`, `docs/ARCHITECTURE.md`, `docs/WALLET.md`, `docs/ONION_SEEDS.md`.*

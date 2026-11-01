@@ -160,9 +160,7 @@
       : "No address yet — create or open a wallet";
     el("recv-addr").value = state.address || "";
     const meta = el("home-meta");
-    const pathLabel = state.via === "public"
-      ? "public 38546 write"
-      : state.via === "local"
+    const pathLabel = state.via === "local"
         ? "loopback write"
         : "RPC";
     meta.textContent = "Wallet “" + state.name + "” · " + pathLabel;
@@ -231,7 +229,7 @@
     const height = Object.prototype.hasOwnProperty.call(r.fields, "height")
       ? r.fields.height
       : "unavailable";
-    const tag = state.via === "public" ? "Public" : "Local";
+    const tag = "Local";
     setPill("ok", tag + " · " + net + " · h=" + height);
     L.setButtons(true);
     await enterApp();

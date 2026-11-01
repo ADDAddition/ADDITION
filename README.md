@@ -3,12 +3,12 @@
 </p>
 
 <h1 align="center">ADDITION</h1>
-<p align="center"><b>C++20 Layer 1 · ML-DSA-87 · SHA3-512 · public product: mainnet</b></p>
+<p align="center"><b>C++20 Layer 1 · ML-DSA-87 · SHA3-512 · pre-mainnet (testnet)</b></p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT">
   <img src="https://img.shields.io/badge/C%2B%2B-20-00599C?style=for-the-badge" alt="C++20">
-  <img src="https://img.shields.io/badge/public_product-mainnet-brightgreen?style=for-the-badge" alt="Public product: mainnet">
+  <img src="https://img.shields.io/badge/status-pre--mainnet-orange?style=for-the-badge" alt="Status: pre-mainnet">
   <img src="https://img.shields.io/badge/crypto-ML--DSA--87-red?style=for-the-badge" alt="ML-DSA-87">
   <img src="https://img.shields.io/badge/Supply-50M_Hard_Cap-gold?style=for-the-badge" alt="Supply 50M">
 </p>
@@ -23,7 +23,7 @@
 
 ---
 
-**ADDITION** is a C++20 Layer 1 node (`additiond`): SHA3-512 hashing, ML-DSA-87 signatures, hash-committed addresses, and SHA3 commitment openings. The public site [additionblockchain.com](https://additionblockchain.com) presents **ADDITION_MAINNET_V1** (public RPC `127.0.0.1:38546` / site `/api/rpc`). Research testnet remains a separate chain.
+**ADDITION** is a C++20 Layer 1 node (`additiond`): SHA3-512 hashing, ML-DSA-87 signatures, hash-committed addresses, and SHA3 commitment openings. Mainnet (**ADDITION_MAINNET_V1**) is implemented but **has not launched**; public nodes run the research testnet. Site: [additionblockchain.com](https://additionblockchain.com).
 
 ### Technical matrix
 
@@ -41,14 +41,14 @@
 
 ## Networks
 
-| | Research testnet | Public mainnet |
+| | Research testnet | Mainnet profile (not launched) |
 | :--- | :--- | :--- |
 | Flag | `additiond --network testnet` | `additiond --mainnet` |
 | `network_id` | `ADDITION_TESTNET_V1` | `ADDITION_MAINNET_V1` |
 | Genesis | [`genesis.json`](genesis.json) | [`genesis-mainnet.json`](genesis-mainnet.json) |
 | Bootstrap | `<seed>.onion:28545` | `<seed>.onion:28546` |
 | Public RPC | `127.0.0.1:38545` | `127.0.0.1:38546` / site `/api/rpc` |
-| Role | Research chain (separate) | Public product — explorer, join, wallet PWA |
+| Role | Research chain (separate) | Mainnet profile (not launched) |
 
 `--mainnet` is the public ADDITION mainnet (`ADDITION_MAINNET_V1`), a separate chain from the research testnet. See [docs/MAINNET_RUNBOOK.md](docs/MAINNET_RUNBOOK.md) and the mainnet section in [`join.md`](web/public/join.md).
 
@@ -63,7 +63,7 @@ What `main` ships:
 - **Addresses** — hash-committed: `SHA3-512(scheme_id || 0x00 || pubkey)` (128 hex)
 - **Privacy** — SHA3-512 commitment + nullifier **opening** (`privacy_mint_open` / `privacy_spend_open`). A hash relation, not ZK
 - **SLH-DSA** — opt-in vault (`slh-dsa-shake-256s`) when this liboqs can sign with a non-empty context; otherwise disabled
-- **RPC** — home-node write on `127.0.0.1:8546` (mainnet). Public seed `127.0.0.1:38546` write allowlist is open per CoS (`createwallet`, `mine`, `wallet_send`, sign, `tx_build`). Site wallet prefers `/api/rpc` → that path, with `/local-rpc` loopback fallback. Height from live `getinfo` may be `0`.
+- **RPC** — home-node write on `127.0.0.1:8546` (mainnet). The public RPC (`38546` mainnet profile / `38545` testnet) is read-only. The site wallet only talks to `/local-rpc` → your loopback node.
 
 Whole integers. No 8-decimal subunit. Block reward `50` (100% to finding miner), `max_supply` `50000000`, min fee `0`.
 
@@ -71,7 +71,7 @@ Whole integers. No 8-decimal subunit. Block reward `50` (100% to finding miner),
 
 ## Cashiers / Windows
 
-Cashiers and Windows users download the live mainnet / local wallet from [https://additionblockchain.com/download/](https://additionblockchain.com/download/) only (`addition-wallet-mainnet` and `addition-wallet-cli-mainnet`). Do not compile liboqs. There is no Windows compile path in this README. This host does not publish a `.exe`.
+No prebuilt or signed binaries are published yet. Build from source as described below.
 
 The helper talks to write RPC on `127.0.0.1:8546` on the machine that already runs `additiond --mainnet`. The desktop binary refuses non-loopback hosts. The in-browser `/wallet/` page prefers public `38546` write via `/api/rpc` when available.
 

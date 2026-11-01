@@ -3,78 +3,39 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Download — ADDITION</title>
-  <meta name="description" content="ADDITION desktop wallet helper for mainnet. Loopback write RPC only. Browser wallet can use public 38546.">
-  <meta name="theme-color" content="#0b1220">
+  <title>Build and download ADDITION</title>
+  <meta name="description" content="How to get ADDITION: build from source. There is no official binary release yet.">
+  <meta name="theme-color" content="#070b14">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/favicon.ico">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:title" content="Build and download ADDITION">
+  <meta property="og:description" content="How to get ADDITION: build from source. There is no official binary release yet.">
   <meta property="og:image" content="https://additionblockchain.com/og.png">
-  <meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="Download" data-sub="mainnet / local">
+<body>
   <header id="site-header"></header>
-  <main class="prose">
-    <section class="product-hero" style="padding-top:1rem;padding-bottom:0.25rem">
-      <p class="eyebrow">Desktop helper</p>
-      <h1>Download</h1>
-      <p class="lede">
-        Mainnet / local wallet helper for <code>ADDITION_MAINNET_V1</code>.
-        This desktop binary talks only to loopback write (<code>127.0.0.1:8546</code>).
-        Prefer the in-browser <a href="/wallet/">Wallet</a> when you want public seed write on
-        <code>38546</code> via <code>/api/rpc</code> (createwallet / mine / wallet_send open per CoS).
-      </p>
+  <main class="page">
+    <section class="hero2">
+      <p class="eyebrow">● Source only</p>
+      <h1>Build &amp; download</h1>
+      <p class="lede">There is no official signed release of ADDITION yet. Build from source so you know exactly what you run.</p>
+      <div class="cta-row"><a class="btn btn-primary" href="/join/">Build instructions</a><a class="btn btn-secondary" href="https://github.com/ADDAddition/ADDITION" rel="noopener">GitHub repository</a></div>
     </section>
-
-    <div class="banner">
-      Not a hosted custodial wallet. Desktop helper keys stay on disk and refuse any RPC host other than loopback.
-      Public seed <code>127.0.0.1:38546</code> write allowlist is open for the site wallet / curl;
-      this binary still stays loopback-only for self-custody on your machine.
+    <div class="callout"><strong>Pre-mainnet.</strong> ADDITION mainnet has <em>not</em> launched. The code is public and tested on local and research testnets; there is no live mainnet, no listed coin and no sale.</div>
+    <section class="section"><div class="grid grid-2">
+      <div class="card2"><h3>Node (additiond)</h3><p>C++20, Linux and macOS. Build steps are on <a href="/join/">Run a node</a>.</p></div>
+      <div class="card2"><h3>Wallet</h3><p>Use the <a href="/wallet/">browser wallet</a> against your own local node, or the Python helper <code>web/addition_wallet.py</code> in the repository. Mobile apps are in development and not published.</p></div>
     </div>
-
-    <section class="panel">
-      <h2>What this is</h2>
-      <ul>
-        <li>A desktop helper packaged from <code>web/addition_wallet_gui.py</code> and <code>web/addition_wallet.py</code></li>
-        <li>Talks only to <code>127.0.0.1:8546</code> by default (or <code>::1</code> / <code>localhost</code>)</li>
-        <li>Refuses any other RPC host — including public <code>38545</code> / <code>38546</code> / <code>:80</code></li>
-        <li>Never prints a private key</li>
-        <li>Needs a local <code>additiond --mainnet</code> with write RPC on loopback</li>
-      </ul>
-      <p class="note">The public <a href="/wallet/">/wallet/</a> page prefers <code>/api/rpc</code> → <code>38546</code> write when available, with <code>/local-rpc</code> loopback fallback. PWA install uses the same path.</p>
-    </section>
-
-    <section class="panel">
-      <h2>Cashiers / Windows</h2>
-      <p>Download the live wallet files on this page. Do not compile. There is no Windows compile path here. This host does not publish a <code>.exe</code>.</p>
-      <p><a href="/download/addition-wallet-mainnet">addition-wallet-mainnet</a> — GUI + <code>--cli</code></p>
-      <p><a href="/download/addition-wallet-cli-mainnet">addition-wallet-cli-mainnet</a> — caller-disk CLI</p>
-      <p>Run against a local <code>additiond --mainnet</code> on <code>127.0.0.1:8546</code>.</p>
-    </section>
-
-    <section class="panel">
-      <h2>Linux (mainnet / local)</h2>
-      <p>These are Linux commands. Do not paste them into PowerShell.</p>
-      <p><a href="/download/addition-wallet-mainnet">addition-wallet-mainnet</a> — GUI + <code>--cli</code></p>
-      <p><a href="/download/addition-wallet-cli-mainnet">addition-wallet-cli-mainnet</a> — caller-disk CLI</p>
-      <pre>chmod +x addition-wallet-mainnet
-# terminal 1
-additiond --mainnet --data-dir $HOME/addition-mainnet --local-rpc-port 8546
-# terminal 2
-./addition-wallet-mainnet --cli getinfo
-# optional GUI (needs a display)
-./addition-wallet-mainnet</pre>
-    </section>
-
-    <section class="panel">
-      <h2>Install the website as an app</h2>
-      <p>On iPhone: Safari → Share → Add to Home Screen. On Android: Chrome → Install app / Add to Home screen. That installs this PWA; spend prefers public <code>38546</code> via <code>/api/rpc</code>, with home-node fallback.</p>
-      <p>Contact: <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
-    </section>
+    <div class="callout info"><strong>Be careful:</strong> any "ADDITION wallet" download offered somewhere other than the GitHub repository is not from this project.</div></section>
   </main>
   <footer id="site-footer"></footer>
+  <script src="/common.js"></script>
   <script src="/chrome.js"></script>
 </body>
 </html>
