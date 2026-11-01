@@ -171,17 +171,17 @@ inline constexpr const char* kOperatorPublicP2p = "34.27.30.115:28545";
 // Legacy clearnet mainnet seed. NOT a default any more (kept only so configs
 // that still list it can be recognised); mainnet defaults to onion seeds.
 inline constexpr const char* kOperatorPublicMainnetP2p = "34.27.30.115:28546";
-// Mainnet bootstrap seeds are Tor v3 onions (docs/ONION_SEEDS.md).
-// PLACEHOLDERS until the real mainnet seed onions are generated: entries
-// starting with "placeholder" are well-formed but never dialed. With only
-// placeholders, --mainnet has no default seed and the operator must pass
-// --bootstrap <onion>:28546 (plus --tor-proxy).
-inline constexpr const char* kMainnetOnionSeeds[] = {
-    "placeholdermainnetseedaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.onion:28546",
-    "placeholdermainnetseedbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.onion:28546",
-};
-bool is_placeholder_seed(const std::string& endpoint);
-// Real (non-placeholder) mainnet onion seeds; empty while all are placeholders.
+// Mainnet bootstrap seeds are Tor v3 onions loaded from a seed file
+// (docs/ONION_SEEDS.md). No seed address is compiled into the binary.
+// File format: one "<56-char-v3>.onion:PORT" per line, '#' comments, blank lines ok.
+// Default path: $ADDITION_SEEDS_FILE, else "seeds-mainnet.txt" (cwd); override
+// with --seeds-file PATH. A malformed file is an error (fail closed).
+inline constexpr const char* kDefaultMainnetSeedFile = "seeds-mainnet.txt";
+std::string default_mainnet_seed_file();
+// Full rend-spec-v3 check (base32, version 3, SHA3-256 checksum) of "<onion>:PORT".
+bool onion_v3_checksum_ok(const std::string& endpoint);
+bool load_seed_file(const std::string& path, std::vector<std::string>& out, std::string& error);
+// Seeds from default_mainnet_seed_file(); empty if the file is absent, empty or invalid.
 std::vector<std::string> mainnet_default_seeds();
 
 bool is_ipv4_endpoint(const std::string& endpoint);

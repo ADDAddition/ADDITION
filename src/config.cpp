@@ -2,6 +2,8 @@
 #include "addition/net_transport.hpp"
 #include "addition/fast_path.hpp"
 
+#include <openssl/evp.h>
+
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
@@ -670,15 +672,85 @@ ChainConfig mainnet_chain_config() {
     return cfg;
 }
 
-bool is_placeholder_seed(const std::string& endpoint) {
-    return endpoint.rfind("placeholder", 0) == 0;
+bool onion_v3_checksum_ok(const std::string& endpoint) {
+    // rend-spec-v3: onion = base32(PUBKEY[32] | CHECKSUM[2] | VERSION=3),
+    // CHECKSUM = SHA3-256(".onion checksum" | PUBKEY | VERSION)[:2].
+    const auto colon = endpoint.rfind(':');
+    const std::string host = endpoint.substr(0, colon);
+    if (host.size() != 62) return false;
+    unsigned char raw[35] = {0};
+    std::uint32_t buf = 0;
+    int bits = 0;
+    std::size_t n = 0;
+    for (std::size_t i = 0; i < 56; ++i) {
+        const char ch = host[i];
+        int v = -1;
+        if (ch >= 'a' && ch <= 'z') v = ch - 'a';
+        else if (ch >= '2' && ch <= '7') v = 26 + (ch - '2');
+        if (v < 0) return false;
+        buf = (buf << 5) | static_cast<std::uint32_t>(v);
+        bits += 5;
+        if (bits >= 8) {
+            bits -= 8;
+            if (n < sizeof(raw)) raw[n++] = static_cast<unsigned char>((buf >> bits) & 0xFF);
+        }
+    }
+    if (n != 35 || raw[34] != 3) return false;
+    static const char kPrefix[] = ".onion checksum";
+    unsigned char md[32];
+    unsigned int mdlen = 0;
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    if (ctx == nullptr) return false;
+    const bool ok = EVP_DigestInit_ex(ctx, EVP_sha3_256(), nullptr) == 1 &&
+                    EVP_DigestUpdate(ctx, kPrefix, sizeof(kPrefix) - 1) == 1 &&
+                    EVP_DigestUpdate(ctx, raw, 32) == 1 &&
+                    EVP_DigestUpdate(ctx, raw + 34, 1) == 1 &&
+                    EVP_DigestFinal_ex(ctx, md, &mdlen) == 1;
+    EVP_MD_CTX_free(ctx);
+    return ok && md[0] == raw[32] && md[1] == raw[33];
+}
+
+std::string default_mainnet_seed_file() {
+    const char* env = std::getenv("ADDITION_SEEDS_FILE");
+    if (env != nullptr && *env != '\0') return env;
+    return kDefaultMainnetSeedFile;
+}
+
+bool load_seed_file(const std::string& path, std::vector<std::string>& out, std::string& error) {
+    out.clear();
+    std::ifstream in(path);
+    if (!in) {
+        error = "cannot open seed file: " + path;
+        return false;
+    }
+    std::string line;
+    std::size_t lineno = 0;
+    while (std::getline(in, line)) {
+        ++lineno;
+        const auto hash = line.find('#');
+        if (hash != std::string::npos) line.erase(hash);
+        const auto b = line.find_first_not_of(" \t\r");
+        if (b == std::string::npos) continue;
+        const auto e = line.find_last_not_of(" \t\r");
+        std::string entry = line.substr(b, e - b + 1);
+        if (!is_onion_v3_endpoint(entry) || !onion_v3_checksum_ok(entry)) {
+            error = "seed file " + path + ":" + std::to_string(lineno) +
+                    ": expected a real Tor v3 <56 chars>.onion:PORT (checksum verified), got '" + entry + "'";
+            out.clear();
+            return false;
+        }
+        if (std::find(out.begin(), out.end(), entry) == out.end()) out.push_back(std::move(entry));
+    }
+    return true;
 }
 
 std::vector<std::string> mainnet_default_seeds() {
     std::vector<std::string> out;
-    for (const char* s : kMainnetOnionSeeds) {
-        if (!is_placeholder_seed(s)) out.emplace_back(s);
-    }
+    const auto path = default_mainnet_seed_file();
+    std::error_code ec;
+    if (!std::filesystem::exists(path, ec)) return out;
+    std::string err;
+    if (!load_seed_file(path, out, err)) out.clear();
     return out;
 }
 
@@ -1233,6 +1305,7 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
     bool cli_dandelion = false;
     std::string cli_p2p_port;
     std::vector<std::string> cli_bootstrap;
+    std::string cli_seeds_file;
     std::string cli_auto_mine_interval;
     std::string cli_auto_mine_reward;
     bool network_from_cli = false;
@@ -1389,6 +1462,16 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
         }
         if (arg.rfind("--p2p-port=", 0) == 0) {
             cli_p2p_port = arg.substr(11);
+            continue;
+        }
+        if (arg == "--seeds-file") {
+            if (!take_value(cli_seeds_file)) {
+                return false;
+            }
+            continue;
+        }
+        if (arg.rfind("--seeds-file=", 0) == 0) {
+            cli_seeds_file = arg.substr(13);
             continue;
         }
         if (arg == "--bootstrap") {
@@ -1611,9 +1694,20 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
     }
     if (cfg.bootstrap_peers.empty()) {
         switch (mode) {
-        case NetworkMode::Mainnet:
-            cfg.bootstrap_peers = mainnet_default_seeds();
+        case NetworkMode::Mainnet: {
+            // Seeds come only from a seed file (never compiled in). An explicit
+            // --seeds-file must exist; a malformed file fails closed.
+            const std::string path = cli_seeds_file.empty() ? default_mainnet_seed_file() : cli_seeds_file;
+            std::error_code ec;
+            if (!cli_seeds_file.empty() || std::filesystem::exists(path, ec)) {
+                std::vector<std::string> seeds;
+                if (!load_seed_file(path, seeds, error)) {
+                    return false;
+                }
+                cfg.bootstrap_peers = std::move(seeds);
+            }
             break;
+        }
         case NetworkMode::Fast:
             cfg.bootstrap_peers = {"127.0.0.1:28547"};
             break;
@@ -1663,8 +1757,9 @@ std::string daemon_help_text() {
            "  getinfo reports confirmations_policy and economic_security=none.\n"
            "\n"
            "--mainnet (same as --network mainnet) starts ADDITION_MAINNET_V1 from genesis-mainnet.json.\n"
-           "  Default bootstrap: Tor onion seeds (docs/ONION_SEEDS.md; placeholders until published,\n"
-           "  so pass --tor-proxy 127.0.0.1:9050 --bootstrap <seed>.onion:28546). No clearnet default.\n"
+           "  Default bootstrap: Tor v3 onion seeds read from --seeds-file PATH, $ADDITION_SEEDS_FILE or\n"
+           "  ./seeds-mainnet.txt (docs/ONION_SEEDS.md). No seed is compiled in and no clearnet default;\n"
+           "  with no seed file pass --tor-proxy 127.0.0.1:9050 --bootstrap <seed>.onion:28546.\n"
            "  Override with --bootstrap IP:PORT. Write RPC stays 127.0.0.1:8546. Auto-mine refused.\n"
            "  PoW memory_hard at 0x000000FFFFFFFFFF — do not loosen.\n"
            "\n"

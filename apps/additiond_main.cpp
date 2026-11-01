@@ -589,7 +589,7 @@ int main(int argc, char** argv) {
     }
     std::cout << '\n';
     if (mainnet_mode && node_cfg.bootstrap_peers.empty()) {
-        std::cout << "WARNING: no mainnet seed configured (onion seeds are placeholders). "
+        std::cout << "WARNING: no mainnet seed configured (no seed file: --seeds-file / ADDITION_SEEDS_FILE / ./seeds-mainnet.txt). "
                      "Use --tor-proxy 127.0.0.1:9050 --bootstrap <seed>.onion:28546 or a node you run.\n";
     }
     if (!node_cfg.advertised_p2p.empty()) {
