@@ -1,12 +1,26 @@
 #include "addition/mempool.hpp"
+#include "addition/shielded.hpp"
 
 #include <algorithm>
+#include <unordered_map>
 
 namespace addition {
 namespace {
 
 std::string outpoint_key(const TxInput& in) {
     return in.previous_txid + ":" + std::to_string(in.output_index);
+}
+
+// Fully shielded tx (no transparent inputs): its double-spend keys are the
+// bundle nullifiers. Returns false if the bundle does not parse.
+bool shielded_nullifier_keys(const Transaction& tx, std::vector<std::string>& out) {
+    out.clear();
+    if (tx.shielded.empty()) return true;
+    shielded::Bundle b;
+    std::string err;
+    if (!shielded::from_tx_field(tx.shielded, b, err)) return false;
+    for (const auto& nf : b.nullifiers) out.push_back("nf:" + shielded::hex32(nf));
+    return true;
 }
 
 } // namespace
@@ -19,10 +33,25 @@ std::string Mempool::signer_nonce_key(const Transaction& tx) const {
 }
 
 bool Mempool::looks_spendable(const Transaction& tx) const {
+    if (tx.inputs.empty() && !tx.shielded.empty()) {
+        // Fully shielded (z->z or z->t): no transparent inputs or signer. The
+        // STARK proof and nullifiers are verified by Chain; here we only require
+        // a parseable bundle that spends at least one nullifier.
+        if (!tx.signer.empty() || !tx.signature.empty()) return false;
+        std::vector<std::string> nfs;
+        return shielded_nullifier_keys(tx, nfs) && !nfs.empty();
+    }
     if (tx.inputs.empty() || tx.outputs.empty()) {
         return false;
     }
-    if (tx.signer.empty() || tx.signer_pubkey.empty()) {
+    if (tx.signer.empty() && tx.signer_pubkey.empty() && tx.signature.empty() && !tx.inputs.empty()) {
+        // Script-v1 spend: every input must carry a witness (verified by Chain).
+        for (const auto& in : tx.inputs) {
+            if (in.witness.empty()) return false;
+        }
+        return true;
+    }
+    if (tx.signer.empty()) {  // empty pubkey => on-chain registry (chain validates)
         return false;
     }
     if (tx.signature.rfind("pq=", 0) != 0) {
@@ -35,11 +64,19 @@ void Mempool::index_inputs(const Transaction& tx) {
     for (const auto& in : tx.inputs) {
         reserved_outpoints_.insert(outpoint_key(in));
     }
+    std::vector<std::string> nfs;
+    if (shielded_nullifier_keys(tx, nfs)) {
+        for (const auto& k : nfs) reserved_outpoints_.insert(k);
+    }
 }
 
 void Mempool::unindex_inputs(const Transaction& tx) {
     for (const auto& in : tx.inputs) {
         reserved_outpoints_.erase(outpoint_key(in));
+    }
+    std::vector<std::string> nfs;
+    if (shielded_nullifier_keys(tx, nfs)) {
+        for (const auto& k : nfs) reserved_outpoints_.erase(k);
     }
 }
 
@@ -57,8 +94,15 @@ bool Mempool::submit(const Transaction& tx) {
         txids_.erase(txid);
         return false;
     }
-    for (const auto& in : tx.inputs) {
-        if (reserved_outpoints_.count(outpoint_key(in)) != 0) {
+    std::vector<std::string> keys;
+    for (const auto& in : tx.inputs) keys.push_back(outpoint_key(in));
+    {
+        std::vector<std::string> nfs;
+        shielded_nullifier_keys(tx, nfs);
+        keys.insert(keys.end(), nfs.begin(), nfs.end());
+    }
+    for (const auto& key : keys) {
+        if (reserved_outpoints_.count(key) != 0) {
             txids_.erase(txid);
             if (!sn.empty()) {
                 signer_nonces_.erase(sn);
@@ -84,6 +128,23 @@ std::vector<Transaction> Mempool::fetch_for_block(std::size_t max_count) {
         return a.nonce < b.nonce;
     });
 
+    // Nonce chaining: several pending txs per signer are allowed, but within
+    // a block each signer's txs must apply in ascending nonce order. Keep the
+    // fee-ordered slots, and reassign each signer's txs to its slots by nonce.
+    {
+        std::unordered_map<std::string, std::vector<std::size_t>> slots;
+        for (std::size_t i = 0; i < pending_.size(); ++i) {
+            if (!pending_[i].signer.empty()) slots[pending_[i].signer].push_back(i);
+        }
+        for (auto& [signer, idx] : slots) {
+            if (idx.size() < 2) continue;
+            std::vector<Transaction> txs;
+            for (auto i : idx) txs.push_back(pending_[i]);
+            std::stable_sort(txs.begin(), txs.end(),
+                             [](const Transaction& a, const Transaction& b) { return a.nonce < b.nonce; });
+            for (std::size_t k = 0; k < idx.size(); ++k) pending_[idx[k]] = std::move(txs[k]);
+        }
+    }
     const auto n = (max_count < pending_.size()) ? max_count : pending_.size();
     std::vector<Transaction> out;
     out.reserve(n);
@@ -139,6 +200,20 @@ void Mempool::replace(const std::vector<Transaction>& txs) {
         index_inputs(tx);
         pending_.push_back(tx);
     }
+}
+
+std::uint64_t Mempool::max_pending_nonce(const std::string& signer) const {
+    std::lock_guard<std::mutex> lk(mu_);
+    std::uint64_t m = 0;
+    for (const auto& tx : pending_) {
+        if (tx.signer == signer && tx.nonce > m) m = tx.nonce;
+    }
+    return m;
+}
+
+bool Mempool::outpoint_reserved(const std::string& key) const {
+    std::lock_guard<std::mutex> lk(mu_);
+    return reserved_outpoints_.count(key) != 0;
 }
 
 std::size_t Mempool::size() const {

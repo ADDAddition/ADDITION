@@ -127,10 +127,10 @@ public port is up. If the daemon is down, pages show **RPC offline**.
 - `getinfo.peers` / `peers` list only non-loopback IPv4 endpoints. Loopback
   two-node peers stay in the internal set for `sync` and appear as
   `local=127.0.0.1:…`. Node ids and `self` are not an external peer count.
-- IPv4 only. The configured operator public P2P is `34.27.30.115:28545`
-  (`--bootstrap 34.27.30.115:28545`). Do not invent extra peers. Write RPC
+- IPv4 only. The configured operator public P2P is `<seed>.onion:28545`
+  (`--bootstrap <seed>.onion:28545`). Do not invent extra peers. Write RPC
   stays `127.0.0.1:8545`.
-- Seed operators set `ADDITION_ADVERTISED_P2P=34.27.30.115:28545` so public
+- Seed operators set `ADDITION_ADVERTISED_P2P=<seed>.onion:28545` so public
   `getinfo` / `peers` do not list `self`. Public TCP 28545 can timeout or
   be filtered; HTTP `:80` sync is the reliable join path. This local
   runbook does not claim public 28545 works.
@@ -149,7 +149,7 @@ Same meaning as CLI / env:
 - `enable_public_rpc`
 - `ports.public_rpc` / `ports.public_rpc_bind`
 - `ports.local_rpc` / `ports.p2p`
-- `bootstrap_peers` (IPv4 `ip:port` only; repo `config.toml` lists `34.27.30.115:28545`)
+- `bootstrap_peers` (IPv4 `ip:port` only; repo `config.toml` lists `<seed>.onion:28545`)
 - `enable_auto_mine` / `auto_mine_interval_sec` / `auto_mine_reward` (off by default)
 
 Env: `ADDITION_ENABLE_PUBLIC_RPC=1`, `ADDITION_PUBLIC_RPC_PORT`,
@@ -170,7 +170,7 @@ python3 tests/test_two_node_http_ingest.py
 ```
 
 The script starts two `additiond` processes. Node A mines on trusted write
-RPC, advertises `ADDITION_ADVERTISED_P2P=34.27.30.115:28545` so public
+RPC, advertises `ADDITION_ADVERTISED_P2P=<seed>.onion:28545` so public
 `getinfo` / `peers` omit `self`, then node B:
 
 1. pulls A's chain over **HTTP ingest** (`getinfo` + `getblockraw` on A's

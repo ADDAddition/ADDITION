@@ -1,3 +1,4 @@
+#include "addition/net_io.hpp"
 #include "addition/auto_mine.hpp"
 #include "addition/chain.hpp"
 #include "addition/config.hpp"
@@ -8,6 +9,7 @@
 #include "addition/mempool.hpp"
 #include "addition/miner.hpp"
 #include "addition/p2p.hpp"
+#include "addition/net_transport.hpp"
 #include "addition/pouw_compute.hpp"
 #include "addition/pouw_storage.hpp"
 #include "addition/private_messaging.hpp"
@@ -210,15 +212,15 @@ int main(int argc, char** argv) {
         return true;
     }();
 
-    const char* privacy_master_key_env = std::getenv("ADDITION_PRIVACY_MASTER_KEY");
-    const bool has_privacy_master_key = privacy_master_key_env != nullptr && std::string(privacy_master_key_env).size() >= 32;
-    if (mainnet_mode && !has_privacy_master_key) {
-        std::cerr << "fatal: ADDITION_PRIVACY_MASTER_KEY missing or too short (min 32 chars) for --network mainnet\n";
-        return 3;
-    }
+    // No node-held privacy master key: note metadata uses the keyless per-note
+    // cipher (see addition/privacy.hpp NoteCipher). The old env var is ignored.
+    const bool legacy_privacy_key_set = std::getenv("ADDITION_PRIVACY_MASTER_KEY") != nullptr;
 
     addition::Chain chain(node_cfg.chain);
     addition::Mempool mempool;
+    chain.set_pending_view(
+        [&mempool](const std::string& a) { return mempool.max_pending_nonce(a); },
+        [&mempool](const std::string& k) { return mempool.outpoint_reserved(k); });
     addition::Miner miner(chain, mempool);
     addition::StakingEngine staking;
     addition::TokenEngine tokens;
@@ -261,9 +263,39 @@ int main(int argc, char** argv) {
             }
         }
 
+        // Persistent node identity (mode 0600), so TOFU peer pins survive restarts.
+        // ADDITION_NODE_KEY_EPHEMERAL=1 keeps the old never-on-disk behavior.
+        const std::string key_path = (std::filesystem::path(node_cfg.data_dir) / "node_key.dat").string();
+        const bool ephemeral_only = std::getenv("ADDITION_NODE_KEY_EPHEMERAL") != nullptr;
+        if (node_keys.private_key.empty() && !ephemeral_only && std::filesystem::exists(key_path)) {
+            std::ifstream kin(key_path, std::ios::binary);
+            std::string kl;
+            std::string kpub;
+            std::string kpriv;
+            while (std::getline(kin, kl)) {
+                if (kl.rfind("PUB|", 0) == 0) kpub = kl.substr(4);
+                else if (kl.rfind("PRIV|", 0) == 0) kpriv = kl.substr(5);
+            }
+            if (!kpub.empty() && !kpriv.empty()) {
+                node_keys.public_key = kpub;
+                node_keys.private_key = kpriv;
+            }
+        }
         if (node_keys.public_key.empty() || node_keys.private_key.empty()) {
             node_keys = addition::generate_wallet_keys();
-            std::cout << "warning: generated ephemeral node private key; set ADDITION_NODE_PRIVKEY for restart persistence\n";
+            if (!ephemeral_only) {
+                std::filesystem::create_directories(node_cfg.data_dir);
+                const std::string tmp = key_path + ".tmp";
+                {
+                    std::ofstream kout(tmp, std::ios::binary | std::ios::trunc);
+                    std::filesystem::permissions(tmp, std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
+                                                 std::filesystem::perm_options::replace);
+                    kout << "PUB|" << node_keys.public_key << "\nPRIV|" << node_keys.private_key << '\n';
+                }
+                std::filesystem::rename(tmp, key_path);
+                std::cout << "generated persistent node key (" << key_path << ", mode 0600)\n";
+            }
+            if (ephemeral_only) std::cout << "warning: generated ephemeral node private key; set ADDITION_NODE_PRIVKEY for restart persistence\n";
             std::filesystem::create_directories(node_cfg.data_dir);
             std::ofstream out(id_path, std::ios::binary | std::ios::trunc);
             out << "PUB|" << node_keys.public_key << '\n';
@@ -284,6 +316,8 @@ int main(int argc, char** argv) {
                                      mempool,
                                      peers,
                                      consensus);
+    addition::PmRelay pm_relay((std::filesystem::path(node_cfg.data_dir) / "pm_keys").string());
+    node.set_pm_relay(&pm_relay);
     addition::StateStore store(node_cfg.data_dir);
 
     {
@@ -322,9 +356,23 @@ int main(int argc, char** argv) {
         }
     });
 
-    addition::RpcNetworkServer p2p_rpc("0.0.0.0", node_cfg.p2p_port, [&](const std::string& cmd) {
-        return node.handle_p2p_line(cmd);
+    // Inbound P2P, RPC and the background sync share one state lock (the RPC
+    // server's). Outbound Tor round trips release it (StateUnlockDuringIo), so a
+    // long catch-up no longer freezes RPC or the peers syncing from us.
+    std::atomic<addition::RpcServer*> state_owner{nullptr};
+    auto with_state_lock = [&](auto&& fn) {
+        addition::RpcServer* owner = state_owner.load();
+        if (owner == nullptr) {
+            return fn();
+        }
+        std::unique_lock<std::mutex> lk(owner->state_mutex());
+        addition::ThreadStateLockScope scope(&lk);
+        return fn();
+    };
+    addition::RpcNetworkServer p2p_rpc(node_cfg.p2p_bind, node_cfg.p2p_port, [&](const std::string& cmd) {
+        return with_state_lock([&] { return node.handle_p2p_line(cmd); });
     });
+    p2p_rpc.set_keepalive(90000);
 
     addition::RpcServer rpc(chain,
                             mempool,
@@ -344,6 +392,7 @@ int main(int argc, char** argv) {
                             allow_insecure_tx_commands,
                             strict_admin_mode,
                             (std::filesystem::path(node_cfg.data_dir) / "wallets").string());
+    state_owner.store(&rpc);
     const bool enable_lan_rpc = []() {
         if (const char* v = std::getenv("ADDITION_ENABLE_LAN_RPC")) {
             return std::string(v) == "1";
@@ -370,6 +419,10 @@ int main(int argc, char** argv) {
             node_cfg.public_rpc_bind = bind;
         }
     }
+    if (node_cfg.onion_only) {
+        // Env may have re-enabled public RPC: keep every listener on loopback.
+        node_cfg.public_rpc_bind = "127.0.0.1";
+    }
     parse_env_u16("ADDITION_LOCAL_RPC_PORT", node_cfg.local_rpc_port);
     parse_env_u16("ADDITION_P2P_PORT", node_cfg.p2p_port);
     addition::apply_advertised_p2p_env(node_cfg);
@@ -386,9 +439,26 @@ int main(int argc, char** argv) {
         if (!node_cfg.advertised_p2p.empty() && peer == node_cfg.advertised_p2p) {
             continue;
         }
-        if (peers.add_peer(peer)) {
+        if (peers.add_seed(peer)) {
             std::cout << "bootstrap addpeer " << peer << '\n';
         }
+    }
+    peers.set_limits(node_cfg.max_peers, 1000, 3600);
+    {
+        addition::TransportPolicy tp;
+        tp.socks_proxy = node_cfg.tor_socks_proxy;
+        tp.onion_only = node_cfg.onion_only;
+        tp.proxy_all = node_cfg.onion_only;
+        addition::set_transport_policy(tp);
+        if (!tp.socks_proxy.empty()) {
+            std::cout << "tor socks_proxy=" << tp.socks_proxy << " onion_only=" << (tp.onion_only ? 1 : 0)
+                      << " p2p_bind=" << node_cfg.p2p_bind << '\n';
+        }
+    }
+    node.set_dandelion(node_cfg.dandelion);
+    node.set_advertised_p2p(node_cfg.advertised_p2p);
+    if (node_cfg.dandelion) {
+        std::cout << "dandelion++ tx relay enabled\n";
     }
 
     std::string local_rpc_token;
@@ -448,7 +518,7 @@ int main(int argc, char** argv) {
 
     std::string local_error;
     if (!local_rpc.start(local_error)) {
-        std::cout << "warning: local RPC failed to start: " << local_error << '\n';
+        std::cout << "fatal: local RPC failed to start: " << local_error << '\n'; return 1;
     } else {
         std::cout << "local RPC listening on 127.0.0.1:" << node_cfg.local_rpc_port << '\n';
         if (local_rpc_auth_required) {
@@ -475,7 +545,7 @@ int main(int argc, char** argv) {
     std::string p2p_error;
     if (enable_p2p_rpc) {
         if (!p2p_rpc.start(p2p_error)) {
-            std::cout << "warning: P2P RPC failed to start: " << p2p_error << '\n';
+            std::cout << "fatal: P2P RPC failed to start: " << p2p_error << '\n'; return 1;
         } else {
             std::cout << "P2P RPC listening on 0.0.0.0:" << node_cfg.p2p_port << '\n';
         }
@@ -507,7 +577,7 @@ int main(int argc, char** argv) {
         std::cout << "genesis=" << node_cfg.genesis_path << '\n';
     }
     if (mainnet_mode) {
-        std::cout << "bootstrap_peers (IPv4 only; not the public testnet seed):";
+        std::cout << "bootstrap_peers (mainnet: onion seeds; see docs/ONION_SEEDS.md):";
     } else if (regtest_mode) {
         std::cout << "bootstrap_peers (IPv4 only; local --regtest, not the public testnet seed):";
     } else {
@@ -518,10 +588,13 @@ int main(int argc, char** argv) {
         std::cout << ' ' << peer;
     }
     std::cout << '\n';
+    if (mainnet_mode && node_cfg.bootstrap_peers.empty()) {
+        std::cout << "WARNING: no mainnet seed configured (onion seeds are placeholders). "
+                     "Use --tor-proxy 127.0.0.1:9050 --bootstrap <seed>.onion:28546 or a node you run.\n";
+    }
     if (!node_cfg.advertised_p2p.empty()) {
         std::cout << "advertised_p2p=" << node_cfg.advertised_p2p
-                  << " (public getinfo/peers; not self). Public TCP 28545 can timeout/filter; "
-                  << "HTTP :80 sync is the reliable join path.\n";
+                  << " (public getinfo/peers; not self). Block sync is P2P only (TCP or Tor).\n";
     }
 
     const bool auto_mine_requested = node_cfg.enable_auto_mine;
@@ -541,7 +614,7 @@ int main(int argc, char** argv) {
     } else {
         std::cout << "auto-mine disabled (default; --auto-mine or ADDITION_AUTO_MINE=1 on testnet)\n";
     }
-    std::cout << "Commands: getinfo, fee_info, createwallet [name] [scheme], wallet_list, wallet_info <name>, wallet_balance <name>, wallet_send <name> <to> <amount> [fee], wallet_sign <name> <message_hex_utf8>, hygiene_classify [path], hygiene_attest <wallet> <btc_addr> <height> <class> [reuse] [pubkey_on_chain], hygiene_verify <receipt_note>, sign_message <privkey_hex> <message_hex_utf8>, verify_message <pubkey_hex> <message_hex_utf8> <sig_hex>, getbalance <addr>, getbalance_instant <addr>, tx_build <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce>, sendtx_signed <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce> <sig_hex>, sendtx_signed_hash <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce> <sig_hex>, mine,\n"
+    std::cout << "Commands: getinfo, fee_info, createwallet [name] [scheme], wallet_list, wallet_info <name>, wallet_balance <name>, wallet_send <name> <to> <amount> [fee], wallet_sign <name> <message_hex_utf8>, hygiene_classify [path], hygiene_attest <wallet> <btc_addr> <height> <class> [reuse] [pubkey_on_chain], hygiene_verify <receipt_note>, sign_message <wallet_name> <message_hex_utf8>, stake <wallet> <amount> [fee], unstake <wallet> <ticket_id> [fee], stake_tickets [addr], stake_info, stake_selected, stake_autovote <on|off|status> [wallet], verify_message <pubkey_hex> <message_hex_utf8> <sig_hex>, getbalance <addr>, getbalance_instant <addr>, tx_build <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce>, sendtx_signed <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce> <sig_hex>, sendtx_signed_hash <from_addr> <pubkey_hex> <to_addr> <amount> <fee> <nonce> <sig_hex>, mine,\n"
                  "protocol_status, benchmark_objective <blocks> <verify_samples>,\n"
                  "monetary_info, crypto_selftest,\n"
                  "stake <addr> <amt>, unstake <addr> <amt>, staked <addr>, stake_reward <amt>, stake_claim <addr>,\n"
@@ -551,9 +624,7 @@ int main(int argc, char** argv) {
                  "privacy_note_prepare <amt>, privacy_mint_open <owner> <amt> <cm> <nf> <trapdoor>,\n"
                  "privacy_spend_open <owner> <note_id> <recipient> <amt> <trapdoor>,\n"
                  "privacy_native_verifier <pq_mldsa87>,\n"
-                 "privacy_mint_zk <owner> <amt> <commitment> <nullifier> <proof> <vk> (ML-DSA wrap, not a circuit),\n"
-                 "privacy_spend_zk <owner> <note_id> <recipient> <amt> <nullifier> <proof> <vk> (ML-DSA wrap, not a circuit),\n"
-                 "privacy_mint_zk_v1 / privacy_spend_zk_v1 (real ZK scaffold; fail-closed until wired; claim=zk_pending),\n"
+                 "privacy_*_zk* commands REMOVED (were not zero-knowledge); use shielded addz txs (docs/SHIELDED_POOL.md),\n"
                  "privacy_status,\n"
                  "pouw_storage_create_deal <client_addr> <content_root> <chunk_count> <replication_factor> <start_height> <end_height> <price_per_epoch>,\n"
                  "pouw_storage_commit <deal_id> <worker_addr> <sealed_commitment> <collateral>,\n"
@@ -630,13 +701,24 @@ int main(int argc, char** argv) {
         std::cout << "testnet mode enabled (default)\n";
         break;
     }
-    if (!has_privacy_master_key) {
-        std::cout << "warning: ADDITION_PRIVACY_MASTER_KEY not set or too short (min 32); private note operations will fail\n";
+    if (legacy_privacy_key_set) {
+        std::cout << "warning: ADDITION_PRIVACY_MASTER_KEY is set but no longer used (no node-held privacy key); "
+                     "remove it from the environment\n";
     }
 
     auto last_sync = std::chrono::steady_clock::now();
     std::signal(SIGINT, handle_stop_signal);
     std::signal(SIGTERM, handle_stop_signal);
+
+    // SIGTERM/SIGINT only set a flag; this watcher turns it into an immediate
+    // abort of outbound network I/O so an in-progress (Tor) sync unwinds in
+    // seconds and the normal save-and-exit path below runs.
+    std::thread stop_watcher([] {
+        while (!g_stay_alive_stop) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        }
+        addition::abort_all_io();
+    });
 
     std::thread auto_mine_thread;
     if (node_cfg.enable_auto_mine) {
@@ -667,11 +749,15 @@ int main(int argc, char** argv) {
     for (std::string line; std::getline(std::cin, line);) {
         const auto now = std::chrono::steady_clock::now();
         if (now - last_sync >= std::chrono::seconds(5)) {
-            std::string sync_err;
-            node.sync_once(sync_err);
-            std::size_t sent = 0;
-            std::string gossip_err;
-            node.flush_outbound_gossip(sent, gossip_err);
+            with_state_lock([&] {
+                std::string sync_err;
+                node.sync_once(sync_err);
+                std::size_t sent = 0;
+                std::string gossip_err;
+                node.flush_outbound_gossip(sent, gossip_err);
+                rpc.rchan_tick();
+                return 0;
+            });
             last_sync = now;
         }
 
@@ -723,17 +809,25 @@ int main(int argc, char** argv) {
             std::this_thread::sleep_for(std::chrono::seconds(1));
             const auto now = std::chrono::steady_clock::now();
             if (now - last_sync >= std::chrono::seconds(5)) {
-                std::string sync_err;
-                node.sync_once(sync_err);
-                std::size_t sent = 0;
-                std::string gossip_err;
-                node.flush_outbound_gossip(sent, gossip_err);
+                with_state_lock([&] {
+                    std::string sync_err;
+                    node.sync_once(sync_err);
+                    std::size_t sent = 0;
+                    std::string gossip_err;
+                    node.flush_outbound_gossip(sent, gossip_err);
+                    rpc.rchan_tick();  // HTLC forwards/settles + interrupted-update recovery
+                    return 0;
+                });
                 last_sync = now;
             }
         }
     }
 
     g_stay_alive_stop = true;
+    std::cout << "shutdown: stopping (network I/O aborted)" << std::endl;
+    if (stop_watcher.joinable()) {
+        stop_watcher.join();
+    }
     if (auto_mine_thread.joinable()) {
         auto_mine_thread.join();
     }

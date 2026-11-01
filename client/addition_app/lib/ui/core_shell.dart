@@ -335,12 +335,12 @@ class _CoreShellState extends State<CoreShell> {
               ],
               const SizedBox(height: 16),
               _section(
-                title: 'Public read (status only)',
+                title: 'Your node read (status only)',
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Optional getinfo via site /api/rpc → 34.27.30.115:38546. '
+                      'Optional getinfo from YOUR node (127.0.0.1 or your .onion); no public server. '
                       'Cannot createwallet or wallet_send.',
                       style: TextStyle(color: AdditionTheme.mute, fontSize: 13),
                     ),

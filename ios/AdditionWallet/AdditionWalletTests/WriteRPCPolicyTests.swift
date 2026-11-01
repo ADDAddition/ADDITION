@@ -30,7 +30,10 @@ final class WriteRPCPolicyTests: XCTestCase {
     }
 
     func testPublicReadIsNotWalletBackend() throws {
-        XCTAssertTrue(WriteRPCPolicy.isKnownPublicReadEndpoint("https://rpc.additionblockchain.com/rpc"))
+        XCTAssertFalse(WriteRPCPolicy.isKnownPublicReadEndpoint("https://rpc.additionblockchain.com/rpc"))
+        XCTAssertFalse(WriteRPCPolicy.isKnownPublicReadEndpoint("http://34.27.30.115:38545/rpc"))
+        XCTAssertTrue(WriteRPCPolicy.isKnownPublicReadEndpoint("http://127.0.0.1:38545/rpc"))
+        XCTAssertTrue(WriteRPCPolicy.isKnownPublicReadEndpoint("http://" + String(repeating: "a", count: 56) + ".onion:38545/rpc"))
         XCTAssertThrowsError(try WriteRPCPolicy.assertCommand("createwallet default", write: false))
         XCTAssertThrowsError(try WriteRPCPolicy.assertCommand("wallet_send demo aa 1", write: false))
         XCTAssertThrowsError(try WriteRPCPolicy.assertCommand("getbalance " + String(repeating: "ab", count: 64), write: false))

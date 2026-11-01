@@ -131,8 +131,58 @@ bool Miner::mine_next_block(const std::string& reward_address,
         }
     }
 
+    // Staking votes are collected first so their bytes are reserved before txs.
+    const bool with_votes = vote_source_ && chain_.staking_active_at(chain_.height() + 1);
+    std::vector<StakeVote> votes;
+    std::vector<SlashEvidence> slashes;
+    std::size_t vote_reserve = 0;
+    if (with_votes) {
+        votes = vote_source_();
+        if (slash_source_) slashes = slash_source_();
+        Block probe{};
+        probe.votes = votes;
+        probe.slashes = slashes;
+        vote_reserve = stake_extension_weight(probe);
+    }
+
+    // Keep the block relayable: stop at the P2P line budget and return the
+    // rest (fee-ordered tail) to the mempool for the next block.
+    {
+        const auto budget = relay_budget_bytes_ > kBlockWireOverheadBytes
+                                ? relay_budget_bytes_ - kBlockWireOverheadBytes
+                                : 0;
+        // coinbase is built by the chain; reserve a generous slot for it
+        std::size_t used = 2048 + (vote_reserve * 4 + 2) / 3;
+        // Consensus weight cap (canonical binary bytes); header+coinbase reserve.
+        const std::size_t weight_cap = chain_.config().max_block_weight;
+        std::size_t weight = 4096 + vote_reserve;
+        std::size_t keep = 0;
+        for (; keep < valid.size(); ++keep) {
+            const auto w = tx_wire_bytes(valid[keep]);
+            const auto tw = tx_weight(valid[keep]);
+            if (used + w > budget || weight + tw > weight_cap) {
+                break;
+            }
+            used += w;
+            weight += tw;
+        }
+        last_deferred_for_size_ = valid.size() - keep;
+        for (std::size_t i = keep; i < valid.size(); ++i) {
+            mempool_.submit(valid[i]);
+        }
+        valid.resize(keep);
+        last_block_wire_bytes_ = used + kBlockWireOverheadBytes;
+    }
+
     const auto tx_count = valid.size();
-    if (!chain_.mine_and_add_block(reward_address, valid, threads, mined_hash, error, &stop_)) {
+    bool mined = false;
+    if (with_votes) {
+        mined = chain_.mine_and_add_block_with_votes(reward_address, valid, votes, slashes, threads,
+                                                     mined_hash, error, &stop_);
+    } else {
+        mined = chain_.mine_and_add_block(reward_address, valid, threads, mined_hash, error, &stop_);
+    }
+    if (!mined) {
         for (const auto& tx : valid) {
             mempool_.submit(tx);
         }
@@ -146,6 +196,18 @@ bool Miner::mine_next_block(const std::string& reward_address,
     const double sec = static_cast<double>(last_mine_ms_) / 1000.0;
     last_tps_ = sec > 0.0 ? static_cast<double>(last_mined_txs_) / sec : static_cast<double>(last_mined_txs_);
     return true;
+}
+
+void Miner::set_relay_budget_bytes(std::size_t bytes) {
+    relay_budget_bytes_ = bytes;
+}
+
+std::size_t Miner::last_deferred_for_size() const {
+    return last_deferred_for_size_;
+}
+
+std::size_t Miner::last_block_wire_bytes() const {
+    return last_block_wire_bytes_;
 }
 
 void Miner::request_stop() {

@@ -23,11 +23,11 @@ additiond --network testnet --public-rpc
 Never open LAN RPC (`18545`) from this unit.
 
 When the operator seed answers, it enables P2P with `ADDITION_ENABLE_P2P_RPC=1`
-and advertises one IPv4 bootstrap: **34.27.30.115:28545**. That is the
+and advertises one IPv4 bootstrap: **<seed>.onion:28545**. That is the
 configured public P2P of this testnet, not a peer-count claim and not a
 mainnet. If `curl` to that host times out, the seed is down — run your own
 node. `config.toml` / `getinfo.bootstrap_peers` list that single endpoint so
-outsiders can `--bootstrap 34.27.30.115:28545`. Do not invent extra peers.
+outsiders can `--bootstrap <seed>.onion:28545`. Do not invent extra peers.
 The binary still leaves P2P off until that env is set; the public GCP
 node sets it when that VM is running.
 
@@ -38,10 +38,10 @@ On the seed, set:
 ```bash
 # /etc/addition/testnet.env
 ADDITION_ENABLE_P2P_RPC=1
-ADDITION_ADVERTISED_P2P=34.27.30.115:28545
+ADDITION_ADVERTISED_P2P=<seed>.onion:28545
 ```
 
-or `advertised_p2p = "34.27.30.115:28545"` in the seed `config.toml`.
+or `advertised_p2p = "<seed>.onion:28545"` in the seed `config.toml`.
 Public `getinfo` / `peers` then list that IPv4 endpoint and omit `self`,
 loopback, and node-id strings. The value is advertisement only; the seed
 does not add it to its internal peer set (no self-sync).
@@ -52,7 +52,7 @@ or filter 28545/38545. The reliable join path is HTTP `:80` (`getinfo` +
 
 ## Live seed P2P + public-read ingest
 
-The operator seed at **34.27.30.115:28545** loop-reads until `\n`. A
+The operator seed at **<seed>.onion:28545** loop-reads until `\n`. A
 well-connected host can send a ~16 KiB HELLO and get a proper error
 line (`hello timestamp skew`). A residential WAN path can still fail
 the same write: `addpeer` after `--bootstrap` is `invalid/duplicate`
@@ -111,10 +111,10 @@ Optional write-RPC token (loopback only):
 ```bash
 # /etc/addition/testnet.env  (mode 0640, owner root:addition)
 ADDITION_RPC_TOKEN=<strong_token>
-# Operator public node (34.27.30.115, when that VM answers): P2P on, write RPC stays loopback.
+# Operator public node (<your-node>, when that VM answers): P2P on, write RPC stays loopback.
 ADDITION_ENABLE_P2P_RPC=1
 # Seed only: do not count this process as an external peer.
-ADDITION_ADVERTISED_P2P=34.27.30.115:28545
+ADDITION_ADVERTISED_P2P=<seed>.onion:28545
 ```
 
 Do not set `ADDITION_MAINNET_MODE`. This unit is testnet only.
@@ -140,7 +140,7 @@ localhost.
 
 The GCP seed uses firewall rule `allow-addition-p2p` for TCP **28545** when
 that VM is up.
-That matches `bootstrap_peers = ["34.27.30.115:28545"]`. If P2P is off,
+That matches `bootstrap_peers = ["<seed>.onion:28545"]`. If P2P is off,
 do not open 28545.
 
 ```bash

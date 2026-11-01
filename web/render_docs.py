@@ -255,6 +255,9 @@ def write_doc(
     *,
     with_toc: bool = False,
 ) -> None:
+    if not (ROOT / rel_md).exists():
+        print(f"skip (missing source): {rel_md}")
+        return
     md = (ROOT / rel_md).read_text(encoding="utf-8")
     dest.parent.mkdir(parents=True, exist_ok=True)
     body = md_to_html(md, with_anchors=with_toc, skip_md_toc=with_toc)
@@ -386,14 +389,14 @@ def main() -> None:
         OUT / "docs" / "runbook" / "index.html",
         "ADDITION mainnet node runbook",
         "Mainnet node runbook",
-        "From <code>docs/MAINNET_RUNBOOK.md</code>. Public product <code>ADDITION_MAINNET_V1</code> — P2P <code>34.27.30.115:28546</code>, RPC <code>34.27.30.115:38546</code> (write allowlist open per CoS). Height from live getinfo may be 0.",
+        "From <code>docs/MAINNET_RUNBOOK.md</code>. Public product <code>ADDITION_MAINNET_V1</code> — P2P <code>&lt;seed&gt;.onion:28546</code>, RPC <code>127.0.0.1:38546</code> (write allowlist open per CoS). Height from live getinfo may be 0.",
     )
     write_doc(
         "docs/TWO_NODE_TESTNET.md",
         OUT / "docs" / "two-node" / "index.html",
         "ADDITION two-node local testnet",
         "Two-node testnet",
-        "From <code>docs/TWO_NODE_TESTNET.md</code>. Two local <code>additiond</code> processes. Live join: <a href=\"/join/\">/join/</a> — bootstrap <code>34.27.30.115:28545</code>, then <code>sync</code>.",
+        "From <code>docs/TWO_NODE_TESTNET.md</code>. Two local <code>additiond</code> processes. Live join: <a href=\"/join/\">/join/</a> — bootstrap <code>&lt;seed&gt;.onion:28545</code>, then <code>sync</code>.",
     )
     write_doc(
         "README.md",

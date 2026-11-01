@@ -20,7 +20,7 @@ Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
 KillSignal=SIGTERM
-# Must include ADDITION_PRIVACY_MASTER_KEY (min 32 chars). Do not put secrets in this unit.
+# No privacy master key is required. Do not put secrets in this unit.
 EnvironmentFile=-/etc/addition/mainnet.env
 # This unit is the ADDITION_MAINNET_V1 chain only. Do not bootstrap 34.27.30.115:28545.
 # Leave LAN RPC off (do not set ADDITION_ENABLE_LAN_RPC). Never open 8546/18546.

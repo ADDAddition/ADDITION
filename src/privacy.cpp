@@ -19,76 +19,65 @@ std::string mk_note_id(const std::string& owner,
     return to_hex(sha3_512_bytes("note|" + owner + "|" + std::to_string(amount) + "|" + seed));
 }
 
-bool get_privacy_master_key(std::string& out, std::string& error) {
-    const char* mk = std::getenv("ADDITION_PRIVACY_MASTER_KEY");
-    if (mk == nullptr || std::string(mk).size() < 32) {
-        error = "ADDITION_PRIVACY_MASTER_KEY not set or too short (min 32)";
-        return false;
-    }
-    out = mk;
-    return true;
-}
+class KeylessNoteCipher final : public NoteCipher {
+public:
+    std::string name() const override { return "keyless_sha3_v1"; }
 
-bool owner_tag_for(const std::string& owner, std::string& out, std::string& error) {
-    std::string mk;
-    if (!get_privacy_master_key(mk, error)) {
-        return false;
-    }
-    out = to_hex(sha3_512_bytes("owner_tag|" + mk + "|" + owner));
-    return true;
-}
-
-bool derive_amount_mask64(const std::string& note_id,
-                          const std::string& blinding,
-                          std::uint64_t& mask64,
-                          std::string& error) {
-    std::string mk;
-    if (!get_privacy_master_key(mk, error)) {
-        return false;
-    }
-    const auto mask_hex = to_hex(sha3_512_bytes("amount_mask|" + mk + "|" + note_id + "|" + blinding));
-    mask64 = static_cast<std::uint64_t>(std::stoull(mask_hex.substr(0, 16), nullptr, 16));
-    return true;
-}
-
-bool seal_amount(std::uint64_t amount,
-                 const std::string& note_id,
-                 const std::string& blinding,
-                 std::string& sealed_hex,
-                 std::string& error) {
-    std::uint64_t mask64 = 0;
-    if (!derive_amount_mask64(note_id, blinding, mask64, error)) {
-        return false;
-    }
-    const auto sealed = amount ^ mask64;
-    std::ostringstream oss;
-    oss << std::hex << sealed;
-    sealed_hex = oss.str();
-    return true;
-}
-
-bool unseal_amount(const std::string& sealed_hex,
-                   const std::string& note_id,
-                   const std::string& blinding,
-                   std::uint64_t& out,
-                   std::string& error) {
-    if (!is_hex_even((sealed_hex.size() % 2 == 0) ? sealed_hex : (std::string("0") + sealed_hex))) {
-        error = "invalid sealed amount";
-        return false;
-    }
-    std::uint64_t mask64 = 0;
-    if (!derive_amount_mask64(note_id, blinding, mask64, error)) {
-        return false;
-    }
-    try {
-        const auto sealed = static_cast<std::uint64_t>(std::stoull(sealed_hex, nullptr, 16));
-        out = sealed ^ mask64;
+    bool owner_tag(const std::string& owner, const std::string& note_id,
+                   std::string& out, std::string& error) const override {
+        if (owner.empty() || note_id.empty()) {
+            error = "owner_tag: owner/note_id empty";
+            return false;
+        }
+        out = to_hex(sha3_512_bytes("owner_tag_v2|" + note_id + "|" + owner));
         return true;
-    } catch (const std::exception&) {
-        error = "invalid sealed amount parse";
-        return false;
     }
-}
+
+    bool seal_amount(std::uint64_t amount, const std::string& note_id, const std::string& blinding,
+                     std::string& sealed_hex, std::string& error) const override {
+        std::uint64_t mask64 = 0;
+        if (!mask(note_id, blinding, mask64, error)) {
+            return false;
+        }
+        std::ostringstream oss;
+        oss << std::hex << (amount ^ mask64);
+        sealed_hex = oss.str();
+        return true;
+    }
+
+    bool unseal_amount(const std::string& sealed_hex, const std::string& note_id, const std::string& blinding,
+                       std::uint64_t& out, std::string& error) const override {
+        if (sealed_hex.empty() || sealed_hex.size() > 16 ||
+            !is_hex_even((sealed_hex.size() % 2 == 0) ? sealed_hex : (std::string("0") + sealed_hex))) {
+            error = "invalid sealed amount";
+            return false;
+        }
+        std::uint64_t mask64 = 0;
+        if (!mask(note_id, blinding, mask64, error)) {
+            return false;
+        }
+        try {
+            const auto sealed = static_cast<std::uint64_t>(std::stoull(sealed_hex, nullptr, 16));
+            out = sealed ^ mask64;
+            return true;
+        } catch (const std::exception&) {
+            error = "invalid sealed amount parse";
+            return false;
+        }
+    }
+
+private:
+    static bool mask(const std::string& note_id, const std::string& blinding, std::uint64_t& mask64,
+                     std::string& error) {
+        if (note_id.empty()) {
+            error = "amount mask: note_id empty";
+            return false;
+        }
+        const auto mask_hex = to_hex(sha3_512_bytes("amount_mask_v2|" + note_id + "|" + blinding));
+        mask64 = static_cast<std::uint64_t>(std::stoull(mask_hex.substr(0, 16), nullptr, 16));
+        return true;
+    }
+};
 
 bool is_hex_even(const std::string& s) {
     if (s.empty() || (s.size() % 2) != 0) {
@@ -194,12 +183,12 @@ std::string PrivacyPool::mint_open(const std::string& owner,
     }
 
     std::string sealed_amount;
-    if (!seal_amount(amount, note_id, "open", sealed_amount, error)) {
+    if (!cipher_->seal_amount(amount, note_id, "open", sealed_amount, error)) {
         return {};
     }
 
     std::string owner_tag;
-    if (!owner_tag_for(owner, owner_tag, error)) {
+    if (!cipher_->owner_tag(owner, note_id, owner_tag, error)) {
         return {};
     }
 
@@ -243,7 +232,7 @@ bool PrivacyPool::spend_open(const std::string& owner,
         return false;
     }
     std::string expected_owner_tag;
-    if (!owner_tag_for(owner, expected_owner_tag, error)) {
+    if (!cipher_->owner_tag(owner, note_id, expected_owner_tag, error)) {
         return false;
     }
     if (note.owner_tag != expected_owner_tag) {
@@ -251,7 +240,7 @@ bool PrivacyPool::spend_open(const std::string& owner,
         return false;
     }
     std::uint64_t note_amount = 0;
-    if (!unseal_amount(note.amount_sealed, note_id, note.blinding, note_amount, error)) {
+    if (!cipher_->unseal_amount(note.amount_sealed, note_id, note.blinding, note_amount, error)) {
         return false;
     }
     if (note_amount < amount) {
@@ -407,12 +396,12 @@ std::string PrivacyPool::mint_note_internal(const std::string& owner,
     const auto nullifier = to_hex(sha3_512_bytes("nf|" + note_id));
 
     std::string sealed_amount;
-    if (!seal_amount(amount, note_id, blind, sealed_amount, error)) {
+    if (!cipher_->seal_amount(amount, note_id, blind, sealed_amount, error)) {
         return {};
     }
 
     std::string owner_tag;
-    if (!owner_tag_for(owner, owner_tag, error)) {
+    if (!cipher_->owner_tag(owner, note_id, owner_tag, error)) {
         return {};
     }
 
@@ -425,146 +414,20 @@ std::string PrivacyPool::mint_note_internal(const std::string& owner,
     return note_id;
 }
 
-std::string PrivacyPool::mint_zk(const std::string& owner,
-                                 std::uint64_t amount,
-                                 const std::string& commitment,
-                                 const std::string& nullifier,
-                                 const std::string& proof_hex,
-                                 const std::string& verification_key_hex,
-                                 std::string& error) {
-    if (owner.empty() || amount == 0) {
-        error = "invalid mint_zk params";
-        return {};
-    }
-    if (!is_hex_even(commitment) || !is_hex_even(nullifier)) {
-        error = "commitment/nullifier must be even-length hex";
-        return {};
-    }
-    if (used_nullifiers_.count(nullifier)) {
-        error = "nullifier already used";
-        return {};
-    }
-    if (spent_commitments_.count(commitment)) {
-        error = "commitment already spent";
-        return {};
-    }
-
-    const std::string public_input = "mint|" + owner + "|" + std::to_string(amount) + "|" + commitment + "|" +
-                                     nullifier;
-    if (!verify_proof(public_input, proof_hex, verification_key_hex, error)) {
-        return {};
-    }
-
-    const auto note_id = mk_note_id(owner, amount, commitment);
-    if (notes_.count(note_id)) {
-        error = "note already exists";
-        return {};
-    }
-
-    std::string sealed_amount;
-    if (!seal_amount(amount, note_id, "zk", sealed_amount, error)) {
-        return {};
-    }
-
-    std::string owner_tag;
-    if (!owner_tag_for(owner, owner_tag, error)) {
-        return {};
-    }
-
-    notes_[note_id] = PrivateNote{owner_tag,
-                                  sealed_amount,
-                                  "zk",
-                                  commitment,
-                                  nullifier,
-                                  false};
-    return note_id;
+// The former mint_zk/spend_zk accepted an ML-DSA signature from a server-held
+// master key as a "proof". That is not zero-knowledge and gave no privacy, so the
+// path is removed. Real privacy: shielded (addz) transactions, see shielded.hpp.
+std::string PrivacyPool::mint_zk(const std::string&, std::uint64_t, const std::string&, const std::string&,
+                                 const std::string&, const std::string&, std::string& error) {
+    error = "mint_zk removed (was not zero-knowledge); use shielded (addz) transactions";
+    return {};
 }
 
-bool PrivacyPool::spend_zk(const std::string& owner,
-                           const std::string& note_id,
-                           const std::string& recipient,
-                           std::uint64_t amount,
-                           const std::string& nullifier,
-                           const std::string& proof_hex,
-                           const std::string& verification_key_hex,
-                           std::string& new_note_id,
+bool PrivacyPool::spend_zk(const std::string&, const std::string&, const std::string&, std::uint64_t,
+                           const std::string&, const std::string&, const std::string&, std::string&,
                            std::string& error) {
-    if (owner.empty() || recipient.empty() || note_id.empty() || amount == 0) {
-        error = "invalid spend_zk params";
-        return false;
-    }
-
-    auto it = notes_.find(note_id);
-    if (it == notes_.end()) {
-        error = "note not found";
-        return false;
-    }
-    auto& note = it->second;
-    if (note.spent) {
-        error = "note already spent";
-        return false;
-    }
-    std::string expected_owner_tag;
-    if (!owner_tag_for(owner, expected_owner_tag, error)) {
-        return false;
-    }
-    if (note.owner_tag != expected_owner_tag) {
-        error = "owner mismatch";
-        return false;
-    }
-    std::uint64_t note_amount = 0;
-    if (!unseal_amount(note.amount_sealed, note_id, note.blinding, note_amount, error)) {
-        return false;
-    }
-    if (note_amount < amount) {
-        error = "insufficient note amount";
-        return false;
-    }
-    if (note.nullifier != nullifier) {
-        error = "nullifier mismatch";
-        return false;
-    }
-    if (used_nullifiers_.count(nullifier)) {
-        error = "nullifier already used";
-        return false;
-    }
-
-    const std::string public_input = "spend|" + owner + "|" + note_id + "|" + recipient + "|" +
-                                     std::to_string(amount) + "|" + nullifier;
-    if (!verify_proof(public_input, proof_hex, verification_key_hex, error)) {
-        return false;
-    }
-
-    note.spent = true;
-    used_nullifiers_.insert(nullifier);
-    spent_commitments_.insert(note.commitment);
-
-    std::string mint_error;
-    new_note_id = mint_note_internal(recipient, amount, mint_error);
-    if (!mint_error.empty()) {
-        note.spent = false;
-        used_nullifiers_.erase(nullifier);
-        spent_commitments_.erase(note.commitment);
-        error = mint_error;
-        return false;
-    }
-
-    const auto change = note_amount - amount;
-    if (change > 0) {
-        std::string change_note;
-        change_note = mint_note_internal(owner, change, mint_error);
-        if (!mint_error.empty() || change_note.empty()) {
-            note.spent = false;
-            used_nullifiers_.erase(nullifier);
-            spent_commitments_.erase(note.commitment);
-            notes_.erase(new_note_id);
-            new_note_id.clear();
-            error = "failed to mint change note";
-            return false;
-        }
-    }
-
-    return true;
+    error = "spend_zk removed (was not zero-knowledge); use shielded (addz) transactions";
+    return false;
 }
 
 bool PrivacyPool::verifier_configured() const {
@@ -572,8 +435,22 @@ bool PrivacyPool::verifier_configured() const {
 }
 
 bool PrivacyPool::master_key_configured() {
-    const char* mk = std::getenv("ADDITION_PRIVACY_MASTER_KEY");
-    return mk != nullptr && std::string(mk).size() >= 32;
+    return false;
+}
+
+std::shared_ptr<const NoteCipher> make_keyless_note_cipher() {
+    static const auto cipher = std::make_shared<const KeylessNoteCipher>();
+    return cipher;
+}
+
+PrivacyPool::PrivacyPool() : cipher_(make_keyless_note_cipher()) {}
+
+void PrivacyPool::set_note_cipher(std::shared_ptr<const NoteCipher> cipher) {
+    cipher_ = cipher ? std::move(cipher) : make_keyless_note_cipher();
+}
+
+std::string PrivacyPool::note_cipher_name() const {
+    return cipher_->name();
 }
 
 std::size_t PrivacyPool::note_count() const {
@@ -664,7 +541,7 @@ bool PrivacyPool::load_state(const std::string& state, std::string& error) {
             } else {
                 // Backward compatibility migration from plaintext owner/amount state.
                 std::string migrated_owner_tag;
-                if (!owner_tag_for(owner_or_tag, migrated_owner_tag, error)) {
+                if (!cipher_->owner_tag(owner_or_tag, id, migrated_owner_tag, error)) {
                     return false;
                 }
                 std::uint64_t migrated_amount = 0;
@@ -675,7 +552,7 @@ bool PrivacyPool::load_state(const std::string& state, std::string& error) {
                     return false;
                 }
                 std::string sealed_amount;
-                if (!seal_amount(migrated_amount, id, blind, sealed_amount, error)) {
+                if (!cipher_->seal_amount(migrated_amount, id, blind, sealed_amount, error)) {
                     return false;
                 }
                 notes_[id] = PrivateNote{migrated_owner_tag, sealed_amount, blind, cm, nf, spent == "1"};

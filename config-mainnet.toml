@@ -1,5 +1,5 @@
 # ADDITION public mainnet (ADDITION_MAINNET_V1) from genesis-mainnet.json.
-# Public seed: P2P 34.27.30.115:28546, HTTP read 34.27.30.115:38546.
+# Seeds: Tor onion only (docs/ONION_SEEDS.md). No clearnet seed, no HTTP read.
 # Anyone can join, sync, and mine locally (bitcoind-style). Write RPC stays 127.0.0.1:8546.
 # Do not bootstrap the research testnet seed 34.27.30.115:28545.
 # Do not flip the public website explorer in a docs/config-only change.
@@ -10,20 +10,18 @@ network_id = "ADDITION_MAINNET_V1"
 data_dir = "data-mainnet"
 genesis_file = "genesis-mainnet.json"
 
-# Public mainnet P2P seed (IPv4 only). Home miners: --bootstrap 34.27.30.115:28546
-# and a different local --p2p-port (e.g. 28547).
+# Mainnet onion seeds are PLACEHOLDERS until the real seed onions exist
+# (see kMainnetOnionSeeds / docs/ONION_SEEDS.md). Until then pass:
+#   --tor-proxy 127.0.0.1:9050 --bootstrap <seed>.onion:28546
 # P2P listen stays off unless ADDITION_ENABLE_P2P_RPC=1.
-# Seed operators also set ADDITION_ADVERTISED_P2P=34.27.30.115:28546 (never list self).
-bootstrap_peers = [
-  "34.27.30.115:28546"
-]
+bootstrap_peers = []
 
 # Public read RPC is off unless --public-rpc or ADDITION_ENABLE_PUBLIC_RPC=1.
 enable_public_rpc = false
 
 # Auto-mine is refused on mainnet even if this is set.
 enable_auto_mine = false
-auto_mine_interval_sec = 60
+auto_mine_interval_sec = 20
 auto_mine_reward = "miner1"
 
 [ports]
@@ -36,17 +34,37 @@ public_rpc = 38546
 public_rpc_bind = "0.0.0.0"
 
 [chain]
-block_reward = 50
+block_reward = 4
 max_supply = 50000000
-target_block_time_sec = 60
-halving_interval = 210000
-tail_emission_reward = 1
-min_fee = 0
+target_block_time_sec = 20
+halving_interval = 5681819
+subsidy_floor = 1
+# Hard cap: 50,000,000 total, exactly. 20 s blocks, 4/block halving every
+# 5,681,819 blocks (~3.6y): 4, 2, then a floor of 1/block until the cap.
+# Emission lands on exactly 50M at height 27,272,727 (~17.3y); ~99% by ~17.0y.
+# No tail emission: after the cap, miners and stakers are paid by fees only.
+tail_emission_reward = 0
+# Hybrid PoW/PoS (Decred-style). Activates when cumulative supply reaches
+# 37,500,000 (3/4 of the cap): height 14,772,727 (~9.36 years). Consensus-pinned.
+staking_activation_height = 14772727
+stake_min_amount = 1000
+stake_maturity = 768  # ~4.3 h at 20 s
+stake_unbond_delay = 4320  # ~1 day at 20 s
+stake_votes_per_block = 5
+stake_vote_quorum = 3
+stake_min_live_tickets = 5
+stake_reward_bps = 3000
+# Consensus minimum fee per tx (base units). Nonzero to price spam.
+min_fee = 1
 genesis_timestamp = 1770000000
 pow_algorithm = "memory_hard"
-# Same numeric floor as the existing testnet *hard* target. Cannot retarget to the
-# ~4ms easy target (0x0000FFFFFFFFFFFF). See docs/MAINNET_RUNBOOK.md.
+# LWMA per-block retarget (window 180 = ~1 h at 20 s; future-time limit 15 blocks = 300 s). Easiest bound (max) stays the testnet
+# *hard* target so mainnet can never get easier than 0x000000FFFFFFFFFF; it can
+# get up to 2^16x harder (min). See docs/MAINNET_RUNBOOK.md.
 initial_difficulty_target = 0x000000FFFFFFFFFF
-min_difficulty_target = 0x000000FFFFFFFFFF
+min_difficulty_target = 0x0000000000FFFFFF
 max_difficulty_target = 0x000000FFFFFFFFFF
 retarget_window = 30
+lwma_window = 180
+# 0 = LWMA from genesis (needs a mainnet relaunch). For an in-place fork set tip+margin.
+difficulty_fork_height = 0

@@ -1,0 +1,10 @@
+# Tor config for one ADDITION node as a v3 onion service (onion-only).
+# Tor generates the service keys in HiddenServiceDir; never copy, print or commit them.
+SocksPort 127.0.0.1:9050
+DataDirectory /var/lib/tor
+HiddenServiceDir /var/lib/tor/addition_p2p
+HiddenServiceVersion 3
+HiddenServicePort 19444 127.0.0.1:19444
+# then:
+#   ADDITION_ADVERTISED_P2P=$(cat /var/lib/tor/addition_p2p/hostname):19444 \
+#   additiond --onion-only --dandelion --p2p-port 19444 --bootstrap <seed>.onion:19444

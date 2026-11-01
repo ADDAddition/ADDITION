@@ -26,7 +26,7 @@
         <span id="conn-pill" class="pill pill-warn">Checking…</span>
       </div>
       <p class="note" style="margin-top:0">
-        Prefers public mainnet write on seed <code>34.27.30.115:38546</code> via
+        Prefers public mainnet write on seed <code>127.0.0.1:38546</code> via
         <code>/api/rpc</code> (CoS allowlist: <code>createwallet</code>, <code>mine</code>,
         <code>wallet_send</code>, sign, <code>tx_build</code>).
         Falls back to home-node loopback via <code>/local-rpc</code>
@@ -43,7 +43,7 @@
         <ol class="connect-steps">
           <li>
             <strong>Public path (preferred)</strong>
-            <span>Seed <code>http://34.27.30.115:38546</code> — write allowlist includes create / mine / send when CoS has it open. Site uses <code>/api/rpc</code>.</span>
+            <span>Seed <code>http://127.0.0.1:38546</code> — write allowlist includes create / mine / send when CoS has it open. Site uses <code>/api/rpc</code>.</span>
           </li>
           <li>
             <strong>Or run additiond locally</strong>

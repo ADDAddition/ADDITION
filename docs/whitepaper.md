@@ -108,7 +108,7 @@ Build requires **liboqs** and **OpenSSL**. Missing liboqs fails the build.
 
 - Thread-local `OQS_SIG` and parallel batch verify in `crypto.cpp`
 - Opt-in **SLH-DSA** (`slh-dsa-shake-256s`) only if this liboqs build can `OQS_SIG_sign_with_ctx_str` with a non-empty context; otherwise rejected in strict mode
-- Unknown schemes (including Falcon/FN-DSA) are rejected
+- Any other scheme name is rejected
 
 Strict mode means the node only accepts the allowlisted PQ schemes it can verify. Lattice assumptions can age; operators should track NIST / cryptanalysis guidance over time. PQ here is a **grade and posture**, not a forever warranty.
 
@@ -181,9 +181,9 @@ Mainnet difficulty floor (initial = min = max): **`0x000000FFFFFFFFFF`**. Smalle
 
 | Parameter | Value (code / genesis) |
 | --- | --- |
-| `target_block_time_sec` | **60** |
-| `retarget_window` | **30** |
-| Retarget compare window | `30 × 60s` of timestamps (`chain.cpp`) |
+| `target_block_time_sec` | **20** |
+| LWMA difficulty window | **180** blocks (~1 hour) |
+| Future-timestamp bound | **300 s** (15 blocks × 20 s) |
 | Early blocks | target × `9/10` (harder) |
 | Late blocks | target scaled up, clamped to `[min, max]` |
 | Mainnet mine deadline | `mine_deadline_sec=0` (search until found) |
@@ -194,9 +194,19 @@ Because mainnet clamps min and max to the same hard floor, retarget cannot climb
 
 `auto_mine` is **refused on mainnet** (`src/auto_mine.cpp`). Live `getinfo` reports `auto_mine=off`. Config `enable_auto_mine = false` in `config-mainnet.toml` does not override that refusal.
 
-### 5.4 Coinbase
+### 5.4 Coinbase and hybrid PoW/PoS
 
-Block template builds a single coinbase output to the **finding miner’s** reward address (`chain.cpp` `make_block_template`). There is **no** 70/25/5 miner/staker/treasury split. Coinbase is 100% to the finding miner.
+Consensus implements hybrid PoW/PoS (tickets on chain). On mainnet, staking activates at **height 14,772,727**, the first block at which cumulative emission reaches **37,500,000 ADD (3/4 of the 50M cap)**: 22,727,272 from the 4/block era (heights 1–5,681,818), +11,363,638 from the 2/block era (to height 11,363,637, total 34,090,910), then 3,409,090 blocks at 1/block. At 20 s blocks that is about **9.36 years** after genesis. Before that height the coinbase is 100% to the finding miner; from it on, 30% of each block's reward plus fees goes to the approving stakers.
+
+When active (regtest/testnet configs can enable it):
+
+- **Tickets:** a stake-lock tx sends ≥ `stake_min_amount` (default **1000**) to `@stake`; it becomes a ticket after `stake_maturity` blocks (mainnet **768** ≈ 4.3 h).
+- **Selection:** for block *h*, **5** tickets are chosen deterministically from the hash of block *h−1*. Each signs an ML-DSA-87 vote on *h−1*; votes relay over P2P (`SVOTE`) and miners include them (block payload `BLB3`).
+- **Quorum:** a block needs **3** approving votes once at least `stake_min_live_tickets` tickets are live.
+- **Reward split:** **30%** of the block subsidy+fees is split equally among the approving voters in the coinbase; the miner gets the rest.
+- **Slashing:** two conflicting votes from one ticket at the same height (equivocation) are evidence; including it burns the ticket. Missed votes are not penalized.
+- **Unbonding:** a stake-unlock tx returns funds, frozen for `stake_unbond_delay` blocks (mainnet **4320** ≈ 1 day).
+- **Keys stay local:** the wallet signs `stake`/`unstake`/votes locally; RPC never accepts a raw private key.
 
 ---
 
@@ -207,13 +217,14 @@ From `genesis-mainnet.json`, `config-mainnet.toml`, and `mainnet_chain_config()`
 | Parameter | Value |
 | --- | --- |
 | `max_supply` | **50,000,000** whole units |
-| `block_reward` | **50** |
-| `halving_interval` | **210,000** blocks |
-| `tail_emission_reward` | 1 (after deep halvings / policy in chain) |
+| `block_reward` | **4** (20 s blocks) |
+| `halving_interval` | **5,681,819** blocks (~3.6 years) |
+| `subsidy_floor` | **1** per block until the cap, then **0** (no tail emission) |
+| Schedule | 4/block (heights 1–5,681,819), 2/block (to 11,363,638), then 1/block until exactly 50,000,000 at height **27,272,727** (~17.3 years); 99% by height ~26.77M (~17.0 years) |
 | `min_fee` (spec / genesis) | **0** |
 | Precision | Whole integers only — no 8-decimal satoshi subunit |
 
-**Coinbase:** 100% of the block reward (plus collected fees, subject to validation) goes to the finding miner’s address. No token sale, no pre-mine claim in genesis beyond the empty height-0 chain, no ICO language.
+**Coinbase:** while staking is dormant, 100% of the block reward (plus collected fees, subject to validation) goes to the finding miner’s address. Supply is hard-capped at 50,000,000; no subsidy is minted past it. No token sale, no pre-mine claim in genesis beyond the empty height-0 chain, no ICO language.
 
 **Fees:** Spec / genesis / `mainnet_chain_config()` floor is `min_fee=0`. Congestion heuristics may raise `recommended_min_fee` / `dynamic_min_fee` from mempool size and last-block fees. Copy live fields from the node; do not invent a fee market narrative.
 
@@ -234,8 +245,8 @@ Public product profile:
 | Genesis | `genesis-mainnet.json` (`timestamp` 1770000000) |
 | Default data dir | `data-mainnet` |
 | Home-node write RPC | **`127.0.0.1:8546`** |
-| Public HTTP | **`38546`** (seed `34.27.30.115:38546`) |
-| P2P | **`28546`** (seed `34.27.30.115:28546`) |
+| Public HTTP | **`38546`** (seed `127.0.0.1:38546`) |
+| P2P | **`28546`** (seed `<seed>.onion:28546`) |
 | Consensus | `memory_hard` |
 
 **Hard rules:**
@@ -243,7 +254,7 @@ Public product profile:
 - Home write RPC binds **`127.0.0.1:8546`** — never public bind / never `0.0.0.0`
 - Never publish `8545` / `8546`
 - Mixing another network’s `blocks.dat` into a mainnet `--data-dir` is refused
-- Seed operators set `ADDITION_ADVERTISED_P2P=34.27.30.115:28546` so public `getinfo` / `peers` advertise that IPv4 endpoint and do not list `self`
+- Seed operators set `ADDITION_ADVERTISED_P2P=<seed>.onion:28546` so public `getinfo` / `peers` advertise that IPv4 endpoint and do not list `self`
 
 A separate testnet profile (`ADDITION_TESTNET_V1`, ports `28545` / `38545`) exists in the same binary for operators; it is **not** the public product on this site. See `/join/#testnet`.
 
@@ -251,7 +262,7 @@ A separate testnet profile (`ADDITION_TESTNET_V1`, ports `28545` / `38545`) exis
 
 ## 8. Public RPC
 
-**Seed:** `34.27.30.115:38546`  
+**Seed:** `127.0.0.1:38546`  
 **Site proxy:** `/api/rpc` (Cloudflare Worker → `PUBLIC_RPC_HTTP`)
 
 Read path (stock allowlist in `rpc_access.cpp` `is_public_read_command`): `getinfo`, `monetary_info`, `crypto_selftest`, `tx_status`, `peers`, `getblock`, `getblockhash`, `getblockraw`.
@@ -269,8 +280,8 @@ Home operators still keep trusted write on **`127.0.0.1:8546`**. The site wallet
 Example:
 
 ```bash
-curl -s 'http://34.27.30.115:38546/rpc?cmd=getinfo'
-curl -s 'http://34.27.30.115:38546/jsonrpc?method=getinfo'
+curl -s 'http://127.0.0.1:38546/rpc?cmd=getinfo'
+curl -s 'http://127.0.0.1:38546/jsonrpc?method=getinfo'
 ```
 
 ---
@@ -318,7 +329,7 @@ An observer with node access or the master key can open commitments. This is **n
 
 ## 11. Live network fields
 
-**Live public `getinfo`** (fetched from seed `34.27.30.115:38546` via `/api/rpc` — height may be `0`; peers change; never a canned marketing number). Prefer [`/status/`](/status/) for the full panel.
+**Live public `getinfo`** (fetched from seed `127.0.0.1:38546` via `/api/rpc` — height may be `0`; peers change; never a canned marketing number). Prefer [`/status/`](/status/) for the full panel.
 
 @@LIVE_GETINFO_SNAPSHOT@@
 
@@ -349,7 +360,7 @@ export ADDITION_ENABLE_P2P_RPC=1
   --data-dir $HOME/addition-mainnet \
   --local-rpc-port 8546 \
   --p2p-port 28547 \
-  --bootstrap 34.27.30.115:28546
+  --bootstrap <seed>.onion:28546
 # sync, then getinfo; mine on 127.0.0.1:8546 or public 38546 write allowlist
 ```
 
@@ -365,4 +376,4 @@ MIT-licensed software. This whitepaper is engineering documentation, not an audi
 
 ---
 
-*Sources: `include/addition/config.hpp`, `src/crypto.cpp`, `src/chain.cpp`, `src/privacy.cpp`, `src/auto_mine.cpp`, `src/rpc_access.cpp`, `src/rpc_server.cpp`, `genesis-mainnet.json`, `config-mainnet.toml`, `docs/MAINNET_RUNBOOK.md`, `docs/ARCHITECTURE.md`, `docs/WALLET.md`, and live RPCs on `34.27.30.115:38546`.*
+*Sources: `include/addition/config.hpp`, `src/crypto.cpp`, `src/chain.cpp`, `src/privacy.cpp`, `src/auto_mine.cpp`, `src/rpc_access.cpp`, `src/rpc_server.cpp`, `genesis-mainnet.json`, `config-mainnet.toml`, `docs/MAINNET_RUNBOOK.md`, `docs/ARCHITECTURE.md`, `docs/WALLET.md`, and live RPCs on `127.0.0.1:38546`.*

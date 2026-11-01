@@ -12,7 +12,7 @@
 int main() {
     {
         const auto mainnet = addition::mainnet_chain_config();
-        if (mainnet.min_difficulty_target != 0x000000FFFFFFFFFFULL ||
+        if (mainnet.min_difficulty_target != 0x0000000000FFFFFFULL ||
             mainnet.initial_difficulty_target != 0x000000FFFFFFFFFFULL ||
             mainnet.max_difficulty_target != 0x000000FFFFFFFFFFULL) {
             std::cerr << "test failed: ADDITION_MAINNET_V1 difficulty must stay 0x000000FFFFFFFFFF\n";

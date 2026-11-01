@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "addition/consensus_rules.hpp"
+
 namespace addition {
 
 enum class NetworkMode {
@@ -43,6 +45,43 @@ inline constexpr std::uint64_t kRegtestMinDifficultyTarget = 0xFFFFFFFFFFFFFFFFU
 // ~4ms easy target. PoW is memory_hard (1 MiB x 16 rounds per attempt).
 inline constexpr std::uint64_t kMainnetDifficultyTarget = kTestnetHardDifficultyTarget;
 inline constexpr std::uint64_t kMainnetMaxDifficultyTarget = kTestnetHardDifficultyTarget;
+// Mainnet hardest allowed target (consensus safety bound for LWMA). 2^16x harder
+// than the floor; the easiest bound stays kMainnetMaxDifficultyTarget so mainnet
+// can never be loosened below the testnet hard target.
+inline constexpr std::uint64_t kMainnetMinDifficultyTarget = 0x0000000000FFFFFFULL;
+// Height at which the LWMA per-block retarget activates. 0 = from genesis
+// (requires a mainnet relaunch). For an in-place fork set to tip+margin.
+inline constexpr std::uint64_t kMainnetDifficultyForkHeight = 0ULL;
+// Sentinel: never activate LWMA (legacy window retarget forever).
+// Mainnet minimum tx fee (base units). Consensus: txs below are rejected in blocks.
+inline constexpr std::uint64_t kMainnetMinFee = 1ULL;
+// Hard-capped emission (no tail), 20 s blocks. 4 coins/block, halving every
+// 5,681,819 blocks (~3.6 years) with a floor of 1 coin/block: 4 -> 2 -> 1,
+// then 1/block until the cap. Supply lands on exactly 50,000,000 at height
+// 27,272,727 (~17.3 years); ~99% by ~17.0 years. After that subsidy = 0 and
+// miners/stakers earn fees only. (The floor is clipped by max_supply, so it is
+// not a tail emission.)
+inline constexpr std::uint32_t kMainnetTargetBlockTimeSec = 20U;
+inline constexpr std::uint64_t kMainnetMaxSupply = 50'000'000ULL;
+inline constexpr std::uint64_t kMainnetBlockReward = 4ULL;
+inline constexpr std::uint32_t kMainnetHalvingInterval = 5'681'819U;
+inline constexpr std::uint64_t kMainnetSubsidyFloor = 1ULL;
+inline constexpr std::uint64_t kMainnetCapHeight = 27'272'727ULL;
+// LWMA window kept at ~1 hour of blocks (180 x 20 s).
+inline constexpr std::uint32_t kMainnetLwmaWindow = 180U;
+// Staking windows rescaled x3 in blocks to keep wall-clock time:
+// maturity 768 blocks (~4.3 h), unbonding 4320 blocks (~1 day).
+inline constexpr std::uint64_t kMainnetStakeMaturity = 768ULL;
+inline constexpr std::uint64_t kMainnetStakeUnbondDelay = 4320ULL;
+// Hybrid PoW/PoS defaults (see staking.hpp). Mainnet activation is a
+// launch decision; Never until vote gossip ships in the P2P layer.
+inline constexpr std::uint64_t kStakingNever = UINT64_MAX;
+// Mainnet staking activation: first height at which cumulative emission reaches
+// 37,500,000 (3/4 of the 50M cap). Genesis mints 0; 4/block for heights
+// 1..5,681,818 (22,727,272), 2/block for 5,681,819..11,363,637 (34,090,910 total),
+// then 1/block: 37.5M at height 14,772,727 (~9.36 years at 20 s).
+inline constexpr std::uint64_t kMainnetStakingActivationHeight = 14'772'727ULL;
+inline constexpr std::uint64_t kDifficultyForkNever = 0xFFFFFFFFFFFFFFFFULL;
 
 // Testnet mine search deadline. Easy SHA3-512 should finish well inside this.
 inline constexpr std::uint64_t kTestnetMineDeadlineSec = 30;
@@ -57,7 +96,6 @@ struct ChainConfig {
     std::uint64_t genesis_timestamp{1'763'000'000ULL};
     std::uint64_t max_supply{50'000'000ULL};
     std::uint64_t block_reward{50ULL};
-    std::uint64_t tail_emission_reward{1ULL};
     std::uint32_t target_block_time_sec{60U};
     std::uint32_t difficulty_window{120U};
     PowAlgorithm pow_algorithm{PowAlgorithm::Sha3_512};
@@ -70,11 +108,32 @@ struct ChainConfig {
     std::uint32_t confirmations_policy{2};
     std::string economic_security{"none"};
     std::uint32_t retarget_window{30U};
+    // LWMA per-block retarget (consensus). Blocks with height >= fork use LWMA.
+    std::uint64_t difficulty_fork_height{kDifficultyForkNever};
+    std::uint32_t lwma_window{60U};
+    // Hardest bound applied by the *legacy* rule before the fork (0 = min_difficulty_target).
+    // Lets mainnet replay its frozen pre-fork history after min was widened.
+    std::uint64_t legacy_min_difficulty_target{0ULL};
     std::uint32_t halving_interval{210000U};
+    std::uint64_t subsidy_floor{0ULL}; // min halved reward until the cap (mainnet 1)
     bool require_pq_signatures{true};
     bool require_privacy_pool{true};
     bool allow_zero_reward_blocks{true};
     std::uint64_t min_fee{0ULL};
+    // Hybrid PoW/PoS (Decred-style tickets). Consensus when height >= activation.
+    std::uint64_t staking_activation_height{UINT64_MAX};
+    std::uint64_t stake_min_amount{1000ULL};       // min coins per ticket
+    std::uint64_t stake_maturity{256ULL};          // blocks before a ticket can be selected
+    std::uint64_t stake_unbond_delay{1440ULL};     // blocks unlocked coins stay frozen
+    std::uint32_t stake_votes_per_block{5U};       // tickets selected per block
+    std::uint32_t stake_vote_quorum{3U};           // approving votes required
+    std::uint64_t stake_min_live_tickets{5ULL};    // below this pool size, votes are optional
+    std::uint32_t stake_reward_bps{3000U};         // stakers' share of subsidy+fees (30%)
+    // Consensus: max canonical binary block weight (bytes). See block.hpp.
+    std::uint64_t max_block_weight{2ULL * 1024ULL * 1024ULL};
+    // EXPERIMENTAL shielded pool (addz). Off by default on every network; must stay
+    // off on mainnet until an external cryptographic audit is complete.
+    bool shielded_enabled{false};
     std::vector<std::string> bootstrap_peers{"127.0.0.1:28545"};
 };
 
@@ -93,6 +152,12 @@ struct NodeConfig {
     std::vector<std::string> bootstrap_peers{"127.0.0.1:28545"};
     // Public advertisement only. Not added to the internal peer set (avoids self-sync).
     std::string advertised_p2p{};
+    // Tor / privacy networking (all off by default).
+    std::string tor_socks_proxy{};     // e.g. "127.0.0.1:9050"; enables .onion peers
+    bool onion_only{false};            // refuse every clearnet connection; bind P2P to 127.0.0.1
+    std::string p2p_bind{"0.0.0.0"};   // forced to 127.0.0.1 when onion_only
+    bool dandelion{false};             // Dandelion++ stem/fluff tx relay
+    std::size_t max_peers{125};        // address-manager cap
     std::string data_dir{"data"};
     std::string config_path{};
     std::string genesis_path{};
@@ -100,12 +165,24 @@ struct NodeConfig {
 
 // Operator's current public P2P (IPv4 only). Not a peer-count claim.
 // Seed operators set ADDITION_ADVERTISED_P2P to this so public getinfo/peers
-// do not list `self`. Public TCP 28545 can timeout or be filtered; HTTP :80
-// sync is the reliable join path for testnet.
+// do not list `self`. Block sync is P2P only
+// (no HTTP/public-RPC ingest).
 inline constexpr const char* kOperatorPublicP2p = "34.27.30.115:28545";
-// Public mainnet P2P seed (ADDITION_MAINNET_V1). Distinct from the testnet seed.
-// Home miners: --mainnet --bootstrap 34.27.30.115:28546. Write RPC stays loopback.
+// Legacy clearnet mainnet seed. NOT a default any more (kept only so configs
+// that still list it can be recognised); mainnet defaults to onion seeds.
 inline constexpr const char* kOperatorPublicMainnetP2p = "34.27.30.115:28546";
+// Mainnet bootstrap seeds are Tor v3 onions (docs/ONION_SEEDS.md).
+// PLACEHOLDERS until the real mainnet seed onions are generated: entries
+// starting with "placeholder" are well-formed but never dialed. With only
+// placeholders, --mainnet has no default seed and the operator must pass
+// --bootstrap <onion>:28546 (plus --tor-proxy).
+inline constexpr const char* kMainnetOnionSeeds[] = {
+    "placeholdermainnetseedaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.onion:28546",
+    "placeholdermainnetseedbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.onion:28546",
+};
+bool is_placeholder_seed(const std::string& endpoint);
+// Real (non-placeholder) mainnet onion seeds; empty while all are placeholders.
+std::vector<std::string> mainnet_default_seeds();
 
 bool is_ipv4_endpoint(const std::string& endpoint);
 bool is_loopback_host(const std::string& host);

@@ -56,7 +56,7 @@ int main() {
         return 1;
     }
     if (mainnet_cfg.initial_difficulty_target != addition::kMainnetDifficultyTarget ||
-        mainnet_cfg.min_difficulty_target != addition::kMainnetDifficultyTarget ||
+        mainnet_cfg.min_difficulty_target != addition::kMainnetMinDifficultyTarget ||
         mainnet_cfg.max_difficulty_target != addition::kMainnetMaxDifficultyTarget) {
         std::cerr << "test failed: mainnet difficulty knobs\n";
         return 1;
@@ -72,7 +72,7 @@ int main() {
     }
     if (addition::kMainnetDifficultyTarget != 0x000000FFFFFFFFFFULL ||
         mainnet_cfg.initial_difficulty_target != 0x000000FFFFFFFFFFULL ||
-        mainnet_cfg.min_difficulty_target != 0x000000FFFFFFFFFFULL ||
+        mainnet_cfg.min_difficulty_target != 0x0000000000FFFFFFULL ||
         mainnet_cfg.max_difficulty_target != 0x000000FFFFFFFFFFULL) {
         std::cerr << "test failed: ADDITION_MAINNET_V1 difficulty_target must stay 0x000000FFFFFFFFFF\n";
         return 1;
@@ -176,9 +176,16 @@ int main() {
                 return 1;
             }
         }
-        if (ncfg.bootstrap_peers.empty() ||
-            ncfg.bootstrap_peers[0] != addition::kOperatorPublicMainnetP2p) {
-            std::cerr << "test failed: --mainnet default bootstrap must be the mainnet seed\n";
+        for (const auto& peer : ncfg.bootstrap_peers) {
+            if (peer == addition::kOperatorPublicMainnetP2p || addition::is_placeholder_seed(peer) ||
+                peer.find(".onion:") == std::string::npos) {
+                std::cerr << "test failed: --mainnet default bootstrap must be real onion seeds only: "
+                          << peer << "\n";
+                return 1;
+            }
+        }
+        if (addition::mainnet_default_seeds() != ncfg.bootstrap_peers) {
+            std::cerr << "test failed: --mainnet default bootstrap != mainnet_default_seeds()\n";
             return 1;
         }
     }

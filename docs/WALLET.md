@@ -12,8 +12,8 @@ Public contact: [contact@additionblockchain.com](mailto:contact@additionblockcha
 | Flag | `additiond --mainnet` | `additiond --network testnet` |
 | `network_id` | `ADDITION_MAINNET_V1` | `ADDITION_TESTNET_V1` |
 | Home-node write RPC | `127.0.0.1:8546` | `127.0.0.1:8545` |
-| Public RPC | `34.27.30.115:38546` | `34.27.30.115:38545` |
-| P2P bootstrap | `34.27.30.115:28546` | `34.27.30.115:28545` |
+| Public RPC | `127.0.0.1:38546` | `127.0.0.1:38545` |
+| P2P bootstrap | `<seed>.onion:28546` | `<seed>.onion:28545` |
 
 Public seed **38546** write allowlist is open (CoS): `createwallet`, `mine`,
 `wallet_send`, `wallet_sign` / `sign_message`, `tx_build` / `sendtx_signed*`.
@@ -31,7 +31,7 @@ Relevant commands (see [FINAL_COMMANDS.md](FINAL_COMMANDS.md)):
 
 | Command | Role |
 |---|---|
-| `createwallet [name] [scheme]` | Default scheme `ml-dsa-87`. Optional `slh-dsa-shake-256s` only if this liboqs can `OQS_SIG_sign_with_ctx_str` with a non-empty context; otherwise rejected in `pq_mode=strict`. Unknown schemes (including Falcon/FN-DSA) are rejected. Writes `data/wallets/<name>.wal`. Returns `address`, `pub`, `algo=...`, `priv_printed=0`. |
+| `createwallet [name] [scheme]` | Default scheme `ml-dsa-87`. Optional `slh-dsa-shake-256s` only if this liboqs can `OQS_SIG_sign_with_ctx_str` with a non-empty context; otherwise rejected in `pq_mode=strict`. Any other scheme name is rejected. Writes `data/wallets/<name>.wal`. Returns `address`, `pub`, `algo=...`, `priv_printed=0`. |
 | `wallet_send <name> <to> <amount> [fee]` | Node signs from that `.wal` file. No privkey on the wire. |
 | `getbalance <address>` | Confirmed balance |
 | `fee_info` | `recommended_min_fee` (floor `0`; congestion can raise it) |
@@ -46,8 +46,7 @@ Relevant commands (see [FINAL_COMMANDS.md](FINAL_COMMANDS.md)):
 Legacy `sendtx` / `sendtx_hash` (private key on the RPC line) stay **disabled**
 unless `ADDITION_ALLOW_INSECURE_TX_COMMANDS=1`. Leave that unset.
 
-`sign_message <privkey_hex> ...` still exists on the daemon. The standalone
-client does **not** call it.
+`sign_message <wallet_name> <msg_hex>` signs with a local wallet file; raw private keys are rejected over RPC.
 
 The site `/wallet/` page uses `wallet_send` against public `38546` when
 available (via `/api/rpc`), or `data/wallets/` on a home node via `/local-rpc`.
@@ -74,7 +73,7 @@ mode `0600`) and is used only in-process to sign `sign_hash`.
 
 ### Prerequisites
 
-* A reachable TEXT RPC: home node `127.0.0.1:8546` (mainnet) / `8545` (testnet), or public `34.27.30.115:38546` when write is open
+* A reachable TEXT RPC: home node `127.0.0.1:8546` (mainnet) / `8545` (testnet), or public `127.0.0.1:38546` when write is open
 * Python 3.10+
 * `liboqs` on the library path (the same library used to build `additiond`)
 

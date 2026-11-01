@@ -15,6 +15,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <thread>
+#include <unordered_set>
 
 namespace addition {
 namespace {
@@ -598,11 +599,98 @@ std::string sign_message_hybrid(const std::string& private_key,
     throw std::runtime_error("liboqs signing failed: " + err);
 }
 
+namespace {
+
+// Positive-result signature cache (Bitcoin-style sigcache). A tx is verified
+// once on mempool admission, again by the miner and again inside block
+// validation; with ML-DSA-87 that repeated verify dominates CPU. Keys are
+// SHA3-512(pk || 0 || msg || 0 || sig), so a hit requires the exact same
+// (pubkey, message, signature) triple: only a SHA3-512 collision could make a
+// cached "valid" apply to different data. Only successes are cached, the
+// scheme policy check still runs on every call, and the set is bounded.
+std::mutex g_sigcache_mu;
+std::unordered_set<std::string> g_sigcache;
+std::atomic<std::uint64_t> g_sigcache_hits{0};
+std::atomic<std::uint64_t> g_sigcache_misses{0};
+std::atomic<bool> g_sigcache_enabled{true};
+constexpr std::size_t kSigCacheMax = 200000;
+
+std::string sigcache_key(const std::string& pk, const std::string& msg, const std::string& sig) {
+    std::string buf;
+    buf.reserve(pk.size() + msg.size() + sig.size() + 2);
+    buf.append(pk).push_back('\0');
+    buf.append(msg).push_back('\0');
+    buf.append(sig);
+    const auto h = sha3_512_bytes(buf);
+    return std::string(reinterpret_cast<const char*>(h.data()), h.size());
+}
+
+bool verify_message_signature_hybrid_uncached(const std::string& public_key,
+                                              const std::string& message,
+                                              const std::string& signature);
+
+} // namespace
+
+void sig_cache_set_enabled(bool enabled) {
+    g_sigcache_enabled.store(enabled);
+}
+
+void sig_cache_clear() {
+    std::lock_guard<std::mutex> lk(g_sigcache_mu);
+    g_sigcache.clear();
+    g_sigcache_hits = 0;
+    g_sigcache_misses = 0;
+}
+
+void sig_cache_stats(std::uint64_t& hits, std::uint64_t& misses, std::size_t& entries) {
+    hits = g_sigcache_hits.load();
+    misses = g_sigcache_misses.load();
+    std::lock_guard<std::mutex> lk(g_sigcache_mu);
+    entries = g_sigcache.size();
+}
+
 bool verify_message_signature_hybrid(const std::string& public_key,
                                      const std::string& message,
                                      const std::string& signature,
                                      const std::string& pq_context) {
     (void)pq_context;
+    if (signature.rfind("pq=", 0) != 0 || (public_key.size() % 2) != 0) {
+        return false;
+    }
+    {
+        // Policy (allowed schemes) is re-checked every call, never cached.
+        const auto scheme = infer_sig_scheme_from_key_bytes(public_key.size() / 2, false);
+        if (scheme == SigScheme::Unknown || !sig_scheme_allowed_strict(scheme)) {
+            return false;
+        }
+    }
+    if (!g_sigcache_enabled.load(std::memory_order_relaxed)) {
+        return verify_message_signature_hybrid_uncached(public_key, message, signature);
+    }
+    const auto key = sigcache_key(public_key, message, signature);
+    {
+        std::lock_guard<std::mutex> lk(g_sigcache_mu);
+        if (g_sigcache.count(key) != 0) {
+            g_sigcache_hits.fetch_add(1, std::memory_order_relaxed);
+            return true;
+        }
+    }
+    g_sigcache_misses.fetch_add(1, std::memory_order_relaxed);
+    if (!verify_message_signature_hybrid_uncached(public_key, message, signature)) {
+        return false;
+    }
+    std::lock_guard<std::mutex> lk(g_sigcache_mu);
+    if (g_sigcache.size() >= kSigCacheMax) {
+        g_sigcache.clear();
+    }
+    g_sigcache.insert(key);
+    return true;
+}
+
+namespace {
+bool verify_message_signature_hybrid_uncached(const std::string& public_key,
+                                              const std::string& message,
+                                              const std::string& signature) {
     constexpr const char* kPrefix = "pq=";
     if (signature.rfind(kPrefix, 0) != 0) {
         return false;
@@ -662,6 +750,7 @@ bool verify_message_signature_hybrid(const std::string& public_key,
     }
     return false;
 }
+} // namespace
 
 bool pq_sign_message(const std::vector<std::uint8_t>& secret_key,
                      const std::string& message,

@@ -1,4 +1,5 @@
 #include "addition/config.hpp"
+#include "addition/net_transport.hpp"
 #include "addition/fast_path.hpp"
 
 #include <algorithm>
@@ -159,7 +160,30 @@ void apply_network_profile_chain(ChainConfig& chain, NetworkMode mode) {
     chain.confirmations_policy = profile.confirmations_policy;
     chain.economic_security = profile.economic_security;
     chain.retarget_window = profile.retarget_window;
+    chain.difficulty_fork_height = profile.difficulty_fork_height;
+    chain.lwma_window = profile.lwma_window;
+    chain.legacy_min_difficulty_target = profile.legacy_min_difficulty_target;
     chain.target_block_time_sec = profile.target_block_time_sec;
+}
+
+// Returns 1 ok, 0 bad value, -1 not a staking key.
+int apply_staking_key(ChainConfig& c, const std::string& k, const std::string& v) {
+    std::uint64_t n = 0;
+    auto num = [&](std::uint64_t lo, std::uint64_t hi) { return parse_u64(v, n) && n >= lo && n <= hi; };
+    if (k == "shielded_enabled") {
+        if (v == "1" || v == "true") { c.shielded_enabled = true; return 1; }
+        if (v == "0" || v == "false") { c.shielded_enabled = false; return 1; }
+        return 0;
+    }
+    if (k == "staking_activation_height") { return parse_u64(v, c.staking_activation_height) ? 1 : 0; }
+    if (k == "stake_min_amount") { if (!num(1, UINT64_MAX)) return 0; c.stake_min_amount = n; return 1; }
+    if (k == "stake_maturity") { if (!num(1, 1000000)) return 0; c.stake_maturity = n; return 1; }
+    if (k == "stake_unbond_delay") { if (!num(0, 1000000)) return 0; c.stake_unbond_delay = n; return 1; }
+    if (k == "stake_votes_per_block") { if (!num(1, 64)) return 0; c.stake_votes_per_block = static_cast<std::uint32_t>(n); return 1; }
+    if (k == "stake_vote_quorum") { if (!num(1, 64)) return 0; c.stake_vote_quorum = static_cast<std::uint32_t>(n); return 1; }
+    if (k == "stake_min_live_tickets") { if (!num(1, UINT64_MAX)) return 0; c.stake_min_live_tickets = n; return 1; }
+    if (k == "stake_reward_bps") { if (!num(0, 10000)) return 0; c.stake_reward_bps = static_cast<std::uint32_t>(n); return 1; }
+    return -1;
 }
 
 void apply_network_mode(NodeConfig& cfg, NetworkMode mode) {
@@ -206,13 +230,31 @@ bool apply_kv(NodeConfig& cfg, const std::string& table, const std::string& key,
             return false;
         }
         for (const auto& peer : peers) {
-            if (!is_ipv4_endpoint(peer)) {
-                error = "bootstrap_peers must be IPv4 host:port (got " + peer + ")";
+            if (!is_peer_endpoint(peer)) {
+                error = "bootstrap_peers must be IPv4 or v3 .onion host:port (got " + peer + ")";
                 return false;
             }
         }
         cfg.bootstrap_peers = peers;
         cfg.chain.bootstrap_peers = peers;
+        return true;
+    }
+    if (full == "tor_socks_proxy" || full == "tor.socks_proxy") {
+        if (!value.empty() && !is_ipv4_endpoint(value)) {
+            error = "tor_socks_proxy must be IPv4 host:port";
+            return false;
+        }
+        cfg.tor_socks_proxy = value;
+        return true;
+    }
+    if (full == "onion_only" || full == "tor.onion_only") {
+        return parse_bool(value, cfg.onion_only);
+    }
+    if (full == "dandelion" || full == "p2p.dandelion") {
+        return parse_bool(value, cfg.dandelion);
+    }
+    if (full == "p2p_bind" || full == "p2p.bind") {
+        cfg.p2p_bind = value;
         return true;
     }
     if (full == "ports.local_rpc" || full == "local_rpc_port") {
@@ -268,10 +310,28 @@ bool apply_kv(NodeConfig& cfg, const std::string& table, const std::string& key,
         return parse_u64(value, cfg.chain.max_supply);
     }
     if (full == "chain.tail_emission_reward" || full == "tail_emission_reward") {
-        return parse_u64(value, cfg.chain.tail_emission_reward);
+        // Tail emission was removed (hard 50M cap). Only 0 is accepted.
+        std::uint64_t v = 1;
+        return parse_u64(value, v) && v == 0;
+    }
+    {
+        const std::string sk = (full.rfind("chain.", 0) == 0) ? full.substr(6) : full;
+        int r = apply_staking_key(cfg.chain, sk, value);
+        if (r >= 0) {
+            return r == 1;
+        }
     }
     if (full == "chain.genesis_timestamp" || full == "genesis_timestamp") {
         return parse_u64(value, cfg.chain.genesis_timestamp);
+    }
+    if (full == "chain.max_block_weight" || full == "max_block_weight") {
+        // Must stay relayable: base64 (x4/3) of the block under the 4 MiB line cap.
+        std::uint64_t w = 0;
+        if (!parse_u64(value, w) || w < 65536ULL || w > 3ULL * 1024ULL * 1024ULL - 65536ULL) {
+            return false;
+        }
+        cfg.chain.max_block_weight = w;
+        return true;
     }
     if (full == "chain.min_fee" || full == "min_fee") {
         return parse_u64(value, cfg.chain.min_fee);
@@ -283,6 +343,9 @@ bool apply_kv(NodeConfig& cfg, const std::string& table, const std::string& key,
         }
         cfg.chain.target_block_time_sec = static_cast<std::uint32_t>(v);
         return true;
+    }
+    if (full == "chain.subsidy_floor" || full == "subsidy_floor") {
+        return parse_u64(value, cfg.chain.subsidy_floor);
     }
     if (full == "chain.halving_interval" || full == "halving_interval") {
         std::uint64_t v = 0;
@@ -335,6 +398,17 @@ bool apply_kv(NodeConfig& cfg, const std::string& table, const std::string& key,
             return false;
         }
         cfg.chain.retarget_window = static_cast<std::uint32_t>(v);
+        return true;
+    }
+    if (full == "chain.difficulty_fork_height" || full == "difficulty_fork_height") {
+        return parse_u64(value, cfg.chain.difficulty_fork_height);
+    }
+    if (full == "chain.lwma_window" || full == "lwma_window") {
+        std::uint64_t v = 0;
+        if (!parse_u64(value, v) || v < 2 || v > 1000) {
+            return false;
+        }
+        cfg.chain.lwma_window = static_cast<std::uint32_t>(v);
         return true;
     }
     if (full == "comment" || full == "chain.comment") {
@@ -454,7 +528,7 @@ bool is_self_peer_label(const std::string& endpoint) {
     if (endpoint == "self" || endpoint == "probe-self") {
         return true;
     }
-    if (endpoint.rfind("self", 0) == 0 && !is_ipv4_endpoint(endpoint)) {
+    if (endpoint.rfind("self", 0) == 0 && !is_peer_endpoint(endpoint)) {
         return true;
     }
     if (endpoint.rfind("probe-self", 0) == 0) {
@@ -464,7 +538,7 @@ bool is_self_peer_label(const std::string& endpoint) {
 }
 
 bool is_external_advertised_peer(const std::string& endpoint) {
-    return is_ipv4_endpoint(endpoint) && !is_loopback_endpoint(endpoint) && !is_self_peer_label(endpoint);
+    return is_peer_endpoint(endpoint) && !is_loopback_endpoint(endpoint) && !is_self_peer_label(endpoint);
 }
 
 bool parse_advertised_p2p(const std::string& value, std::string& out, std::string& error) {
@@ -474,7 +548,7 @@ bool parse_advertised_p2p(const std::string& value, std::string& out, std::strin
         return true;
     }
     if (!is_external_advertised_peer(trimmed)) {
-        error = "advertised_p2p must be a non-loopback IPv4 host:port (got " + trimmed + ")";
+        error = "advertised_p2p must be a non-loopback IPv4 or v3 .onion host:port (got " + trimmed + ")";
         return false;
     }
     out = trimmed;
@@ -567,26 +641,45 @@ ChainConfig mainnet_chain_config() {
     cfg.network_name = kMainnetNetworkName;
     cfg.network_id = kMainnetNetworkId;
     cfg.genesis_timestamp = kMainnetGenesisTimestamp;
-    cfg.max_supply = 50'000'000ULL;
-    cfg.block_reward = 50ULL;
-    cfg.tail_emission_reward = 1ULL;
-    cfg.target_block_time_sec = 60U;
+    cfg.max_supply = kMainnetMaxSupply;
+    cfg.block_reward = kMainnetBlockReward;
+    cfg.target_block_time_sec = kMainnetTargetBlockTimeSec;
     cfg.difficulty_window = 120U;
     cfg.pow_algorithm = PowAlgorithm::MemoryHard;
     cfg.initial_difficulty_target = kMainnetDifficultyTarget;
-    cfg.min_difficulty_target = kMainnetDifficultyTarget;
+    cfg.min_difficulty_target = kMainnetMinDifficultyTarget;
     cfg.max_difficulty_target = kMainnetMaxDifficultyTarget;
+    cfg.legacy_min_difficulty_target = kMainnetDifficultyTarget;
     cfg.retarget_window = 30U;
-    cfg.halving_interval = 210000U;
+    cfg.difficulty_fork_height = kMainnetDifficultyForkHeight;
+    cfg.lwma_window = kMainnetLwmaWindow;
+    cfg.halving_interval = kMainnetHalvingInterval;
+    cfg.subsidy_floor = kMainnetSubsidyFloor;
+    cfg.stake_maturity = kMainnetStakeMaturity;
+    cfg.stake_unbond_delay = kMainnetStakeUnbondDelay;
+    cfg.staking_activation_height = kMainnetStakingActivationHeight;
     cfg.require_pq_signatures = true;
     cfg.require_privacy_pool = true;
     cfg.allow_zero_reward_blocks = true;
-    cfg.min_fee = 0ULL;
+    // Nonzero relay/consensus floor (1 base unit) against free spam.
+    cfg.min_fee = kMainnetMinFee;
     cfg.pow_profile = "mainnet";
     cfg.confirmations_policy = 2;
     cfg.economic_security = "none";
-    cfg.bootstrap_peers = {kOperatorPublicMainnetP2p};
+    cfg.bootstrap_peers = mainnet_default_seeds();
     return cfg;
+}
+
+bool is_placeholder_seed(const std::string& endpoint) {
+    return endpoint.rfind("placeholder", 0) == 0;
+}
+
+std::vector<std::string> mainnet_default_seeds() {
+    std::vector<std::string> out;
+    for (const char* s : kMainnetOnionSeeds) {
+        if (!is_placeholder_seed(s)) out.emplace_back(s);
+    }
+    return out;
 }
 
 ChainConfig fast_chain_config() {
@@ -597,7 +690,6 @@ ChainConfig fast_chain_config() {
     cfg.genesis_timestamp = kFastGenesisTimestamp;
     cfg.max_supply = 50'000'000ULL;
     cfg.block_reward = 50ULL;
-    cfg.tail_emission_reward = 1ULL;
     cfg.difficulty_window = 120U;
     cfg.retarget_window = 30U;
     cfg.halving_interval = 210000U;
@@ -675,6 +767,10 @@ bool validate_network_profile(const NodeConfig& cfg, std::string& error) {
                     "refusing to relabel a testnet chain";
             return false;
         }
+        if (cfg.chain.shielded_enabled) {
+            error = "shielded_enabled is EXPERIMENTAL (unaudited) and refused on mainnet";
+            return false;
+        }
         if (cfg.chain.genesis_timestamp == kTestnetGenesisTimestamp) {
             error = "mainnet genesis must not reuse the testnet genesis timestamp";
             return false;
@@ -685,9 +781,32 @@ bool validate_network_profile(const NodeConfig& cfg, std::string& error) {
                     "(not the ~4ms easy target)";
             return false;
         }
-        if (cfg.chain.min_difficulty_target != kMainnetDifficultyTarget ||
+        if (cfg.chain.min_difficulty_target != kMainnetMinDifficultyTarget ||
+            cfg.chain.max_difficulty_target != kMainnetMaxDifficultyTarget ||
             cfg.chain.initial_difficulty_target != kMainnetDifficultyTarget) {
-            error = "mainnet difficulty must stay at 0x000000FFFFFFFFFF";
+            error = "mainnet difficulty: initial/max must be 0x000000FFFFFFFFFF and min 0x0000000000FFFFFF";
+            return false;
+        }
+        if (cfg.chain.max_supply != kMainnetMaxSupply || cfg.chain.block_reward != kMainnetBlockReward ||
+            cfg.chain.halving_interval != kMainnetHalvingInterval ||
+            cfg.chain.subsidy_floor != kMainnetSubsidyFloor ||
+            cfg.chain.target_block_time_sec != kMainnetTargetBlockTimeSec) {
+            error = "mainnet emission: max_supply=50000000 block_reward=4 halving_interval=5681819 "
+                    "subsidy_floor=1 target_block_time_sec=20 (hard cap)";
+            return false;
+        }
+        if (scheduled_total_emission(cfg.chain.max_supply, cfg.chain.block_reward, cfg.chain.halving_interval,
+                                     nullptr, cfg.chain.subsidy_floor) != cfg.chain.max_supply) {
+            error = "mainnet emission schedule must reach max_supply exactly";
+            return false;
+        }
+        if (cfg.chain.stake_vote_quorum == 0 || cfg.chain.stake_vote_quorum > cfg.chain.stake_votes_per_block ||
+            cfg.chain.stake_reward_bps > 10000) {
+            error = "mainnet staking parameters invalid";
+            return false;
+        }
+        if (cfg.chain.staking_activation_height != kMainnetStakingActivationHeight) {
+            error = "mainnet staking_activation_height must be 14772727 (37.5M cumulative supply)";
             return false;
         }
         if (cfg.chain.pow_algorithm != PowAlgorithm::MemoryHard) {
@@ -948,7 +1067,14 @@ bool load_genesis_json(const std::string& path, ChainConfig& chain, std::string&
             return parse_u64(v, chain.block_reward);
         }
         if (k == "tail_emission_reward") {
-            return parse_u64(v, chain.tail_emission_reward);
+            std::uint64_t t = 1;
+            return parse_u64(v, t) && t == 0;
+        }
+        {
+            int r = apply_staking_key(chain, k, v);
+            if (r >= 0) {
+                return r == 1;
+            }
         }
         if (k == "min_fee") {
             return parse_u64(v, chain.min_fee);
@@ -960,6 +1086,9 @@ bool load_genesis_json(const std::string& path, ChainConfig& chain, std::string&
             }
             chain.target_block_time_sec = static_cast<std::uint32_t>(n);
             return true;
+        }
+        if (k == "subsidy_floor") {
+            return parse_u64(v, chain.subsidy_floor);
         }
         if (k == "halving_interval") {
             std::uint64_t n = 0;
@@ -992,6 +1121,17 @@ bool load_genesis_json(const std::string& path, ChainConfig& chain, std::string&
                 return false;
             }
             chain.retarget_window = static_cast<std::uint32_t>(n);
+            return true;
+        }
+        if (k == "difficulty_fork_height") {
+            return parse_u64(v, chain.difficulty_fork_height);
+        }
+        if (k == "lwma_window") {
+            std::uint64_t n = 0;
+            if (!parse_u64(v, n) || n < 2 || n > 1000) {
+                return false;
+            }
+            chain.lwma_window = static_cast<std::uint32_t>(n);
             return true;
         }
         error = "unknown genesis key: " + k;
@@ -1087,6 +1227,10 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
     std::string cli_public_rpc_port;
     std::string cli_public_rpc_bind;
     std::string cli_local_rpc_port;
+    std::string cli_tor_proxy;
+    std::string cli_p2p_bind;
+    bool cli_onion_only = false;
+    bool cli_dandelion = false;
     std::string cli_p2p_port;
     std::vector<std::string> cli_bootstrap;
     std::string cli_auto_mine_interval;
@@ -1199,6 +1343,42 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
         }
         if (arg.rfind("--local-rpc-port=", 0) == 0) {
             cli_local_rpc_port = arg.substr(17);
+            continue;
+        }
+        if (arg == "--tor-proxy") {
+            std::string v;
+            if (!take_value(v)) {
+                return false;
+            }
+            if (!is_ipv4_endpoint(v)) {
+                error = "invalid --tor-proxy (IPv4 host:port)";
+                return false;
+            }
+            cli_tor_proxy = v;
+            continue;
+        }
+        if (arg.rfind("--tor-proxy=", 0) == 0) {
+            cli_tor_proxy = arg.substr(12);
+            if (!is_ipv4_endpoint(cli_tor_proxy)) {
+                error = "invalid --tor-proxy (IPv4 host:port)";
+                return false;
+            }
+            continue;
+        }
+        if (arg == "--onion-only") {
+            cli_onion_only = true;
+            continue;
+        }
+        if (arg == "--dandelion") {
+            cli_dandelion = true;
+            continue;
+        }
+        if (arg == "--p2p-bind") {
+            std::string v;
+            if (!take_value(v)) {
+                return false;
+            }
+            cli_p2p_bind = v;
             continue;
         }
         if (arg == "--p2p-port") {
@@ -1367,13 +1547,33 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
     }
     if (!cli_bootstrap.empty()) {
         for (const auto& peer : cli_bootstrap) {
-            if (!is_ipv4_endpoint(peer)) {
-                error = "invalid --bootstrap (IPv4 host:port only): " + peer;
+            if (!is_peer_endpoint(peer)) {
+                error = "invalid --bootstrap (IPv4 or v3 .onion host:port only): " + peer;
                 return false;
             }
         }
         cfg.bootstrap_peers = cli_bootstrap;
         cfg.chain.bootstrap_peers = cli_bootstrap;
+    }
+    if (!cli_tor_proxy.empty()) {
+        cfg.tor_socks_proxy = cli_tor_proxy;
+    }
+    if (cli_onion_only) {
+        cfg.onion_only = true;
+    }
+    if (cli_dandelion) {
+        cfg.dandelion = true;
+    }
+    if (!cli_p2p_bind.empty()) {
+        cfg.p2p_bind = cli_p2p_bind;
+    }
+    if (cfg.onion_only) {
+        if (cfg.tor_socks_proxy.empty()) {
+            cfg.tor_socks_proxy = "127.0.0.1:9050";
+        }
+        // Never accept clearnet inbound: the onion service forwards to loopback.
+        cfg.p2p_bind = "127.0.0.1";
+        cfg.public_rpc_bind = "127.0.0.1";
     }
     if (auto_mine_from_cli) {
         cfg.enable_auto_mine = true;
@@ -1412,7 +1612,7 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
     if (cfg.bootstrap_peers.empty()) {
         switch (mode) {
         case NetworkMode::Mainnet:
-            cfg.bootstrap_peers = {kOperatorPublicMainnetP2p};
+            cfg.bootstrap_peers = mainnet_default_seeds();
             break;
         case NetworkMode::Fast:
             cfg.bootstrap_peers = {"127.0.0.1:28547"};
@@ -1425,8 +1625,8 @@ bool apply_cli_args(int argc, char** argv, NodeConfig& cfg, bool& show_help, std
         cfg.chain.bootstrap_peers = cfg.bootstrap_peers;
     }
     for (const auto& peer : cfg.bootstrap_peers) {
-        if (!is_ipv4_endpoint(peer)) {
-            error = "bootstrap_peers must be IPv4 host:port (got " + peer + ")";
+        if (!is_peer_endpoint(peer)) {
+            error = "bootstrap_peers must be IPv4 or v3 .onion host:port (got " + peer + ")";
             return false;
         }
     }
@@ -1463,7 +1663,8 @@ std::string daemon_help_text() {
            "  getinfo reports confirmations_policy and economic_security=none.\n"
            "\n"
            "--mainnet (same as --network mainnet) starts ADDITION_MAINNET_V1 from genesis-mainnet.json.\n"
-           "  Default bootstrap is the public mainnet seed 34.27.30.115:28546 (not the testnet seed).\n"
+           "  Default bootstrap: Tor onion seeds (docs/ONION_SEEDS.md; placeholders until published,\n"
+           "  so pass --tor-proxy 127.0.0.1:9050 --bootstrap <seed>.onion:28546). No clearnet default.\n"
            "  Override with --bootstrap IP:PORT. Write RPC stays 127.0.0.1:8546. Auto-mine refused.\n"
            "  PoW memory_hard at 0x000000FFFFFFFFFF — do not loosen.\n"
            "\n"
@@ -1483,9 +1684,12 @@ std::string daemon_help_text() {
            "  HTTP: curl 'http://HOST:38545/rpc?cmd=getinfo'\n"
            "LAN RPC stays token-gated (ADDITION_ENABLE_LAN_RPC=1 + ADDITION_LAN_RPC_TOKEN).\n"
            "P2P stays off unless ADDITION_ENABLE_P2P_RPC=1. --p2p-port / ADDITION_P2P_PORT (second node: 28546).\n"
-           "--bootstrap IP:PORT replaces bootstrap_peers (IPv4 only; hostnames are not resolved).\n"
-           "  Testnet public P2P (current): 34.27.30.115:28545 — HTTP :80 sync is the reliable join path.\n"
-           "  Mainnet public P2P (current): 34.27.30.115:28546 — HTTP :38546 and/or P2P HELLO+REQBLK.\n"
+           "--bootstrap HOST:PORT replaces bootstrap_peers (repeatable; IPv4 or v3 .onion; no DNS).\n"
+           "Tor: --tor-proxy 127.0.0.1:9050 enables .onion peers via SOCKS5; --onion-only refuses all\n"
+           "  clearnet connections and binds P2P/public RPC to 127.0.0.1 (expose via HiddenServicePort).\n"
+           "  --dandelion enables Dandelion++ stem/fluff tx relay. --p2p-bind ADDR sets the P2P listen addr.\n"
+           "  Testnet public P2P (current): 34.27.30.115:28545 — P2P HELLO+REQBLK only.\n"
+           "  Mainnet seeds: onion only (see docs/ONION_SEEDS.md) — P2P HELLO+REQBLK only.\n"
            "  Seed operators set ADDITION_ADVERTISED_P2P to the matching seed so public getinfo/peers\n"
            "  do not list self. Write RPC stays 127.0.0.1.\n"
            "Auto-mine (testnet only, off by default, never on public RPC):\n"

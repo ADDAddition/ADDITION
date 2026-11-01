@@ -32,10 +32,9 @@ Not on the public port: `mine`, `sendtx*`, `createwallet`, `wallet_*`, identity 
 TCP and a tiny HTTP adapter share the same port:
 
 ```bash
-curl 'https://rpc.additionblockchain.com/rpc?cmd=getinfo'
-curl 'http://34.27.30.115/rpc?cmd=getinfo'
-curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'
-curl 'http://34.27.30.115:38545/jsonrpc?method=getinfo'
+curl 'http://127.0.0.1:38545/rpc?cmd=getinfo'
+curl 'http://127.0.0.1:38545/rpc?cmd=getinfo'
+curl 'http://127.0.0.1:38545/jsonrpc?method=getinfo'
 ```
 
 Those curls succeed only when the operator seed answers. If they timeout, run a local `--public-rpc` node or `scripts/start_two_node_testnet.sh`. Do not treat a timeout as a secret second seed.
@@ -52,7 +51,7 @@ POST http://HOST:38545/jsonrpc
 {"jsonrpc":"2.0","id":1,"method":"monetary_info","params":[]}
 ```
 
-Join the operator testnet: `--bootstrap 34.27.30.115:28545`. `sync` uses HTTP `:80` then `:38545` (`getblockraw`). HTTP `:80` is the reliable path; public TCP 28545 can timeout or be filtered. Seed operators set `ADDITION_ADVERTISED_P2P=34.27.30.115:28545` so public `getinfo` / `peers` do not list `self`. Write RPC stays `127.0.0.1`.
+Join the operator testnet: `--bootstrap <seed>.onion:28545`. `sync` uses HTTP `:80` then `:38545` (`getblockraw`). HTTP `:80` is the reliable path; public TCP 28545 can timeout or be filtered. Seed operators set `ADDITION_ADVERTISED_P2P=<seed>.onion:28545` so public `getinfo` / `peers` do not list `self`. Write RPC stays `127.0.0.1`.
 
 Override bind/port with `--public-rpc-bind`, `--public-rpc-port`, `ADDITION_PUBLIC_RPC_BIND`, or `ADDITION_PUBLIC_RPC_PORT`. HTTP replies send `Access-Control-Allow-Origin: *` (read-only allowlist, no cookies), `Access-Control-Allow-Methods: GET, OPTIONS`, `OPTIONS` 204, and `Cache-Control: no-store`. `curl /rpc?cmd=getinfo` is unchanged.
 
@@ -64,7 +63,7 @@ Two-node local testnet (write RPC stays loopback):
 
 Node A: `--public-rpc` on `38545`, P2P `28545`, write `127.0.0.1:8545`.
 Node B: `--data-dir` second tree, write `8546`, P2P `28546`, `--bootstrap 127.0.0.1:28545`.
-Operator public P2P (IPv4 only): `--bootstrap 34.27.30.115:28545`. Write RPC stays loopback.
+Operator public P2P (IPv4 only): `--bootstrap <seed>.onion:28545`. Write RPC stays loopback.
 See [TWO_NODE_TESTNET.md](TWO_NODE_TESTNET.md).
 
 Website `PUBLIC_RPC_HTTP` is a Worker secret, not a committed `wrangler.toml` value. Missing secret → `RPC offline`. Set it only to a real public-rpc HTTP URL you operate. Do not commit trycloudflare URLs.
@@ -121,7 +120,7 @@ Website `PUBLIC_RPC_HTTP` is a Worker secret, not a committed `wrangler.toml` va
 - Strict handshake required before peer message processing:
 	- request: `HELLO|2|<network_id>|<unix_ts>|<nonce>|<peer_pubkey>|<peer_signature>`
 	- response: `HELLO_ACK|2|<network_id>|<unix_ts>|<echo_nonce>|<responder_pubkey>|<responder_signature>`
-	- testnet `network_id` is `ADDITION_TESTNET_V1` (default binary). Public product mainnet is `ADDITION_MAINNET_V1` (`additiond --mainnet`, seed `34.27.30.115:28546` / `38546`).
+	- testnet `network_id` is `ADDITION_TESTNET_V1` (default binary). Public product mainnet is `ADDITION_MAINNET_V1` (`additiond --mainnet`, seed `<seed>.onion:28546` / `38546`).
 	- inbound timestamp skew window: ±90s
 	- nonce replay is rejected per peer (rolling anti-replay set)
 	- signatures are validated with PQ verification (`ml-dsa-87`) over the signed handshake body

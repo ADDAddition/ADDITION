@@ -8,46 +8,45 @@ Run `additiond --mainnet` (same as `--network mainnet`) like `bitcoind`: anyone 
 
 | Public seed | Role |
 |-------------|------|
-| `34.27.30.115:28546` | P2P bootstrap |
-| `34.27.30.115:38546` | HTTP public RPC (`/rpc?cmd=getinfo`; write allowlist open per CoS) |
+| `<seed>.onion:28546` | P2P bootstrap |
+| `127.0.0.1:38546` | HTTP public RPC (`/rpc?cmd=getinfo`; write allowlist open per CoS) |
 
 That is a separate chain from the research testnet (`28545` / `38545`). Not a label flip.
 
 The public site and explorer follow `ADDITION_MAINNET_V1`. Height comes from live `getinfo` only (may still be `0`). This runbook does not invent TPS or peer counts.
 
-Do not open home-node write RPC `8545`/`8546` to the internet. Never bind write RPC to `0.0.0.0`. Do not bootstrap `34.27.30.115:28545` for mainnet.
+Do not open home-node write RPC `8545`/`8546` to the internet. Never bind write RPC to `0.0.0.0`. Do not bootstrap `<seed>.onion:28545` for mainnet.
 
 Unit file: [`deploy/systemd/additiond-mainnet.service`](../deploy/systemd/additiond-mainnet.service)
 
 ## Join mainnet (home node)
 
-Build `additiond` from this repository on `main`. Set `ADDITION_PRIVACY_MASTER_KEY` to at least 32 characters. Then:
+Build `additiond` from this repository on `main`. No privacy master key is needed (privacy notes are keyless). Then:
 
 ```bash
-export ADDITION_PRIVACY_MASTER_KEY='replace-with-32-or-more-chars____'
 export ADDITION_ENABLE_P2P_RPC=1
 ./build/additiond --mainnet \
   --data-dir $HOME/addition-mainnet \
   --local-rpc-port 8546 \
   --p2p-port 28547 \
-  --bootstrap 34.27.30.115:28546
+  --bootstrap <seed>.onion:28546
 # then: sync   (HTTP :38546 getblockraw and/or P2P HELLO+REQBLK)
 # then: mine on 127.0.0.1:8546 only
 ```
 
 Type `sync` on the daemon stdin (or send it to write RPC on `127.0.0.1:8546`), then `getinfo`.
 
-Never pass `--bootstrap 34.27.30.115:28545` on mainnet (research testnet seed only). Never publish port `8546`.
+Never pass `--bootstrap <seed>.onion:28545` on mainnet (research testnet seed only). Never publish port `8546`.
 
 ### Public read (HTTP ingest)
 
 ```bash
-curl -s 'http://34.27.30.115:38546/rpc?cmd=getinfo'
+curl -s 'http://127.0.0.1:38546/rpc?cmd=getinfo'
 ```
 
 Expect `network=mainnet` and `network_id=ADDITION_MAINNET_V1`. Height may still be `0`; copy only what `getinfo` prints. Auto-mine stays off on mainnet. Do not invent peer counts or TPS.
 
-`config-mainnet.toml` lists bootstrap peer `34.27.30.115:28546`. Seed operators set `ADDITION_ADVERTISED_P2P=34.27.30.115:28546` so public `getinfo` / `peers` advertise that IPv4 endpoint and never list `self`.
+`config-mainnet.toml` lists bootstrap peer `<seed>.onion:28546`. Seed operators set `ADDITION_ADVERTISED_P2P=<seed>.onion:28546` so public `getinfo` / `peers` advertise that IPv4 endpoint and never list `self`.
 
 ## What `--mainnet` changes
 
@@ -58,7 +57,7 @@ Expect `network=mainnet` and `network_id=ADDITION_MAINNET_V1`. Height may still 
 | Genesis | `genesis.json` timestamp `1763000000` | `genesis-mainnet.json` timestamp `1770000000` |
 | Data dir | `data` | `data-mainnet` |
 | Write RPC | `127.0.0.1:8545` | `127.0.0.1:8546` |
-| Public read | `0.0.0.0:38545` (opt-in) | `0.0.0.0:38546` (seed: `34.27.30.115:38546`) |
+| Public read | `0.0.0.0:38545` (opt-in) | `0.0.0.0:38546` (seed: `127.0.0.1:38546`) |
 | P2P | `28545` (research seed) | `28546` public seed; home nodes use another port (e.g. `28547`) |
 | PoW | SHA3-512 | memory_hard (1 MiB × 16 rounds) |
 | Difficulty | easy `0x0000FFFFFFFFFFFF` (~4 ms observed) | hard floor `0x000000FFFFFFFFFF` |
@@ -67,7 +66,7 @@ Expect `network=mainnet` and `network_id=ADDITION_MAINNET_V1`. Height may still 
 
 A testnet process still reports `network=testnet`. Mixing a testnet `blocks.dat` or `network.dat` into a mainnet `--data-dir` is refused.
 
-`ADDITION_PRIVACY_MASTER_KEY` (min 32 characters) is required to start `--mainnet`. Auto-mine is refused.
+`ADDITION_PRIVACY_MASTER_KEY` is no longer required or used (a warning is logged if set). Auto-mine is refused.
 
 ## Mine (local write RPC only)
 
@@ -84,7 +83,7 @@ Home-node write RPC stays `127.0.0.1:8546` (never publish). Public seed `38546` 
 printf 'mine miner1\n' | nc 127.0.0.1 8546
 # waits until a nonce meets the target; clients must not use a 30s timeout
 # or against the public seed when the write allowlist is open:
-curl -s 'http://34.27.30.115:38546/rpc?cmd=getinfo'
+curl -s 'http://127.0.0.1:38546/rpc?cmd=getinfo'
 ```
 
 After a `mine`, the node announces `BLK|` and `gossip_flush` pushes to peers.
@@ -112,7 +111,6 @@ This is a target/retarget choice, not a throughput claim. Do not invent TPS.
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --target additiond
-export ADDITION_PRIVACY_MASTER_KEY='replace-with-32-or-more-chars____'
 ./build/additiond --mainnet --data-dir /tmp/addition-mainnet --local-rpc-port 8546
 printf 'getinfo\n' | nc 127.0.0.1 8546
 # expect: network=mainnet network_id=ADDITION_MAINNET_V1
@@ -128,10 +126,9 @@ sudo mkdir -p /opt/addition /var/lib/addition/mainnet /etc/addition
 sudo cp -a . /opt/addition
 sudo chown -R addition:addition /var/lib/addition/mainnet
 # /etc/addition/mainnet.env  (mode 0640, owner root:addition)
-# ADDITION_PRIVACY_MASTER_KEY=<32+ chars>
 # ADDITION_RPC_TOKEN=<optional write-RPC token>
 # ADDITION_ENABLE_P2P_RPC=1
-# ADDITION_ADVERTISED_P2P=34.27.30.115:28546   # public seed operator
+# ADDITION_ADVERTISED_P2P=<seed>.onion:28546   # public seed operator
 sudo install -m 0644 deploy/systemd/additiond-mainnet.service /etc/systemd/system/additiond-mainnet.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now additiond-mainnet.service
@@ -139,7 +136,7 @@ sudo systemctl enable --now additiond-mainnet.service
 
 | Listener | Bind | Port | Role |
 |----------|------|------|------|
-| Public RPC | `0.0.0.0` | **38546** | Seed: `34.27.30.115:38546` — read + write allowlist (createwallet/mine/wallet_send/sign/tx_build per CoS) |
+| Public RPC | `0.0.0.0` | **38546** | Seed: `127.0.0.1:38546` — read + write allowlist (createwallet/mine/wallet_send/sign/tx_build per CoS) |
 | Home-node write RPC | `127.0.0.1` | **8546** | Trusted local only; never publish |
 | P2P | `0.0.0.0` | **28546** | Public seed; home nodes use another port (e.g. 28547). Needs `ADDITION_ENABLE_P2P_RPC=1` |
 
@@ -150,7 +147,7 @@ If you also run the research testnet unit, keep its ports (38545 / 8545 / 28545)
 ```bash
 printf 'getinfo\n' | nc 127.0.0.1 38546
 curl -s 'http://127.0.0.1:38546/rpc?cmd=getinfo'
-curl -s 'http://34.27.30.115:38546/rpc?cmd=getinfo'
+curl -s 'http://127.0.0.1:38546/rpc?cmd=getinfo'
 # height may be 0 — copy only live fields
 ```
 
@@ -160,7 +157,7 @@ curl -s 'http://34.27.30.115:38546/rpc?cmd=getinfo'
 
 P2P listen is off unless `ADDITION_ENABLE_P2P_RPC=1`. HELLO carries `ADDITION_MAINNET_V1`, so a testnet peer is rejected.
 
-Public bootstrap is **34.27.30.115:28546**. Do not use the research testnet seed `34.27.30.115:28545`. If TCP 28546 is filtered on your path, use HTTP `:38546` for `getinfo` / ingest checks (`getblockraw`), then retry P2P (`HELLO`+`REQBLK`).
+Public bootstrap is **<seed>.onion:28546**. Do not use the research testnet seed `<seed>.onion:28545`. If TCP 28546 is filtered on your path, use HTTP `:38546` for `getinfo` / ingest checks (`getblockraw`), then retry P2P (`HELLO`+`REQBLK`).
 
 Do not loosen `memory_hard` / `0x000000FFFFFFFFFF`. Do not auto-mine. Do not bind write RPC to `0.0.0.0`.
 

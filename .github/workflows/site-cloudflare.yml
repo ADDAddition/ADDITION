@@ -27,15 +27,12 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: c4ceeebc81b5a07252d4d4244e50a916
-          PUBLIC_RPC_HTTP: ${{ secrets.PUBLIC_RPC_HTTP }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
             echo "CLOUDFLARE_API_TOKEN secret is not set; skip deploy"
             exit 0
           fi
-          if [ -n "$PUBLIC_RPC_HTTP" ]; then
-            printf '%s' "$PUBLIC_RPC_HTTP" | npx --yes wrangler@4 secret put PUBLIC_RPC_HTTP
-          else
-            echo "PUBLIC_RPC_HTTP GitHub secret unset; keep existing Worker secret"
-          fi
+          # No upstream RPC is pushed from CI. The Worker's /api/rpc proxy is optional:
+          # with no PUBLIC_RPC_URL/PUBLIC_RPC_HTTP binding it answers "RPC offline" and
+          # the site falls back to the visitor's own node via /local-rpc (127.0.0.1).
           npx --yes wrangler@4 deploy

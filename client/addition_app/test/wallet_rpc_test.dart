@@ -72,17 +72,22 @@ void main() {
       expect(WriteRpcPolicy.coinbaseReward, 50);
     });
 
-    test('public read allowlist includes site /api/rpc and 38546', () {
+    test('no public server: read only from user-run node (loopback/onion)', () {
+      for (final u in [
+        'https://additionblockchain.com/api/rpc',
+        'https://rpc.additionblockchain.com/rpc',
+        'http://34.27.30.115:38546/rpc',
+      ]) {
+        expect(WriteRpcPolicy.isKnownPublicReadEndpoint(u), isFalse);
+      }
+      expect(WriteRpcPolicy.isKnownPublicReadEndpoint('http://127.0.0.1:38545/rpc'), isTrue);
       expect(
         WriteRpcPolicy.isKnownPublicReadEndpoint(
-          'https://additionblockchain.com/api/rpc',
+          'http://${'a' * 56}.onion:38545/rpc',
         ),
         isTrue,
       );
-      expect(
-        WriteRpcPolicy.isKnownPublicReadEndpoint('http://34.27.30.115:38546/rpc'),
-        isTrue,
-      );
+      expect(WriteRpcPolicy.defaultPublicReadUrl.contains('34.27.30.115'), isFalse);
     });
   });
 

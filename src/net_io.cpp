@@ -101,7 +101,7 @@ void socket_apply_wan_opts(std::uintptr_t sock_raw) {
     int one = 1;
 #ifdef _WIN32
     setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&one), sizeof(one));
-    int buf = static_cast<int>(kMaxLineBytes);
+    int buf = kSocketBufBytes;
     setsockopt(sock, SOL_SOCKET, SO_SNDBUF, reinterpret_cast<const char*>(&buf), sizeof(buf));
     setsockopt(sock, SOL_SOCKET, SO_RCVBUF, reinterpret_cast<const char*>(&buf), sizeof(buf));
 #else
@@ -110,7 +110,7 @@ void socket_apply_wan_opts(std::uintptr_t sock_raw) {
     int mss = kWanMss;
     setsockopt(sock, IPPROTO_TCP, TCP_MAXSEG, &mss, sizeof(mss));
 #endif
-    int buf = static_cast<int>(kMaxLineBytes);
+    int buf = kSocketBufBytes;
     setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &buf, sizeof(buf));
     setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &buf, sizeof(buf));
 #endif
@@ -296,6 +296,33 @@ bool socket_recv_http_response(std::uintptr_t sock_raw, std::string& raw, std::s
         raw.append(buf, buf + n);
     }
     return false;
+}
+
+namespace {
+thread_local std::unique_lock<std::mutex>* tl_state_lock = nullptr;
+}
+
+void set_thread_state_lock(std::unique_lock<std::mutex>* lock) { tl_state_lock = lock; }
+std::unique_lock<std::mutex>* thread_state_lock() { return tl_state_lock; }
+
+bool socket_recv_line_buffered(std::uintptr_t sock_raw, std::string& carry, std::string& line, std::size_t max_bytes) {
+    line.clear();
+    const SocketT sock = static_cast<SocketT>(sock_raw);
+    char buf[16384];
+    for (;;) {
+        const auto nl = carry.find('\n');
+        if (nl != std::string::npos) {
+            if (nl > max_bytes) return false;
+            line.assign(carry, 0, nl);
+            carry.erase(0, nl + 1);
+            while (!line.empty() && line.back() == '\r') line.pop_back();
+            return true;
+        }
+        if (carry.size() >= max_bytes) return false;
+        const int n = recv_chunk(sock, buf, std::min<std::size_t>(sizeof(buf), max_bytes - carry.size()));
+        if (n <= 0) return false;
+        carry.append(buf, buf + n);
+    }
 }
 
 } // namespace addition

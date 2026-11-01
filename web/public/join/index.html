@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Get started — ADDITION</title>
-  <meta name="description" content="Join ADDITION_MAINNET_V1. Public seed P2P 34.27.30.115:28546, RPC 38546 (read + write). Bitcoin-like self-custody.">
+  <meta name="description" content="Join ADDITION_MAINNET_V1. Public seed P2P &lt;seed&gt;.onion:28546, RPC 38546 (read + write). Bitcoin-like self-custody.">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/favicon.ico">
@@ -31,8 +31,8 @@
       <h1>Get started</h1>
       <p class="lede">
         Run <code>additiond --mainnet</code> on your machine — the same model as Bitcoin.
-        Network <code>ADDITION_MAINNET_V1</code>, P2P bootstrap <code>34.27.30.115:28546</code>,
-        public RPC <code>http://34.27.30.115:38546</code> (read + write allowlist open).
+        Network <code>ADDITION_MAINNET_V1</code>, P2P bootstrap <code>&lt;seed&gt;.onion:28546</code>,
+        public RPC <code>http://127.0.0.1:38546</code> (read + write allowlist open).
         Research testnet remains available as a separate chain.
       </p>
       <div class="cta-row">
@@ -58,8 +58,8 @@
         the same model as <code>bitcoind</code> against a known bootstrap peer.
       </p>
       <p>
-        Public seed: <strong>34.27.30.115:28546</strong> (P2P) and
-        <strong>34.27.30.115:38546</strong> (HTTP).
+        Public seed: <strong>&lt;seed&gt;.onion:28546</strong> (P2P) and
+        <strong>127.0.0.1:38546</strong> (HTTP).
         Site <code>/api/rpc</code> proxies that path.
         Separate chain from research testnet (<code>28545</code> / <code>38545</code>).
       </p>
@@ -77,16 +77,16 @@
       <p>Set <code>ADDITION_PRIVACY_MASTER_KEY</code> (32+ characters), build <code>additiond</code> from <code>main</code>, then:</p>
       <pre>export ADDITION_PRIVACY_MASTER_KEY='replace-with-32-or-more-chars____'
 export ADDITION_ENABLE_P2P_RPC=1
-additiond --mainnet --data-dir $HOME/addition-mainnet --local-rpc-port 8546 --p2p-port 28547 --bootstrap 34.27.30.115:28546</pre>
+additiond --mainnet --data-dir $HOME/addition-mainnet --local-rpc-port 8546 --p2p-port 28547 --bootstrap &lt;seed&gt;.onion:28546</pre>
       <p>Type <code>sync</code> on the daemon stdin (or send it to write RPC on <code>127.0.0.1:8546</code> or public <code>38546</code>), then <code>getinfo</code>. Mine with <code>memory_hard</code> on either path when you want to produce blocks.</p>
-      <p>Never <code>--bootstrap 34.27.30.115:28545</code> for mainnet (that is the research testnet seed). Never publish port <code>8546</code>. Auto-mine is refused on mainnet.</p>
+      <p>Never <code>--bootstrap &lt;seed&gt;.onion:28545</code> for mainnet (that is the research testnet seed). Never publish port <code>8546</code>. Auto-mine is refused on mainnet.</p>
 
       <h3>Mainnet public RPC</h3>
-      <pre>curl -s 'http://34.27.30.115:38546/rpc?cmd=getinfo'
+      <pre>curl -s 'http://127.0.0.1:38546/rpc?cmd=getinfo'
 curl -s 'https://additionblockchain.com/api/rpc?cmd=getinfo'</pre>
       <p>Expect <code>network=mainnet</code> and <code>network_id=ADDITION_MAINNET_V1</code>. Height may still be <code>0</code>; copy only fields the node prints. Do not invent peer counts or TPS.</p>
       <p>On the seed, <code>createwallet</code> / <code>mine</code> / <code>wallet_send</code> / sign / <code>tx_build</code> answer on <code>38546</code> (CoS write allowlist). The site wallet prefers that public path via <code>/api/rpc</code>, with a loopback fallback to <code>/local-rpc</code> if offline.</p>
-      <p>Seed operator: <code>ADDITION_ADVERTISED_P2P=34.27.30.115:28546</code> so public <code>getinfo</code> / <code>peers</code> list that IPv4 endpoint and do not list <code>self</code>.</p>
+      <p>Seed operator: <code>ADDITION_ADVERTISED_P2P=&lt;seed&gt;.onion:28546</code> so public <code>getinfo</code> / <code>peers</code> list that IPv4 endpoint and do not list <code>self</code>.</p>
     </section>
 
     <section class="panel" id="testnet">
@@ -101,14 +101,14 @@ curl -s 'https://additionblockchain.com/api/rpc?cmd=getinfo'</pre>
 
       <h3>Start a testnet node</h3>
       <p>Build <code>additiond</code> from <code>main</code>, then:</p>
-      <pre>additiond --network testnet --data-dir $HOME/addition-testnet --local-rpc-port 8545 --p2p-port 28547 --bootstrap 34.27.30.115:28545</pre>
+      <pre>additiond --network testnet --data-dir $HOME/addition-testnet --local-rpc-port 8545 --p2p-port 28547 --bootstrap &lt;seed&gt;.onion:28545</pre>
       <p>Type <code>sync</code> on the daemon stdin (or send it to write RPC on <code>127.0.0.1</code>). Height should move.</p>
       <p><code>addpeer</code> after <code>--bootstrap</code> is <code>invalid/duplicate</code> (the seed is already listed).</p>
 
       <h3>Public read (testnet)</h3>
-      <pre>curl 'http://34.27.30.115:38545/rpc?cmd=getinfo'</pre>
+      <pre>curl 'http://127.0.0.1:38545/rpc?cmd=getinfo'</pre>
       <p>Those curls succeed only when the operator seed answers. If they timeout, run your own <code>--network testnet</code> node.</p>
-      <p>Seed operator: <code>ADDITION_ADVERTISED_P2P=34.27.30.115:28545</code>.</p>
+      <p>Seed operator: <code>ADDITION_ADVERTISED_P2P=&lt;seed&gt;.onion:28545</code>.</p>
     </section>
 
     <section class="panel">

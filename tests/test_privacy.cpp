@@ -1,6 +1,5 @@
 #include "addition/crypto.hpp"
 #include "addition/privacy.hpp"
-#include "addition/privacy_zk.hpp"
 
 #include <cstdlib>
 #include <iostream>
@@ -72,42 +71,44 @@ int main() {
     }
 
     {
-        unsetenv("ADDITION_PRIVACY_MASTER_KEY");
+        // No node-held master key: pool must work with the env var absent.
 #ifdef _WIN32
         _putenv_s("ADDITION_PRIVACY_MASTER_KEY", "");
+#else
+        unsetenv("ADDITION_PRIVACY_MASTER_KEY");
 #endif
         addition::PrivacyPool bare;
-        addition::OpeningNote short_prep{};
-        std::string short_err;
-        if (!addition::PrivacyPool::prepare_opening(1, short_prep, short_err)) {
-            std::cerr << "test failed: prepare_opening without key should still hash: " << short_err << '\n';
+        addition::OpeningNote prep{};
+        std::string err;
+        if (!addition::PrivacyPool::prepare_opening(7, prep, err)) {
+            std::cerr << "test failed: prepare_opening: " << err << '\n';
             return 1;
         }
-        if (bare.mint_open("alice", 1, short_prep.commitment, short_prep.nullifier, short_prep.trapdoor, short_err).size()) {
-            std::cerr << "test failed: mint_open must fail without master key\n";
+        const auto id = bare.mint_open("alice", 7, prep.commitment, prep.nullifier, prep.trapdoor, err);
+        if (id.empty()) {
+            std::cerr << "test failed: mint_open must work without master key: " << err << '\n';
             return 1;
         }
-        if (short_err.find("ADDITION_PRIVACY_MASTER_KEY") == std::string::npos ||
-            short_err.find("min 32") == std::string::npos) {
-            std::cerr << "test failed: short/missing key error: " << short_err << '\n';
+        if (addition::PrivacyPool::master_key_configured() || bare.note_cipher_name() != "keyless_sha3_v1") {
+            std::cerr << "test failed: no master key / keyless cipher expected\n";
             return 1;
         }
-        if (addition::PrivacyPool::master_key_configured()) {
-            std::cerr << "test failed: master_key_configured must be false when unset\n";
+        // Owner tags are salted per note: same owner, two notes -> different tags.
+        addition::OpeningNote prep2{};
+        addition::PrivacyPool::prepare_opening(7, prep2, err);
+        const auto id2 = bare.mint_open("alice", 7, prep2.commitment, prep2.nullifier, prep2.trapdoor, err);
+        const auto dump = bare.dump_state();
+        auto tag_of = [&](const std::string& nid) {
+            const auto pos = dump.find("N|" + nid + "|");
+            const auto start = pos + 3 + nid.size();
+            return dump.substr(start, dump.find('|', start) - start);
+        };
+        if (id2.empty() || tag_of(id) == tag_of(id2)) {
+            std::cerr << "test failed: owner tags must be unlinkable across notes\n";
             return 1;
         }
-#ifdef _WIN32
-        _putenv_s("ADDITION_PRIVACY_MASTER_KEY", "too-short");
-#else
-        setenv("ADDITION_PRIVACY_MASTER_KEY", "too-short", 1);
-#endif
-        if (addition::PrivacyPool::master_key_configured()) {
-            std::cerr << "test failed: master_key_configured must reject <32 chars\n";
-            return 1;
-        }
-        set_master_key();
-        if (!addition::PrivacyPool::master_key_configured()) {
-            std::cerr << "test failed: master_key_configured after set\n";
+        if (dump.find("alice") != std::string::npos) {
+            std::cerr << "test failed: owner must not appear in clear in state\n";
             return 1;
         }
     }
@@ -191,72 +192,15 @@ int main() {
         return 1;
     }
 
-    // --- Real ZK path scaffold: fail-closed, honest labels ---
+    // Former fake "zk" (server-signed) paths must be gone.
     {
-        const auto& zk = addition::default_privacy_zk_verifier();
-        if (!expect(!zk.backend_wired(), "zk backend unwired") ||
-            !expect(zk.backend_id() == "fail_closed_stub", "zk backend id") ||
-            !expect(zk.claim_label() == addition::PrivacyClaimLabel::ZkPending, "zk claim pending") ||
-            !expect(addition::live_privacy_claim() == "opening_not_zk", "live claim opening") ||
-            !expect(addition::privacy_zk_roadmap_label() == "zk_pending", "roadmap pending") ||
-            !expect(addition::privacy_claim_label_string(addition::PrivacyClaimLabel::ZkV1) == "zk_v1",
-                    "zk_v1 string exists for future")) {
-            return 1;
-        }
-
-        addition::ZkMintPublicInputs mint_in{"alice", 5, std::string(128, 'a'), std::string(128, 'b')};
-        addition::ZkProofMaterial material{std::string(64, 'c'), std::string(64, 'd')};
-        addition::PrivacyClaimLabel claim = addition::PrivacyClaimLabel::ZkV1;
-        std::string zk_err;
-        if (addition::privacy_zk_v1_mint_allowed(mint_in, material, zk_err, claim)) {
-            std::cerr << "test failed: zk_v1 mint must reject without proofs\n";
-            return 1;
-        }
-        if (!expect(claim == addition::PrivacyClaimLabel::ZkPending, "mint reject claim") ||
-            !expect(zk_err.find("fail-closed") != std::string::npos, "mint fail-closed text") ||
-            !expect(zk_err.find("opening_not_zk") != std::string::npos, "mint keeps live claim honest")) {
-            std::cerr << "got claim/err: " << addition::privacy_claim_label_string(claim) << " / " << zk_err
-                      << '\n';
-            return 1;
-        }
-        // Empty / odd hex must not slip through as zk_v1.
-        addition::ZkMintPublicInputs bad_hex{"alice", 1, "abc", "00"};
-        claim = addition::PrivacyClaimLabel::ZkV1;
-        if (addition::privacy_zk_v1_mint_allowed(bad_hex, material, zk_err, claim)) {
-            std::cerr << "test failed: odd commitment hex must reject\n";
-            return 1;
-        }
-        if (claim == addition::PrivacyClaimLabel::ZkV1) {
-            std::cerr << "test failed: reject must not leave claim=zk_v1\n";
-            return 1;
-        }
-
-        addition::ZkSpendPublicInputs spend_in{"alice", "note", "bob", 1, std::string(128, 'e')};
-        claim = addition::PrivacyClaimLabel::ZkV1;
-        if (addition::privacy_zk_v1_spend_allowed(spend_in, material, zk_err, claim)) {
-            std::cerr << "test failed: zk_v1 spend must reject without proofs\n";
-            return 1;
-        }
-        if (!expect(claim == addition::PrivacyClaimLabel::ZkPending, "spend reject claim") ||
-            !expect(zk_err.find("fail-closed") != std::string::npos, "spend fail-closed text")) {
-            std::cerr << "got: " << zk_err << '\n';
-            return 1;
-        }
-
-        // Opening path still works after zk rejects (no shared state mutation).
-        addition::OpeningNote still{};
-        if (!addition::PrivacyPool::prepare_opening(3, still, error)) {
-            std::cerr << "test failed: opening still works after zk reject: " << error << '\n';
-            return 1;
-        }
-        addition::PrivacyPool pool2;
-        const auto n2 = pool2.mint_open("carol", 3, still.commitment, still.nullifier, still.trapdoor, error);
-        if (n2.empty()) {
-            std::cerr << "test failed: mint_open after zk scaffold: " << error << '\n';
+        std::string zerr;
+        if (!pool.mint_zk("alice", 1, "aa", "bb", "cc", "dd", zerr).empty() ||
+            zerr.find("removed") == std::string::npos) {
+            std::cerr << "test failed: mint_zk must be removed: " << zerr << '\n';
             return 1;
         }
     }
-
-    std::cout << "all privacy opening + zk scaffold tests passed\n";
+    std::cout << "all privacy opening tests passed\n";
     return 0;
 }

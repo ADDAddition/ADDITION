@@ -30,7 +30,7 @@ bool Wallet::build_signed_send(const Chain& chain,
     }
 
     out_tx.signer = address_;
-    out_tx.signer_pubkey = public_key_;
+    out_tx.signer_pubkey = chain.pubkey_field_for(address_, public_key_);
     out_tx.signature.clear();
     const auto msg = hash_transaction(out_tx);
     out_tx.signature = sign_message_hybrid(private_key_, msg);

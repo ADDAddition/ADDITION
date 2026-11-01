@@ -13,7 +13,7 @@
 <body data-title="Two-node testnet" data-sub="from the repo">
   <header id="site-header"></header>
   <main class="prose">
-    <div class="banner">From <code>docs/TWO_NODE_TESTNET.md</code>. Two local <code>additiond</code> processes. Live join: <a href="/join/">/join/</a> — bootstrap <code>34.27.30.115:28545</code>, then <code>sync</code>.</div>
+    <div class="banner">From <code>docs/TWO_NODE_TESTNET.md</code>. Two local <code>additiond</code> processes. Live join: <a href="/join/">/join/</a> — bootstrap <code>&lt;seed&gt;.onion:28545</code>, then <code>sync</code>.</div>
     <h2>Two-node local testnet runbook</h2>
 <p>This starts <strong>two local <code>additiond</code> processes</strong> on one machine. It is not a public</p>
 <p>mainnet, not a token sale, and it does not invent peer counts or hashrate.</p>
@@ -88,10 +88,10 @@ printf &#x27;createwallet\n&#x27; | nc 127.0.0.1 38545</pre>
 <ul><li><code>getinfo.peers</code> / <code>peers</code> list only non-loopback IPv4 endpoints. Loopback</li></ul>
 <p>  two-node peers stay in the internal set for <code>sync</code> and appear as</p>
 <p>  <code>local=127.0.0.1:…</code>. Node ids and <code>self</code> are not an external peer count.</p>
-<ul><li>IPv4 only. The configured operator public P2P is <code>34.27.30.115:28545</code></li></ul>
-<p>  (<code>--bootstrap 34.27.30.115:28545</code>). Do not invent extra peers. Write RPC</p>
+<ul><li>IPv4 only. The configured operator public P2P is <code>&lt;seed&gt;.onion:28545</code></li></ul>
+<p>  (<code>--bootstrap &lt;seed&gt;.onion:28545</code>). Do not invent extra peers. Write RPC</p>
 <p>  stays <code>127.0.0.1:8545</code>.</p>
-<ul><li>Seed operators set <code>ADDITION_ADVERTISED_P2P=34.27.30.115:28545</code> so public</li></ul>
+<ul><li>Seed operators set <code>ADDITION_ADVERTISED_P2P=&lt;seed&gt;.onion:28545</code> so public</li></ul>
 <p>  <code>getinfo</code> / <code>peers</code> do not list <code>self</code>. Public TCP 28545 can timeout or</p>
 <p>  be filtered; HTTP <code>:80</code> sync is the reliable join path. This local</p>
 <p>  runbook does not claim public 28545 works.</p>
@@ -103,7 +103,7 @@ printf &#x27;createwallet\n&#x27; | nc 127.0.0.1 38545</pre>
 <p>  them unless they succeed on the trusted local port of a running node.</p>
 <h2>Config keys</h2>
 <p>Same meaning as CLI / env:</p>
-<ul><li><code>enable_public_rpc</code></li><li><code>ports.public_rpc</code> / <code>ports.public_rpc_bind</code></li><li><code>ports.local_rpc</code> / <code>ports.p2p</code></li><li><code>bootstrap_peers</code> (IPv4 <code>ip:port</code> only; repo <code>config.toml</code> lists <code>34.27.30.115:28545</code>)</li><li><code>enable_auto_mine</code> / <code>auto_mine_interval_sec</code> / <code>auto_mine_reward</code> (off by default)</li></ul>
+<ul><li><code>enable_public_rpc</code></li><li><code>ports.public_rpc</code> / <code>ports.public_rpc_bind</code></li><li><code>ports.local_rpc</code> / <code>ports.p2p</code></li><li><code>bootstrap_peers</code> (IPv4 <code>ip:port</code> only; repo <code>config.toml</code> lists <code>&lt;seed&gt;.onion:28545</code>)</li><li><code>enable_auto_mine</code> / <code>auto_mine_interval_sec</code> / <code>auto_mine_reward</code> (off by default)</li></ul>
 <p>Env: <code>ADDITION_ENABLE_PUBLIC_RPC=1</code>, <code>ADDITION_PUBLIC_RPC_PORT</code>,</p>
 <p><code>ADDITION_PUBLIC_RPC_BIND</code>, <code>ADDITION_LOCAL_RPC_PORT</code>, <code>ADDITION_P2P_PORT</code>,</p>
 <p><code>ADDITION_ADVERTISED_P2P</code> (seed public IPv4 only),</p>
@@ -116,7 +116,7 @@ cmake --build build --target additiond
 python3 tests/test_two_node_http_ingest.py
 # or: ctest --test-dir build -R test_two_node_http_ingest --output-on-failure</pre>
 <p>The script starts two <code>additiond</code> processes. Node A mines on trusted write</p>
-<p>RPC, advertises <code>ADDITION_ADVERTISED_P2P=34.27.30.115:28545</code> so public</p>
+<p>RPC, advertises <code>ADDITION_ADVERTISED_P2P=&lt;seed&gt;.onion:28545</code> so public</p>
 <p><code>getinfo</code> / <code>peers</code> omit <code>self</code>, then node B:</p>
 <ol><li>pulls A&#x27;s chain over <strong>HTTP ingest</strong> (<code>getinfo</code> + <code>getblockraw</code> on A&#x27;s</li></ol>
 <p>   public-read port via <code>ADDITION_PUBLIC_HTTP_PORT</code>)</p>

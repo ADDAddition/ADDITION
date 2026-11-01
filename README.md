@@ -23,7 +23,7 @@
 
 ---
 
-**ADDITION** is a C++20 Layer 1 node (`additiond`): SHA3-512 hashing, ML-DSA-87 signatures, hash-committed addresses, and SHA3 commitment openings. The public site [additionblockchain.com](https://additionblockchain.com) presents **ADDITION_MAINNET_V1** (public RPC `34.27.30.115:38546` / site `/api/rpc`). Research testnet remains a separate chain.
+**ADDITION** is a C++20 Layer 1 node (`additiond`): SHA3-512 hashing, ML-DSA-87 signatures, hash-committed addresses, and SHA3 commitment openings. The public site [additionblockchain.com](https://additionblockchain.com) presents **ADDITION_MAINNET_V1** (public RPC `127.0.0.1:38546` / site `/api/rpc`). Research testnet remains a separate chain.
 
 ### Technical matrix
 
@@ -46,8 +46,8 @@
 | Flag | `additiond --network testnet` | `additiond --mainnet` |
 | `network_id` | `ADDITION_TESTNET_V1` | `ADDITION_MAINNET_V1` |
 | Genesis | [`genesis.json`](genesis.json) | [`genesis-mainnet.json`](genesis-mainnet.json) |
-| Bootstrap | `34.27.30.115:28545` | `34.27.30.115:28546` |
-| Public RPC | `34.27.30.115:38545` | `34.27.30.115:38546` / site `/api/rpc` |
+| Bootstrap | `<seed>.onion:28545` | `<seed>.onion:28546` |
+| Public RPC | `127.0.0.1:38545` | `127.0.0.1:38546` / site `/api/rpc` |
 | Role | Research chain (separate) | Public product — explorer, join, wallet PWA |
 
 `--mainnet` is the public ADDITION mainnet (`ADDITION_MAINNET_V1`), a separate chain from the research testnet. See [docs/MAINNET_RUNBOOK.md](docs/MAINNET_RUNBOOK.md) and the mainnet section in [`join.md`](web/public/join.md).
@@ -63,7 +63,7 @@ What `main` ships:
 - **Addresses** — hash-committed: `SHA3-512(scheme_id || 0x00 || pubkey)` (128 hex)
 - **Privacy** — SHA3-512 commitment + nullifier **opening** (`privacy_mint_open` / `privacy_spend_open`). A hash relation, not ZK
 - **SLH-DSA** — opt-in vault (`slh-dsa-shake-256s`) when this liboqs can sign with a non-empty context; otherwise disabled
-- **RPC** — home-node write on `127.0.0.1:8546` (mainnet). Public seed `34.27.30.115:38546` write allowlist is open per CoS (`createwallet`, `mine`, `wallet_send`, sign, `tx_build`). Site wallet prefers `/api/rpc` → that path, with `/local-rpc` loopback fallback. Height from live `getinfo` may be `0`.
+- **RPC** — home-node write on `127.0.0.1:8546` (mainnet). Public seed `127.0.0.1:38546` write allowlist is open per CoS (`createwallet`, `mine`, `wallet_send`, sign, `tx_build`). Site wallet prefers `/api/rpc` → that path, with `/local-rpc` loopback fallback. Height from live `getinfo` may be `0`.
 
 Whole integers. No 8-decimal subunit. Block reward `50` (100% to finding miner), `max_supply` `50000000`, min fee `0`.
 
@@ -103,13 +103,13 @@ Build `additiond` on Linux from this repository on `main`, then:
 ```bash
 export ADDITION_PRIVACY_MASTER_KEY='replace-with-32-or-more-chars____'
 export ADDITION_ENABLE_P2P_RPC=1
-additiond --mainnet --data-dir $HOME/addition-mainnet --local-rpc-port 8546 --p2p-port 28547 --bootstrap 34.27.30.115:28546
+additiond --mainnet --data-dir $HOME/addition-mainnet --local-rpc-port 8546 --p2p-port 28547 --bootstrap <seed>.onion:28546
 ```
 
 Type `sync` on the daemon stdin, or send it to write RPC on `127.0.0.1:8546`. Height should move. Write RPC stays loopback.
 
 ```bash
-curl -s 'http://34.27.30.115:38546/rpc?cmd=getinfo'
+curl -s 'http://127.0.0.1:38546/rpc?cmd=getinfo'
 curl -s 'https://additionblockchain.com/api/rpc?cmd=getinfo'
 ```
 
@@ -117,7 +117,7 @@ Expect `network=mainnet` / `ADDITION_MAINNET_V1`. Height may be `0` — copy onl
 
 Desktop wallet (loopback RPC): [additionblockchain.com/download/](https://additionblockchain.com/download/) · in-browser PWA: [additionblockchain.com/wallet/](https://additionblockchain.com/wallet/)
 
-Research testnet (separate): `additiond --network testnet … --bootstrap 34.27.30.115:28545` (write `8545`, read `38545`).
+Research testnet (separate): `additiond --network testnet … --bootstrap <seed>.onion:28545` (write `8545`, read `38545`).
 ---
 
 ## Build on Linux (Ubuntu EliteDesk)
