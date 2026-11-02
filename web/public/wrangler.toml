@@ -10,9 +10,6 @@ zone_name = "additionblockchain.com"
 [[routes]]
 pattern = "www.additionblockchain.com/*"
 zone_name = "additionblockchain.com"
-[[routes]]
-pattern = "<your-node>/*"
-zone_name = "additionblockchain.com"
 
 [assets]
 directory = "."
