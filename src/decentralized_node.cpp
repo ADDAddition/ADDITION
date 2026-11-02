@@ -841,6 +841,9 @@ bool DecentralizedNode::ingest_block(const Block& block, std::string& error) {
         seen_block_hashes_.erase(bh);
         return false;
     }
+    // A block from a peer confirms txs we may still hold: evict them (and any
+    // now-conflicting spends) so tx_status, mining and re-gossip stay correct.
+    mempool_.remove_confirmed(block.transactions);
 
     consensus_.submit_vote(self_id_, block.header.height, bh);
     outbound_.push_back(encode_block_announce(block));

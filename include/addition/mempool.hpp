@@ -15,6 +15,10 @@ public:
     std::vector<Transaction> fetch_for_block(std::size_t max_count);
     std::vector<Transaction> snapshot() const;
     void replace(const std::vector<Transaction>& txs);
+    // Drop pending txs confirmed by (or conflicting with) a connected block:
+    // same txid, a spent outpoint/nullifier, or the same signer nonce.
+    // Returns how many pending txs were removed.
+    std::size_t remove_confirmed(const std::vector<Transaction>& block_txs);
     std::size_t size() const;
     // Highest pending nonce for an account signer (0 if none).
     std::uint64_t max_pending_nonce(const std::string& signer) const;

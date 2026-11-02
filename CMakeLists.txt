@@ -139,7 +139,7 @@ if(ADDITION_BUILD_TESTS)
     add_executable(test_mainnet_chain tests/test_mainnet_chain.cpp)
     target_link_libraries(test_mainnet_chain PRIVATE addition_core)
     add_test(NAME test_mainnet_chain COMMAND test_mainnet_chain)
-    set_tests_properties(test_mainnet_chain PROPERTIES TIMEOUT 90)
+    set_tests_properties(test_mainnet_chain PROPERTIES TIMEOUT 90 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
     add_executable(test_rpc_access tests/test_rpc_access.cpp)
     target_link_libraries(test_rpc_access PRIVATE addition_core)
@@ -340,6 +340,14 @@ if(ADDITION_BUILD_TESTS)
             ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
             TIMEOUT 300)
         add_test(
+            NAME test_regtest_mempool_evict
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_regtest_mempool_evict.py
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        )
+        set_tests_properties(test_regtest_mempool_evict PROPERTIES
+            ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
+            TIMEOUT 180)
+        add_test(
             NAME test_regtest_client_signing
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_regtest_client_signing.py
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
@@ -347,5 +355,16 @@ if(ADDITION_BUILD_TESTS)
         set_tests_properties(test_regtest_client_signing PROPERTIES
             ENVIRONMENT "ADDITIOND=$<TARGET_FILE:additiond>"
             TIMEOUT 180)
+        # Daemon-launching tests bind fixed loopback ports; serialize them so
+        # `ctest -jN` cannot cross-connect nodes from different tests.
+        foreach(_addition_daemon_test
+                test_amm_live test_auto_mine_daemon test_chain_persist_restart test_core_path_smoke
+                test_live_mine_and_privacy test_mainnet_genesis test_mainnet_two_node test_public_rpc_two_node
+                test_public_site_static test_regtest_client_signing test_regtest_mempool_evict
+                test_regtest_staking_three_node test_regtest_two_node test_runtime_live test_two_node_http_ingest)
+            if(TEST ${_addition_daemon_test})
+                set_tests_properties(${_addition_daemon_test} PROPERTIES RESOURCE_LOCK addition_daemon_ports)
+            endif()
+        endforeach()
     endif()
 endif()

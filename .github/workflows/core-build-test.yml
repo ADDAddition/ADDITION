@@ -1,0 +1,79 @@
+name: core-build-test
+
+# Builds the C++ daemon + Rust STARK crate and runs the full ctest suite.
+# Never deploys, never publishes, never contacts a public node (tests are loopback only).
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "include/**"
+      - "tests/**"
+      - "zk/**"
+      - "tools/**"
+      - "CMakeLists.txt"
+      - "genesis*.json"
+      - "config*.toml"
+      - ".github/workflows/core-build-test.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "include/**"
+      - "tests/**"
+      - "zk/**"
+      - "CMakeLists.txt"
+      - ".github/workflows/core-build-test.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      LIBOQS_VERSION: "0.12.0"
+    steps:
+      - uses: actions/checkout@v4
+      - name: System deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake g++ libssl-dev python3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: zk/shielded_stark
+      - name: Cache liboqs
+        id: oqs
+        uses: actions/cache@v4
+        with:
+          path: ~/oqs
+          key: liboqs-${{ env.LIBOQS_VERSION }}-${{ runner.os }}
+      - name: Build liboqs
+        if: steps.oqs.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "$LIBOQS_VERSION" https://github.com/open-quantum-safe/liboqs.git /tmp/liboqs
+          cmake -S /tmp/liboqs -B /tmp/liboqs/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$HOME/oqs" -DBUILD_SHARED_LIBS=OFF -DOQS_BUILD_ONLY_LIB=ON
+          cmake --build /tmp/liboqs/build
+          cmake --install /tmp/liboqs/build
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DADDITION_BUILD_TESTS=ON -DCMAKE_PREFIX_PATH="$HOME/oqs"
+      - name: Build
+        run: cmake --build build -j"$(nproc)"
+      - name: Test
+        working-directory: build
+        run: ctest -j2 --output-on-failure --timeout 900
+      - name: Short tx soak (3 local regtest nodes, 3 min)
+        env:
+          ADDITIOND: ${{ github.workspace }}/build/additiond
+        run: python3 tools/soak_tx_three_node.py --minutes 3 --interval 5 --report soak.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: soak-report
+          path: soak.json
+          if-no-files-found: ignore
