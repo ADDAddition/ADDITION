@@ -1,0 +1,21 @@
+# systemd unit for an ADDITION mainnet seed node behind Tor (onion-only).
+# Install: cp to /etc/systemd/system/, put the public seed list in
+# /etc/addition/seeds-mainnet.txt, set SEED_ONION in /etc/addition/seed.env.
+[Unit]
+Description=ADDITION mainnet seed node (Tor onion)
+After=network-online.target tor.service
+Requires=tor.service
+
+[Service]
+User=addition
+EnvironmentFile=/etc/addition/seed.env
+Environment=ADDITION_ADVERTISED_P2P=${SEED_ONION}:28546
+WorkingDirectory=/var/lib/addition
+ExecStart=/usr/local/bin/additiond --mainnet --onion-only --tor-proxy 127.0.0.1:9050 --p2p-port 28546 --seeds-file /etc/addition/seeds-mainnet.txt
+Restart=on-failure
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/addition
+
+[Install]
+WantedBy=multi-user.target

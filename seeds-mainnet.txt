@@ -1,0 +1,9 @@
+# ADDITION mainnet bootstrap seeds (Tor v3 onion only, see docs/ONION_SEEDS.md)
+#
+# One entry per line:  <56-char-v3-address>.onion:28546
+# Lines starting with '#' are comments. Every entry is checked (base32, version 3,
+# SHA3-256 checksum); any invalid line makes the daemon refuse to start (fail closed).
+#
+# No seed has been published yet. Entries are added only after the operator runs
+# scripts/tor/setup_seed_hidden_service.sh on a seed machine and reports the
+# hostname it prints. Never add an address that was not produced that way.

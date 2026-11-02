@@ -10,8 +10,9 @@ network_id = "ADDITION_MAINNET_V1"
 data_dir = "data-mainnet"
 genesis_file = "genesis-mainnet.json"
 
-# Mainnet onion seeds are PLACEHOLDERS until the real seed onions exist
-# (see kMainnetOnionSeeds / docs/ONION_SEEDS.md). Until then pass:
+# Mainnet onion seeds are read from a seed file (--seeds-file PATH,
+# $ADDITION_SEEDS_FILE or ./seeds-mainnet.txt; see docs/ONION_SEEDS.md).
+# No seed is compiled in. With no published seed yet, pass:
 #   --tor-proxy 127.0.0.1:9050 --bootstrap <seed>.onion:28546
 # P2P listen stays off unless ADDITION_ENABLE_P2P_RPC=1.
 bootstrap_peers = []

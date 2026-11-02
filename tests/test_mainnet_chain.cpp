@@ -8,6 +8,7 @@
 #include <atomic>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <thread>
@@ -32,6 +33,41 @@ bool load_checked_genesis(const char* path, addition::ChainConfig& chain, std::s
 } // namespace
 
 int main() {
+    {
+        // Seed-file loader: synthetic test vector (pubkey bytes 0x00..0x1f), not a real service.
+        const std::string good = "aaaqeayeaudaocajbifqydiob4ibceqtcqkrmfyydenbwha5dyp3kead.onion:28546";
+        const std::string badsum = "aaaqeayeaudaocajbifqydiob4ibceqtcqkrmfyydenbwha5dyp3keed.onion:28546";
+        if (!addition::onion_v3_checksum_ok(good) || addition::onion_v3_checksum_ok(badsum)) {
+            std::cerr << "test failed: onion v3 checksum validation\n";
+            return 1;
+        }
+        const auto dir = std::filesystem::temp_directory_path() / "addition_seedfile_test";
+        std::filesystem::create_directories(dir);
+        const auto ok_path = (dir / "ok.txt").string();
+        { std::ofstream f(ok_path); f << "# comment\n\n  " << good << "  # trailing\n" << good << "\n"; }
+        std::vector<std::string> seeds; std::string err;
+        if (!addition::load_seed_file(ok_path, seeds, err) || seeds.size() != 1 || seeds[0] != good) {
+            std::cerr << "test failed: load_seed_file valid file: " << err << "\n";
+            return 1;
+        }
+        const auto bad_path = (dir / "bad.txt").string();
+        { std::ofstream f(bad_path); f << good << "\n" << badsum << "\n"; }
+        if (addition::load_seed_file(bad_path, seeds, err) || !seeds.empty()) {
+            std::cerr << "test failed: load_seed_file must reject bad checksum\n";
+            return 1;
+        }
+        { std::ofstream f(bad_path); f << "34.27.30.115:28546\n"; }
+        if (addition::load_seed_file(bad_path, seeds, err)) {
+            std::cerr << "test failed: load_seed_file must reject clearnet seeds\n";
+            return 1;
+        }
+        if (addition::load_seed_file((dir / "missing.txt").string(), seeds, err)) {
+            std::cerr << "test failed: load_seed_file must fail on missing file\n";
+            return 1;
+        }
+        std::filesystem::remove_all(dir);
+    }
+
     const auto testnet_cfg = addition::testnet_chain_config();
     const auto mainnet_cfg = addition::mainnet_chain_config();
 
@@ -177,7 +213,7 @@ int main() {
             }
         }
         for (const auto& peer : ncfg.bootstrap_peers) {
-            if (peer == addition::kOperatorPublicMainnetP2p || addition::is_placeholder_seed(peer) ||
+            if (peer == addition::kOperatorPublicMainnetP2p || 
                 peer.find(".onion:") == std::string::npos) {
                 std::cerr << "test failed: --mainnet default bootstrap must be real onion seeds only: "
                           << peer << "\n";
