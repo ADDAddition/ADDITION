@@ -202,6 +202,58 @@ void Mempool::replace(const std::vector<Transaction>& txs) {
     }
 }
 
+std::size_t Mempool::remove_confirmed(const std::vector<Transaction>& block_txs) {
+    std::lock_guard<std::mutex> lk(mu_);
+    if (pending_.empty() || block_txs.empty()) {
+        return 0;
+    }
+    std::unordered_set<std::string> ids;
+    std::unordered_set<std::string> spent;
+    std::unordered_set<std::string> nonces;
+    for (const auto& tx : block_txs) {
+        ids.insert(hash_transaction(tx));
+        for (const auto& in : tx.inputs) spent.insert(outpoint_key(in));
+        std::vector<std::string> nfs;
+        if (shielded_nullifier_keys(tx, nfs)) spent.insert(nfs.begin(), nfs.end());
+        const auto sn = signer_nonce_key(tx);
+        if (!sn.empty()) nonces.insert(sn);
+    }
+    std::vector<Transaction> keep;
+    keep.reserve(pending_.size());
+    std::size_t removed = 0;
+    for (auto& tx : pending_) {
+        bool drop = ids.count(hash_transaction(tx)) != 0;
+        if (!drop) {
+            const auto sn = signer_nonce_key(tx);
+            drop = !sn.empty() && nonces.count(sn) != 0;
+        }
+        if (!drop) {
+            for (const auto& in : tx.inputs) {
+                if (spent.count(outpoint_key(in)) != 0) { drop = true; break; }
+            }
+        }
+        if (!drop) {
+            std::vector<std::string> nfs;
+            if (shielded_nullifier_keys(tx, nfs)) {
+                for (const auto& k : nfs) {
+                    if (spent.count(k) != 0) { drop = true; break; }
+                }
+            }
+        }
+        if (drop) {
+            txids_.erase(hash_transaction(tx));
+            const auto sn = signer_nonce_key(tx);
+            if (!sn.empty()) signer_nonces_.erase(sn);
+            unindex_inputs(tx);
+            ++removed;
+        } else {
+            keep.push_back(std::move(tx));
+        }
+    }
+    pending_ = std::move(keep);
+    return removed;
+}
+
 std::uint64_t Mempool::max_pending_nonce(const std::string& signer) const {
     std::lock_guard<std::mutex> lk(mu_);
     std::uint64_t m = 0;
