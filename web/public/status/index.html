@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Network status — ADDITION</title>
-  <meta name="description" content="Live getinfo from the ADDITION mainnet public read RPC (ADDITION_MAINNET_V1).">
+  <meta name="description" content="ADDITION launch readiness (pre-mainnet) and live read-only status of the public node.">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/favicon.ico">
@@ -14,7 +14,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="/common.css">
 </head>
 <body>
@@ -25,25 +25,26 @@
       <dl id="strip-cells" class="status-cells"></dl>
     </div>
   </div>
-  <main>
-    <section class="product-hero" style="padding-top:1rem;padding-bottom:0.25rem">
-      <p class="eyebrow"><span class="net-badge">MAINNET</span> Public RPC</p>
-      <h1>Network status</h1>
-      <p class="lede">
-        Values come from the public mainnet path (<code>/api/rpc</code> →
-        <code>127.0.0.1:38546</code> / <code>ADDITION_MAINNET_V1</code>).
-        Write allowlist on that seed includes createwallet / mine / wallet_send / sign / tx_build (CoS).
-        If the node does not answer: <strong>RPC offline</strong>.
-        Copy only fields the node prints — height may be <code>0</code>.
-      </p>
+  <main class="page">
+    <section class="hero2">
+      <p class="eyebrow">● Pre-mainnet</p>
+      <h1>Status</h1>
+      <p class="lede">Where the launch stands, plus whatever the public read-only node reports right now.</p>
     </section>
-    <p class="note">
-      Public product: <code>ADDITION_MAINNET_V1</code> · <code>memory_hard</code> PoW ·
-      <code>pq_mode=strict</code> (ML-DSA-87 / SHA3-512).
-      <code>privacy_claim</code> is whatever the node prints (live opening is <code>opening_not_zk</code>).
-      Fields below are copied from the node only — no canned height, peers, TPS, or price.
-      See <a href="/compare/">compare</a> and <a href="/whitepaper/">whitepaper</a>.
-    </p>
+    <section class="section">
+      <h2>Launch readiness</h2>
+      <div class="card2"><table class="spec-table">
+        <tr><th><span class="status-dot ok"></span>Core node</th><td>Implemented and covered by CI tests (C++ / Rust core, 3-node transaction soak)</td></tr>
+        <tr><th><span class="status-dot ok"></span>Research testnet</th><td>Runs over Tor onion services</td></tr>
+        <tr><th><span class="status-dot warn"></span>Mainnet seed nodes</th><td>Not published yet. <code>seeds-mainnet.txt</code> is empty.</td></tr>
+        <tr><th><span class="status-dot warn"></span>Signed releases</th><td>None yet. Build from source.</td></tr>
+        <tr><th><span class="status-dot off"></span>Mainnet</th><td>Not launched, no date announced</td></tr>
+      </table></div>
+    </section>
+    <section class="section">
+      <h2>Public node (live)</h2>
+      <p class="sub">Read-only commands through <code>/api/rpc</code>. Every field below is printed by the node itself, including its network name. "RPC offline" means it did not answer.</p>
+    </section>
     <p id="rpc-state"></p>
     <section class="panel">
       <h2>getinfo</h2>

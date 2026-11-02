@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Wallet — ADDITION</title>
-  <meta name="description" content="ADDITION wallet. Prefers public mainnet RPC 38546 write (createwallet/mine/send). Falls back to home-node loopback if offline.">
+  <meta name="description" content="ADDITION wallet for your own local node. Keys stay on your machine. Pre-mainnet.">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/favicon.ico">
@@ -14,7 +14,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="/common.css">
 </head>
 <body data-title="Wallet" data-sub="mainnet RPC" class="wallet-page">
@@ -26,37 +26,31 @@
         <span id="conn-pill" class="pill pill-warn">Checking…</span>
       </div>
       <p class="note" style="margin-top:0">
-        Prefers public mainnet write on seed <code>127.0.0.1:38546</code> via
-        <code>/api/rpc</code> (CoS allowlist: <code>createwallet</code>, <code>mine</code>,
-        <code>wallet_send</code>, sign, <code>tx_build</code>).
-        Falls back to home-node loopback via <code>/local-rpc</code>
-        (<code>127.0.0.1:8546</code>) when public RPC is offline.
+        This wallet talks <strong>only to a node you run</strong>, through <code>/local-rpc</code> to
+        127.0.0.1 (8545 testnet / 8546 mainnet profile). Keys stay in that node's
+        <code>data/wallets/</code>. The public RPC is read-only and never receives wallet commands.
       </p>
 
       <!-- Offline / connect -->
       <section id="panel-offline" class="panel wallet-panel" hidden>
         <h2>RPC offline</h2>
         <p class="note">
-          Public <code>38546</code> / <code>/api/rpc</code> did not answer, and no home-node
-          <code>/local-rpc</code> is available. Retry, or run a local node.
+          No local node answered on <code>/local-rpc</code>. The hosted site cannot reach your machine:
+          run the node and serve this site locally.
         </p>
         <ol class="connect-steps">
           <li>
-            <strong>Public path (preferred)</strong>
-            <span>Seed <code>http://127.0.0.1:38546</code> — write allowlist includes create / mine / send when CoS has it open. Site uses <code>/api/rpc</code>.</span>
-          </li>
-          <li>
             <strong>Or run additiond locally</strong>
-            <span>Start <code>additiond --mainnet</code> with write RPC on <code>127.0.0.1:8546</code> only — never bind write on <code>0.0.0.0</code>.</span>
+            <span>Start <code>additiond</code> (testnet) with write RPC on <code>127.0.0.1:8545</code> only. Never bind write RPC on <code>0.0.0.0</code>.</span>
           </li>
           <li>
             <strong>Serve this site next to the node</strong>
-            <span>From the repo: <code>ADDITION_NETWORK=mainnet python3 web/serve.py</code> so <code>/local-rpc</code> can reach loopback as fallback.</span>
+            <span>From the repo: <code>python3 web/serve.py</code>, then open the printed local address, so <code>/local-rpc</code> reaches your node.</span>
           </li>
         </ol>
         <div class="cta-row" style="margin-top:1rem">
-          <a class="btn btn-primary" href="/join/#mainnet">How to run a node</a>
-          <a class="btn btn-secondary" href="/download/">Desktop helper</a>
+          <a class="btn btn-primary" href="/join/">How to run a node</a>
+          <a class="btn btn-secondary" href="/download/">Build from source</a>
           <button type="button" class="btn btn-ghost" id="retry-btn">Check again</button>
         </div>
       </section>
@@ -120,13 +114,13 @@
       <!-- Send -->
       <section id="panel-send" class="panel wallet-panel" hidden>
         <h2>Send</h2>
-        <p class="note">Signs and broadcasts via the active RPC path (public <code>38546</code> / <code>/api/rpc</code> when available, else loopback <code>/local-rpc</code>).</p>
+        <p class="note">Your local node signs with ML-DSA-87 and broadcasts to its peers.</p>
         <label for="to">Recipient address</label>
         <input id="to" autocomplete="off" spellcheck="false" placeholder="128-hex address">
         <label for="amount">Amount (whole ADD)</label>
         <input id="amount" inputmode="numeric" value="1">
-        <label for="fee">Fee (0 allowed when floor is 0)</label>
-        <input id="fee" inputmode="numeric" value="0">
+        <label for="fee">Fee (whole ADD; mainnet minimum is 1)</label>
+        <input id="fee" inputmode="numeric" value="1">
         <div class="btn-row">
           <button type="button" class="btn btn-primary" id="send-btn">Send ADD</button>
           <button type="button" class="btn btn-ghost" data-back>Back</button>
@@ -153,22 +147,19 @@
 
         <h3>Mine to this wallet</h3>
         <p class="note">
-          Calls <code>mine</code> on the active write path (public <code>38546</code> when available,
-          else <code>/local-rpc</code> → <code>127.0.0.1:8546</code> mainnet / <code>8545</code> testnet).
-          Coinbase is 50 ADD, 100% to the finding miner.
+          Calls <code>mine</code> on your local node. The reward follows the network's
+          schedule (mainnet profile: 4 ADD per block at the start); coinbase outputs must mature before they can be spent.
         </p>
         <div class="btn-row">
           <button type="button" class="btn btn-secondary" id="mine-btn">Mine one block</button>
         </div>
         <pre id="mine-raw" class="raw"></pre>
 
-        <h3>Other local tools</h3>
+        <h3>More</h3>
         <div class="tool-grid">
-          <a href="/tokens/"><strong>Tokens</strong><span>Create and transfer on your node</span></a>
-          <a href="/swap/"><strong>Swap</strong><span>Local in-process ADD tokens only</span></a>
-          <a href="/privacy/"><strong>Privacy</strong><span>SHA3 opening — not ZK</span></a>
-          <a href="/local/"><strong>Local hub</strong><span>Operator toolbox</span></a>
-          <a href="/"><strong>Explore</strong><span>Back to mainnet explorer</span></a>
+          <a href="/privacy/"><strong>Privacy</strong><span>Shielded pool and opening RPCs</span></a>
+          <a href="/join/"><strong>Run a node</strong><span>Build and start additiond</span></a>
+          <a href="/"><strong>Explore</strong><span>Back to home</span></a>
         </div>
         <div class="btn-row">
           <button type="button" class="btn btn-ghost" data-back>Back to wallet</button>

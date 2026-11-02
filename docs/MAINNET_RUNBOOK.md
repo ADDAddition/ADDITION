@@ -1,15 +1,17 @@
-# ADDITION mainnet runbook (public chain)
+# ADDITION mainnet runbook (pre-launch)
 
 Contact: [contact@additionblockchain.com](mailto:contact@additionblockchain.com)
 
-This is the **public ADDITION mainnet**: `network_id=ADDITION_MAINNET_V1`, genesis `genesis-mainnet.json`, default data dir `data-mainnet`.
+> **Mainnet has not launched.** This is the planned procedure for the mainnet profile. No mainnet seeds are published yet (`seeds-mainnet.txt` is empty; see `docs/ONION_SEEDS.md`).
 
-Run `additiond --mainnet` (same as `--network mainnet`) like `bitcoind`: anyone can join the P2P network, sync from the public seed, and mine locally on loopback write RPC.
+Mainnet profile: `network_id=ADDITION_MAINNET_V1`, genesis `genesis-mainnet.json`, default data dir `data-mainnet`.
 
-| Public seed | Role |
+Run `additiond --mainnet` (same as `--network mainnet`) like `bitcoind`: anyone can join the P2P network, sync from the published onion seeds, and mine locally on loopback write RPC.
+
+| Endpoint (planned) | Role |
 |-------------|------|
 | `<seed>.onion:28546` | P2P bootstrap |
-| `127.0.0.1:38546` | HTTP public RPC (`/rpc?cmd=getinfo`; write allowlist open per CoS) |
+| `127.0.0.1:38546` | HTTP public RPC, read-only (`/rpc?cmd=getinfo`) |
 
 That is a separate chain from the research testnet (`28545` / `38545`). Not a label flip.
 
@@ -57,7 +59,7 @@ Expect `network=mainnet` and `network_id=ADDITION_MAINNET_V1`. Height may still 
 | Genesis | `genesis.json` timestamp `1763000000` | `genesis-mainnet.json` timestamp `1770000000` |
 | Data dir | `data` | `data-mainnet` |
 | Write RPC | `127.0.0.1:8545` | `127.0.0.1:8546` |
-| Public read | `0.0.0.0:38545` (opt-in) | `0.0.0.0:38546` (seed: `127.0.0.1:38546`) |
+| Public read | `0.0.0.0:38545` (opt-in) | `0.0.0.0:38546` (opt-in) |
 | P2P | `28545` (research seed) | `28546` public seed; home nodes use another port (e.g. `28547`) |
 | PoW | SHA3-512 | memory_hard (1 MiB × 16 rounds) |
 | Difficulty | easy `0x0000FFFFFFFFFFFF` (~4 ms observed) | hard floor `0x000000FFFFFFFFFF` |
@@ -77,12 +79,12 @@ thread, `hardware_concurrency` workers by default) against the existing
 target `0x000000FFFFFFFFFF`. That is about 2^24 hashes. Do not loosen it.
 Do not invent TPS.
 
-Home-node write RPC stays `127.0.0.1:8546` (never publish). Public seed `38546` now allows the write allowlist CoS enabled: `createwallet`, `mine`, `wallet_send`, `wallet_sign` / `sign_message`, `tx_build` / `sendtx_signed*`. Height from live `getinfo` may still be `0`.
+Home-node write RPC stays `127.0.0.1:8546` (never publish). The public port `38546` is read-only (`is_public_read_command` in `rpc_access.cpp`); wallet, mining and send commands are refused there.
 
 ```bash
 printf 'mine miner1\n' | nc 127.0.0.1 8546
 # waits until a nonce meets the target; clients must not use a 30s timeout
-# or against the public seed when the write allowlist is open:
+# read-only check on the public port:
 curl -s 'http://127.0.0.1:38546/rpc?cmd=getinfo'
 ```
 
@@ -136,7 +138,7 @@ sudo systemctl enable --now additiond-mainnet.service
 
 | Listener | Bind | Port | Role |
 |----------|------|------|------|
-| Public RPC | `0.0.0.0` | **38546** | Seed: `127.0.0.1:38546` — read + write allowlist (createwallet/mine/wallet_send/sign/tx_build per CoS) |
+| Public RPC | `0.0.0.0` | **38546** | read-only allowlist |
 | Home-node write RPC | `127.0.0.1` | **8546** | Trusted local only; never publish |
 | P2P | `0.0.0.0` | **28546** | Public seed; home nodes use another port (e.g. 28547). Needs `ADDITION_ENABLE_P2P_RPC=1` |
 
@@ -157,7 +159,7 @@ curl -s 'http://127.0.0.1:38546/rpc?cmd=getinfo'
 
 P2P listen is off unless `ADDITION_ENABLE_P2P_RPC=1`. HELLO carries `ADDITION_MAINNET_V1`, so a testnet peer is rejected.
 
-Public bootstrap is **<seed>.onion:28546**. Do not use the research testnet seed `<seed>.onion:28545`. If TCP 28546 is filtered on your path, use HTTP `:38546` for `getinfo` / ingest checks (`getblockraw`), then retry P2P (`HELLO`+`REQBLK`).
+Bootstrap will be the **<seed>.onion:28546** lines in `seeds-mainnet.txt` once published. Do not use the research testnet seed `<seed>.onion:28545`. If TCP 28546 is filtered on your path, use HTTP `:38546` for `getinfo` / ingest checks (`getblockraw`), then retry P2P (`HELLO`+`REQBLK`).
 
 Do not loosen `memory_hard` / `0x000000FFFFFFFFFF`. Do not auto-mine. Do not bind write RPC to `0.0.0.0`.
 

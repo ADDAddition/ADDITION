@@ -1,5 +1,4 @@
 (function (global) {
-  const PUBLIC_SEED_RPC = "http://127.0.0.1:38546/rpc";
 
   function parseFields(line) {
     if (global.AdditionSite && typeof global.AdditionSite.parseFields === "function") {
@@ -95,32 +94,14 @@
     }
   }
 
-  function canUseDirectSeed() {
-    // HTTPS pages cannot call the plain HTTP seed (mixed content).
-    return global.location && global.location.protocol === "http:";
-  }
-
   async function cmd(command, timeoutMs) {
-    // Prefer public seed write (CoS open on 38546) via same-origin /api/rpc.
-    // Fall back to loopback /local-rpc when public write is offline or filtered.
-    // Proxy path form: /local-rpc?cmd=<command>
-    const publicResult = await fetchRpc("/api/rpc", command, timeoutMs);
-    if (!publicResult.offline && !publicResult.disabled) {
-      return Object.assign(publicResult, { via: "public" });
-    }
-
-    if (canUseDirectSeed() && (publicResult.offline || publicResult.disabled)) {
-      const seedResult = await fetchRpc(PUBLIC_SEED_RPC, command, timeoutMs);
-      if (!seedResult.offline && !seedResult.disabled) {
-        return Object.assign(seedResult, { via: "public" });
-      }
-    }
-
+    // Wallet / write commands go ONLY to your own node on loopback via /local-rpc.
+    // The public RPC is read-only in the node (rpc_access.cpp allowlist), and
+    // wallet commands must never be sent to a server you do not control.
     const localResult = await fetchRpc("/local-rpc", command, timeoutMs);
     if (!localResult.offline) {
       return Object.assign(localResult, { via: "local" });
     }
-
     return {
       ok: false,
       offline: true,
@@ -148,11 +129,7 @@
       return;
     }
     el.className = "ok";
-    if (result.via === "public") {
-      el.textContent = "Public mainnet RPC answered (38546 write)";
-    } else {
-      el.textContent = "Local write RPC answered";
-    }
+    el.textContent = "Your local node answered (loopback write RPC)";
   }
 
   function showResult(rawEl, fieldsEl, result) {

@@ -7,14 +7,12 @@
   ];
 
   const MORE = [
-    ["/compare/", "Compare"],
+    ["/compare/", "Specs & compare"],
     ["/privacy/", "Privacy"],
-    ["/download/", "Download"],
     ["/whitepaper/", "Whitepaper"],
     ["/rpc/", "Public RPC"],
-    ["/docs/", "Docs"],
-    ["/local/", "Local tools"],
-    ["/embed/", "Embed"]
+    ["/download/", "Build & download"],
+    ["/docs/", "Docs"]
   ];
 
   function rpcQuerySuffix() {
@@ -93,7 +91,7 @@
       ensureLink("preconnect", "https://fonts.gstatic.com", { crossorigin: "anonymous" });
       ensureLink(
         "stylesheet",
-        "https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
       );
     }
 
@@ -141,9 +139,9 @@
       '<a class="brand" href="' + withQ("/") + '">' +
       '<img class="brand-logo" src="/logo-transparent.png" alt="ADDITION" width="172" height="34" decoding="async">' +
       '<span class="brand-text"><span class="brand-name">ADDITION</span>' +
-      '<span class="brand-tag">Layer 1 · ML-DSA-87</span></span></a>' +
+      '<span class="brand-tag">Post-quantum Layer 1</span></span></a>' +
       '<div class="chrome-right">' +
-      '<span class="net-badge" title="Public product is ADDITION_MAINNET_V1">MAINNET</span>' +
+      '<a class="net-badge net-badge-pre" href="/status/" title="Mainnet has not launched. Public builds run on testnet.">PRE-MAINNET</a>' +
       '<nav class="site-nav-desktop" id="site-nav" aria-label="Primary">' + desktopNav + "</nav>" +
       '<details class="more-menu">' +
       '<summary aria-label="More pages">More</summary>' +
@@ -224,12 +222,17 @@
 
   function fillFooter(el) {
     el.className = "site-footer-wrap";
-    // Banner video lives in the homepage hero only — footer is copy + links.
     el.innerHTML =
-      '<div class="site-footer-copy">' +
-      '<p>ADDITION · public product is <strong>MAINNET</strong> · keys stay on your device or local node</p>' +
-      '<p><a href="/compare/">Compare</a> · <a href="/download/">Download</a> · <a href="/docs/">Docs</a> · ' +
-      '<a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>' +
+      '<div class="site-footer-inner">' +
+      '<div class="footer-brand"><strong>ADDITION</strong>' +
+      '<p>Open-source post-quantum Layer 1. <span class="pill pill-warn">Pre-mainnet</span> ' +
+      'Mainnet has not launched; nothing on this site is an offer or a token sale.</p></div>' +
+      '<nav class="footer-links" aria-label="Footer">' +
+      '<a href="/whitepaper/">Whitepaper</a><a href="/docs/">Docs</a><a href="/join/">Run a node</a>' +
+      '<a href="/status/">Status</a><a href="/legal/">Legal</a>' +
+      '<a href="https://github.com/ADDAddition/ADDITION" rel="noopener">GitHub</a>' +
+      '<a href="mailto:contact@additionblockchain.com">Contact</a></nav>' +
+      '<p class="footer-fine">MIT licensed · keys stay on your own device or node</p>' +
       "</div>";
   }
 

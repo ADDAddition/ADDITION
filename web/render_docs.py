@@ -345,7 +345,7 @@ def write_whitepaper() -> None:
     html_out = SHELL.format(
         title=html.escape("ADDITION technical whitepaper"),
         heading=html.escape("White paper"),
-        sub="ADDITION_MAINNET_V1",
+        sub="Pre-mainnet",
         banner=(
             "Complete technical whitepaper from <code>docs/whitepaper.md</code>. "
             "Live <code>getinfo</code>, code, and docs. Brand: <strong>ADDITION</strong>."
@@ -389,7 +389,7 @@ def main() -> None:
         OUT / "docs" / "runbook" / "index.html",
         "ADDITION mainnet node runbook",
         "Mainnet node runbook",
-        "From <code>docs/MAINNET_RUNBOOK.md</code>. Public product <code>ADDITION_MAINNET_V1</code> — P2P <code>&lt;seed&gt;.onion:28546</code>, RPC <code>127.0.0.1:38546</code> (write allowlist open per CoS). Height from live getinfo may be 0.",
+        "From <code>docs/MAINNET_RUNBOOK.md</code>. Mainnet has not launched: this is the planned procedure. Mainnet P2P seeds will be <code>.onion:28546</code> entries in <code>seeds-mainnet.txt</code> (none published yet). The public RPC is read-only.",
     )
     write_doc(
         "docs/TWO_NODE_TESTNET.md",

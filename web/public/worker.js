@@ -8,9 +8,7 @@ const PAGE_ROUTES = {
   "/rpc": "/rpc/index.html",
   "/join": "/join/index.html",
   "/download": "/download/index.html",
-  "/local": "/local/index.html",
   "/wallet": "/wallet/index.html",
-  "/tokens": "/tokens/index.html",
   "/privacy": "/privacy/index.html",
   "/docs": "/docs/index.html",
   "/docs/getting-started": "/docs/getting-started/index.html",
@@ -20,13 +18,8 @@ const PAGE_ROUTES = {
   "/docs/runbook": "/docs/runbook/index.html",
   "/docs/two-node": "/docs/two-node/index.html",
   "/docs/zk": "/docs/zk/index.html",
-  "/contracts": "/contracts/index.html",
-  "/swap": "/swap/index.html",
-  "/evm": "/evm/index.html",
   "/whitepaper": "/whitepaper/index.html",
   "/legal": "/legal/index.html",
-  "/embed": "/embed/index.html",
-  "/launch": "/launch/index.html",
 };
 
 const LAUNCH_PROBE_COMMANDS = [
@@ -295,13 +288,13 @@ async function buildCapabilitiesPayload(upstream) {
       offline: !!info.offline,
       brand: "ADDITION",
       network_id: networkId,
-      public_write: true,
+      public_write: false,
       launch_tabs_enabled: anyAvailable,
       note: info.offline
         ? "RPC offline"
         : (anyAvailable
           ? "At least one launch command answered on the public path"
-          : "Public write on 38546 includes createwallet/mine/wallet_send/sign/tx_build; Create Token / Presale / Airdrop / Farm stay off unless probed available"),
+          : "Public RPC is read-only. Wallet and mining commands only answer on a local node (127.0.0.1)."),
       probes: probes,
     },
   };

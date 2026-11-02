@@ -18,25 +18,25 @@
 </style>
 
 </head>
-<body data-title="White paper" data-sub="ADDITION_MAINNET_V1">
+<body data-title="White paper" data-sub="Pre-mainnet">
   <header id="site-header"></header>
   <main class="prose">
     <div class="banner">Complete technical whitepaper from <code>docs/whitepaper.md</code>. Live <code>getinfo</code>, code, and docs. Brand: <strong>ADDITION</strong>.</div>
-    <nav class="wp-toc" aria-label="Table of contents"><strong>Contents</strong><ol><li><a href="#what-ships-on-mainnet">What ships on mainnet</a></li><li><a href="#1-abstract-and-motivation">1. Abstract and motivation</a></li><li><a href="#2-architecture">2. Architecture</a></li><li><a href="#3-cryptography">3. Cryptography</a></li><li><a href="#4-privacy-model-as-shipped">4. Privacy model (as shipped)</a></li><li><a href="#5-consensus-and-proof-of-work">5. Consensus and proof of work</a></li><li><a href="#6-economics">6. Economics</a></li><li><a href="#7-networks-and-ports">7. Networks and ports</a></li><li><a href="#8-public-rpc">8. Public RPC</a></li><li><a href="#9-wallet-and-transactions">9. Wallet and transactions</a></li><li><a href="#10-security-assumptions-and-threat-model">10. Security assumptions and threat model</a></li><li><a href="#11-live-network-fields">11. Live network fields</a></li><li><a href="#12-how-to-join">12. How to join</a></li><li><a href="#13-contact">13. Contact</a></li></ol></nav>
+    <nav class="wp-toc" aria-label="Table of contents"><strong>Contents</strong><ol><li><a href="#mainnet-profile-implemented-not-launched">Mainnet profile (implemented, not launched)</a></li><li><a href="#1-abstract-and-motivation">1. Abstract and motivation</a></li><li><a href="#2-architecture">2. Architecture</a></li><li><a href="#3-cryptography">3. Cryptography</a></li><li><a href="#4-privacy-model-as-shipped">4. Privacy model (as shipped)</a></li><li><a href="#5-consensus-and-proof-of-work">5. Consensus and proof of work</a></li><li><a href="#6-economics">6. Economics</a></li><li><a href="#7-networks-and-ports">7. Networks and ports</a></li><li><a href="#8-public-rpc">8. Public RPC</a></li><li><a href="#9-wallet-and-transactions">9. Wallet and transactions</a></li><li><a href="#10-security-assumptions-and-threat-model">10. Security assumptions and threat model</a></li><li><a href="#11-live-network-fields">11. Live network fields</a></li><li><a href="#12-how-to-join-after-launch">12. How to join (after launch)</a></li><li><a href="#13-contact">13. Contact</a></li></ol></nav>
 <h2 id="addition-technical-whitepaper">ADDITION Technical Whitepaper</h2>
 <p><strong>Brand:</strong> ADDITION (never “SmartChain”)  </p>
-<p><strong>Network (public product):</strong> <code>ADDITION_MAINNET_V1</code> / <code>addition-mainnet</code>  </p>
+<p><strong>Network status:</strong> pre-mainnet. The mainnet profile (<code>ADDITION_MAINNET_V1</code>) is implemented but <strong>has not launched</strong>. Public nodes run the research testnet.  </p>
 <p><strong>Canonical source:</strong> <a href="https://github.com/ADDAddition/ADDITION">github.com/ADDAddition/ADDITION</a>  </p>
 <p><strong>Contact:</strong> <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a>  </p>
-<p><strong>Status:</strong> Engineering description of the C++20 node, configs, and live public RPC. Values that can change (height, peers, fees) come only from live <code>getinfo</code> / related RPCs.</p>
+<p><strong>Status:</strong> Engineering description of the C++20 node and its configs. Values that can change (height, peers, fees) come only from live <code>getinfo</code> / related RPCs.</p>
 <p>This document supersedes the short sketch in <code>docs/WHITE_PAPER.md</code>.</p>
 <hr>
-<h2 id="what-ships-on-mainnet">What ships on mainnet</h2>
-<table><tr><th>Topic</th><th>Live public product</th></tr><tr><td>Network</td><td><code>ADDITION_MAINNET_V1</code>, <code>memory_hard</code> PoW</td></tr><tr><td>Height / peers / fees</td><td>Copy live <code>getinfo</code> only (height may be <code>0</code>)</td></tr><tr><td>Privacy</td><td><code>privacy_claim=opening_not_zk</code> (SHA3-512 opening; node sees trapdoor)</td></tr><tr><td>PQ crypto</td><td><strong>ML-DSA-87</strong> + <strong>SHA3-512</strong>, <code>pq_mode=strict</code> — not a forever-unbreakable claim</td></tr><tr><td>Throughput claim</td><td><code>throughput_claim=none</code> on the live product (no invented TPS)</td></tr></table>
-<ul><li>Public product <strong><code>ADDITION_MAINNET_V1</code></strong>: UTXO L1, P2P seed, public RPC, wallet spend path with <strong>ML-DSA-87</strong> / <strong>SHA3-512</strong> / <code>pq_mode=strict</code></li><li>Mainnet PoW <strong><code>memory_hard</code></strong> at target floor <strong><code>0x000000FFFFFFFFFF</code></strong></li><li>Privacy opening path: <code>privacy_mint_open</code> / <code>privacy_spend_open</code> labeled <strong><code>opening_not_zk</code></strong></li><li>Height and monetary fields from <strong>live <code>getinfo</code> / <code>monetary_info</code> only</strong></li></ul>
+<h2 id="mainnet-profile-implemented-not-launched">Mainnet profile (implemented, not launched)</h2>
+<table><tr><th>Topic</th><th>Mainnet profile in the code</th></tr><tr><td>Network</td><td><code>ADDITION_MAINNET_V1</code>, <code>memory_hard</code> PoW</td></tr><tr><td>Height / peers / fees</td><td>Copy live <code>getinfo</code> only (height may be <code>0</code>)</td></tr><tr><td>Privacy</td><td><code>privacy_claim=opening_not_zk</code> (SHA3-512 opening; node sees trapdoor)</td></tr><tr><td>PQ crypto</td><td><strong>ML-DSA-87</strong> + <strong>SHA3-512</strong>, <code>pq_mode=strict</code> — not a forever-unbreakable claim</td></tr><tr><td>Throughput claim</td><td><code>throughput_claim=none</code> (no invented TPS)</td></tr></table>
+<ul><li>Mainnet profile <strong><code>ADDITION_MAINNET_V1</code></strong>: UTXO L1, Tor onion P2P seeds (none published yet), read-only public RPC, wallet spend path with <strong>ML-DSA-87</strong> / <strong>SHA3-512</strong> / <code>pq_mode=strict</code></li><li>Mainnet PoW <strong><code>memory_hard</code></strong> at target floor <strong><code>0x000000FFFFFFFFFF</code></strong></li><li>Privacy opening path: <code>privacy_mint_open</code> / <code>privacy_spend_open</code> labeled <strong><code>opening_not_zk</code></strong></li><li>Height and monetary fields from <strong>live <code>getinfo</code> / <code>monetary_info</code> only</strong></li></ul>
 <hr>
 <h2 id="1-abstract-and-motivation">1. Abstract and motivation</h2>
-<p>ADDITION is a Bitcoin-like Layer 1: a single C++20 daemon (<code>additiond</code>), a UTXO ledger, peer-to-peer gossip, and text/HTTP RPC. The public product network is <strong>ADDITION_MAINNET_V1</strong> — a decentralized public mainnet that anyone can join by bootstrapping the published seed, syncing, mining, and using wallet RPCs (same operational model as running <code>bitcoind</code> against a known bootstrap peer).</p>
+<p>ADDITION is a Bitcoin-like Layer 1: a single C++20 daemon (<code>additiond</code>), a UTXO ledger, peer-to-peer gossip, and text/HTTP RPC. The mainnet profile <strong>ADDITION_MAINNET_V1</strong> is designed so anyone can join by bootstrapping from published onion seeds, syncing, mining, and using wallet RPCs on their own node (the same model as running <code>bitcoind</code>). Mainnet has not launched yet and no seeds are published.</p>
 <p>The design priority is <strong>post-quantum signatures at the protocol layer</strong>. Spend transactions require <strong>ML-DSA-87</strong> (FIPS 204) via liboqs in <code>pq_mode=strict</code>. Hashing and PoW use <strong>SHA3-512</strong> (OpenSSL), with mainnet PoW wrapped in a memory-hard scratch (<code>memory_hard</code>).</p>
 <p>Motivation in one sentence: keep a familiar UTXO / PoW L1 shape while replacing elliptic-curve signatures with a NIST-standardized lattice signature before large quantum computers become practical against ECDSA/Schnorr.</p>
 <p>What this whitepaper does <strong>not</strong> claim:</p>
@@ -99,46 +99,43 @@ kRounds      = 16</pre>
 <pre id="live-monetary-snapshot" class="raw">Loading live monetary_info…</pre>
 <hr>
 <h2 id="7-networks-and-ports">7. Networks and ports</h2>
-<p>Public product profile:</p>
-<table><tr><th></th><th>Public mainnet</th></tr><tr><td>Flag</td><td><code>additiond --mainnet</code></td></tr><tr><td><code>network_id</code></td><td><code>ADDITION_MAINNET_V1</code></td></tr><tr><td>Genesis</td><td><code>genesis-mainnet.json</code> (<code>timestamp</code> 1770000000)</td></tr><tr><td>Default data dir</td><td><code>data-mainnet</code></td></tr><tr><td>Home-node write RPC</td><td><strong><code>127.0.0.1:8546</code></strong></td></tr><tr><td>Public HTTP</td><td><strong><code>38546</code></strong> (seed <code>127.0.0.1:38546</code>)</td></tr><tr><td>P2P</td><td><strong><code>28546</code></strong> (seed <code>&lt;seed&gt;.onion:28546</code>)</td></tr><tr><td>Consensus</td><td><code>memory_hard</code></td></tr></table>
+<p>Mainnet profile:</p>
+<table><tr><th></th><th>Mainnet profile (not launched)</th></tr><tr><td>Flag</td><td><code>additiond --mainnet</code></td></tr><tr><td><code>network_id</code></td><td><code>ADDITION_MAINNET_V1</code></td></tr><tr><td>Genesis</td><td><code>genesis-mainnet.json</code> (<code>timestamp</code> 1770000000)</td></tr><tr><td>Default data dir</td><td><code>data-mainnet</code></td></tr><tr><td>Home-node write RPC</td><td><strong><code>127.0.0.1:8546</code></strong></td></tr><tr><td>Public HTTP (read-only)</td><td><strong><code>38546</code></strong></td></tr><tr><td>P2P</td><td><strong><code>28546</code></strong> (seeds <code>&lt;seed&gt;.onion:28546</code> from <code>seeds-mainnet.txt</code>)</td></tr><tr><td>Consensus</td><td><code>memory_hard</code></td></tr></table>
 <p><strong>Hard rules:</strong></p>
 <ul><li>Home write RPC binds <strong><code>127.0.0.1:8546</code></strong> — never public bind / never <code>0.0.0.0</code></li><li>Never publish <code>8545</code> / <code>8546</code></li><li>Mixing another network’s <code>blocks.dat</code> into a mainnet <code>--data-dir</code> is refused</li><li>Seed operators set <code>ADDITION_ADVERTISED_P2P=&lt;seed&gt;.onion:28546</code> so public <code>getinfo</code> / <code>peers</code> advertise that IPv4 endpoint and do not list <code>self</code></li></ul>
-<p>A separate testnet profile (<code>ADDITION_TESTNET_V1</code>, ports <code>28545</code> / <code>38545</code>) exists in the same binary for operators; it is <strong>not</strong> the public product on this site. See <code>/join/#testnet</code>.</p>
+<p>A separate testnet profile (<code>ADDITION_TESTNET_V1</code>, ports <code>28545</code> / <code>38545</code>) exists in the same binary for operators; it is what public nodes run today. See <code>/join/</code>.</p>
 <hr>
 <h2 id="8-public-rpc">8. Public RPC</h2>
-<p><strong>Seed:</strong> <code>127.0.0.1:38546</code>  </p>
 <p><strong>Site proxy:</strong> <code>/api/rpc</code> (Cloudflare Worker → <code>PUBLIC_RPC_HTTP</code>)</p>
 <p>Read path (stock allowlist in <code>rpc_access.cpp</code> <code>is_public_read_command</code>): <code>getinfo</code>, <code>monetary_info</code>, <code>crypto_selftest</code>, <code>tx_status</code>, <code>peers</code>, <code>getblock</code>, <code>getblockhash</code>, <code>getblockraw</code>.</p>
-<p><strong>Write allowlist (CoS / public product, documented in <code>MAINNET_RUNBOOK.md</code>):</strong> on seed <code>38546</code>, the following answer for join/wallet flows:</p>
-<ul><li><code>createwallet</code></li><li><code>mine</code></li><li><code>wallet_send</code></li><li>sign (<code>wallet_sign</code> / <code>sign_message</code>)</li><li><code>tx_build</code> / <code>sendtx_signed*</code></li></ul>
-<p>Home operators still keep trusted write on <strong><code>127.0.0.1:8546</code></strong>. The site wallet prefers <code>/api/rpc</code> → public <code>38546</code>, with a loopback fallback to <code>/local-rpc</code> when public RPC is offline.</p>
+<p>Every other command (wallet, mining, send, signing) is refused on the public port and only answers on loopback (<code>127.0.0.1:8546</code> mainnet profile / <code>8545</code> testnet) on your own node. The site wallet talks only to <code>/local-rpc</code> on loopback.</p>
 <p>Example:</p>
-<pre>curl -s &#x27;http://127.0.0.1:38546/rpc?cmd=getinfo&#x27;
-curl -s &#x27;http://127.0.0.1:38546/jsonrpc?method=getinfo&#x27;</pre>
+<pre>curl -s &#x27;http://127.0.0.1:38545/rpc?cmd=getinfo&#x27;   # testnet node with --public-rpc</pre>
 <hr>
 <h2 id="9-wallet-and-transactions">9. Wallet and transactions</h2>
-<h3 id="9-1-wallet-and-spends-public-product-path">9.1 Wallet and spends (public product path)</h3>
+<h3 id="9-1-wallet-and-spends-on-your-own-node">9.1 Wallet and spends (on your own node)</h3>
 <ul><li><code>createwallet [name] [scheme]</code> — default ML-DSA-87; keys in <code>data/wallets/&lt;name&gt;.wal</code> (<code>priv_printed=0</code>)</li><li><code>wallet_send &lt;name&gt; &lt;to&gt; &lt;amount&gt; [fee]</code> — node signs from the <code>.wal</code>; no privkey on the wire</li><li><code>tx_build</code> + <code>sendtx_signed*</code> — build unsigned spend, sign off-wire, submit PQ signature</li><li>Legacy <code>sendtx</code> with privkey on the line stays disabled unless <code>ADDITION_ALLOW_INSECURE_TX_COMMANDS=1</code> (leave unset)</li><li>Standalone CLI: <code>web/addition_wallet.py</code> (keys on caller disk)</li></ul>
-<p>Site UI: <code>/wallet/</code> — product surface for mainnet.</p>
-<h3 id="9-2-what-is-not-a-public-product-on-this-site">9.2 What is not a public product on this site</h3>
+<p>Site UI: <code>/wallet/</code>. It talks only to your own node over loopback (<code>/local-rpc</code>).</p>
+<h3 id="9-2-what-is-out-of-scope">9.2 What is out of scope</h3>
 <p>Loopback-only token / KV / swap / bridge operators tools may exist next to a home node. They are <strong>not</strong> a public DEX, Uniswap fork, mainnet token sale, or live cross-chain bridge. Do not invent liquidity, TVL, listing prices, or foreign-chain custody.</p>
 <hr>
 <h2 id="10-security-assumptions-and-threat-model">10. Security assumptions and threat model</h2>
 <h3 id="assumptions">Assumptions</h3>
-<ol><li><strong>ML-DSA-87 remains hard</strong> against classical and near-term quantum adversaries at the parameter set shipped by liboqs for FIPS 204 level used here — <strong>not</strong> a forever-unbreakable claim.</li><li><strong>SHA3-512</strong> remains a secure hash for commitments and PoW digests under current public cryptanalysis.</li><li><strong>Majority of hashrate</strong> under memory-hard PoW (same economic assumption family as Bitcoin PoW — not proven by this paper).</li><li>Operators protect <code>ADDITION_PRIVACY_MASTER_KEY</code>, wallet <code>.wal</code> files, and never expose home write RPC beyond loopback.</li><li>Public seed write allowlist is an operational trust surface: anyone who can reach those RPCs can create wallets / mine / send as allowed — treat keys and node storage accordingly.</li></ol>
+<ol><li><strong>ML-DSA-87 remains hard</strong> against classical and near-term quantum adversaries at the parameter set shipped by liboqs for FIPS 204 level used here — <strong>not</strong> a forever-unbreakable claim.</li><li><strong>SHA3-512</strong> remains a secure hash for commitments and PoW digests under current public cryptanalysis.</li><li><strong>Majority of hashrate</strong> under memory-hard PoW (same economic assumption family as Bitcoin PoW — not proven by this paper).</li><li>Operators protect <code>ADDITION_PRIVACY_MASTER_KEY</code>, wallet <code>.wal</code> files, and never expose home write RPC beyond loopback.</li><li>The public RPC is read-only (<code>is_public_read_command</code>). Anyone who can reach a node&#x27;s loopback write RPC controls its wallets, so it must never be exposed.</li></ol>
 <h3 id="threat-model-what-privacy-is-not">Threat model — what privacy is NOT</h3>
 <p>An observer with node access or the master key can open commitments. This is <strong>not</strong> zero-knowledge privacy against the verifying node. Do not market it as Zcash/Monero-equivalent.</p>
 <h3 id="other-explicit-non-goals">Other explicit non-goals</h3>
 <ul><li>Not FIPS 140-3 validated module</li><li>Not immune to every future cryptanalytic break</li><li>Not a Solana-scale (or any invented) TPS claim on live mainnet</li><li>Live <code>getinfo</code> may report <code>economic_security=none</code> — that field is copied from the node, not upgraded in marketing copy</li></ul>
 <hr>
 <h2 id="11-live-network-fields">11. Live network fields</h2>
-<p><strong>Live public <code>getinfo</code></strong> (fetched from seed <code>127.0.0.1:38546</code> via <code>/api/rpc</code> — height may be <code>0</code>; peers change; never a canned marketing number). Prefer <a href="/status/"><code>/status/</code></a> for the full panel.</p>
+<p><strong>Live public <code>getinfo</code></strong> (fetched via <code>/api/rpc</code> from the site&#x27;s read-only node; check <code>network_id</code> in the answer; height and peers change, no canned numbers). Prefer <a href="/status/"><code>/status/</code></a> for the full panel.</p>
 <pre id="live-getinfo-snapshot" class="raw">Loading live getinfo…</pre>
 <p id="live-getinfo-note" class="note"></p>
-<table><tr><th>Field / topic</th><th>Live truth</th></tr><tr><td><code>network_id</code></td><td>From live <code>getinfo</code> only</td></tr><tr><td>Height</td><td>From live <code>getinfo</code> only — <strong>may be <code>0</code></strong></td></tr><tr><td><code>pq_mode</code> / algs</td><td><code>strict</code> / <code>ml-dsa-87</code> + SHA3-512 (confirm via live fields)</td></tr><tr><td><code>privacy_claim</code></td><td>From live <code>getinfo</code> (opening is <code>opening_not_zk</code>)</td></tr><tr><td><code>consensus_path</code></td><td><code>memory_hard_pow</code> on mainnet</td></tr><tr><td><code>throughput_claim</code></td><td><code>none</code></td></tr><tr><td><code>peers=…</code></td><td>Live query only — not a permanent marketing number</td></tr></table>
+<table><tr><th>Field / topic</th><th>Live truth</th></tr><tr><td><code>network_id</code></td><td>From live <code>getinfo</code> only</td></tr><tr><td>Height</td><td>From live <code>getinfo</code> only — <strong>may be <code>0</code></strong></td></tr><tr><td><code>pq_mode</code> / algs</td><td><code>strict</code> / <code>ml-dsa-87</code> + SHA3-512 (confirm via live fields)</td></tr><tr><td><code>privacy_claim</code></td><td>From live <code>getinfo</code> (opening is <code>opening_not_zk</code>)</td></tr><tr><td><code>consensus_path</code></td><td><code>memory_hard_pow</code> on the mainnet profile</td></tr><tr><td><code>throughput_claim</code></td><td><code>none</code></td></tr><tr><td><code>peers=…</code></td><td>Live query only — not a permanent marketing number</td></tr></table>
 <p>No USD ticker (<code>price_usd</code> stays null on the site API).</p>
 <hr>
-<h2 id="12-how-to-join">12. How to join</h2>
+<h2 id="12-how-to-join-after-launch">12. How to join (after launch)</h2>
+<p>Mainnet has not launched and <code>seeds-mainnet.txt</code> is still empty, so these steps are the planned procedure. Today, use the testnet on <a href="https://additionblockchain.com/join/">/join/</a>.</p>
 <ol><li>Read <strong><a href="https://additionblockchain.com/join/">/join/</a></strong> on the site</li><li>Follow <strong><a href="MAINNET_RUNBOOK.md"><code>docs/MAINNET_RUNBOOK.md</code></a></strong> in this repository</li><li>Set <code>ADDITION_PRIVACY_MASTER_KEY</code> (≥32 characters), build <code>additiond</code> from <code>main</code>, then:</li></ol>
 <pre>export ADDITION_PRIVACY_MASTER_KEY=&#x27;replace-with-32-or-more-chars____&#x27;
 export ADDITION_ENABLE_P2P_RPC=1
@@ -147,14 +144,14 @@ export ADDITION_ENABLE_P2P_RPC=1
   --local-rpc-port 8546 \
   --p2p-port 28547 \
   --bootstrap &lt;seed&gt;.onion:28546
-# sync, then getinfo; mine on 127.0.0.1:8546 or public 38546 write allowlist</pre>
+# sync, then getinfo; mine on your own 127.0.0.1:8546</pre>
 <p>Never publish port <code>8546</code>. Auto-mine stays off on mainnet.</p>
 <hr>
 <h2 id="13-contact">13. Contact</h2>
 <p><strong>Email:</strong> <a href="mailto:contact@additionblockchain.com">contact@additionblockchain.com</a></p>
 <p>MIT-licensed software. This whitepaper is engineering documentation, not an audit certificate, not investment advice, and not a token-sale prospectus.</p>
 <hr>
-<p>*Sources: <code>include/addition/config.hpp</code>, <code>src/crypto.cpp</code>, <code>src/chain.cpp</code>, <code>src/privacy.cpp</code>, <code>src/auto_mine.cpp</code>, <code>src/rpc_access.cpp</code>, <code>src/rpc_server.cpp</code>, <code>genesis-mainnet.json</code>, <code>config-mainnet.toml</code>, <code>docs/MAINNET_RUNBOOK.md</code>, <code>docs/ARCHITECTURE.md</code>, <code>docs/WALLET.md</code>, and live RPCs on <code>127.0.0.1:38546</code>.*</p>
+<p>*Sources: <code>include/addition/config.hpp</code>, <code>src/crypto.cpp</code>, <code>src/chain.cpp</code>, <code>src/privacy.cpp</code>, <code>src/auto_mine.cpp</code>, <code>src/rpc_access.cpp</code>, <code>src/rpc_server.cpp</code>, <code>genesis-mainnet.json</code>, <code>config-mainnet.toml</code>, <code>docs/MAINNET_RUNBOOK.md</code>, <code>docs/ARCHITECTURE.md</code>, <code>docs/WALLET.md</code>, <code>docs/ONION_SEEDS.md</code>.*</p>
     <p class="note">Source file in the repository: <a href="https://github.com/ADDAddition/ADDITION/blob/main/docs/whitepaper.md">docs/whitepaper.md</a></p>
   </main>
   <footer id="site-footer"></footer>

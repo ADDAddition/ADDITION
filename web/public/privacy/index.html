@@ -3,69 +3,38 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Privacy — ADDITION</title>
-  <meta name="description" content="Live ADDITION privacy claim: opening_not_zk. SHA3-512 commitment + nullifier opening on ADDITION_MAINNET_V1.">
-  <meta name="theme-color" content="#0b1220">
+  <title>ADDITION privacy model</title>
+  <meta name="description" content="How privacy works in ADDITION: the STARK shielded pool and the transparent opening RPCs, described honestly.">
+  <meta name="theme-color" content="#070b14">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/favicon.ico">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:title" content="ADDITION privacy model">
+  <meta property="og:description" content="How privacy works in ADDITION: the STARK shielded pool and the transparent opening RPCs, described honestly.">
   <meta property="og:image" content="https://additionblockchain.com/og.png">
-  <meta name="twitter:image" content="https://additionblockchain.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="/common.css">
 </head>
 <body>
   <header id="site-header"></header>
-  <div id="live-strip" class="status-strip pending" aria-live="polite">
-    <div class="status-strip-inner">
-      <span id="strip-flag" class="status-flag">…</span>
-      <dl id="strip-cells" class="status-cells"></dl>
-    </div>
-  </div>
-  <main>
-    <section class="product-hero" style="padding-top:1rem;padding-bottom:0.25rem">
-      <p class="eyebrow"><span class="net-badge">MAINNET</span> Live privacy</p>
-      <h1>Opening privacy</h1>
-      <p class="lede">
-        On <code>ADDITION_MAINNET_V1</code>, the live privacy claim is
-        <code>opening_not_zk</code>: SHA3-512 commitment + nullifier opening.
-        The node sees the trapdoor. This is not zero-knowledge and not Monero/Zcash privacy.
-      </p>
+  <main class="page">
+    <section class="hero2">
+      <p class="eyebrow">● Privacy</p>
+      <h1>Privacy model</h1>
+      <p class="lede">ADDITION has two separate privacy paths in the code. Here is what each one actually does.</p>
     </section>
-
-    <section class="panel">
-      <h2>What is live</h2>
-      <ul>
-        <li><code>privacy_claim=opening_not_zk</code> on live <code>getinfo</code> / <code>privacy_status</code></li>
-        <li>Opening RPCs on a home node (loopback write): <code>privacy_note_prepare</code>,
-          <code>privacy_mint_open</code>, <code>privacy_spend_open</code></li>
-        <li>Requires <code>ADDITION_PRIVACY_MASTER_KEY</code> (≥32 chars) on the daemon</li>
-      </ul>
-      <p class="note">
-        Public Pages do not host mint/spend forms — those need your node’s loopback write RPC
-        via <a href="/local/">local tools</a> next to <code>additiond</code>.
-        Confirm the claim on <a href="/status/">network status</a> (live strip includes <code>privacy_claim</code>).
-      </p>
-      <div class="cta-row">
-        <a class="btn btn-primary" href="/status/">Live status</a>
-        <a class="btn btn-secondary" href="/compare/">Compare</a>
-        <a class="btn btn-ghost" href="/local/">Local tools</a>
-      </div>
-    </section>
+    <div class="callout"><strong>Pre-mainnet.</strong> ADDITION mainnet has <em>not</em> launched. The code is public and tested on local and research testnets; there is no live mainnet, no listed coin and no sale.</div>
+    <section class="section"><div class="grid grid-2">
+      <div class="card2"><span class="tag">Shielded pool</span><h3>STARK proofs</h3><p>Shielded notes are spent with STARK proofs and nullifiers, and memos are encrypted. Fully shielded transactions relay through the mempool. Tested on local testnets only.</p></div>
+      <div class="card2"><span class="tag warn">Opening RPCs</span><h3>Not zero-knowledge</h3><p>The older <code>privacy_*_open</code> RPCs use a SHA3-512 commitment plus a nullifier opening. The node sees the secret, which is why <code>getinfo</code> reports <code>privacy_claim=opening_not_zk</code>. Do not treat them as private.</p></div>
+    </div></section>
+    <section class="section"><h2>Network privacy</h2><p class="sub">Peers connect over Tor v3 onion services, and the mainnet profile is onion-only. The wallet UI on this site talks only to your own node on 127.0.0.1.</p></section>
   </main>
   <footer id="site-footer"></footer>
   <script src="/common.js"></script>
   <script src="/chrome.js"></script>
-  <script>
-    (function () {
-      const S = window.AdditionSite;
-      S.rpcCommand("getinfo").then(function (info) {
-        S.renderLiveStrip(info);
-      });
-    }());
-  </script>
 </body>
 </html>

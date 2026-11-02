@@ -9,58 +9,34 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="/common.css">
 </head>
-<body data-title="Docs" data-sub="ADDITION_MAINNET_V1">
+<body data-title="Docs" data-sub="Pre-mainnet">
   <header id="site-header"></header>
-  <main>
-    <div class="banner">
-      <span class="net-badge">MAINNET</span>
-      Public product: <code>ADDITION_MAINNET_V1</code> —
-      P2P <code>&lt;seed&gt;.onion:28546</code>,
-      public RPC <code>127.0.0.1:38546</code> / site <code>/api/rpc</code>
-      (read + write allowlist: createwallet, mine, wallet_send, sign, tx_build).
-      Home-node write: <code>127.0.0.1:8546</code>.
-      Live join: <a href="/join/">/join/</a>.
+  <main class="page">
+    <section class="hero2">
+      <p class="eyebrow">● Pre-mainnet</p>
+      <h1>Documentation</h1>
+      <p class="lede">Guides generated from the repository docs. Mainnet has not launched. Commands target the research testnet unless they say otherwise.</p>
+    </section>
+    <div class="grid">
+      <a class="card2" href="/docs/getting-started/"><h3>Getting started</h3><p>Build additiond and run a testnet node</p></a>
+      <a class="card2" href="/join/"><h3>Run a node</h3><p>Testnet over Tor, seed-file mechanism</p></a>
+      <a class="card2" href="/wallet/"><h3>Wallet</h3><p>Local-only wallet for your own node</p></a>
+      <a class="card2" href="/rpc/"><h3>Public RPC</h3><p>Read-only commands and ports</p></a>
+      <a class="card2" href="/docs/commands/"><h3>Commands</h3><p>RPC command reference</p></a>
+      <a class="card2" href="/docs/architecture/"><h3>Architecture</h3><p>Node components</p></a>
+      <a class="card2" href="/docs/runbook/"><h3>Runbook</h3><p>Operator runbook (pre-mainnet)</p></a>
+      <a class="card2" href="/docs/two-node/"><h3>Two-node runbook</h3><p>Two local processes</p></a>
+      <a class="card2" href="/privacy/"><h3>Privacy</h3><p>Shielded pool vs opening RPCs</p></a>
+      <a class="card2" href="/whitepaper/"><h3>Whitepaper</h3><p>Design and emission</p></a>
+      <a class="card2" href="/compare/"><h3>Specs & compare</h3><p>Parameters from the code</p></a>
     </div>
-    <div class="cards">
-      <a href="/compare/"><strong>Compare</strong>Live ADDITION vs Bitcoin, Ethereum, Solana, Monero</a>
-      <a href="/join/"><strong>Join mainnet</strong>additiond --mainnet, bootstrap &lt;seed&gt;.onion:28546, sync + mine. Public RPC 38546.</a>
-      <a href="/status/"><strong>Status</strong>Live getinfo — height may be 0</a>
-      <a href="/wallet/"><strong>Wallet</strong>Prefer public 38546 write; home-node fallback 127.0.0.1:8546</a>
-      <a href="/privacy/"><strong>Privacy</strong>Live claim opening_not_zk</a>
-      <a href="/rpc/"><strong>Public RPC</strong>/rpc?cmd=getinfo on seed :38546 / site /api/rpc</a>
-      <a href="/docs/getting-started/"><strong>Build and run</strong>liboqs, OpenSSL, additiond, public RPC.</a>
-      <a href="/docs/architecture/"><strong>Architecture</strong>docs/ARCHITECTURE.md</a>
-      <a href="/docs/commands/"><strong>Commands</strong>docs/FINAL_COMMANDS.md</a>
-      <a href="/docs/runbook/"><strong>Mainnet runbook</strong>docs/MAINNET_RUNBOOK.md — public seed, home node, ports.</a>
-      <a href="/whitepaper/"><strong>White paper</strong>Complete technical reference + live getinfo</a>
-      <a href="/download/"><strong>Download</strong>Desktop helper for loopback write</a>
-      <a href="/legal/"><strong>Legal</strong>MIT</a>
-    </div>
-    <section class="panel">
-      <h2>Operator / local</h2>
-      <p class="note">Loopback tools for a node you run. Not mockup product desks on public Pages.</p>
-      <ul>
-        <li><a href="/local/">Local node tools</a> — <code>/local-rpc</code> → <code>8546</code></li>
-        <li><a href="/join/#testnet">Research testnet join</a> — separate chain (<code>28545</code> / <code>38545</code>)</li>
-      </ul>
-    </section>
-    <section class="panel">
-      <h2>Raw markdown</h2>
-      <p>Same copy as <code>text/markdown</code> (no HTML scrape):</p>
-      <ul>
-        <li><a href="/join.md"><code>/join.md</code></a> — join ADDITION mainnet</li>
-        <li><a href="/docs/join.md"><code>/docs/join.md</code></a> — same join copy</li>
-        <li><a href="/docs/wallet.md"><code>/docs/wallet.md</code></a> — mainnet wallet + public 38546 write</li>
-        <li><a href="/docs/testnet-rpc-runbook.md"><code>/docs/testnet-rpc-runbook.md</code></a> — research testnet public-read RPC</li>
-      </ul>
-    </section>
-    <section class="panel">
-      <h2>Source</h2>
-      <p><a class="github" href="https://github.com/ADDAddition/ADDITION">github.com/ADDAddition/ADDITION</a></p>
-    </section>
+    <section class="section"><h2>Plain text</h2><ul>
+      <li><a href="/join.md"><code>/join.md</code></a>: run a testnet node</li>
+      <li><a href="/docs/wallet.md"><code>/docs/wallet.md</code></a>: wallet notes</li>
+    </ul></section>
   </main>
   <footer id="site-footer"></footer>
   <script src="/chrome.js"></script>

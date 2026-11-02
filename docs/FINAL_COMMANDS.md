@@ -120,7 +120,7 @@ Website `PUBLIC_RPC_HTTP` is a Worker secret, not a committed `wrangler.toml` va
 - Strict handshake required before peer message processing:
 	- request: `HELLO|2|<network_id>|<unix_ts>|<nonce>|<peer_pubkey>|<peer_signature>`
 	- response: `HELLO_ACK|2|<network_id>|<unix_ts>|<echo_nonce>|<responder_pubkey>|<responder_signature>`
-	- testnet `network_id` is `ADDITION_TESTNET_V1` (default binary). Public product mainnet is `ADDITION_MAINNET_V1` (`additiond --mainnet`, seed `<seed>.onion:28546` / `38546`).
+	- testnet `network_id` is `ADDITION_TESTNET_V1` (default binary). The mainnet profile (not launched) is `ADDITION_MAINNET_V1` (`additiond --mainnet`, P2P `28546`, read-only public RPC `38546`).
 	- inbound timestamp skew window: ±90s
 	- nonce replay is rejected per peer (rolling anti-replay set)
 	- signatures are validated with PQ verification (`ml-dsa-87`) over the signed handshake body
